@@ -1,22 +1,44 @@
-import { Phone, Menu, X } from "lucide-react";
-import { useState } from "react";
+import { Phone, Menu, X, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { User as SupabaseUser } from "@supabase/supabase-js";
+import { useNavigate } from "react-router-dom";
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [user, setUser] = useState<SupabaseUser | null>(null);
+  const navigate = useNavigate();
 
-  const scrollToSection = (id: string) => {
-    const element = document.getElementById(id);
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const scrollToSection = (sectionId: string) => {
+    const element = document.getElementById(sectionId);
     if (element) {
       element.scrollIntoView({ behavior: "smooth" });
       setIsMenuOpen(false);
     }
   };
 
+  const handleNavigation = (path: string) => {
+    navigate(path);
+    setIsMenuOpen(false);
+  };
+
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center justify-between">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate("/")}>
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
             <Phone className="h-6 w-6 text-primary-foreground" />
           </div>
@@ -26,16 +48,28 @@ const Header = () => {
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-6">
           <button
-            onClick={() => scrollToSection("services")}
+            onClick={() => handleNavigation("/")}
             className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
           >
-            Услуги
+            Главная
           </button>
           <button
-            onClick={() => scrollToSection("about")}
+            onClick={() => handleNavigation("/domofony")}
             className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
           >
-            О компании
+            Домофоны
+          </button>
+          <button
+            onClick={() => handleNavigation("/videonablyudenie")}
+            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Видеонаблюдение
+          </button>
+          <button
+            onClick={() => handleNavigation("/nashi-raboty")}
+            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Наши работы
           </button>
           <button
             onClick={() => scrollToSection("faq")}
@@ -56,12 +90,22 @@ const Header = () => {
             <Phone className="h-4 w-4" />
             +7 (495) 123-45-67
           </a>
-          <Button
-            onClick={() => scrollToSection("contact")}
-            className="hidden md:inline-flex gradient-primary text-primary-foreground hover:opacity-90 transition-opacity"
-          >
-            Заказать звонок
-          </Button>
+          {user ? (
+            <Button
+              onClick={() => navigate("/cabinet")}
+              className="hidden md:inline-flex"
+            >
+              <User className="h-4 w-4 mr-2" />
+              Кабинет
+            </Button>
+          ) : (
+            <Button
+              onClick={() => navigate("/auth")}
+              className="hidden md:inline-flex gradient-primary text-primary-foreground hover:opacity-90 transition-opacity"
+            >
+              Войти
+            </Button>
+          )}
 
           {/* Mobile Menu Button */}
           <Button
@@ -80,16 +124,28 @@ const Header = () => {
         <div className="md:hidden border-t bg-background">
           <nav className="container flex flex-col gap-4 py-4">
             <button
-              onClick={() => scrollToSection("services")}
+              onClick={() => handleNavigation("/")}
               className="text-left text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
             >
-              Услуги
+              Главная
             </button>
             <button
-              onClick={() => scrollToSection("about")}
+              onClick={() => handleNavigation("/domofony")}
               className="text-left text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
             >
-              О компании
+              Домофоны
+            </button>
+            <button
+              onClick={() => handleNavigation("/videonablyudenie")}
+              className="text-left text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Видеонаблюдение
+            </button>
+            <button
+              onClick={() => handleNavigation("/nashi-raboty")}
+              className="text-left text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Наши работы
             </button>
             <button
               onClick={() => scrollToSection("faq")}
@@ -107,6 +163,16 @@ const Header = () => {
               <Phone className="h-4 w-4" />
               +7 (495) 123-45-67
             </a>
+            {user ? (
+              <Button onClick={() => navigate("/cabinet")} className="w-full">
+                <User className="h-4 w-4 mr-2" />
+                Личный кабинет
+              </Button>
+            ) : (
+              <Button onClick={() => navigate("/auth")} className="w-full">
+                Войти
+              </Button>
+            )}
           </nav>
         </div>
       )}

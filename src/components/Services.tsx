@@ -1,4 +1,4 @@
-import { Wrench, Settings, Shield } from "lucide-react";
+import { Wrench, Settings, Shield, Camera, DoorClosed } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import serviceInstall from "@/assets/service-install.jpg";
 import serviceRepair from "@/assets/service-repair.jpg";
@@ -11,6 +11,20 @@ const services = [
     description: "Монтаж и настройка современных домофонных систем с гарантией качества",
     image: serviceInstall,
     features: ["Цифровые и аналоговые системы", "Видеодомофоны", "Система контроля доступа"]
+  },
+  {
+    icon: Camera,
+    title: "Видеонаблюдение",
+    description: "Проектирование и установка систем видеонаблюдения для объектов любой сложности",
+    image: serviceRepair,
+    features: ["IP и аналоговые камеры", "Удаленный доступ", "Облачное хранилище"]
+  },
+  {
+    icon: DoorClosed,
+    title: "Шлагбаумы и СКУД",
+    description: "Установка автоматических шлагбаумов и систем контроля управления доступом",
+    image: serviceMaintenance,
+    features: ["Автоматические шлагбаумы", "RFID-системы", "Интеграция с домофонами"]
   },
   {
     icon: Wrench,
@@ -41,7 +55,7 @@ const Services = () => {
           </p>
         </div>
 
-        <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
           {services.map((service, index) => (
             <Card 
               key={index} 
