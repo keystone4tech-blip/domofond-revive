@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Phone, Mail, MapPin, Clock } from "lucide-react";
+import { Phone, Mail, MapPin, Clock, MessageCircle, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -81,9 +81,9 @@ const Contact = () => {
                 <Phone className="h-6 w-6 text-primary" />
               </div>
               <div>
-                <h3 className="font-semibold mb-1">Телефон</h3>
-                <a href="tel:+74951234567" className="text-muted-foreground hover:text-primary transition-colors">
-                  +7 (495) 123-45-67
+                <h3 className="font-semibold mb-1">Телефон / WhatsApp</h3>
+                <a href="tel:+79034118393" className="text-muted-foreground hover:text-primary transition-colors">
+                  +7 (903) 411-83-93
                 </a>
                 <p className="text-sm text-muted-foreground mt-1">Круглосуточная линия</p>
               </div>
@@ -95,10 +95,25 @@ const Contact = () => {
               </div>
               <div>
                 <h3 className="font-semibold mb-1">Email</h3>
-                <a href="mailto:info@domofondar.ru" className="text-muted-foreground hover:text-primary transition-colors">
-                  info@domofondar.ru
+                <a href="mailto:domofondar@mail.ru" className="text-muted-foreground hover:text-primary transition-colors">
+                  domofondar@mail.ru
                 </a>
                 <p className="text-sm text-muted-foreground mt-1">Ответим в течение часа</p>
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 flex-shrink-0">
+                <Send className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-semibold mb-1">Telegram</h3>
+                <a href="https://t.me/domofondar123" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors block">
+                  @domofondar123
+                </a>
+                <a href="https://t.me/Domofondar_bot" target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-primary transition-colors mt-1 block">
+                  Telegram бот
+                </a>
               </div>
             </div>
 
@@ -108,8 +123,8 @@ const Contact = () => {
               </div>
               <div>
                 <h3 className="font-semibold mb-1">Адрес офиса</h3>
-                <p className="text-muted-foreground">г. Москва, ул. Примерная, д. 1</p>
-                <p className="text-sm text-muted-foreground mt-1">Пн-Пт: 9:00 - 18:00</p>
+                <p className="text-muted-foreground">г. Краснодар, проезд Репина 1</p>
+                <p className="text-sm text-muted-foreground mt-1">2 этаж, офис 134</p>
               </div>
             </div>
 

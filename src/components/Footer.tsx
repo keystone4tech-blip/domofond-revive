@@ -15,7 +15,7 @@ const Footer = () => {
               <span className="text-lg font-bold">Домофондар</span>
             </div>
             <p className="text-sm text-muted-foreground">
-              Профессиональное обслуживание домофонных систем с 2005 года.
+              ООО "Домофондар" - Профессиональное обслуживание домофонных систем с 2005 года.
             </p>
           </div>
 
@@ -66,19 +66,19 @@ const Footer = () => {
             <ul className="space-y-3 text-sm text-muted-foreground">
               <li className="flex items-start gap-2">
                 <Phone className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                <a href="tel:+74951234567" className="hover:text-foreground transition-colors">
-                  +7 (495) 123-45-67
+                <a href="tel:+79034118393" className="hover:text-foreground transition-colors">
+                  +7 (903) 411-83-93
                 </a>
               </li>
               <li className="flex items-start gap-2">
                 <Mail className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                <a href="mailto:info@domofondar.ru" className="hover:text-foreground transition-colors">
-                  info@domofondar.ru
+                <a href="mailto:domofondar@mail.ru" className="hover:text-foreground transition-colors">
+                  domofondar@mail.ru
                 </a>
               </li>
               <li className="flex items-start gap-2">
                 <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                <span>г. Москва, ул. Примерная, д. 1</span>
+                <span>г. Краснодар, проезд Репина 1, 2 этаж, офис 134</span>
               </li>
             </ul>
           </div>

@@ -87,9 +87,9 @@ const Header = () => {
         </nav>
 
         <div className="flex items-center gap-2 sm:gap-3 lg:gap-4">
-          <a href="tel:+74951234567" className="hidden xl:flex items-center gap-2 text-sm font-semibold text-primary whitespace-nowrap">
+          <a href="tel:+79034118393" className="hidden xl:flex items-center gap-2 text-sm font-semibold text-primary whitespace-nowrap">
             <Phone className="h-4 w-4" />
-            +7 (495) 123-45-67
+            +7 (903) 411-83-93
           </a>
           <ThemeToggle />
           {user ? (
@@ -163,9 +163,9 @@ const Header = () => {
             >
               Контакты
             </button>
-            <a href="tel:+74951234567" className="flex items-center gap-2 text-sm font-semibold text-primary py-2 border-t mt-2 pt-3">
+            <a href="tel:+79034118393" className="flex items-center gap-2 text-sm font-semibold text-primary py-2 border-t mt-2 pt-3">
               <Phone className="h-4 w-4" />
-              +7 (495) 123-45-67
+              +7 (903) 411-83-93
             </a>
             {user ? (
               <Button onClick={() => { handleNavigation("/cabinet"); }} className="w-full md:hidden">
