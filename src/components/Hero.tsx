@@ -12,14 +12,14 @@ const Hero = () => {
 
   return (
     <section className="relative overflow-hidden bg-gradient-subtle">
-      <div className="container py-12 md:py-24">
+      <div className="container px-4 py-12 md:py-24">
         <div className="grid gap-8 lg:grid-cols-2 lg:gap-12 items-center">
           <div className="flex flex-col gap-6">
-            <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
+            <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl md:text-5xl lg:text-6xl">
               Профессиональное обслуживание{" "}
               <span className="text-primary">домофонов</span>
             </h1>
-            <p className="text-lg text-muted-foreground md:text-xl">
+            <p className="text-base text-muted-foreground md:text-lg">
               Установка, ремонт и техническое обслуживание домофонных систем любой сложности. 
               Работаем быстро, качественно и с гарантией.
             </p>
@@ -40,11 +40,11 @@ const Hero = () => {
             <div className="flex flex-col sm:flex-row gap-4">
               <Button 
                 size="lg" 
-                className="gradient-primary text-primary-foreground hover:opacity-90 transition-opacity shadow-lg text-base"
+                className="gradient-primary text-primary-foreground hover:opacity-90 transition-opacity shadow-lg text-sm sm:text-base w-full sm:w-auto"
                 onClick={scrollToContact}
               >
                 Заказать звонок
-                <ArrowRight className="ml-2 h-5 w-5" />
+                <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5" />
               </Button>
               <Button 
                 size="lg" 
@@ -53,13 +53,13 @@ const Hero = () => {
                   const element = document.getElementById("services");
                   if (element) element.scrollIntoView({ behavior: "smooth" });
                 }}
-                className="text-base"
+                className="text-sm sm:text-base w-full sm:w-auto"
               >
                 Наши услуги
               </Button>
             </div>
           </div>
-          <div className="relative">
+          <div className="relative mt-8 lg:mt-0">
             <div className="absolute inset-0 bg-gradient-to-tr from-primary/20 to-secondary/20 rounded-2xl blur-3xl" />
             <img
               src={heroImage}

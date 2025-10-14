@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { User as SupabaseUser } from "@supabase/supabase-js";
 import { useNavigate } from "react-router-dom";
+import { ThemeToggle } from "./ThemeToggle";
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -37,16 +38,16 @@ const Header = () => {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-16 items-center justify-between">
+      <div className="container px-4 flex h-16 items-center justify-between">
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate("/")}>
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
-            <Phone className="h-6 w-6 text-primary-foreground" />
+          <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-primary">
+            <Phone className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground" />
           </div>
-          <span className="text-xl font-bold text-foreground">Домофондар</span>
+          <span className="text-lg sm:text-xl font-bold text-foreground">Домофондар</span>
         </div>
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-6">
+        <nav className="hidden lg:flex items-center gap-4 xl:gap-6">
           <button
             onClick={() => handleNavigation("/")}
             className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
@@ -85,23 +86,26 @@ const Header = () => {
           </button>
         </nav>
 
-        <div className="flex items-center gap-4">
-          <a href="tel:+74951234567" className="hidden md:flex items-center gap-2 text-sm font-semibold text-primary">
+        <div className="flex items-center gap-2 sm:gap-3 lg:gap-4">
+          <a href="tel:+74951234567" className="hidden xl:flex items-center gap-2 text-sm font-semibold text-primary whitespace-nowrap">
             <Phone className="h-4 w-4" />
             +7 (495) 123-45-67
           </a>
+          <ThemeToggle />
           {user ? (
             <Button
               onClick={() => navigate("/cabinet")}
               className="hidden md:inline-flex"
+              size="sm"
             >
-              <User className="h-4 w-4 mr-2" />
-              Кабинет
+              <User className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">Кабинет</span>
             </Button>
           ) : (
             <Button
               onClick={() => navigate("/auth")}
               className="hidden md:inline-flex gradient-primary text-primary-foreground hover:opacity-90 transition-opacity"
+              size="sm"
             >
               Войти
             </Button>
@@ -111,65 +115,65 @@ const Header = () => {
           <Button
             variant="ghost"
             size="icon"
-            className="md:hidden"
+            className="lg:hidden"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
           >
-            {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            {isMenuOpen ? <X className="h-5 w-5 sm:h-6 sm:w-6" /> : <Menu className="h-5 w-5 sm:h-6 sm:w-6" />}
           </Button>
         </div>
       </div>
 
       {/* Mobile Menu */}
       {isMenuOpen && (
-        <div className="md:hidden border-t bg-background">
-          <nav className="container flex flex-col gap-4 py-4">
+        <div className="lg:hidden border-t bg-background">
+          <nav className="container px-4 flex flex-col gap-3 py-4">
             <button
               onClick={() => handleNavigation("/")}
-              className="text-left text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+              className="text-left text-sm font-medium text-muted-foreground hover:text-foreground transition-colors py-1"
             >
               Главная
             </button>
             <button
               onClick={() => handleNavigation("/domofony")}
-              className="text-left text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+              className="text-left text-sm font-medium text-muted-foreground hover:text-foreground transition-colors py-1"
             >
               Домофоны
             </button>
             <button
               onClick={() => handleNavigation("/videonablyudenie")}
-              className="text-left text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+              className="text-left text-sm font-medium text-muted-foreground hover:text-foreground transition-colors py-1"
             >
               Видеонаблюдение
             </button>
             <button
               onClick={() => handleNavigation("/nashi-raboty")}
-              className="text-left text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+              className="text-left text-sm font-medium text-muted-foreground hover:text-foreground transition-colors py-1"
             >
               Наши работы
             </button>
             <button
               onClick={() => scrollToSection("faq")}
-              className="text-left text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+              className="text-left text-sm font-medium text-muted-foreground hover:text-foreground transition-colors py-1"
             >
               Вопросы
             </button>
             <button
               onClick={() => scrollToSection("contact")}
-              className="text-left text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+              className="text-left text-sm font-medium text-muted-foreground hover:text-foreground transition-colors py-1"
             >
               Контакты
             </button>
-            <a href="tel:+74951234567" className="flex items-center gap-2 text-sm font-semibold text-primary">
+            <a href="tel:+74951234567" className="flex items-center gap-2 text-sm font-semibold text-primary py-2 border-t mt-2 pt-3">
               <Phone className="h-4 w-4" />
               +7 (495) 123-45-67
             </a>
             {user ? (
-              <Button onClick={() => navigate("/cabinet")} className="w-full">
+              <Button onClick={() => { handleNavigation("/cabinet"); }} className="w-full md:hidden">
                 <User className="h-4 w-4 mr-2" />
                 Личный кабинет
               </Button>
             ) : (
-              <Button onClick={() => navigate("/auth")} className="w-full">
+              <Button onClick={() => { handleNavigation("/auth"); }} className="w-full md:hidden">
                 Войти
               </Button>
             )}
