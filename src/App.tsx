@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Cabinet from "./pages/Cabinet";
+import Admin from "./pages/Admin";
 import Domofony from "./pages/Domofony";
 import Videonablyudenie from "./pages/Videonablyudenie";
 import NashiRaboty from "./pages/NashiRaboty";
@@ -23,6 +24,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/cabinet" element={<Cabinet />} />
+          <Route path="/admin" element={<Admin />} />
           <Route path="/domofony" element={<Domofony />} />
           <Route path="/videonablyudenie" element={<Videonablyudenie />} />
           <Route path="/nashi-raboty" element={<NashiRaboty />} />
