@@ -12,14 +12,16 @@ const Hero = () => {
 
   return (
     <section className="relative overflow-hidden bg-background">
-      {/* Animated security background */}
-      <div className="absolute inset-0 overflow-hidden opacity-10">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary via-secondary to-primary animate-[gradient_8s_ease_infinite] bg-[length:200%_200%]" />
-        <div className="absolute inset-0" style={{
-          backgroundImage: `repeating-linear-gradient(0deg, transparent, transparent 2px, hsl(var(--primary) / 0.1) 2px, hsl(var(--primary) / 0.1) 4px),
-                           repeating-linear-gradient(90deg, transparent, transparent 2px, hsl(var(--primary) / 0.1) 2px, hsl(var(--primary) / 0.1) 4px)`,
-          backgroundSize: '50px 50px',
-          animation: 'slide 20s linear infinite'
+      {/* Animated security background with multiple layers */}
+      <div className="absolute inset-0 overflow-hidden opacity-20">
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-500 via-cyan-500 to-blue-600 animate-gradient bg-[length:200%_200%]" />
+        <div className="absolute top-0 left-0 w-96 h-96 bg-primary/30 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-0 right-0 w-96 h-96 bg-secondary/30 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full" style={{
+          backgroundImage: `repeating-linear-gradient(0deg, transparent, transparent 3px, hsl(var(--primary) / 0.15) 3px, hsl(var(--primary) / 0.15) 6px),
+                           repeating-linear-gradient(90deg, transparent, transparent 3px, hsl(var(--primary) / 0.15) 3px, hsl(var(--primary) / 0.15) 6px)`,
+          backgroundSize: '60px 60px',
+          animation: 'slide 25s linear infinite'
         }} />
       </div>
 
@@ -27,8 +29,8 @@ const Hero = () => {
         <div className="grid gap-8 lg:grid-cols-2 lg:gap-12 items-center">
           <div className="flex flex-col gap-6">
             <div className="space-y-4">
-              <h1 className="text-5xl font-extrabold tracking-tight sm:text-6xl md:text-7xl lg:text-8xl animate-fade-in">
-                ООО <span className="text-primary">"Домофондар"</span>
+              <h1 className="text-6xl font-extrabold tracking-tight sm:text-7xl md:text-8xl lg:text-9xl animate-fade-in bg-gradient-to-r from-primary via-blue-600 to-primary bg-clip-text text-transparent bg-[length:200%_auto] animate-gradient">
+                Домофондар
               </h1>
               <h2 className="text-2xl font-bold tracking-tight sm:text-3xl md:text-4xl lg:text-5xl text-muted-foreground animate-fade-in" style={{ animationDelay: '0.2s' }}>
                 Профессиональное обслуживание домофонов
