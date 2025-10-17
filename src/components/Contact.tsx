@@ -80,12 +80,26 @@ const Contact = () => {
               <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 flex-shrink-0">
                 <Phone className="h-6 w-6 text-primary" />
               </div>
-              <div>
+              <div className="flex-1">
                 <h3 className="font-semibold mb-1">Телефон / WhatsApp</h3>
-                <a href="tel:+79034118393" className="text-muted-foreground hover:text-primary transition-colors">
+                <a href="tel:+79034118393" className="text-muted-foreground hover:text-primary transition-colors block">
                   +7 (903) 411-83-93
                 </a>
                 <p className="text-sm text-muted-foreground mt-1">Круглосуточная линия</p>
+                <div className="flex gap-2 mt-2">
+                  <Button asChild size="sm" variant="outline">
+                    <a href="tel:+79034118393">
+                      <Phone className="h-4 w-4 mr-1" />
+                      Позвонить
+                    </a>
+                  </Button>
+                  <Button asChild size="sm" variant="outline">
+                    <a href="https://wa.me/79034118393" target="_blank" rel="noopener noreferrer">
+                      <MessageCircle className="h-4 w-4 mr-1" />
+                      WhatsApp
+                    </a>
+                  </Button>
+                </div>
               </div>
             </div>
 
@@ -93,12 +107,20 @@ const Contact = () => {
               <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 flex-shrink-0">
                 <Mail className="h-6 w-6 text-primary" />
               </div>
-              <div>
+              <div className="flex-1">
                 <h3 className="font-semibold mb-1">Email</h3>
-                <a href="mailto:domofondar@mail.ru" className="text-muted-foreground hover:text-primary transition-colors">
+                <a href="mailto:domofondar@mail.ru" className="text-muted-foreground hover:text-primary transition-colors block">
                   domofondar@mail.ru
                 </a>
                 <p className="text-sm text-muted-foreground mt-1">Ответим в течение часа</p>
+                <div className="mt-2">
+                  <Button asChild size="sm" variant="outline">
+                    <a href="mailto:domofondar@mail.ru">
+                      <Mail className="h-4 w-4 mr-1" />
+                      Написать
+                    </a>
+                  </Button>
+                </div>
               </div>
             </div>
 
@@ -106,7 +128,7 @@ const Contact = () => {
               <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 flex-shrink-0">
                 <Send className="h-6 w-6 text-primary" />
               </div>
-              <div>
+              <div className="flex-1">
                 <h3 className="font-semibold mb-1">Telegram</h3>
                 <a href="https://t.me/domofondar123" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors block">
                   @domofondar123
@@ -114,6 +136,19 @@ const Contact = () => {
                 <a href="https://t.me/Domofondar_bot" target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-primary transition-colors mt-1 block">
                   Telegram бот
                 </a>
+                <div className="flex gap-2 mt-2">
+                  <Button asChild size="sm" variant="outline">
+                    <a href="https://t.me/domofondar123" target="_blank" rel="noopener noreferrer">
+                      <Send className="h-4 w-4 mr-1" />
+                      Открыть чат
+                    </a>
+                  </Button>
+                  <Button asChild size="sm" variant="outline">
+                    <a href="https://t.me/Domofondar_bot" target="_blank" rel="noopener noreferrer">
+                      Telegram бот
+                    </a>
+                  </Button>
+                </div>
               </div>
             </div>
 
@@ -121,10 +156,18 @@ const Contact = () => {
               <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 flex-shrink-0">
                 <MapPin className="h-6 w-6 text-primary" />
               </div>
-              <div>
+              <div className="flex-1">
                 <h3 className="font-semibold mb-1">Адрес офиса</h3>
                 <p className="text-muted-foreground">г. Краснодар, проезд Репина 1</p>
                 <p className="text-sm text-muted-foreground mt-1">2 этаж, офис 134</p>
+                <div className="mt-2">
+                  <Button asChild size="sm" variant="outline">
+                    <a href="https://yandex.ru/maps/?text=Краснодар, проезд Репина 1" target="_blank" rel="noopener noreferrer">
+                      <MapPin className="h-4 w-4 mr-1" />
+                      Посмотреть на карте
+                    </a>
+                  </Button>
+                </div>
               </div>
             </div>
 
@@ -134,8 +177,8 @@ const Contact = () => {
               </div>
               <div>
                 <h3 className="font-semibold mb-1">Режим работы</h3>
-                <p className="text-muted-foreground">Аварийная служба: 24/7</p>
-                <p className="text-sm text-muted-foreground mt-1">Выезд мастера в любое время</p>
+                <p className="text-muted-foreground">Пн-Пт: 9:00 - 17:00</p>
+                <p className="text-sm text-muted-foreground mt-1">Аварийная служба: 24/7</p>
               </div>
             </div>
           </div>
