@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Plus, Edit, Trash2, X } from "lucide-react";
 
@@ -16,6 +17,8 @@ interface PremiumBlock {
   content: {
     id: string;
     badge_text: string;
+    badge_color: string;
+    badge_icon: string;
     title: string;
     description: string;
     features: Array<{
@@ -35,6 +38,8 @@ interface PremiumBlock {
 const defaultContent = {
   id: "",
   badge_text: "Премиум предложение",
+  badge_color: "primary",
+  badge_icon: "Star",
   title: "Умный видеодомофон нового поколения",
   description: "Революционная система безопасности с искусственным интеллектом для вашего дома",
   features: [
@@ -49,6 +54,19 @@ const defaultContent = {
   benefits: ["Гарантия 3 года", "Бесплатное обслуживание 1 год"],
   disclaimer: "* Окончательная стоимость зависит от конфигурации и особенностей объекта"
 };
+
+const availableIcons = [
+  "Star", "ScanFace", "Smartphone", "Video", "HardDrive", "Shield", 
+  "Lock", "Camera", "Bell", "Home", "Zap", "Wifi", "Clock", "Award"
+];
+
+const availableColors = [
+  { name: "Синий (Primary)", value: "primary" },
+  { name: "Зелёный (Success)", value: "success" },
+  { name: "Красный (Destructive)", value: "destructive" },
+  { name: "Оранжевый (Warning)", value: "warning" },
+  { name: "Фиолетовый (Accent)", value: "accent" },
+];
 
 export const PremiumBlocksManager = () => {
   const [blocks, setBlocks] = useState<PremiumBlock[]>([]);
@@ -261,6 +279,46 @@ export const PremiumBlocksManager = () => {
                 />
               </div>
 
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="badge_icon">Иконка бейджа</Label>
+                  <Select
+                    value={formData.content.badge_icon}
+                    onValueChange={(value) => updateContent("badge_icon", value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableIcons.map((icon) => (
+                        <SelectItem key={icon} value={icon}>
+                          {icon}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="badge_color">Цвет бейджа</Label>
+                  <Select
+                    value={formData.content.badge_color}
+                    onValueChange={(value) => updateContent("badge_color", value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableColors.map((color) => (
+                        <SelectItem key={color.value} value={color.value}>
+                          {color.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
               <div>
                 <Label htmlFor="title">Заголовок</Label>
                 <Input
@@ -298,11 +356,21 @@ export const PremiumBlocksManager = () => {
                             <X className="h-4 w-4" />
                           </Button>
                         </div>
-                        <Input
-                          placeholder="Иконка (ScanFace, Smartphone, Video, HardDrive)"
+                        <Select
                           value={feature.icon}
-                          onChange={(e) => updateFeature(index, "icon", e.target.value)}
-                        />
+                          onValueChange={(value) => updateFeature(index, "icon", value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Выберите иконку" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableIcons.map((icon) => (
+                              <SelectItem key={icon} value={icon}>
+                                {icon}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <Input
                           placeholder="Название"
                           value={feature.title}

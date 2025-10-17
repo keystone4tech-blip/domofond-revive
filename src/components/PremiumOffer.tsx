@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Star, Smartphone, Video, HardDrive, ScanFace } from "lucide-react";
+import { Star, Smartphone, Video, HardDrive, ScanFace, Shield, Lock, Camera, Bell, Home, Zap, Wifi, Clock, Award } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,6 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 interface PremiumBlock {
   id: string;
   badge_text: string;
+  badge_color: string;
+  badge_icon: string;
   title: string;
   description: string;
   features: Array<{
@@ -22,10 +24,28 @@ interface PremiumBlock {
 }
 
 const iconMap: Record<string, any> = {
+  Star,
   ScanFace,
   Smartphone,
   Video,
   HardDrive,
+  Shield,
+  Lock,
+  Camera,
+  Bell,
+  Home,
+  Zap,
+  Wifi,
+  Clock,
+  Award,
+};
+
+const colorMap: Record<string, string> = {
+  primary: "bg-primary/10 text-primary border-primary/20",
+  success: "bg-green-500/10 text-green-600 border-green-500/20",
+  destructive: "bg-destructive/10 text-destructive border-destructive/20",
+  warning: "bg-orange-500/10 text-orange-600 border-orange-500/20",
+  accent: "bg-purple-500/10 text-purple-600 border-purple-500/20",
 };
 
 const PremiumOffer = () => {
@@ -68,80 +88,82 @@ const PremiumOffer = () => {
   if (loading || blocks.length === 0) return null;
 
   return (
-    <>
-      {blocks.map((block) => (
-        <section key={block.id} className="py-16 md:py-24 bg-gradient-to-br from-primary/10 via-background to-primary/5">
-          <div className="container px-4">
-            <div className="text-center mb-12">
-              <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-3 sm:px-4 py-2 rounded-full mb-4">
-                <Star className="h-4 w-4 sm:h-5 sm:w-5 fill-current" />
-                <span className="text-sm sm:text-base font-semibold">{block.badge_text}</span>
-              </div>
-              <h2 className="text-2xl font-bold tracking-tight sm:text-3xl md:text-4xl lg:text-5xl mb-4">
-                {block.title}
-              </h2>
-              <p className="text-base sm:text-lg text-muted-foreground max-w-3xl mx-auto">
-                {block.description}
-              </p>
-            </div>
-
-            <div className="max-w-5xl mx-auto">
-              <Card className="overflow-hidden border-2 border-primary/20 shadow-2xl">
-                <CardContent className="p-4 sm:p-6 md:p-8 lg:p-12">
-                  <div className="grid md:grid-cols-2 gap-6 md:gap-8 items-center">
-                    <div>
-                      <h3 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Возможности системы</h3>
-                      <div className="space-y-3 sm:space-y-4">
-                        {block.features.map((feature, index) => {
-                          const IconComponent = iconMap[feature.icon] || Star;
-                          return (
-                            <div key={index} className="flex items-start gap-3 sm:gap-4">
-                              <div className="flex h-10 w-10 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                                <IconComponent className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-                              </div>
-                              <div>
-                                <h4 className="font-semibold mb-1 text-sm sm:text-base">{feature.title}</h4>
-                                <p className="text-xs sm:text-sm text-muted-foreground">
-                                  {feature.description}
-                                </p>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
+    <section className="py-16 md:py-24 bg-gradient-to-br from-primary/10 via-background to-primary/5">
+      <div className="container px-4">
+        <div className={`grid gap-6 ${
+          blocks.length === 1 ? "max-w-5xl mx-auto" :
+          blocks.length === 2 ? "md:grid-cols-2 max-w-6xl mx-auto" :
+          blocks.length === 3 ? "md:grid-cols-2 lg:grid-cols-3 max-w-7xl mx-auto" :
+          "md:grid-cols-2 lg:grid-cols-4 max-w-7xl mx-auto"
+        }`}>
+          {blocks.map((block) => {
+            const BadgeIcon = iconMap[block.badge_icon] || Star;
+            const badgeColorClass = colorMap[block.badge_color] || colorMap.primary;
+            
+            return (
+              <Card key={block.id} className="overflow-hidden border-2 border-primary/20 shadow-xl hover:shadow-2xl transition-shadow">
+                <CardContent className="p-6">
+                  <div className="text-center mb-6">
+                    <div className={`inline-flex items-center gap-2 px-3 py-2 rounded-full mb-4 border ${badgeColorClass}`}>
+                      <BadgeIcon className="h-4 w-4 fill-current" />
+                      <span className="text-sm font-semibold">{block.badge_text}</span>
                     </div>
-
-                    <div className="space-y-4 sm:space-y-6 mt-6 md:mt-0">
-                      <div className="bg-primary/5 rounded-2xl p-4 sm:p-6 border border-primary/20">
-                        <div className="text-center mb-4">
-                          <div className="text-3xl sm:text-4xl font-bold text-primary mb-2">{block.price}</div>
-                          <p className="text-xs sm:text-sm text-muted-foreground">{block.price_description}</p>
-                        </div>
-                        <ul className="space-y-2 mb-4 sm:mb-6 text-xs sm:text-sm">
-                          {block.benefits.map((benefit, index) => (
-                            <li key={index} className="flex items-center gap-2">
-                              <span className="text-primary flex-shrink-0">✓</span>
-                              <span>{benefit}</span>
-                            </li>
-                          ))}
-                        </ul>
-                        <Button onClick={scrollToContact} className="w-full" size="lg">
-                          Получить консультацию
-                        </Button>
-                      </div>
-                      
-                      <p className="text-xs text-center text-muted-foreground px-2">
-                        {block.disclaimer}
-                      </p>
-                    </div>
+                    <h3 className="text-xl font-bold mb-2">
+                      {block.title}
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      {block.description}
+                    </p>
                   </div>
+
+                  <div className="space-y-4 mb-6">
+                    <h4 className="font-semibold text-sm">Возможности:</h4>
+                    {block.features.map((feature, index) => {
+                      const IconComponent = iconMap[feature.icon] || Star;
+                      return (
+                        <div key={index} className="flex items-start gap-3">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                            <IconComponent className="h-4 w-4 text-primary" />
+                          </div>
+                          <div>
+                            <h5 className="font-semibold text-sm mb-1">{feature.title}</h5>
+                            <p className="text-xs text-muted-foreground">
+                              {feature.description}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="bg-primary/5 rounded-xl p-4 border border-primary/20 mb-4">
+                    <div className="text-center mb-3">
+                      <div className="text-2xl font-bold text-primary mb-1">{block.price}</div>
+                      <p className="text-xs text-muted-foreground">{block.price_description}</p>
+                    </div>
+                    <ul className="space-y-2 mb-4 text-xs">
+                      {block.benefits.map((benefit, index) => (
+                        <li key={index} className="flex items-center gap-2">
+                          <span className="text-primary flex-shrink-0">✓</span>
+                          <span>{benefit}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <Button onClick={scrollToContact} className="w-full" size="sm">
+                      Консультация
+                    </Button>
+                  </div>
+                  
+                  <p className="text-xs text-center text-muted-foreground">
+                    {block.disclaimer}
+                  </p>
                 </CardContent>
               </Card>
-            </div>
-          </div>
-        </section>
-      ))}
-    </>
+            );
+          })}
+        </div>
+      </div>
+    </section>
   );
 };
 
