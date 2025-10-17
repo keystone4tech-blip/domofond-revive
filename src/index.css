@@ -150,4 +150,32 @@ All colors MUST be HSL.
   .transition-fast {
     transition: var(--transition-fast);
   }
+
+  @keyframes glow {
+    0%, 100% {
+      opacity: 0.5;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.8;
+      transform: scale(1.1);
+    }
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% {
+      box-shadow: 0 0 20px rgba(250, 204, 21, 0.3);
+    }
+    50% {
+      box-shadow: 0 0 30px rgba(250, 204, 21, 0.5);
+    }
+  }
+
+  .animate-glow {
+    animation: glow 3s ease-in-out infinite;
+  }
+
+  .animate-pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
 }
