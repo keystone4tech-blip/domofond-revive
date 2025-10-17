@@ -91,8 +91,8 @@ export const CommentsSection = ({ contentType, contentId }: CommentsSectionProps
       setNewComment("");
       fetchComments();
       toast({
-        title: "Успешно",
-        description: "Комментарий добавлен",
+        title: "Комментарий отправлен",
+        description: "Ваш комментарий скоро появится после модерации",
       });
     } else {
       toast({

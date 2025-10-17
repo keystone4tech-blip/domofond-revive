@@ -20,6 +20,7 @@ export type Database = {
           content_type: string
           created_at: string
           id: string
+          is_approved: boolean | null
           text: string
           updated_at: string
           user_id: string
@@ -29,6 +30,7 @@ export type Database = {
           content_type: string
           created_at?: string
           id?: string
+          is_approved?: boolean | null
           text: string
           updated_at?: string
           user_id: string
@@ -38,6 +40,7 @@ export type Database = {
           content_type?: string
           created_at?: string
           id?: string
+          is_approved?: boolean | null
           text?: string
           updated_at?: string
           user_id?: string

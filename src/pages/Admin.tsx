@@ -10,6 +10,7 @@ import { NewsManager } from "@/components/admin/NewsManager";
 import { BlocksManager } from "@/components/admin/BlocksManager";
 import { PremiumBlocksManager } from "@/components/admin/PremiumBlocksManager";
 import { SiteStats } from "@/components/admin/SiteStats";
+import { CommentsManager } from "@/components/admin/CommentsManager";
 import { Loader2, Shield } from "lucide-react";
 
 const Admin = () => {
@@ -84,11 +85,12 @@ const Admin = () => {
         </div>
 
         <Tabs defaultValue="stats" className="w-full">
-          <TabsList className="grid w-full grid-cols-5 mb-8">
+          <TabsList className="grid w-full grid-cols-6 mb-8">
             <TabsTrigger value="stats">Статистика</TabsTrigger>
             <TabsTrigger value="promotions">Акции</TabsTrigger>
             <TabsTrigger value="news">Новости</TabsTrigger>
             <TabsTrigger value="premium">Премиум</TabsTrigger>
+            <TabsTrigger value="comments">Комментарии</TabsTrigger>
             <TabsTrigger value="blocks">Блоки</TabsTrigger>
           </TabsList>
 
@@ -106,6 +108,10 @@ const Admin = () => {
 
           <TabsContent value="premium">
             <PremiumBlocksManager />
+          </TabsContent>
+
+          <TabsContent value="comments">
+            <CommentsManager />
           </TabsContent>
 
           <TabsContent value="blocks">
