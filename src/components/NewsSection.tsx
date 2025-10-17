@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Newspaper, Calendar } from "lucide-react";
+import { LikesSection } from "./LikesSection";
+import { CommentsSection } from "./CommentsSection";
 
 interface News {
   id: string;
@@ -72,6 +73,10 @@ export const NewsSection = () => {
                   <p className="text-muted-foreground mb-4">{item.excerpt}</p>
                 )}
               </CardContent>
+              <CardFooter className="flex gap-2 border-t pt-4">
+                <LikesSection contentType="news" contentId={item.id} />
+                <CommentsSection contentType="news" contentId={item.id} />
+              </CardFooter>
             </Card>
           ))}
         </div>
