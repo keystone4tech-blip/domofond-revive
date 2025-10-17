@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { MessageCircle, Send, Trash2 } from "lucide-react";
+import { MessageCircle, Send, Trash2, LogIn } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -33,6 +34,7 @@ export const CommentsSection = ({ contentType, contentId }: CommentsSectionProps
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     checkAuth();
@@ -146,10 +148,20 @@ export const CommentsSection = ({ contentType, contentId }: CommentsSectionProps
           )}
 
           {!isAuthenticated && (
-            <div className="p-4 bg-muted rounded-lg text-center">
+            <div className="p-6 bg-muted rounded-lg text-center space-y-3">
               <p className="text-muted-foreground">
                 Войдите в систему, чтобы оставить комментарий
               </p>
+              <Button 
+                onClick={() => {
+                  setIsOpen(false);
+                  navigate("/auth");
+                }} 
+                className="gap-2"
+              >
+                <LogIn className="h-4 w-4" />
+                Войти в систему
+              </Button>
             </div>
           )}
 
