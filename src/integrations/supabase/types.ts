@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      clients: {
+        Row: {
+          address: string
+          contact_person: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          location: Json | null
+          name: string
+          notes: string | null
+          phone: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          address: string
+          contact_person?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          location?: Json | null
+          name: string
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string
+          contact_person?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          location?: Json | null
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       comments: {
         Row: {
           content_id: string
@@ -47,6 +86,45 @@ export type Database = {
         }
         Relationships: []
       }
+      employees: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          current_location: Json | null
+          full_name: string
+          id: string
+          is_active: boolean | null
+          phone: string | null
+          position: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          current_location?: Json | null
+          full_name: string
+          id?: string
+          is_active?: boolean | null
+          phone?: string | null
+          position?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          current_location?: Json | null
+          full_name?: string
+          id?: string
+          is_active?: boolean | null
+          phone?: string | null
+          position?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       likes: {
         Row: {
           content_id: string
@@ -73,6 +151,35 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: []
+      }
+      location_history: {
+        Row: {
+          employee_id: string
+          id: string
+          location: Json
+          recorded_at: string | null
+        }
+        Insert: {
+          employee_id: string
+          id?: string
+          location: Json
+          recorded_at?: string | null
+        }
+        Update: {
+          employee_id?: string
+          id?: string
+          location?: Json
+          recorded_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "location_history_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       news: {
         Row: {
@@ -221,6 +328,151 @@ export type Database = {
         }
         Relationships: []
       }
+      task_checklists: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          id: string
+          is_completed: boolean | null
+          item_text: string
+          order_index: number | null
+          task_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          is_completed?: boolean | null
+          item_text: string
+          order_index?: number | null
+          task_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          is_completed?: boolean | null
+          item_text?: string
+          order_index?: number | null
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_checklists_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_photos: {
+        Row: {
+          caption: string | null
+          created_at: string | null
+          id: string
+          location: Json | null
+          photo_url: string
+          task_id: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          caption?: string | null
+          created_at?: string | null
+          id?: string
+          location?: Json | null
+          photo_url: string
+          task_id: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          caption?: string | null
+          created_at?: string | null
+          id?: string
+          location?: Json | null
+          photo_url?: string
+          task_id?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_photos_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tasks: {
+        Row: {
+          assigned_by: string | null
+          assigned_to: string | null
+          client_id: string | null
+          completed_at: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          notes: string | null
+          priority: string | null
+          scheduled_date: string | null
+          scheduled_time_end: string | null
+          scheduled_time_start: string | null
+          status: string
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_by?: string | null
+          assigned_to?: string | null
+          client_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          notes?: string | null
+          priority?: string | null
+          scheduled_date?: string | null
+          scheduled_time_end?: string | null
+          scheduled_time_start?: string | null
+          status?: string
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_by?: string | null
+          assigned_to?: string | null
+          client_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          notes?: string | null
+          priority?: string | null
+          scheduled_date?: string | null
+          scheduled_time_end?: string | null
+          scheduled_time_start?: string | null
+          status?: string
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -247,6 +499,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      has_fsm_role: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -254,9 +507,16 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_manager: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
-      app_role: "admin" | "user"
+      app_role:
+        | "admin"
+        | "user"
+        | "director"
+        | "dispatcher"
+        | "master"
+        | "engineer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -384,7 +644,14 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "user"],
+      app_role: [
+        "admin",
+        "user",
+        "director",
+        "dispatcher",
+        "master",
+        "engineer",
+      ],
     },
   },
 } as const
