@@ -1,27 +1,47 @@
-import { Phone, Menu, X, User } from "lucide-react";
+import { Phone, Menu, X, User, LayoutDashboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { User as SupabaseUser } from "@supabase/supabase-js";
 import { useNavigate } from "react-router-dom";
 import { ThemeToggle } from "./ThemeToggle";
+import { AppRole } from "@/hooks/useUserRole";
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [user, setUser] = useState<SupabaseUser | null>(null);
+  const [userRoles, setUserRoles] = useState<AppRole[]>([]);
   const navigate = useNavigate();
 
   useEffect(() => {
+    const fetchRoles = async (userId: string) => {
+      const { data } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userId);
+      setUserRoles((data || []).map((r) => r.role as AppRole));
+    };
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
+      if (session?.user) fetchRoles(session.user.id);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
+      if (session?.user) {
+        setTimeout(() => fetchRoles(session.user.id), 0);
+      } else {
+        setUserRoles([]);
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const isFSMUser = userRoles.some((r) => 
+    ["admin", "director", "dispatcher", "master", "engineer"].includes(r)
+  );
 
   const scrollToSection = (sectionId: string) => {
     const element = document.getElementById(sectionId);
@@ -93,14 +113,25 @@ const Header = () => {
           </a>
           <ThemeToggle />
           {user ? (
-            <Button
-              onClick={() => navigate("/cabinet")}
-              className="hidden md:inline-flex"
-              size="sm"
-            >
-              <User className="h-4 w-4 md:mr-2" />
-              <span className="hidden md:inline">Кабинет</span>
-            </Button>
+            <div className="hidden md:flex items-center gap-2">
+              {isFSMUser && (
+                <Button
+                  onClick={() => navigate("/fsm")}
+                  variant="outline"
+                  size="sm"
+                >
+                  <LayoutDashboard className="h-4 w-4 md:mr-2" />
+                  <span className="hidden lg:inline">FSM</span>
+                </Button>
+              )}
+              <Button
+                onClick={() => navigate("/cabinet")}
+                size="sm"
+              >
+                <User className="h-4 w-4 md:mr-2" />
+                <span className="hidden lg:inline">Кабинет</span>
+              </Button>
+            </div>
           ) : (
             <Button
               onClick={() => navigate("/auth")}
@@ -168,10 +199,18 @@ const Header = () => {
               +7 (903) 411-83-93
             </a>
             {user ? (
-              <Button onClick={() => { handleNavigation("/cabinet"); }} className="w-full md:hidden">
-                <User className="h-4 w-4 mr-2" />
-                Личный кабинет
-              </Button>
+              <div className="flex flex-col gap-2 md:hidden">
+                {isFSMUser && (
+                  <Button variant="outline" onClick={() => { handleNavigation("/fsm"); }} className="w-full">
+                    <LayoutDashboard className="h-4 w-4 mr-2" />
+                    FSM Система
+                  </Button>
+                )}
+                <Button onClick={() => { handleNavigation("/cabinet"); }} className="w-full">
+                  <User className="h-4 w-4 mr-2" />
+                  Личный кабинет
+                </Button>
+              </div>
             ) : (
               <Button onClick={() => { handleNavigation("/auth"); }} className="w-full md:hidden">
                 Войти
