@@ -70,22 +70,36 @@ const EmployeesManager = () => {
 
   const createEmployeeMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
+      // Используем admin API через edge function или создаем через signUp
+      // Сохраняем текущую сессию
+      const { data: sessionData } = await supabase.auth.getSession();
+      const currentSession = sessionData.session;
+
       // Создаем пользователя через Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
         options: {
           data: { full_name: data.full_name },
-          emailRedirectTo: `${window.location.origin}/`,
         },
       });
 
       if (authError) throw authError;
       if (!authData.user) throw new Error("Не удалось создать пользователя");
 
+      const newUserId = authData.user.id;
+
+      // Восстанавливаем сессию админа
+      if (currentSession) {
+        await supabase.auth.setSession({
+          access_token: currentSession.access_token,
+          refresh_token: currentSession.refresh_token,
+        });
+      }
+
       // Создаем запись сотрудника
       const { error: empError } = await supabase.from("employees").insert({
-        user_id: authData.user.id,
+        user_id: newUserId,
         full_name: data.full_name,
         phone: data.phone || null,
         position: data.position || null,
@@ -95,13 +109,13 @@ const EmployeesManager = () => {
 
       // Назначаем роль
       const { error: roleError } = await supabase.from("user_roles").insert({
-        user_id: authData.user.id,
+        user_id: newUserId,
         role: data.role,
       });
 
       if (roleError) throw roleError;
 
-      return authData.user;
+      return { id: newUserId };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });

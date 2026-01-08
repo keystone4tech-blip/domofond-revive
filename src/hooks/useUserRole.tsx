@@ -10,6 +10,7 @@ interface UseUserRoleResult {
   isLoading: boolean;
   isManager: boolean;
   isFSMUser: boolean;
+  isAdmin: boolean;
   hasRole: (role: AppRole) => boolean;
 }
 
@@ -71,6 +72,8 @@ export const useUserRole = (): UseUserRoleResult => {
   const isFSMUser = roles.some((r) => 
     ["admin", "director", "dispatcher", "master", "engineer"].includes(r)
   );
+  
+  const isAdmin = roles.includes("admin");
 
   return {
     user,
@@ -78,6 +81,7 @@ export const useUserRole = (): UseUserRoleResult => {
     isLoading,
     isManager,
     isFSMUser,
+    isAdmin,
     hasRole,
   };
 };
