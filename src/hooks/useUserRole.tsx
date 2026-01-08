@@ -22,17 +22,22 @@ export const useUserRole = (): UseUserRoleResult => {
   useEffect(() => {
     const fetchUserRoles = async (userId: string) => {
       try {
+        console.log("Fetching roles for user:", userId);
         const { data, error } = await supabase
           .from("user_roles")
           .select("role")
           .eq("user_id", userId);
+
+        console.log("Roles response:", data, error);
 
         if (error) {
           console.error("Error fetching roles:", error);
           return;
         }
 
-        setRoles((data || []).map((r) => r.role as AppRole));
+        const rolesList = (data || []).map((r) => r.role as AppRole);
+        console.log("Setting roles:", rolesList);
+        setRoles(rolesList);
       } catch (err) {
         console.error("Error:", err);
       }
