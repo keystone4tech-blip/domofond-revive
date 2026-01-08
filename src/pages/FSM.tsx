@@ -27,6 +27,8 @@ const FSM = () => {
   const { user, isFSMUser, isManager, isLoading, roles } = useUserRole();
 
   useEffect(() => {
+    console.log("FSM page check - isLoading:", isLoading, "user:", !!user, "isFSMUser:", isFSMUser, "roles:", roles);
+    
     if (!isLoading) {
       if (!user) {
         toast({
@@ -35,7 +37,8 @@ const FSM = () => {
           variant: "destructive",
         });
         navigate("/auth");
-      } else if (!isFSMUser) {
+      } else if (!isFSMUser && roles.length > 0) {
+        // Только если роли загружены, но FSM роли нет
         toast({
           title: "Доступ запрещен",
           description: "У вас нет прав для доступа к FSM системе",
@@ -44,7 +47,7 @@ const FSM = () => {
         navigate("/");
       }
     }
-  }, [user, isFSMUser, isLoading, navigate, toast]);
+  }, [user, isFSMUser, isLoading, roles, navigate, toast]);
 
   if (isLoading) {
     return (
