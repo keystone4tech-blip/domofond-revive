@@ -33,9 +33,12 @@ interface Task {
   scheduled_time_end: string | null;
   client_id: string | null;
   assigned_to: string | null;
+  accepted_by?: string | null;
+  accepted_at?: string | null;
   created_at: string;
   clients: { id: string; name: string; address: string } | null;
-  employees: { id: string; full_name: string } | null;
+  assigned_employee?: { id: string; full_name: string } | null;
+  accepted_employee?: { id: string; full_name: string } | null;
 }
 
 interface TaskDetailsProps {

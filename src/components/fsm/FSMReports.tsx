@@ -22,8 +22,17 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { BarChart3, Download, Loader2, TrendingUp, TrendingDown, Minus } from "lucide-react";
-import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
-import { ru } from "date-fns/locale";
+import { format, startOfMonth, endOfMonth } from "date-fns";
+
+interface TaskWithEmployee {
+  id: string;
+  status: string;
+  priority: string;
+  created_at: string;
+  completed_at: string | null;
+  assigned_to: string | null;
+  assigned_employee: { id: string; full_name: string } | null;
+}
 
 const FSMReports = () => {
   const [dateFrom, setDateFrom] = useState(
@@ -57,7 +66,7 @@ const FSMReports = () => {
           created_at,
           completed_at,
           assigned_to,
-          employees (id, full_name)
+          assigned_employee:employees!tasks_assigned_to_fkey (id, full_name)
         `)
         .gte("created_at", `${dateFrom}T00:00:00`)
         .lte("created_at", `${dateTo}T23:59:59`);
@@ -70,7 +79,7 @@ const FSMReports = () => {
       if (error) throw error;
 
       // Агрегация данных
-      const tasks = data || [];
+      const tasks = (data || []) as TaskWithEmployee[];
       const totalTasks = tasks.length;
       const completedTasks = tasks.filter((t) => t.status === "completed").length;
       const cancelledTasks = tasks.filter((t) => t.status === "cancelled").length;
@@ -86,9 +95,9 @@ const FSMReports = () => {
       }> = {};
 
       tasks.forEach((task) => {
-        if (task.employees) {
-          const empId = (task.employees as { id: string; full_name: string }).id;
-          const empName = (task.employees as { id: string; full_name: string }).full_name;
+        if (task.assigned_employee) {
+          const empId = task.assigned_employee.id;
+          const empName = task.assigned_employee.full_name;
           
           if (!employeeStats[empId]) {
             employeeStats[empId] = { name: empName, total: 0, completed: 0, inProgress: 0 };
