@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Edit, Trash2, Loader2, CheckCircle2, Play, Eye } from "lucide-react";
+import { Plus, Edit, Trash2, Loader2, CheckCircle2, Play, Eye, HandMetal } from "lucide-react";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 import TaskDetails from "./TaskDetails";
@@ -38,9 +38,12 @@ interface Task {
   scheduled_time_end: string | null;
   client_id: string | null;
   assigned_to: string | null;
+  accepted_by: string | null;
+  accepted_at: string | null;
   created_at: string;
   clients: { id: string; name: string; address: string } | null;
-  employees: { id: string; full_name: string } | null;
+  assigned_employee: { id: string; full_name: string } | null;
+  accepted_employee: { id: string; full_name: string } | null;
 }
 
 interface TasksManagerProps {
@@ -73,7 +76,8 @@ const TasksManager = ({ isManager }: TasksManagerProps) => {
         .select(`
           *,
           clients (id, name, address),
-          employees (id, full_name)
+          assigned_employee:employees!tasks_assigned_to_fkey (id, full_name),
+          accepted_employee:employees!tasks_accepted_by_fkey (id, full_name)
         `)
         .order("created_at", { ascending: false });
 
@@ -173,6 +177,41 @@ const TasksManager = ({ isManager }: TasksManagerProps) => {
       toast({ title: "Задача обновлена" });
       setEditingTask(null);
       setIsDialogOpen(false);
+    },
+  });
+
+  // Принять задачу - кнопка для сотрудников
+  const acceptTaskMutation = useMutation({
+    mutationFn: async (taskId: string) => {
+      // Получаем employee_id текущего пользователя
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error("Не авторизован");
+
+      const { data: employee, error: empError } = await supabase
+        .from("employees")
+        .select("id")
+        .eq("user_id", userData.user.id)
+        .single();
+
+      if (empError || !employee) throw new Error("Сотрудник не найден");
+
+      const { error } = await supabase
+        .from("tasks")
+        .update({
+          status: "in_progress",
+          accepted_by: employee.id,
+          accepted_at: new Date().toISOString(),
+        })
+        .eq("id", taskId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      toast({ title: "Заявка принята в работу" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Ошибка", description: error.message, variant: "destructive" });
     },
   });
 
@@ -468,8 +507,8 @@ const TasksManager = ({ isManager }: TasksManagerProps) => {
                       {task.clients?.name && (
                         <span className="mr-3">📍 {task.clients.name}</span>
                       )}
-                      {task.employees?.full_name && (
-                        <span className="mr-3">👤 {task.employees.full_name}</span>
+                      {task.assigned_employee?.full_name && (
+                        <span className="mr-3">👤 {task.assigned_employee.full_name}</span>
                       )}
                       {task.scheduled_date && (
                         <span>
@@ -478,6 +517,11 @@ const TasksManager = ({ isManager }: TasksManagerProps) => {
                         </span>
                       )}
                     </div>
+                    {task.accepted_employee && task.accepted_at && (
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        ✅ Принял: {task.accepted_employee.full_name} • {format(new Date(task.accepted_at), "dd.MM.yyyy HH:mm")}
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-1">
                     <Button
@@ -487,13 +531,21 @@ const TasksManager = ({ isManager }: TasksManagerProps) => {
                     >
                       <Eye className="h-4 w-4" />
                     </Button>
-                    {task.status === "assigned" && (
+                    {/* Кнопка "Принять" для назначенных задач */}
+                    {(task.status === "assigned" || task.status === "pending") && (
                       <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => updateStatusMutation.mutate({ id: task.id, status: "in_progress" })}
+                        variant="default"
+                        size="sm"
+                        className="gap-1"
+                        onClick={() => acceptTaskMutation.mutate(task.id)}
+                        disabled={acceptTaskMutation.isPending}
                       >
-                        <Play className="h-4 w-4 text-orange-600" />
+                        {acceptTaskMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <HandMetal className="h-4 w-4" />
+                        )}
+                        Принял
                       </Button>
                     )}
                     {task.status === "in_progress" && (

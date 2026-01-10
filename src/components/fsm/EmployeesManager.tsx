@@ -29,7 +29,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Edit, UserCheck, UserX, Loader2 } from "lucide-react";
+import { Plus, Edit, UserCheck, UserX, Loader2, Search, User } from "lucide-react";
 
 interface Employee {
   id: string;
@@ -41,14 +41,21 @@ interface Employee {
   created_at: string;
 }
 
+interface Profile {
+  id: string;
+  full_name: string | null;
+  phone: string | null;
+  address: string | null;
+}
+
 const EmployeesManager = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
   const [formData, setFormData] = useState({
-    email: "",
-    password: "",
     full_name: "",
     phone: "",
     position: "",
@@ -68,38 +75,38 @@ const EmployeesManager = () => {
     },
   });
 
+  // Поиск пользователей по имени/фамилии
+  const { data: searchResults, isLoading: isSearching } = useQuery({
+    queryKey: ["profile-search", searchQuery],
+    queryFn: async () => {
+      if (searchQuery.length < 2) return [];
+
+      // Получаем уже добавленных сотрудников
+      const { data: existingEmployees } = await supabase
+        .from("employees")
+        .select("user_id");
+
+      const existingUserIds = existingEmployees?.map(e => e.user_id) || [];
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, full_name, phone, address")
+        .ilike("full_name", `%${searchQuery}%`)
+        .limit(10);
+
+      if (error) throw error;
+
+      // Фильтруем уже добавленных
+      return (data as Profile[]).filter(p => !existingUserIds.includes(p.id));
+    },
+    enabled: searchQuery.length >= 2 && !editingEmployee,
+  });
+
   const createEmployeeMutation = useMutation({
-    mutationFn: async (data: typeof formData) => {
-      // Используем admin API через edge function или создаем через signUp
-      // Сохраняем текущую сессию
-      const { data: sessionData } = await supabase.auth.getSession();
-      const currentSession = sessionData.session;
-
-      // Создаем пользователя через Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: data.email,
-        password: data.password,
-        options: {
-          data: { full_name: data.full_name },
-        },
-      });
-
-      if (authError) throw authError;
-      if (!authData.user) throw new Error("Не удалось создать пользователя");
-
-      const newUserId = authData.user.id;
-
-      // Восстанавливаем сессию админа
-      if (currentSession) {
-        await supabase.auth.setSession({
-          access_token: currentSession.access_token,
-          refresh_token: currentSession.refresh_token,
-        });
-      }
-
+    mutationFn: async (data: { userId: string; full_name: string; phone: string; position: string; role: string }) => {
       // Создаем запись сотрудника
       const { error: empError } = await supabase.from("employees").insert({
-        user_id: newUserId,
+        user_id: data.userId,
         full_name: data.full_name,
         phone: data.phone || null,
         position: data.position || null,
@@ -108,14 +115,14 @@ const EmployeesManager = () => {
       if (empError) throw empError;
 
       // Назначаем роль
-      const { error: roleError } = await supabase.from("user_roles").insert({
-        user_id: newUserId,
-        role: data.role,
-      });
+      const { error: roleError } = await supabase.from("user_roles").insert([{
+        user_id: data.userId,
+        role: data.role as "master" | "engineer" | "dispatcher",
+      }]);
 
       if (roleError) throw roleError;
 
-      return { id: newUserId };
+      return { id: data.userId };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
@@ -145,6 +152,7 @@ const EmployeesManager = () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       toast({ title: "Данные обновлены" });
       setEditingEmployee(null);
+      setIsDialogOpen(false);
     },
     onError: (error: Error) => {
       toast({
@@ -172,13 +180,24 @@ const EmployeesManager = () => {
 
   const resetForm = () => {
     setFormData({
-      email: "",
-      password: "",
       full_name: "",
       phone: "",
       position: "",
       role: "master",
     });
+    setSearchQuery("");
+    setSelectedProfile(null);
+    setEditingEmployee(null);
+  };
+
+  const handleSelectProfile = (profile: Profile) => {
+    setSelectedProfile(profile);
+    setFormData({
+      ...formData,
+      full_name: profile.full_name || "",
+      phone: profile.phone || "",
+    });
+    setSearchQuery("");
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -190,8 +209,14 @@ const EmployeesManager = () => {
         phone: formData.phone || null,
         position: formData.position || null,
       });
-    } else {
-      createEmployeeMutation.mutate(formData);
+    } else if (selectedProfile) {
+      createEmployeeMutation.mutate({
+        userId: selectedProfile.id,
+        full_name: formData.full_name,
+        phone: formData.phone,
+        position: formData.position,
+        role: formData.role,
+      });
     }
   };
 
@@ -199,98 +224,168 @@ const EmployeesManager = () => {
     <Card className="border-border/50">
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Сотрудники</CardTitle>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isDialogOpen} onOpenChange={(open) => {
+          setIsDialogOpen(open);
+          if (!open) resetForm();
+        }}>
           <DialogTrigger asChild>
             <Button onClick={() => { resetForm(); setEditingEmployee(null); }}>
               <Plus className="h-4 w-4 mr-2" />
               Добавить
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>
-                {editingEmployee ? "Редактировать сотрудника" : "Новый сотрудник"}
+                {editingEmployee ? "Редактировать сотрудника" : "Назначить сотрудника"}
               </DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               {!editingEmployee && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Пароль</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      value={formData.password}
-                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                      required
-                      minLength={6}
-                    />
-                  </div>
-                </>
-              )}
-              <div className="space-y-2">
-                <Label htmlFor="full_name">ФИО</Label>
-                <Input
-                  id="full_name"
-                  value={formData.full_name}
-                  onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone">Телефон</Label>
-                <Input
-                  id="phone"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="position">Должность</Label>
-                <Input
-                  id="position"
-                  value={formData.position}
-                  onChange={(e) => setFormData({ ...formData, position: e.target.value })}
-                />
-              </div>
-              {!editingEmployee && (
-                <div className="space-y-2">
-                  <Label>Роль</Label>
-                  <Select
-                    value={formData.role}
-                    onValueChange={(v) => setFormData({ ...formData, role: v as typeof formData.role })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="dispatcher">Диспетчер</SelectItem>
-                      <SelectItem value="master">Мастер</SelectItem>
-                      <SelectItem value="engineer">Инженер</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="space-y-4">
+                  {!selectedProfile ? (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="search">Поиск пользователя по ФИО</Label>
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            id="search"
+                            placeholder="Введите имя или фамилию..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-10"
+                          />
+                        </div>
+                      </div>
+                      
+                      {isSearching && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Поиск...
+                        </div>
+                      )}
+                      
+                      {searchResults && searchResults.length > 0 && (
+                        <div className="border rounded-lg divide-y max-h-60 overflow-auto">
+                          {searchResults.map((profile) => (
+                            <div
+                              key={profile.id}
+                              className="p-3 hover:bg-muted/50 cursor-pointer transition-colors"
+                              onClick={() => handleSelectProfile(profile)}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                                  <User className="h-5 w-5 text-primary" />
+                                </div>
+                                <div>
+                                  <p className="font-medium">{profile.full_name || "Без имени"}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {profile.phone || profile.address || "Нет данных"}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {searchQuery.length >= 2 && !isSearching && searchResults?.length === 0 && (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          Пользователи не найдены
+                        </p>
+                      )}
+                      
+                      {searchQuery.length < 2 && (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          Введите минимум 2 символа для поиска
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <div className="p-4 rounded-lg bg-muted/50 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                          <User className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="font-medium">{selectedProfile.full_name}</p>
+                          <p className="text-sm text-muted-foreground">{selectedProfile.phone || "—"}</p>
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedProfile(null);
+                          setFormData({ ...formData, full_name: "", phone: "" });
+                        }}
+                      >
+                        Изменить
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={createEmployeeMutation.isPending || updateEmployeeMutation.isPending}
-              >
-                {(createEmployeeMutation.isPending || updateEmployeeMutation.isPending) && (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                )}
-                {editingEmployee ? "Сохранить" : "Создать"}
-              </Button>
+              
+              {(selectedProfile || editingEmployee) && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="full_name">ФИО</Label>
+                    <Input
+                      id="full_name"
+                      value={formData.full_name}
+                      onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Телефон</Label>
+                    <Input
+                      id="phone"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="position">Должность</Label>
+                    <Input
+                      id="position"
+                      value={formData.position}
+                      onChange={(e) => setFormData({ ...formData, position: e.target.value })}
+                    />
+                  </div>
+                  {!editingEmployee && (
+                    <div className="space-y-2">
+                      <Label>Роль в системе</Label>
+                      <Select
+                        value={formData.role}
+                        onValueChange={(v) => setFormData({ ...formData, role: v as typeof formData.role })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="dispatcher">Диспетчер</SelectItem>
+                          <SelectItem value="master">Мастер</SelectItem>
+                          <SelectItem value="engineer">Инженер</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={createEmployeeMutation.isPending || updateEmployeeMutation.isPending}
+                  >
+                    {(createEmployeeMutation.isPending || updateEmployeeMutation.isPending) && (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    )}
+                    {editingEmployee ? "Сохранить" : "Назначить сотрудником"}
+                  </Button>
+                </>
+              )}
             </form>
           </DialogContent>
         </Dialog>
@@ -300,6 +395,8 @@ const EmployeesManager = () => {
           <div className="flex justify-center py-8">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
+        ) : employees?.length === 0 ? (
+          <p className="text-center text-muted-foreground py-8">Нет сотрудников</p>
         ) : (
           <Table>
             <TableHeader>

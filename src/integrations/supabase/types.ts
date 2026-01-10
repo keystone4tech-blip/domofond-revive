@@ -406,6 +406,8 @@ export type Database = {
       }
       tasks: {
         Row: {
+          accepted_at: string | null
+          accepted_by: string | null
           assigned_by: string | null
           assigned_to: string | null
           client_id: string | null
@@ -423,6 +425,8 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          accepted_at?: string | null
+          accepted_by?: string | null
           assigned_by?: string | null
           assigned_to?: string | null
           client_id?: string | null
@@ -440,6 +444,8 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          accepted_at?: string | null
+          accepted_by?: string | null
           assigned_by?: string | null
           assigned_to?: string | null
           client_id?: string | null
@@ -457,6 +463,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "tasks_accepted_by_fkey"
+            columns: ["accepted_by"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "tasks_assigned_to_fkey"
             columns: ["assigned_to"]

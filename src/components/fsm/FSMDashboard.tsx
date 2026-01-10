@@ -1,20 +1,45 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { 
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { 
   ClipboardList, 
   CheckCircle2, 
   Clock, 
   AlertTriangle,
   Users,
-  Building2
+  Building2,
+  Loader2,
+  X
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { format } from "date-fns";
+import { ru } from "date-fns/locale";
 
 interface FSMDashboardProps {
   isManager: boolean;
 }
 
+type DetailType = "totalTasks" | "pendingTasks" | "inProgressTasks" | "completedTasks" | "employees" | "clients" | null;
+
 const FSMDashboard = ({ isManager }: FSMDashboardProps) => {
+  const [detailType, setDetailType] = useState<DetailType>(null);
+
   const { data: stats } = useQuery({
     queryKey: ["fsm-stats"],
     queryFn: async () => {
@@ -41,6 +66,7 @@ const FSMDashboard = ({ isManager }: FSMDashboardProps) => {
 
   const statCards = [
     {
+      id: "totalTasks" as DetailType,
       title: "Всего задач",
       value: stats?.totalTasks || 0,
       icon: ClipboardList,
@@ -48,6 +74,7 @@ const FSMDashboard = ({ isManager }: FSMDashboardProps) => {
       bgColor: "bg-primary/10",
     },
     {
+      id: "pendingTasks" as DetailType,
       title: "Ожидают",
       value: stats?.pendingTasks || 0,
       icon: Clock,
@@ -55,6 +82,7 @@ const FSMDashboard = ({ isManager }: FSMDashboardProps) => {
       bgColor: "bg-yellow-100 dark:bg-yellow-900/30",
     },
     {
+      id: "inProgressTasks" as DetailType,
       title: "В работе",
       value: stats?.inProgressTasks || 0,
       icon: AlertTriangle,
@@ -62,6 +90,7 @@ const FSMDashboard = ({ isManager }: FSMDashboardProps) => {
       bgColor: "bg-orange-100 dark:bg-orange-900/30",
     },
     {
+      id: "completedTasks" as DetailType,
       title: "Выполнено",
       value: stats?.completedTasks || 0,
       icon: CheckCircle2,
@@ -73,6 +102,7 @@ const FSMDashboard = ({ isManager }: FSMDashboardProps) => {
   if (isManager) {
     statCards.push(
       {
+        id: "employees" as DetailType,
         title: "Сотрудников",
         value: stats?.activeEmployees || 0,
         icon: Users,
@@ -80,6 +110,7 @@ const FSMDashboard = ({ isManager }: FSMDashboardProps) => {
         bgColor: "bg-blue-100 dark:bg-blue-900/30",
       },
       {
+        id: "clients" as DetailType,
         title: "Клиентов",
         value: stats?.totalClients || 0,
         icon: Building2,
@@ -89,11 +120,27 @@ const FSMDashboard = ({ isManager }: FSMDashboardProps) => {
     );
   }
 
+  const getDialogTitle = (type: DetailType) => {
+    switch (type) {
+      case "totalTasks": return "Все задачи";
+      case "pendingTasks": return "Ожидающие задачи";
+      case "inProgressTasks": return "Задачи в работе";
+      case "completedTasks": return "Выполненные задачи";
+      case "employees": return "Сотрудники";
+      case "clients": return "Клиенты";
+      default: return "";
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         {statCards.map((stat) => (
-          <Card key={stat.title} className="border-border/50">
+          <Card 
+            key={stat.title} 
+            className="border-border/50 cursor-pointer hover:shadow-md hover:border-primary/30 transition-all"
+            onClick={() => setDetailType(stat.id)}
+          >
             <CardHeader className="pb-2">
               <div className={`w-10 h-10 rounded-lg ${stat.bgColor} flex items-center justify-center`}>
                 <stat.icon className={`h-5 w-5 ${stat.color}`} />
@@ -128,7 +175,210 @@ const FSMDashboard = ({ isManager }: FSMDashboardProps) => {
           </Card>
         )}
       </div>
+
+      {/* Модальное окно с детальной информацией */}
+      <Dialog open={!!detailType} onOpenChange={() => setDetailType(null)}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle>{getDialogTitle(detailType)}</DialogTitle>
+          </DialogHeader>
+          <DetailContent type={detailType} />
+        </DialogContent>
+      </Dialog>
     </div>
+  );
+};
+
+// Компонент для отображения детальной информации
+const DetailContent = ({ type }: { type: DetailType }) => {
+  if (!type) return null;
+
+  if (type === "employees") return <EmployeesList />;
+  if (type === "clients") return <ClientsList />;
+  
+  return <TasksList type={type} />;
+};
+
+// Список задач по статусу
+const TasksList = ({ type }: { type: "totalTasks" | "pendingTasks" | "inProgressTasks" | "completedTasks" }) => {
+  const { data: tasks, isLoading } = useQuery({
+    queryKey: ["detail-tasks", type],
+    queryFn: async () => {
+      let query = supabase
+        .from("tasks")
+        .select(`
+          id,
+          title,
+          status,
+          priority,
+          scheduled_date,
+          created_at,
+          clients (name),
+          assigned_employee:employees!tasks_assigned_to_fkey (full_name)
+        `)
+        .order("created_at", { ascending: false });
+
+      if (type === "pendingTasks") {
+        query = query.in("status", ["pending", "assigned"]);
+      } else if (type === "inProgressTasks") {
+        query = query.eq("status", "in_progress");
+      } else if (type === "completedTasks") {
+        query = query.eq("status", "completed");
+      }
+
+      const { data, error } = await query.limit(50);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  if (isLoading) {
+    return <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
+  }
+
+  if (!tasks?.length) {
+    return <p className="text-center text-muted-foreground py-8">Нет задач</p>;
+  }
+
+  const getStatusBadge = (status: string) => {
+    const styles: Record<string, string> = {
+      pending: "bg-yellow-100 text-yellow-800",
+      assigned: "bg-blue-100 text-blue-800",
+      in_progress: "bg-orange-100 text-orange-800",
+      completed: "bg-green-100 text-green-800",
+    };
+    const labels: Record<string, string> = {
+      pending: "Ожидает",
+      assigned: "Назначена",
+      in_progress: "В работе",
+      completed: "Выполнена",
+    };
+    return <Badge className={styles[status]}>{labels[status]}</Badge>;
+  };
+
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Название</TableHead>
+          <TableHead>Клиент</TableHead>
+          <TableHead>Исполнитель</TableHead>
+          <TableHead>Статус</TableHead>
+          <TableHead>Дата</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {tasks.map((task) => (
+          <TableRow key={task.id}>
+            <TableCell className="font-medium">{task.title}</TableCell>
+            <TableCell>{(task.clients as { name: string } | null)?.name || "—"}</TableCell>
+            <TableCell>{(task.assigned_employee as { full_name: string } | null)?.full_name || "—"}</TableCell>
+            <TableCell>{getStatusBadge(task.status)}</TableCell>
+            <TableCell>
+              {task.scheduled_date 
+                ? format(new Date(task.scheduled_date), "dd.MM.yyyy")
+                : format(new Date(task.created_at), "dd.MM.yyyy")}
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+};
+
+// Список сотрудников
+const EmployeesList = () => {
+  const { data: employees, isLoading } = useQuery({
+    queryKey: ["detail-employees"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employees")
+        .select("*")
+        .order("full_name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  if (isLoading) {
+    return <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
+  }
+
+  if (!employees?.length) {
+    return <p className="text-center text-muted-foreground py-8">Нет сотрудников</p>;
+  }
+
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>ФИО</TableHead>
+          <TableHead>Телефон</TableHead>
+          <TableHead>Должность</TableHead>
+          <TableHead>Статус</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {employees.map((emp) => (
+          <TableRow key={emp.id}>
+            <TableCell className="font-medium">{emp.full_name}</TableCell>
+            <TableCell>{emp.phone || "—"}</TableCell>
+            <TableCell>{emp.position || "—"}</TableCell>
+            <TableCell>
+              <Badge variant={emp.is_active ? "default" : "secondary"}>
+                {emp.is_active ? "Активен" : "Неактивен"}
+              </Badge>
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+};
+
+// Список клиентов
+const ClientsList = () => {
+  const { data: clients, isLoading } = useQuery({
+    queryKey: ["detail-clients"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("clients")
+        .select("*")
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  if (isLoading) {
+    return <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
+  }
+
+  if (!clients?.length) {
+    return <p className="text-center text-muted-foreground py-8">Нет клиентов</p>;
+  }
+
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Название</TableHead>
+          <TableHead>Адрес</TableHead>
+          <TableHead>Контактное лицо</TableHead>
+          <TableHead>Телефон</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {clients.map((client) => (
+          <TableRow key={client.id}>
+            <TableCell className="font-medium">{client.name}</TableCell>
+            <TableCell>{client.address}</TableCell>
+            <TableCell>{client.contact_person || "—"}</TableCell>
+            <TableCell>{client.phone || "—"}</TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   );
 };
 
