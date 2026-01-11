@@ -58,8 +58,7 @@ const EmployeesManager = () => {
   const [formData, setFormData] = useState({
     full_name: "",
     phone: "",
-    position: "",
-    role: "master" as "master" | "engineer" | "dispatcher" | "director",
+    position: "master" as "master" | "engineer" | "dispatcher",
   });
 
   const { data: employees, isLoading } = useQuery({
@@ -102,22 +101,39 @@ const EmployeesManager = () => {
     enabled: searchQuery.length >= 2 && !editingEmployee,
   });
 
+  const positionLabels: Record<string, string> = {
+    master: "Мастер",
+    dispatcher: "Диспетчер",
+    engineer: "Инженер",
+  };
+
   const createEmployeeMutation = useMutation({
-    mutationFn: async (data: { userId: string; full_name: string; phone: string; position: string; role: string }) => {
-      // Создаем запись сотрудника
+    mutationFn: async (data: { userId: string; full_name: string; phone: string; position: string }) => {
+      // Проверяем, не существует ли уже такой сотрудник
+      const { data: existing } = await supabase
+        .from("employees")
+        .select("id")
+        .eq("user_id", data.userId)
+        .maybeSingle();
+
+      if (existing) {
+        throw new Error("Этот пользователь уже является сотрудником");
+      }
+
+      // Создаем запись сотрудника с должностью
       const { error: empError } = await supabase.from("employees").insert({
         user_id: data.userId,
         full_name: data.full_name,
         phone: data.phone || null,
-        position: data.position || null,
+        position: positionLabels[data.position] || data.position,
       });
 
       if (empError) throw empError;
 
-      // Назначаем роль
+      // Назначаем роль на основе должности
       const { error: roleError } = await supabase.from("user_roles").insert([{
         user_id: data.userId,
-        role: data.role as "master" | "engineer" | "dispatcher" | "director",
+        role: data.position as "master" | "engineer" | "dispatcher",
       }]);
 
       if (roleError) throw roleError;
@@ -182,8 +198,7 @@ const EmployeesManager = () => {
     setFormData({
       full_name: "",
       phone: "",
-      position: "",
-      role: "master",
+      position: "master",
     });
     setSearchQuery("");
     setSelectedProfile(null);
@@ -215,7 +230,6 @@ const EmployeesManager = () => {
         full_name: formData.full_name,
         phone: formData.phone,
         position: formData.position,
-        role: formData.role,
       });
     }
   };
@@ -348,31 +362,32 @@ const EmployeesManager = () => {
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="position">Должность</Label>
-                    <Input
-                      id="position"
-                      value={formData.position}
-                      onChange={(e) => setFormData({ ...formData, position: e.target.value })}
-                    />
-                  </div>
                   {!editingEmployee && (
                     <div className="space-y-2">
-                      <Label>Роль в системе</Label>
+                      <Label>Должность</Label>
                       <Select
-                        value={formData.role}
-                        onValueChange={(v) => setFormData({ ...formData, role: v as typeof formData.role })}
+                        value={formData.position}
+                        onValueChange={(v) => setFormData({ ...formData, position: v as typeof formData.position })}
                       >
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="director">Директор</SelectItem>
                           <SelectItem value="dispatcher">Диспетчер</SelectItem>
                           <SelectItem value="master">Мастер</SelectItem>
                           <SelectItem value="engineer">Инженер</SelectItem>
                         </SelectContent>
                       </Select>
+                    </div>
+                  )}
+                  {editingEmployee && (
+                    <div className="space-y-2">
+                      <Label htmlFor="position">Должность</Label>
+                      <Input
+                        id="position"
+                        value={positionLabels[formData.position] || formData.position}
+                        disabled
+                      />
                     </div>
                   )}
                   <Button
@@ -427,10 +442,9 @@ const EmployeesManager = () => {
                       onClick={() => {
                         setEditingEmployee(emp);
                         setFormData({
-                          ...formData,
                           full_name: emp.full_name,
                           phone: emp.phone || "",
-                          position: emp.position || "",
+                          position: "master",
                         });
                         setIsDialogOpen(true);
                       }}
