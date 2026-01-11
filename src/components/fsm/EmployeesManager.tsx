@@ -107,6 +107,13 @@ const EmployeesManager = () => {
     engineer: "Инженер",
   };
 
+  // Обратный маппинг: русское название -> ключ роли
+  const positionKeys: Record<string, "master" | "engineer" | "dispatcher"> = {
+    "Мастер": "master",
+    "Диспетчер": "dispatcher",
+    "Инженер": "engineer",
+  };
+
   const createEmployeeMutation = useMutation({
     mutationFn: async (data: { userId: string; full_name: string; phone: string; position: string }) => {
       // Проверяем, не существует ли уже такой сотрудник
@@ -222,7 +229,7 @@ const EmployeesManager = () => {
         id: editingEmployee.id,
         full_name: formData.full_name,
         phone: formData.phone || null,
-        position: formData.position || null,
+        position: positionLabels[formData.position] || formData.position,
       });
     } else if (selectedProfile) {
       createEmployeeMutation.mutate({
@@ -362,34 +369,22 @@ const EmployeesManager = () => {
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     />
                   </div>
-                  {!editingEmployee && (
-                    <div className="space-y-2">
-                      <Label>Должность</Label>
-                      <Select
-                        value={formData.position}
-                        onValueChange={(v) => setFormData({ ...formData, position: v as typeof formData.position })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="dispatcher">Диспетчер</SelectItem>
-                          <SelectItem value="master">Мастер</SelectItem>
-                          <SelectItem value="engineer">Инженер</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                  {editingEmployee && (
-                    <div className="space-y-2">
-                      <Label htmlFor="position">Должность</Label>
-                      <Input
-                        id="position"
-                        value={positionLabels[formData.position] || formData.position}
-                        disabled
-                      />
-                    </div>
-                  )}
+                  <div className="space-y-2">
+                    <Label>Должность</Label>
+                    <Select
+                      value={formData.position}
+                      onValueChange={(v) => setFormData({ ...formData, position: v as typeof formData.position })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="dispatcher">Диспетчер</SelectItem>
+                        <SelectItem value="master">Мастер</SelectItem>
+                        <SelectItem value="engineer">Инженер</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <Button
                     type="submit"
                     className="w-full"
@@ -441,10 +436,12 @@ const EmployeesManager = () => {
                       size="icon"
                       onClick={() => {
                         setEditingEmployee(emp);
+                        // Преобразуем русскую должность обратно в ключ
+                        const posKey = emp.position ? positionKeys[emp.position] || "master" : "master";
                         setFormData({
                           full_name: emp.full_name,
                           phone: emp.phone || "",
-                          position: "master",
+                          position: posKey,
                         });
                         setIsDialogOpen(true);
                       }}
