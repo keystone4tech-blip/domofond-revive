@@ -246,11 +246,11 @@ const TaskDetails = ({ task, onBack, isManager }: TaskDetailsProps) => {
                 </div>
               </div>
             )}
-            {task.employees && (
+            {task.assigned_employee && (
               <div className="flex items-center gap-3">
                 <User className="h-5 w-5 text-primary" />
                 <div>
-                  <p className="font-medium">{task.employees.full_name}</p>
+                  <p className="font-medium">{task.assigned_employee.full_name}</p>
                   <p className="text-sm text-muted-foreground">Исполнитель</p>
                 </div>
               </div>
