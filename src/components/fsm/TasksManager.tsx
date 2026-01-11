@@ -191,9 +191,23 @@ const TasksManager = ({ isManager }: TasksManagerProps) => {
         .from("employees")
         .select("id")
         .eq("user_id", userData.user.id)
-        .single();
+        .maybeSingle();
 
-      if (empError || !employee) throw new Error("Сотрудник не найден");
+      // Если пользователь не является сотрудником, но является менеджером - 
+      // просто обновляем статус без записи accepted_by
+      if (!employee) {
+        // Проверяем, является ли менеджером
+        const { error } = await supabase
+          .from("tasks")
+          .update({
+            status: "in_progress",
+            accepted_at: new Date().toISOString(),
+          })
+          .eq("id", taskId);
+        
+        if (error) throw error;
+        return;
+      }
 
       const { error } = await supabase
         .from("tasks")

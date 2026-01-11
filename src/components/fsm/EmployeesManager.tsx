@@ -59,7 +59,7 @@ const EmployeesManager = () => {
     full_name: "",
     phone: "",
     position: "",
-    role: "master" as "master" | "engineer" | "dispatcher",
+    role: "master" as "master" | "engineer" | "dispatcher" | "director",
   });
 
   const { data: employees, isLoading } = useQuery({
@@ -117,7 +117,7 @@ const EmployeesManager = () => {
       // Назначаем роль
       const { error: roleError } = await supabase.from("user_roles").insert([{
         user_id: data.userId,
-        role: data.role as "master" | "engineer" | "dispatcher",
+        role: data.role as "master" | "engineer" | "dispatcher" | "director",
       }]);
 
       if (roleError) throw roleError;
@@ -367,6 +367,7 @@ const EmployeesManager = () => {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="director">Директор</SelectItem>
                           <SelectItem value="dispatcher">Диспетчер</SelectItem>
                           <SelectItem value="master">Мастер</SelectItem>
                           <SelectItem value="engineer">Инженер</SelectItem>
