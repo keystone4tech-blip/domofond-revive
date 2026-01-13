@@ -127,6 +127,14 @@ const EmployeesManager = () => {
         throw new Error("Этот пользователь уже является сотрудником");
       }
 
+      // Если телефон введён/изменён, сохраняем его в профиле пользователя
+      if (data.phone) {
+        await supabase
+          .from("profiles")
+          .update({ phone: data.phone })
+          .eq("id", data.userId);
+      }
+
       // Создаем запись сотрудника с должностью
       const { error: empError } = await supabase.from("employees").insert({
         user_id: data.userId,
@@ -214,10 +222,11 @@ const EmployeesManager = () => {
 
   const handleSelectProfile = (profile: Profile) => {
     setSelectedProfile(profile);
+    // Телефон берётся из базы данных профиля
     setFormData({
       ...formData,
       full_name: profile.full_name || "",
-      phone: profile.phone || "",
+      phone: profile.phone || "", // Автозаполнение телефона из БД
     });
     setSearchQuery("");
   };
