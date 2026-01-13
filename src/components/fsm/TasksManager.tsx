@@ -40,10 +40,12 @@ interface Task {
   assigned_to: string | null;
   accepted_by: string | null;
   accepted_at: string | null;
+  completed_at: string | null;
   created_at: string;
+  notes: string | null;
   clients: { id: string; name: string; address: string } | null;
-  assigned_employee: { id: string; full_name: string } | null;
-  accepted_employee: { id: string; full_name: string } | null;
+  assigned_employee: { id: string; full_name: string; phone: string | null } | null;
+  accepted_employee: { id: string; full_name: string; phone: string | null } | null;
 }
 
 interface TasksManagerProps {
@@ -64,8 +66,6 @@ const TasksManager = ({ isManager }: TasksManagerProps) => {
     assigned_to: "",
     priority: "medium",
     scheduled_date: "",
-    scheduled_time_start: "",
-    scheduled_time_end: "",
   });
 
   const { data: tasks, isLoading } = useQuery({
@@ -76,8 +76,8 @@ const TasksManager = ({ isManager }: TasksManagerProps) => {
         .select(`
           *,
           clients (id, name, address),
-          assigned_employee:employees!tasks_assigned_to_fkey (id, full_name),
-          accepted_employee:employees!tasks_accepted_by_fkey (id, full_name)
+          assigned_employee:employees!tasks_assigned_to_fkey (id, full_name, phone),
+          accepted_employee:employees!tasks_accepted_by_fkey (id, full_name, phone)
         `)
         .order("created_at", { ascending: false });
 
@@ -96,7 +96,7 @@ const TasksManager = ({ isManager }: TasksManagerProps) => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employees")
-        .select("id, full_name")
+        .select("id, full_name, phone")
         .eq("is_active", true);
       if (error) throw error;
       return data;
@@ -146,8 +146,6 @@ const TasksManager = ({ isManager }: TasksManagerProps) => {
         assigned_by: userData.user?.id,
         priority: data.priority,
         scheduled_date: data.scheduled_date || null,
-        scheduled_time_start: data.scheduled_time_start || null,
-        scheduled_time_end: data.scheduled_time_end || null,
         status: data.assigned_to ? "assigned" : "pending",
       });
 
@@ -180,44 +178,51 @@ const TasksManager = ({ isManager }: TasksManagerProps) => {
     },
   });
 
-  // Принять задачу - кнопка для сотрудников
+  // Принять задачу - записываем полную информацию и время начала
   const acceptTaskMutation = useMutation({
     mutationFn: async (taskId: string) => {
-      // Получаем employee_id текущего пользователя
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error("Не авторизован");
 
-      const { data: employee, error: empError } = await supabase
+      const { data: employee } = await supabase
         .from("employees")
-        .select("id")
+        .select("id, full_name, phone")
         .eq("user_id", userData.user.id)
         .maybeSingle();
 
-      // Если пользователь не является сотрудником, но является менеджером - 
-      // просто обновляем статус без записи accepted_by
-      if (!employee) {
-        // Проверяем, является ли менеджером
-        const { error } = await supabase
-          .from("tasks")
-          .update({
-            status: "in_progress",
-            accepted_at: new Date().toISOString(),
-          })
-          .eq("id", taskId);
-        
-        if (error) throw error;
-        return;
+      const now = new Date();
+      const timeStart = now.toTimeString().slice(0, 5); // HH:mm
+
+      // Формируем заметку с полной информацией о принявшем
+      let acceptNote = `Принял: `;
+      if (employee) {
+        acceptNote += employee.full_name;
+        if (employee.phone) acceptNote += `, тел: ${employee.phone}`;
+      } else {
+        // Для менеджера без записи в employees берем из профиля
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("full_name, phone")
+          .eq("id", userData.user.id)
+          .single();
+        if (profile) {
+          acceptNote += profile.full_name || "Менеджер";
+          if (profile.phone) acceptNote += `, тел: ${profile.phone}`;
+        }
       }
+      acceptNote += ` • ${format(now, "dd.MM.yyyy HH:mm")}`;
 
       const { error } = await supabase
         .from("tasks")
         .update({
           status: "in_progress",
-          accepted_by: employee.id,
-          accepted_at: new Date().toISOString(),
+          accepted_by: employee?.id || null,
+          accepted_at: now.toISOString(),
+          scheduled_time_start: timeStart,
+          notes: acceptNote,
         })
         .eq("id", taskId);
-      
+
       if (error) throw error;
     },
     onSuccess: () => {
@@ -229,13 +234,22 @@ const TasksManager = ({ isManager }: TasksManagerProps) => {
     },
   });
 
+  // Завершение задачи - записываем время окончания
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const update: { status: string; completed_at?: string | null } = { status };
+      const now = new Date();
+      const update: { 
+        status: string; 
+        completed_at?: string | null;
+        scheduled_time_end?: string | null;
+      } = { status };
+      
       if (status === "completed") {
-        update.completed_at = new Date().toISOString();
+        update.completed_at = now.toISOString();
+        update.scheduled_time_end = now.toTimeString().slice(0, 5); // HH:mm
       } else {
         update.completed_at = null;
+        update.scheduled_time_end = null;
       }
       
       const { error } = await supabase
@@ -269,8 +283,6 @@ const TasksManager = ({ isManager }: TasksManagerProps) => {
       assigned_to: "",
       priority: "medium",
       scheduled_date: "",
-      scheduled_time_start: "",
-      scheduled_time_end: "",
     });
     setEditingTask(null);
   };
@@ -286,8 +298,6 @@ const TasksManager = ({ isManager }: TasksManagerProps) => {
         assigned_to: formData.assigned_to || null,
         priority: formData.priority,
         scheduled_date: formData.scheduled_date || null,
-        scheduled_time_start: formData.scheduled_time_start || null,
-        scheduled_time_end: formData.scheduled_time_end || null,
       });
     } else {
       createTaskMutation.mutate(formData);
@@ -460,26 +470,6 @@ const TasksManager = ({ isManager }: TasksManagerProps) => {
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="time_start">Время начала</Label>
-                      <Input
-                        id="time_start"
-                        type="time"
-                        value={formData.scheduled_time_start}
-                        onChange={(e) => setFormData({ ...formData, scheduled_time_start: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="time_end">Время окончания</Label>
-                      <Input
-                        id="time_end"
-                        type="time"
-                        value={formData.scheduled_time_end}
-                        onChange={(e) => setFormData({ ...formData, scheduled_time_end: e.target.value })}
-                      />
-                    </div>
-                  </div>
                   <Button
                     type="submit"
                     className="w-full"
@@ -531,9 +521,15 @@ const TasksManager = ({ isManager }: TasksManagerProps) => {
                         </span>
                       )}
                     </div>
-                    {task.accepted_employee && task.accepted_at && (
+                    {task.notes && (
                       <div className="mt-1 text-xs text-muted-foreground">
-                        ✅ Принял: {task.accepted_employee.full_name} • {format(new Date(task.accepted_at), "dd.MM.yyyy HH:mm")}
+                        ✅ {task.notes}
+                      </div>
+                    )}
+                    {task.scheduled_time_start && (
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        ⏱ Начало: {task.scheduled_time_start}
+                        {task.scheduled_time_end && ` → Завершено: ${task.scheduled_time_end}`}
                       </div>
                     )}
                   </div>
@@ -585,8 +581,6 @@ const TasksManager = ({ isManager }: TasksManagerProps) => {
                               assigned_to: task.assigned_to || "",
                               priority: task.priority,
                               scheduled_date: task.scheduled_date || "",
-                              scheduled_time_start: task.scheduled_time_start || "",
-                              scheduled_time_end: task.scheduled_time_end || "",
                             });
                             setIsDialogOpen(true);
                           }}

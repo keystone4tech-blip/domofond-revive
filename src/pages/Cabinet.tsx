@@ -1,19 +1,34 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, LogOut, CheckCircle, AlertCircle } from "lucide-react";
+import { Loader2, LogOut, CheckCircle, AlertCircle, ClipboardList, Calendar } from "lucide-react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import { format } from "date-fns";
+import { ru } from "date-fns/locale";
+
+interface Task {
+  id: string;
+  title: string;
+  status: string;
+  priority: string;
+  scheduled_date: string | null;
+  notes: string | null;
+  clients: { name: string; address: string } | null;
+}
 
 const Cabinet = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [profile, setProfile] = useState<any>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
@@ -34,6 +49,8 @@ const Cabinet = () => {
         return;
       }
 
+      setUserId(session.user.id);
+
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
@@ -53,6 +70,48 @@ const Cabinet = () => {
       setLoading(false);
     }
   };
+
+  // Получаем задачи пользователя (если он сотрудник)
+  const { data: myTasks } = useQuery({
+    queryKey: ["my-tasks", userId],
+    queryFn: async () => {
+      if (!userId) return [];
+      
+      // Сначала проверяем, есть ли запись сотрудника
+      const { data: employee } = await supabase
+        .from("employees")
+        .select("id")
+        .eq("user_id", userId)
+        .maybeSingle();
+      
+      if (!employee) return [];
+
+      const { data, error } = await supabase
+        .from("tasks")
+        .select(`
+          id, title, status, priority, scheduled_date, notes,
+          clients (name, address)
+        `)
+        .or(`assigned_to.eq.${employee.id},accepted_by.eq.${employee.id}`)
+        .neq("status", "completed")
+        .neq("status", "cancelled");
+
+      if (error) throw error;
+      
+      // Сортировка по приоритету
+      const priorityOrder: Record<string, number> = {
+        urgent: 1,
+        high: 2,
+        medium: 3,
+        low: 4,
+      };
+      
+      return (data as Task[]).sort((a, b) => 
+        (priorityOrder[a.priority] || 5) - (priorityOrder[b.priority] || 5)
+      );
+    },
+    enabled: !!userId,
+  });
 
   const handleSave = async () => {
     setSaving(true);
@@ -94,6 +153,36 @@ const Cabinet = () => {
     navigate("/");
   };
 
+  const getStatusBadge = (status: string) => {
+    const styles: Record<string, string> = {
+      pending: "bg-yellow-100 text-yellow-800",
+      assigned: "bg-blue-100 text-blue-800",
+      in_progress: "bg-orange-100 text-orange-800",
+    };
+    const labels: Record<string, string> = {
+      pending: "Ожидает",
+      assigned: "Назначена",
+      in_progress: "В работе",
+    };
+    return <Badge className={styles[status]} variant="secondary">{labels[status]}</Badge>;
+  };
+
+  const getPriorityBadge = (priority: string) => {
+    const styles: Record<string, string> = {
+      low: "bg-gray-100 text-gray-700",
+      medium: "bg-blue-100 text-blue-700",
+      high: "bg-orange-100 text-orange-700",
+      urgent: "bg-red-100 text-red-700",
+    };
+    const labels: Record<string, string> = {
+      low: "Низкий",
+      medium: "Средний",
+      high: "Высокий",
+      urgent: "Срочно",
+    };
+    return <Badge className={styles[priority]} variant="secondary">{labels[priority]}</Badge>;
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -116,6 +205,51 @@ const Cabinet = () => {
           </div>
 
           <div className="grid gap-6">
+            {/* Мои заявки - показываем если есть задачи */}
+            {myTasks && myTasks.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <ClipboardList className="h-5 w-5" />
+                    Мои заявки
+                  </CardTitle>
+                  <CardDescription>
+                    Активные заявки отсортированы по приоритету
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {myTasks.map((task) => (
+                    <div 
+                      key={task.id} 
+                      className="p-4 rounded-lg border border-border/50 bg-card"
+                    >
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        <span className="font-medium">{task.title}</span>
+                        {getStatusBadge(task.status)}
+                        {getPriorityBadge(task.priority)}
+                      </div>
+                      {task.clients && (
+                        <p className="text-sm text-muted-foreground">
+                          📍 {task.clients.name} — {task.clients.address}
+                        </p>
+                      )}
+                      {task.scheduled_date && (
+                        <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
+                          <Calendar className="h-3 w-3" />
+                          {format(new Date(task.scheduled_date), "dd MMMM yyyy", { locale: ru })}
+                        </p>
+                      )}
+                      {task.notes && (
+                        <p className="text-xs text-muted-foreground mt-2">
+                          {task.notes}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+
             <Card>
               <CardHeader>
                 <CardTitle>Статус верификации</CardTitle>
