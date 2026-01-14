@@ -12,6 +12,7 @@ import Domofony from "./pages/Domofony";
 import Videonablyudenie from "./pages/Videonablyudenie";
 import NashiRaboty from "./pages/NashiRaboty";
 import NotFound from "./pages/NotFound";
+import MobileBottomNav from "./components/MobileBottomNav";
 
 const queryClient = new QueryClient();
 
@@ -21,18 +22,21 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/cabinet" element={<Cabinet />} />
-          <Route path="/admin" element={<Admin />} />
-          <Route path="/fsm" element={<FSM />} />
-          <Route path="/domofony" element={<Domofony />} />
-          <Route path="/videonablyudenie" element={<Videonablyudenie />} />
-          <Route path="/nashi-raboty" element={<NashiRaboty />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <div className="pb-16 lg:pb-0">
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/cabinet" element={<Cabinet />} />
+            <Route path="/admin" element={<Admin />} />
+            <Route path="/fsm" element={<FSM />} />
+            <Route path="/domofony" element={<Domofony />} />
+            <Route path="/videonablyudenie" element={<Videonablyudenie />} />
+            <Route path="/nashi-raboty" element={<NashiRaboty />} />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </div>
+        <MobileBottomNav />
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
