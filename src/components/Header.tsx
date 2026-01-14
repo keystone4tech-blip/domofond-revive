@@ -1,4 +1,4 @@
-import { Phone, Menu, X, User, LayoutDashboard } from "lucide-react";
+import { Phone, User, LayoutDashboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,7 +8,6 @@ import { ThemeToggle } from "./ThemeToggle";
 import { AppRole } from "@/hooks/useUserRole";
 
 const Header = () => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [userRoles, setUserRoles] = useState<AppRole[]>([]);
   const navigate = useNavigate();
@@ -47,13 +46,11 @@ const Header = () => {
     const element = document.getElementById(sectionId);
     if (element) {
       element.scrollIntoView({ behavior: "smooth" });
-      setIsMenuOpen(false);
     }
   };
 
   const handleNavigation = (path: string) => {
     navigate(path);
-    setIsMenuOpen(false);
   };
 
   return (
@@ -142,83 +139,8 @@ const Header = () => {
             </Button>
           )}
 
-          {/* Mobile Menu Button */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="lg:hidden"
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-          >
-            {isMenuOpen ? <X className="h-5 w-5 sm:h-6 sm:w-6" /> : <Menu className="h-5 w-5 sm:h-6 sm:w-6" />}
-          </Button>
         </div>
       </div>
-
-      {/* Mobile Menu */}
-      {isMenuOpen && (
-        <div className="lg:hidden border-t bg-background">
-          <nav className="container px-4 flex flex-col gap-3 py-4">
-            <button
-              onClick={() => handleNavigation("/")}
-              className="text-left text-sm font-medium text-muted-foreground hover:text-foreground transition-colors py-1"
-            >
-              Главная
-            </button>
-            <button
-              onClick={() => handleNavigation("/domofony")}
-              className="text-left text-sm font-medium text-muted-foreground hover:text-foreground transition-colors py-1"
-            >
-              Домофоны
-            </button>
-            <button
-              onClick={() => handleNavigation("/videonablyudenie")}
-              className="text-left text-sm font-medium text-muted-foreground hover:text-foreground transition-colors py-1"
-            >
-              Видеонаблюдение
-            </button>
-            <button
-              onClick={() => handleNavigation("/nashi-raboty")}
-              className="text-left text-sm font-medium text-muted-foreground hover:text-foreground transition-colors py-1"
-            >
-              Наши работы
-            </button>
-            <button
-              onClick={() => scrollToSection("faq")}
-              className="text-left text-sm font-medium text-muted-foreground hover:text-foreground transition-colors py-1"
-            >
-              Вопросы
-            </button>
-            <button
-              onClick={() => scrollToSection("contact")}
-              className="text-left text-sm font-medium text-muted-foreground hover:text-foreground transition-colors py-1"
-            >
-              Контакты
-            </button>
-            <a href="tel:+79034118393" className="flex items-center gap-2 text-sm font-semibold text-primary py-2 border-t mt-2 pt-3">
-              <Phone className="h-4 w-4" />
-              +7 (903) 411-83-93
-            </a>
-            {user ? (
-              <div className="flex flex-col gap-2 md:hidden">
-                {isFSMUser && (
-                  <Button variant="outline" onClick={() => { handleNavigation("/fsm"); }} className="w-full">
-                    <LayoutDashboard className="h-4 w-4 mr-2" />
-                    FSM Система
-                  </Button>
-                )}
-                <Button onClick={() => { handleNavigation("/cabinet"); }} className="w-full">
-                  <User className="h-4 w-4 mr-2" />
-                  Личный кабинет
-                </Button>
-              </div>
-            ) : (
-              <Button onClick={() => { handleNavigation("/auth"); }} className="w-full md:hidden">
-                Войти
-              </Button>
-            )}
-          </nav>
-        </div>
-      )}
     </header>
   );
 };
