@@ -90,13 +90,13 @@ const Header = () => {
             Наши работы
           </button>
           <button
-            onClick={() => scrollToSection("faq")}
+            onClick={() => handleNavigation("/voprosy")}
             className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
           >
             Вопросы
           </button>
           <button
-            onClick={() => scrollToSection("contact")}
+            onClick={() => handleNavigation("/kontakty")}
             className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
           >
             Контакты

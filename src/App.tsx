@@ -11,8 +11,11 @@ import FSM from "./pages/FSM";
 import Domofony from "./pages/Domofony";
 import Videonablyudenie from "./pages/Videonablyudenie";
 import NashiRaboty from "./pages/NashiRaboty";
+import Voprosy from "./pages/Voprosy";
+import Kontakty from "./pages/Kontakty";
 import NotFound from "./pages/NotFound";
 import MobileBottomNav from "./components/MobileBottomNav";
+import ScrollToTop from "./components/ScrollToTop";
 
 const queryClient = new QueryClient();
 
@@ -23,6 +26,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <div className="pb-16 lg:pb-0">
+          <ScrollToTop />
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
@@ -32,6 +36,8 @@ const App = () => (
             <Route path="/domofony" element={<Domofony />} />
             <Route path="/videonablyudenie" element={<Videonablyudenie />} />
             <Route path="/nashi-raboty" element={<NashiRaboty />} />
+            <Route path="/voprosy" element={<Voprosy />} />
+            <Route path="/kontakty" element={<Kontakty />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

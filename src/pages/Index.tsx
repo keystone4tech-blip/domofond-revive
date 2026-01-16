@@ -5,7 +5,6 @@ import PremiumOffer from "@/components/PremiumOffer";
 import { PromotionsSection } from "@/components/PromotionsSection";
 import { NewsSection } from "@/components/NewsSection";
 import About from "@/components/About";
-import FAQ from "@/components/FAQ";
 import Contact from "@/components/Contact";
 import Footer from "@/components/Footer";
 
@@ -20,7 +19,6 @@ const Index = () => {
         <PromotionsSection />
         <NewsSection />
         <About />
-        <FAQ />
         <Contact />
       </main>
       <Footer />

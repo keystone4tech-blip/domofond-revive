@@ -78,14 +78,14 @@ const MobileBottomNav = () => {
     {
       icon: <PhoneIcon className="h-5 w-5" />,
       label: "Контакты",
-      action: () => scrollToSection("contact"),
-      isActive: false,
+      action: () => navigate("/kontakty"),
+      isActive: location.pathname === "/kontakty",
     },
     {
       icon: <HelpCircle className="h-5 w-5" />,
       label: "Вопросы",
-      action: () => scrollToSection("faq"),
-      isActive: false,
+      action: () => navigate("/voprosy"),
+      isActive: location.pathname === "/voprosy",
     },
   ];
 

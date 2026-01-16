@@ -1,13 +1,13 @@
 import { ArrowRight, CheckCircle2, Camera, DoorOpen, Settings, BrainCircuit } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 import heroImage from "@/assets/hero-image.jpg";
 
 const Hero = () => {
+  const navigate = useNavigate();
+
   const scrollToContact = () => {
-    const element = document.getElementById("contact");
-    if (element) {
-      element.scrollIntoView({ behavior: "smooth" });
-    }
+    navigate("/kontakty");
   };
 
   return (
