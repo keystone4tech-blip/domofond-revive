@@ -1,10 +1,11 @@
-import { Wrench, Settings, Shield, Camera, DoorClosed } from "lucide-react";
+import { Wrench, Settings, Shield, Camera, DoorClosed, Building } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import intercomSystem from "@/assets/intercom-system.jpg";
 import cctvCamera from "@/assets/cctv-camera.jpg";
 import barrierGate from "@/assets/barrier-gate.jpg";
 import repairWork from "@/assets/repair-work.jpg";
 import maintenanceService from "@/assets/maintenance-service.jpg";
+import constructionWork from "@/assets/construction-work.jpg";
 
 const services = [
   {
@@ -42,22 +43,29 @@ const services = [
     image: maintenanceService,
     features: ["Профилактические работы", "Чистка и настройка", "Замена расходников"]
   },
+  {
+    icon: Building,
+    title: "Сотрудничество и подрядные работы",
+    description: "Выполнение монтажных работ и проектов любой сложности на взаимовыгодных условиях",
+    image: constructionWork,
+    features: ["Подрядные работы", "Монтаж сложных систем", "Гибкие условия сотрудничества"]
+  },
 ];
 
 const Services = () => {
   return (
-    <section id="services" className="py-16 md:py-24 bg-muted/30">
+    <section id="services" className="py-8 md:py-12 bg-muted/30">
       <div className="container">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl mb-4">
+        <div className="text-center mb-8">
+          <h2 className="text-2xl font-bold tracking-tight sm:text-3xl md:text-4xl mb-4">
             Наши услуги
           </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-base text-muted-foreground max-w-2xl mx-auto">
             Полный спектр услуг по обслуживанию домофонных систем для жилых и коммерческих объектов
           </p>
         </div>
 
-        <div className="grid gap-6 sm:gap-8 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
           {services.map((service, index) => (
             <Card 
               key={index} 

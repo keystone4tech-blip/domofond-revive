@@ -14,6 +14,8 @@ import NashiRaboty from "./pages/NashiRaboty";
 import Voprosy from "./pages/Voprosy";
 import Kontakty from "./pages/Kontakty";
 import NotFound from "./pages/NotFound";
+import SmartIntercom from "./pages/SmartIntercom";
+import Payment from "./pages/Payment";
 import MobileBottomNav from "./components/MobileBottomNav";
 import ScrollToTop from "./components/ScrollToTop";
 
@@ -38,6 +40,8 @@ const App = () => (
             <Route path="/nashi-raboty" element={<NashiRaboty />} />
             <Route path="/voprosy" element={<Voprosy />} />
             <Route path="/kontakty" element={<Kontakty />} />
+            <Route path="/smart-intercom" element={<SmartIntercom />} />
+            <Route path="/payment" element={<Payment />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

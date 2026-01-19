@@ -88,7 +88,7 @@ const PremiumOffer = () => {
   if (loading || blocks.length === 0) return null;
 
   return (
-    <section className="py-16 md:py-24 bg-gradient-to-br from-primary/10 via-background to-primary/5">
+    <section className="py-8 md:py-12 bg-gradient-to-br from-primary/10 via-background to-primary/5">
       <div className="container px-4">
         <div className={`grid gap-6 ${
           blocks.length === 1 ? "max-w-5xl mx-auto" :

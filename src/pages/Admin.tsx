@@ -19,6 +19,20 @@ const Admin = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isVisible, setIsVisible] = useState({
+    header: false,
+    content: false
+  });
+
+  useEffect(() => {
+    if (!loading && isAdmin) {
+      // Анимация заголовка (0.5 сек)
+      setTimeout(() => setIsVisible(prev => ({ ...prev, header: true })), 500);
+
+      // Анимация содержимого (1.0 сек)
+      setTimeout(() => setIsVisible(prev => ({ ...prev, content: true })), 1000);
+    }
+  }, [loading, isAdmin]);
 
   useEffect(() => {
     checkAdminAccess();
@@ -80,12 +94,21 @@ const Admin = () => {
     <div className="min-h-screen">
       <Header />
       <main className="container mx-auto px-4 py-8">
-        <div className="flex items-center gap-3 mb-8">
+        <div
+          className={`flex items-center gap-3 mb-8 ${
+            isVisible.header ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-10'
+          } transition-all duration-700 ease-out`}
+        >
           <Shield className="h-8 w-8 text-primary" />
           <h1 className="text-3xl font-bold">Панель администратора</h1>
         </div>
 
-        <Tabs defaultValue="stats" className="w-full">
+        <Tabs
+          defaultValue="stats"
+          className={`w-full ${
+            isVisible.content ? 'opacity-100' : 'opacity-0'
+          } transition-opacity duration-700`}
+        >
           <TabsList className="grid w-full grid-cols-7 mb-8">
             <TabsTrigger value="stats">Статистика</TabsTrigger>
             <TabsTrigger value="promotions">Акции</TabsTrigger>

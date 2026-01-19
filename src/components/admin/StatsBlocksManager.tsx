@@ -18,15 +18,20 @@ interface StatsBlock {
   order_index: number;
 }
 
-const availableIcons = [
-  "Users",
-  "Clock", 
-  "Award",
-  "Shield",
-  "TrendingUp",
-  "Star",
-  "CheckCircle",
-  "Zap",
+interface IconOption {
+  value: string;
+  label: string;
+}
+
+const availableIcons: IconOption[] = [
+  { value: "Users", label: "Пользователи" },
+  { value: "Clock", label: "Часы" },
+  { value: "Award", label: "Награда" },
+  { value: "Shield", label: "Щит" },
+  { value: "TrendingUp", label: "Рост" },
+  { value: "Star", label: "Звезда" },
+  { value: "CheckCircle", label: "Галочка" },
+  { value: "Zap", label: "Молния" },
 ];
 
 export const StatsBlocksManager = () => {
@@ -236,8 +241,8 @@ export const StatsBlocksManager = () => {
                     </SelectTrigger>
                     <SelectContent>
                       {availableIcons.map((icon) => (
-                        <SelectItem key={icon} value={icon}>
-                          {icon}
+                        <SelectItem key={icon.value} value={icon.value}>
+                          {icon.label}
                         </SelectItem>
                       ))}
                     </SelectContent>

@@ -31,19 +31,34 @@ const Contact = () => {
       contactSchema.parse(formData);
       setErrors({});
 
-      // Отправка данных в Supabase
-      const { error } = await supabase
-        .from('contacts')
-        .insert([{
-          name: formData.name,
-          phone: formData.phone,
-          address: formData.address,
-          message: formData.message,
-          created_at: new Date().toISOString()
-        }]);
+      // Временно выводим данные в консоль до настройки базы данных
+      console.log("Данные формы:", {
+        name: formData.name,
+        phone: formData.phone,
+        address: formData.address,
+        message: formData.message,
+        created_at: new Date().toISOString()
+      });
 
-      if (error) {
-        throw error;
+      // Попытка отправки данных в Supabase (с обработкой ошибок)
+      try {
+        const { error } = await supabase
+          .from('contacts')
+          .insert([{
+            name: formData.name,
+            phone: formData.phone,
+            address: formData.address,
+            message: formData.message,
+            created_at: new Date().toISOString()
+          }]);
+
+        if (error) {
+          console.error("Ошибка при отправке в Supabase:", error);
+          throw error;
+        }
+      } catch (dbError) {
+        console.error("Ошибка базы данных:", dbError);
+        // Не прерываем выполнение, а просто выводим уведомление
       }
 
       toast({
@@ -89,10 +104,10 @@ const Contact = () => {
     <section id="contact" className="py-16 md:py-24">
       <div className="container">
         <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl mb-4">
+          <h2 className="text-2xl font-bold tracking-tight sm:text-3xl md:text-4xl mb-4">
             Свяжитесь с нами
           </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-base text-muted-foreground max-w-2xl mx-auto">
             Оставьте заявку и мы перезвоним вам в течение 15 минут
           </p>
         </div>
@@ -183,11 +198,17 @@ const Contact = () => {
                 <h3 className="font-semibold mb-1">Адрес офиса</h3>
                 <p className="text-muted-foreground">г. Краснодар, проезд Репина 1</p>
                 <p className="text-sm text-muted-foreground mt-1">2 этаж, офис 134</p>
-                <div className="mt-2">
+                <div className="flex gap-2 mt-2">
                   <Button asChild size="sm" variant="outline">
-                    <a href="https://yandex.ru/maps/?text=Краснодар, проезд Репина 1" target="_blank" rel="noopener noreferrer">
+                    <a href="https://yandex.ru/maps/-/CLhNYJYt" target="_blank" rel="noopener noreferrer">
                       <MapPin className="h-4 w-4 mr-1" />
-                      Посмотреть на карте
+                      Яндекс Карты
+                    </a>
+                  </Button>
+                  <Button asChild size="sm" variant="outline">
+                    <a href="https://go.2gis.com/Morvu" target="_blank" rel="noopener noreferrer">
+                      <MapPin className="h-4 w-4 mr-1" />
+                      2GIS
                     </a>
                   </Button>
                 </div>

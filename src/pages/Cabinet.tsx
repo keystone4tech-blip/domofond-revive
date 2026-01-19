@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, LogOut, CheckCircle, AlertCircle, ClipboardList, Calendar } from "lucide-react";
+import { Loader2, LogOut, CheckCircle, AlertCircle, ClipboardList, Calendar, Shield } from "lucide-react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { format } from "date-fns";
@@ -29,12 +29,27 @@ const Cabinet = () => {
   const [saving, setSaving] = useState(false);
   const [profile, setProfile] = useState<any>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [userRoles, setUserRoles] = useState<string[]>([]);
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [apartment, setApartment] = useState("");
+  const [isVisible, setIsVisible] = useState({
+    header: false,
+    content: false
+  });
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (!loading) {
+      // Анимация заголовка (0.5 сек)
+      setTimeout(() => setIsVisible(prev => ({ ...prev, header: true })), 500);
+
+      // Анимация содержимого (1.0 сек)
+      setTimeout(() => setIsVisible(prev => ({ ...prev, content: true })), 1000);
+    }
+  }, [loading]);
 
   useEffect(() => {
     checkUser();
@@ -43,13 +58,23 @@ const Cabinet = () => {
   const checkUser = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      
+
       if (!session) {
         navigate("/auth");
         return;
       }
 
       setUserId(session.user.id);
+
+      // Получаем роли пользователя
+      const { data: rolesData } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", session.user.id);
+
+      if (rolesData) {
+        setUserRoles(rolesData.map(r => r.role));
+      }
 
       const { data, error } = await supabase
         .from("profiles")
@@ -197,11 +222,29 @@ const Cabinet = () => {
       <main className="flex-1 bg-muted/30 py-8">
         <div className="container max-w-4xl">
           <div className="flex justify-between items-center mb-8">
-            <h1 className="text-3xl font-bold">Личный кабинет</h1>
-            <Button variant="outline" onClick={handleLogout}>
-              <LogOut className="h-4 w-4 mr-2" />
-              Выйти
-            </Button>
+            <h1
+              className={`text-3xl font-bold ${
+                isVisible.header ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-10'
+              } transition-all duration-700 ease-out`}
+            >
+              Личный кабинет
+            </h1>
+            <div
+              className={`flex gap-2 ${
+                isVisible.header ? 'opacity-100' : 'opacity-0'
+              } transition-opacity duration-700 delay-300`}
+            >
+              {userRoles.includes("admin") && (
+                <Button variant="outline" onClick={() => navigate("/admin")}>
+                  <Shield className="h-4 w-4 mr-2" />
+                  Админ-панель
+                </Button>
+              )}
+              <Button variant="outline" onClick={handleLogout}>
+                <LogOut className="h-4 w-4 mr-2" />
+                Выйти
+              </Button>
+            </div>
           </div>
 
           <div className="grid gap-6">

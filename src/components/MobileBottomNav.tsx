@@ -73,7 +73,7 @@ const MobileBottomNav = () => {
       icon: <Wrench className="h-5 w-5" />,
       label: "Услуги",
       action: () => navigate("/domofony"),
-      isActive: location.pathname === "/domofony" || location.pathname === "/videonablyudenie",
+      isActive: location.pathname === "/domofony" || location.pathname === "/videonablyudenie" || location.pathname === "/smart-intercom",
     },
     {
       icon: <PhoneIcon className="h-5 w-5" />,

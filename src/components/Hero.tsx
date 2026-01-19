@@ -36,14 +36,14 @@ const Hero = () => {
         }} />
       </div>
 
-      <div className="container px-4 py-8 md:py-12 lg:py-24 relative z-10">
-        <div className="grid gap-6 md:gap-8 lg:grid-cols-2 lg:gap-12 items-center">
-          <div className="flex flex-col gap-4 md:gap-6">
-            <div className="space-y-2 md:space-y-4">
-              <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl animate-fade-in bg-gradient-to-r from-primary via-blue-600 to-primary bg-clip-text text-transparent bg-[length:200%_auto] animate-gradient drop-shadow-lg">
+      <div className="container px-4 py-6 md:py-8 lg:py-12 relative z-10">
+        <div className="grid gap-4 md:gap-6 lg:grid-cols-2 lg:gap-8 items-center">
+          <div className="flex flex-col gap-3 md:gap-4">
+            <div className="space-y-2 md:space-y-3">
+              <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl md:text-5xl lg:text-6xl animate-fade-in bg-gradient-to-r from-primary via-blue-600 to-primary bg-clip-text text-transparent bg-[length:200%_auto] animate-gradient drop-shadow-lg">
                 Домофондар
               </h1>
-              <h2 className="text-lg font-bold tracking-tight sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl text-foreground/90 animate-fade-in drop-shadow-md" style={{ animationDelay: '0.2s' }}>
+              <h2 className="text-base font-bold tracking-tight sm:text-lg md:text-xl lg:text-2xl text-foreground/90 animate-fade-in drop-shadow-md" style={{ animationDelay: '0.2s' }}>
                 Профессиональное обслуживание домофонов
               </h2>
             </div>
@@ -66,16 +66,26 @@ const Hero = () => {
               </div>
             </div>
             <div className="flex flex-col sm:flex-row gap-4 animate-fade-in" style={{ animationDelay: '0.8s' }}>
-              <Button 
-                size="lg" 
-                className="gradient-primary text-primary-foreground hover:opacity-90 transition-opacity shadow-lg text-sm sm:text-base w-full sm:w-auto"
-                onClick={scrollToContact}
-              >
-                Заказать звонок
-                <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5" />
-              </Button>
-              <Button 
-                size="lg" 
+              <div className="flex flex-col gap-4">
+                <Button
+                  size="lg"
+                  className="gradient-primary text-primary-foreground hover:opacity-90 transition-opacity shadow-lg text-sm sm:text-base w-full sm:w-auto"
+                  onClick={scrollToContact}
+                >
+                  Заказать звонок
+                  <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5" />
+                </Button>
+                <Button
+                  size="lg"
+                  variant="secondary"
+                  onClick={() => navigate("/payment")}
+                  className="text-sm sm:text-base w-full sm:w-auto"
+                >
+                  Оплатить за техническое обслуживание
+                </Button>
+              </div>
+              <Button
+                size="lg"
                 variant="outline"
                 onClick={() => {
                   const element = document.getElementById("services");

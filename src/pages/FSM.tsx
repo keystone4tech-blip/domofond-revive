@@ -1,15 +1,15 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  LayoutDashboard, 
-  Users, 
-  ClipboardList, 
-  MapPin, 
+import {
+  LayoutDashboard,
+  Users,
+  ClipboardList,
+  MapPin,
   Building2,
   BarChart3,
   Loader2
@@ -22,9 +22,24 @@ import LocationMap from "@/components/fsm/LocationMap";
 import FSMReports from "@/components/fsm/FSMReports";
 
 const FSM = () => {
+  const [isVisible, setIsVisible] = useState({
+    header: false,
+    content: false
+  });
+
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, isFSMUser, isManager, isLoading, roles } = useUserRole();
+
+  useEffect(() => {
+    if (!isLoading && user && isFSMUser) {
+      // Анимация заголовка (0.5 сек)
+      setTimeout(() => setIsVisible(prev => ({ ...prev, header: true })), 500);
+
+      // Анимация содержимого (1.0 сек)
+      setTimeout(() => setIsVisible(prev => ({ ...prev, content: true })), 1000);
+    }
+  }, [isLoading, user, isFSMUser]);
 
   useEffect(() => {
     console.log("FSM page check - isLoading:", isLoading, "user:", !!user, "isFSMUser:", isFSMUser, "roles:", roles);
@@ -75,7 +90,11 @@ const FSM = () => {
       <Header />
       
       <main className="flex-1 container px-4 py-6">
-        <div className="mb-6">
+        <div
+          className={`mb-6 ${
+            isVisible.header ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-10'
+          } transition-all duration-700 ease-out`}
+        >
           <h1 className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-3">
             <LayoutDashboard className="h-7 w-7 text-primary" />
             FSM Система
@@ -85,7 +104,12 @@ const FSM = () => {
           </p>
         </div>
 
-        <Tabs defaultValue="dashboard" className="space-y-6">
+        <Tabs
+          defaultValue="dashboard"
+          className={`space-y-6 ${
+            isVisible.content ? 'opacity-100' : 'opacity-0'
+          } transition-opacity duration-700`}
+        >
           <TabsList className="flex flex-wrap h-auto gap-1 bg-muted/50 p-1">
             <TabsTrigger value="dashboard" className="flex items-center gap-2">
               <LayoutDashboard className="h-4 w-4" />
