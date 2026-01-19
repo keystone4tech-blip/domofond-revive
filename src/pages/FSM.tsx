@@ -12,6 +12,7 @@ import {
   MapPin,
   Building2,
   BarChart3,
+  FileText,
   Loader2
 } from "lucide-react";
 import FSMDashboard from "@/components/fsm/FSMDashboard";
@@ -20,6 +21,7 @@ import TasksManager from "@/components/fsm/TasksManager";
 import ClientsManager from "@/components/fsm/ClientsManager";
 import LocationMap from "@/components/fsm/LocationMap";
 import FSMReports from "@/components/fsm/FSMReports";
+import RequestsManager from "@/components/fsm/RequestsManager";
 
 const FSM = () => {
   const [isVisible, setIsVisible] = useState({
@@ -119,6 +121,10 @@ const FSM = () => {
               <ClipboardList className="h-4 w-4" />
               <span className="hidden sm:inline">Задачи</span>
             </TabsTrigger>
+            <TabsTrigger value="requests" className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              <span className="hidden sm:inline">Заявки</span>
+            </TabsTrigger>
             {isManager && (
               <>
                 <TabsTrigger value="employees" className="flex items-center gap-2">
@@ -147,6 +153,10 @@ const FSM = () => {
 
           <TabsContent value="tasks">
             <TasksManager isManager={isManager} />
+          </TabsContent>
+
+          <TabsContent value="requests">
+            <RequestsManager />
           </TabsContent>
 
           {isManager && (

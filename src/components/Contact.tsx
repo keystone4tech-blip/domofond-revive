@@ -31,34 +31,49 @@ const Contact = () => {
       contactSchema.parse(formData);
       setErrors({});
 
-      // Временно выводим данные в консоль до настройки базы данных
-      console.log("Данные формы:", {
+      // Отправляем данные в новую таблицу requests
+      console.log("Отправляем данные в таблицу requests:", {
         name: formData.name,
         phone: formData.phone,
         address: formData.address,
         message: formData.message,
+        status: 'pending',
+        priority: 'medium',
         created_at: new Date().toISOString()
       });
 
-      // Попытка отправки данных в Supabase (с обработкой ошибок)
-      try {
-        const { error } = await supabase
-          .from('contacts')
-          .insert([{
-            name: formData.name,
-            phone: formData.phone,
-            address: formData.address,
-            message: formData.message,
-            created_at: new Date().toISOString()
-          }]);
+      const { data, error: requestError } = await supabase
+        .from('requests')
+        .insert([{
+          name: formData.name,
+          phone: formData.phone,
+          address: formData.address,
+          message: formData.message,
+          status: 'pending',
+          priority: 'medium',
+          created_at: new Date().toISOString()
+        }]);
 
-        if (error) {
-          console.error("Ошибка при отправке в Supabase:", error);
-          throw error;
-        }
-      } catch (dbError) {
-        console.error("Ошибка базы данных:", dbError);
-        // Не прерываем выполнение, а просто выводим уведомление
+      if (requestError) {
+        console.error("Ошибка при отправке заявки в requests:", requestError);
+        throw requestError;
+      } else {
+        console.log("Заявка успешно отправлена в requests:", data);
+      }
+
+      // Также сохраняем в старую таблицу contacts для совместимости
+      const { error: contactError } = await supabase
+        .from('contacts')
+        .insert([{
+          name: formData.name,
+          phone: formData.phone,
+          address: formData.address,
+          message: formData.message,
+          created_at: new Date().toISOString()
+        }]);
+
+      if (contactError) {
+        console.warn("Предупреждение: Ошибка при сохранении в contacts:", contactError);
       }
 
       toast({
