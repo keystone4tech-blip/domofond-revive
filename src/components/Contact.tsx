@@ -61,21 +61,6 @@ const Contact = () => {
         console.log("Заявка успешно отправлена в requests:", data);
       }
 
-      // Также сохраняем в старую таблицу contacts для совместимости
-      const { error: contactError } = await supabase
-        .from('contacts')
-        .insert([{
-          name: formData.name,
-          phone: formData.phone,
-          address: formData.address,
-          message: formData.message,
-          created_at: new Date().toISOString()
-        }]);
-
-      if (contactError) {
-        console.warn("Предупреждение: Ошибка при сохранении в contacts:", contactError);
-      }
-
       toast({
         title: "Заявка отправлена!",
         description: "Мы свяжемся с вами в ближайшее время.",

@@ -49,6 +49,11 @@ const MobileBottomNav = () => {
     ["admin", "director", "dispatcher", "master", "engineer"].includes(r)
   );
 
+  // Hide on FSM pages - they have their own nav
+  if (location.pathname.startsWith("/fsm")) {
+    return null;
+  }
+
   const scrollToSection = (sectionId: string) => {
     if (location.pathname !== "/") {
       navigate("/");

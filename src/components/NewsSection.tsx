@@ -11,7 +11,7 @@ interface NewsItem {
   id: string;
   title: string;
   excerpt: string | null;
-  full_text: string | null;
+  content: string | null;
   image_url: string | null;
   published_at: string | null;
 }
@@ -136,7 +136,7 @@ export const NewsSection = () => {
                 )}
                 <h3 className="text-2xl font-bold mb-2">{selectedNews.title}</h3>
                 <div className="prose max-w-none">
-                  {selectedNews.full_text || selectedNews.excerpt}
+                  {selectedNews.content || selectedNews.excerpt}
                 </div>
               </div>
               <div className="mt-6 pt-4 border-t flex justify-between">

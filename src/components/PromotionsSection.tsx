@@ -11,9 +11,8 @@ interface Promotion {
   id: string;
   title: string;
   description: string | null;
-  full_description: string | null;
   image_url: string | null;
-  created_at: string;
+  created_at: string | null;
 }
 
 export const PromotionsSection = () => {
@@ -124,7 +123,7 @@ export const PromotionsSection = () => {
               <div className="mb-4">
                 <h3 className="text-2xl font-bold mb-2">{selectedPromotion.title}</h3>
                 <div className="prose max-w-none">
-                  {selectedPromotion.full_description || selectedPromotion.description}
+                  {selectedPromotion.description}
                 </div>
               </div>
               <div className="mt-6 pt-4 border-t flex justify-between">
