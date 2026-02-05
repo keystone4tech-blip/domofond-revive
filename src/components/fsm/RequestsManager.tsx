@@ -44,10 +44,12 @@ import {
   User,
   HandMetal,
   Calendar,
-  Package
+  Package,
+  Eye
 } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 import { ru } from "date-fns/locale";
+import RequestDetails from "./RequestDetails";
 
 interface Request {
   id: string;
@@ -97,7 +99,6 @@ const RequestsManager = () => {
   const { user, isManager } = useUserRole();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<Request | null>(null);
   const [editingRequest, setEditingRequest] = useState<Request | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -193,24 +194,6 @@ const RequestsManager = () => {
       if (error) throw error;
       return data as Product[];
     },
-  });
-
-  // Fetch items for selected request
-  const { data: selectedRequestItems } = useQuery({
-    queryKey: ["request-items", selectedRequest?.id],
-    queryFn: async () => {
-      if (!selectedRequest?.id) return [];
-      const { data, error } = await supabase
-        .from("request_items")
-        .select(`
-          *,
-          product:products (id, name, unit)
-        `)
-        .eq("request_id", selectedRequest.id);
-      if (error) throw error;
-      return data as RequestItem[];
-    },
-    enabled: !!selectedRequest?.id,
   });
 
   // Statistics
@@ -337,36 +320,6 @@ const RequestsManager = () => {
     },
   });
 
-  // Complete request mutation
-  const completeRequestMutation = useMutation({
-    mutationFn: async (requestId: string) => {
-      const now = new Date();
-      const { data: request } = await supabase
-        .from("requests")
-        .select("notes")
-        .eq("id", requestId)
-        .single();
-
-      const completeNote = (request?.notes || "") + ` | Выполнено: ${format(now, "dd.MM.yyyy HH:mm")}`;
-
-      const { error } = await supabase
-        .from("requests")
-        .update({
-          status: "completed",
-          completed_at: now.toISOString(),
-          notes: completeNote,
-        })
-        .eq("id", requestId);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["requests"] });
-      toast({ title: "Заявка выполнена" });
-      setIsDetailOpen(false);
-    },
-  });
-
   // Delete request mutation
   const deleteRequestMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -376,42 +329,6 @@ const RequestsManager = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["requests"] });
       toast({ title: "Заявка удалена" });
-    },
-  });
-
-  // Add item to request
-  const addItemMutation = useMutation({
-    mutationFn: async ({ requestId, productId, quantity }: { requestId: string; productId: string; quantity: number }) => {
-      const product = products?.find(p => p.id === productId);
-      if (!product) throw new Error("Товар не найден");
-
-      const { error } = await supabase
-        .from("request_items")
-        .insert({
-          request_id: requestId,
-          product_id: productId,
-          quantity,
-          price: product.price,
-        });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["request-items"] });
-      toast({ title: "Товар добавлен" });
-      setShowProductDialog(false);
-      setNewItem({ product_id: "", quantity: 1 });
-    },
-  });
-
-  // Delete item from request
-  const deleteItemMutation = useMutation({
-    mutationFn: async (itemId: string) => {
-      const { error } = await supabase.from("request_items").delete().eq("id", itemId);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["request-items"] });
-      toast({ title: "Товар удален" });
     },
   });
 
@@ -486,15 +403,22 @@ const RequestsManager = () => {
     return <Badge variant="secondary" className={cfg.color}>{cfg.label}</Badge>;
   };
 
-  const calculateTotal = (items: RequestItem[]) => {
-    return items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  };
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
+    );
+  }
+
+  // Show request details view
+  if (selectedRequest) {
+    return (
+      <RequestDetails
+        request={selectedRequest}
+        onBack={() => setSelectedRequest(null)}
+        isManager={isManager}
+      />
     );
   }
 
@@ -653,6 +577,62 @@ const RequestsManager = () => {
                       </div>
                     </div>
 
+                    {/* Products section for new request */}
+                    {!editingRequest && (
+                      <div className="border-t pt-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label className="font-semibold flex items-center gap-2">
+                            <Package className="h-4 w-4" />
+                            Товары и услуги
+                          </Label>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setShowProductDialog(true)}
+                          >
+                            <Plus className="h-4 w-4 mr-1" />
+                            Добавить
+                          </Button>
+                        </div>
+                        {requestItems.length > 0 ? (
+                          <div className="space-y-2">
+                            {requestItems.map((item, idx) => {
+                              const product = products?.find(p => p.id === item.product_id);
+                              return (
+                                <div key={idx} className="flex items-center justify-between p-2 bg-muted/50 rounded text-sm">
+                                  <div>
+                                    <span className="font-medium">{product?.name}</span>
+                                    <span className="text-muted-foreground ml-2">
+                                      {item.quantity} × {item.price.toFixed(0)} ₽
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-semibold">{(item.price * item.quantity).toFixed(0)} ₽</span>
+                                    <Button
+                                      type="button"
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-6 w-6 text-destructive"
+                                      onClick={() => setRequestItems(requestItems.filter((_, i) => i !== idx))}
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                            <div className="flex justify-between pt-2 border-t text-sm font-semibold">
+                              <span>Итого:</span>
+                              <span>{requestItems.reduce((sum, i) => sum + i.price * i.quantity, 0).toFixed(0)} ₽</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">Нет добавленных товаров</p>
+                        )}
+                      </div>
+                    )}
+
                     <Button
                       type="submit"
                       className="w-full"
@@ -679,111 +659,121 @@ const RequestsManager = () => {
               {requests.map((request) => (
                 <Card 
                   key={request.id} 
-                  className={`hover:border-primary/50 transition-colors cursor-pointer ${request.priority === 'urgent' ? 'border-red-500/50' : ''}`}
-                  onClick={() => {
-                    setSelectedRequest(request);
-                    setIsDetailOpen(true);
-                  }}
+                  className={`hover:border-primary/50 transition-colors cursor-pointer ${request.priority === 'urgent' ? 'border-red-500/50 border-2' : 'border-border/50'}`}
+                  onClick={() => setSelectedRequest(request)}
                 >
-                  <CardContent className="p-4">
-                    <div className="flex flex-col sm:flex-row gap-3 justify-between">
-                      <div className="flex-1 space-y-2">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-semibold">{request.name}</span>
+                  <CardContent className="p-4 space-y-3">
+                    {/* Header row */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <User className="h-4 w-4 text-primary" />
+                          <span className="font-semibold text-lg">{request.name}</span>
+                        </div>
+                        <div className="flex gap-2 flex-wrap">
                           {getStatusBadge(request.status)}
                           {getPriorityBadge(request.priority)}
                         </div>
-                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                          <Phone className="h-3 w-3" />
-                          <a href={`tel:${request.phone}`} className="hover:text-primary" onClick={e => e.stopPropagation()}>
-                            {request.phone}
-                          </a>
-                        </div>
-                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                          <MapPin className="h-3 w-3" />
-                          {request.address}
-                        </div>
-                        <p className="text-sm line-clamp-2">{request.message}</p>
-                        
-                        {/* Show who accepted */}
-                        {request.accepted_employee && (
-                          <div className="flex items-center gap-1 text-sm text-green-600 dark:text-green-400">
-                            <User className="h-3 w-3" />
-                            Принял: {request.accepted_employee.full_name}
-                            {request.accepted_at && (
-                              <span className="text-muted-foreground">
-                                • {format(new Date(request.accepted_at), "dd.MM HH:mm", { locale: ru })}
-                              </span>
-                            )}
-                          </div>
+                      </div>
+                      <div className="text-xs text-muted-foreground text-right">
+                        {format(new Date(request.created_at), "dd MMM", { locale: ru })}
+                        <br />
+                        {format(new Date(request.created_at), "HH:mm")}
+                      </div>
+                    </div>
+
+                    {/* Contact info */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                      <div className="flex items-center gap-2">
+                        <Phone className="h-4 w-4 text-primary" />
+                        <a
+                          href={`tel:${request.phone}`}
+                          className="text-primary hover:underline font-medium"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {request.phone}
+                        </a>
+                      </div>
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <MapPin className="h-4 w-4" />
+                        <span className="truncate">{request.address}</span>
+                      </div>
+                    </div>
+
+                    {/* Description */}
+                    <p className="text-sm text-muted-foreground line-clamp-2 bg-muted/30 p-2 rounded">
+                      {request.message}
+                    </p>
+
+                    {/* Accepted by info */}
+                    {request.accepted_employee && (
+                      <div className="flex items-center gap-2 text-sm p-2 bg-green-50 dark:bg-green-900/20 rounded">
+                        <HandMetal className="h-4 w-4 text-green-600" />
+                        <span className="font-medium text-green-700 dark:text-green-400">
+                          {request.accepted_employee.full_name}
+                        </span>
+                        {request.accepted_at && (
+                          <span className="text-muted-foreground">
+                            • {format(new Date(request.accepted_at), "dd.MM HH:mm")}
+                          </span>
                         )}
                       </div>
+                    )}
 
-                      <div className="flex flex-col items-end gap-2">
-                        <div className="text-xs text-muted-foreground">
-                          {format(new Date(request.created_at), "dd MMM, HH:mm", { locale: ru })}
-                        </div>
-                        <div className="flex gap-1">
-                          {request.status === "pending" && (
-                            <Button
-                              size="sm"
-                              variant="default"
+                    {/* Action buttons */}
+                    <div className="flex gap-2 pt-2 border-t">
+                      {request.status === "pending" && (
+                        <Button
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            acceptRequestMutation.mutate(request.id);
+                          }}
+                          disabled={acceptRequestMutation.isPending}
+                        >
+                          <HandMetal className="h-4 w-4 mr-1" />
+                          Принять
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedRequest(request);
+                        }}
+                      >
+                        <Eye className="h-4 w-4 mr-1" />
+                        Подробнее
+                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={(e) => {
+                            e.stopPropagation();
+                            startEdit(request);
+                          }}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Редактировать
+                          </DropdownMenuItem>
+                          {isManager && (
+                            <DropdownMenuItem 
+                              className="text-destructive"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                acceptRequestMutation.mutate(request.id);
+                                deleteRequestMutation.mutate(request.id);
                               }}
-                              disabled={acceptRequestMutation.isPending}
                             >
-                              <HandMetal className="h-4 w-4 mr-1" />
-                              Принять
-                            </Button>
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Удалить
+                            </DropdownMenuItem>
                           )}
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                              <Button variant="ghost" size="icon">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedRequest(request);
-                                setIsDetailOpen(true);
-                              }}>
-                                Подробнее
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={(e) => {
-                                e.stopPropagation();
-                                startEdit(request);
-                              }}>
-                                <Edit className="h-4 w-4 mr-2" />
-                                Редактировать
-                              </DropdownMenuItem>
-                              {request.status === "in_progress" && (
-                                <DropdownMenuItem onClick={(e) => {
-                                  e.stopPropagation();
-                                  completeRequestMutation.mutate(request.id);
-                                }}>
-                                  <CheckCircle2 className="h-4 w-4 mr-2" />
-                                  Выполнено
-                                </DropdownMenuItem>
-                              )}
-                              {isManager && (
-                                <DropdownMenuItem 
-                                  className="text-destructive"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    deleteRequestMutation.mutate(request.id);
-                                  }}
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Удалить
-                                </DropdownMenuItem>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </div>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </CardContent>
                 </Card>
@@ -792,169 +782,6 @@ const RequestsManager = () => {
           )}
         </CardContent>
       </Card>
-
-      {/* Request Detail Dialog */}
-      <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Детали заявки</DialogTitle>
-          </DialogHeader>
-          
-          {selectedRequest && (
-            <div className="space-y-4">
-              <div className="flex gap-2 flex-wrap">
-                {getStatusBadge(selectedRequest.status)}
-                {getPriorityBadge(selectedRequest.priority)}
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-muted-foreground">Клиент</Label>
-                  <p className="font-medium">{selectedRequest.name}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Телефон</Label>
-                  <a href={`tel:${selectedRequest.phone}`} className="text-primary hover:underline flex items-center gap-1">
-                    <Phone className="h-4 w-4" />
-                    {selectedRequest.phone}
-                  </a>
-                </div>
-                <div className="col-span-2">
-                  <Label className="text-muted-foreground">Адрес</Label>
-                  <p className="flex items-center gap-1">
-                    <MapPin className="h-4 w-4" />
-                    {selectedRequest.address}
-                  </p>
-                </div>
-              </div>
-
-              <div>
-                <Label className="text-muted-foreground">Описание</Label>
-                <p className="whitespace-pre-wrap">{selectedRequest.message}</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-muted-foreground">Дата создания</Label>
-                  <p className="flex items-center gap-1">
-                    <Calendar className="h-4 w-4" />
-                    {format(new Date(selectedRequest.created_at), "dd MMMM yyyy, HH:mm", { locale: ru })}
-                  </p>
-                </div>
-                {selectedRequest.accepted_at && (
-                  <div>
-                    <Label className="text-muted-foreground">Время принятия</Label>
-                    <p>{format(new Date(selectedRequest.accepted_at), "dd MMMM yyyy, HH:mm", { locale: ru })}</p>
-                  </div>
-                )}
-                {selectedRequest.completed_at && (
-                  <div>
-                    <Label className="text-muted-foreground">Время выполнения</Label>
-                    <p>{format(new Date(selectedRequest.completed_at), "dd MMMM yyyy, HH:mm", { locale: ru })}</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Accepted by info */}
-              {selectedRequest.accepted_employee && (
-                <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                  <Label className="text-green-700 dark:text-green-400">Принял заявку</Label>
-                  <p className="font-medium">{selectedRequest.accepted_employee.full_name}</p>
-                  {selectedRequest.accepted_employee.phone && (
-                    <a href={`tel:${selectedRequest.accepted_employee.phone}`} className="text-sm text-primary">
-                      {selectedRequest.accepted_employee.phone}
-                    </a>
-                  )}
-                </div>
-              )}
-
-              {/* Notes */}
-              {selectedRequest.notes && (
-                <div>
-                  <Label className="text-muted-foreground">Примечания</Label>
-                  <p className="text-sm whitespace-pre-wrap bg-muted/50 p-2 rounded">{selectedRequest.notes}</p>
-                </div>
-              )}
-
-              {/* Products/Items Section */}
-              <div className="border-t pt-4">
-                <div className="flex items-center justify-between mb-3">
-                  <Label className="text-lg font-semibold flex items-center gap-2">
-                    <Package className="h-5 w-5" />
-                    Товары и услуги
-                  </Label>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setShowProductDialog(true)}
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    Добавить
-                  </Button>
-                </div>
-                
-                {selectedRequestItems && selectedRequestItems.length > 0 ? (
-                  <div className="space-y-2">
-                    {selectedRequestItems.map(item => (
-                      <div key={item.id} className="flex items-center justify-between p-2 bg-muted/50 rounded">
-                        <div>
-                          <span className="font-medium">{item.product?.name}</span>
-                          <span className="text-muted-foreground ml-2">
-                            {item.quantity} {item.product?.unit} × {item.price} ₽
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold">{(item.price * item.quantity).toFixed(0)} ₽</span>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-8 w-8 text-destructive"
-                            onClick={() => deleteItemMutation.mutate(item.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                    <div className="flex justify-between pt-2 border-t font-bold">
-                      <span>Итого:</span>
-                      <span>{calculateTotal(selectedRequestItems).toFixed(0)} ₽</span>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">Нет добавленных товаров</p>
-                )}
-              </div>
-
-              {/* Action buttons */}
-              <div className="flex gap-2 pt-4 border-t">
-                {selectedRequest.status === "pending" && (
-                  <Button 
-                    onClick={() => acceptRequestMutation.mutate(selectedRequest.id)}
-                    disabled={acceptRequestMutation.isPending}
-                  >
-                    <HandMetal className="h-4 w-4 mr-2" />
-                    Принять в работу
-                  </Button>
-                )}
-                {selectedRequest.status === "in_progress" && (
-                  <Button 
-                    onClick={() => completeRequestMutation.mutate(selectedRequest.id)}
-                    disabled={completeRequestMutation.isPending}
-                  >
-                    <CheckCircle2 className="h-4 w-4 mr-2" />
-                    Выполнено
-                  </Button>
-                )}
-                <Button variant="outline" onClick={() => startEdit(selectedRequest)}>
-                  <Edit className="h-4 w-4 mr-2" />
-                  Редактировать
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
 
       {/* Add Product Dialog */}
       <Dialog open={showProductDialog} onOpenChange={setShowProductDialog}>
@@ -975,7 +802,7 @@ const RequestsManager = () => {
                 <SelectContent>
                   {products?.map(product => (
                     <SelectItem key={product.id} value={product.id}>
-                      {product.name} - {product.price} ₽/{product.unit}
+                      {product.name} - {product.price.toFixed(0)} ₽/{product.unit}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -986,6 +813,7 @@ const RequestsManager = () => {
               <Input
                 type="number"
                 min="1"
+                step="0.1"
                 value={newItem.quantity}
                 onChange={(e) => setNewItem({ ...newItem, quantity: Number(e.target.value) })}
               />
@@ -993,17 +821,24 @@ const RequestsManager = () => {
             <Button
               className="w-full"
               onClick={() => {
-                if (selectedRequest && newItem.product_id) {
-                  addItemMutation.mutate({
-                    requestId: selectedRequest.id,
-                    productId: newItem.product_id,
-                    quantity: newItem.quantity,
-                  });
+                if (newItem.product_id) {
+                  const product = products?.find(p => p.id === newItem.product_id);
+                  if (product) {
+                    setRequestItems([
+                      ...requestItems,
+                      {
+                        product_id: newItem.product_id,
+                        quantity: newItem.quantity,
+                        price: product.price,
+                      },
+                    ]);
+                    setShowProductDialog(false);
+                    setNewItem({ product_id: "", quantity: 1 });
+                  }
                 }
               }}
-              disabled={!newItem.product_id || addItemMutation.isPending}
+              disabled={!newItem.product_id}
             >
-              {addItemMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Добавить
             </Button>
           </div>
