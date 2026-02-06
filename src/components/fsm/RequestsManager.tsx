@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -43,9 +44,11 @@ import {
   Loader2,
   User,
   HandMetal,
-  Calendar,
   Package,
-  Eye
+  Eye,
+  Banknote,
+  Calendar,
+  ClipboardCheck
 } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -76,7 +79,7 @@ interface RequestItem {
   product_id: string;
   quantity: number;
   price: number;
-  product?: { id: string; name: string; unit: string };
+  product?: { id: string; name: string; unit: string; category: string | null };
 }
 
 interface Product {
@@ -101,8 +104,7 @@ const RequestsManager = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<Request | null>(null);
   const [editingRequest, setEditingRequest] = useState<Request | null>(null);
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [employeeFilter, setEmployeeFilter] = useState<string>("all");
+  const [activeTab, setActiveTab] = useState("pending");
   
   const [formData, setFormData] = useState({
     name: "",
@@ -118,11 +120,11 @@ const RequestsManager = () => {
   const [showProductDialog, setShowProductDialog] = useState(false);
   const [newItem, setNewItem] = useState({ product_id: "", quantity: 1 });
 
-  // Fetch requests with employees
+  // Fetch all requests
   const { data: requests, isLoading } = useQuery({
-    queryKey: ["requests", statusFilter, employeeFilter],
+    queryKey: ["requests"],
     queryFn: async () => {
-      let query = supabase
+      const { data, error } = await supabase
         .from("requests")
         .select(`
           *,
@@ -131,15 +133,6 @@ const RequestsManager = () => {
         `)
         .order("created_at", { ascending: false });
 
-      if (statusFilter !== "all") {
-        query = query.eq("status", statusFilter);
-      }
-
-      if (employeeFilter !== "all") {
-        query = query.or(`assigned_to.eq.${employeeFilter},accepted_by.eq.${employeeFilter}`);
-      }
-
-      const { data, error } = await query;
       if (error) throw error;
 
       // Auto-upgrade priority for old pending requests
@@ -169,7 +162,22 @@ const RequestsManager = () => {
     },
   });
 
-  // Fetch employees for filter and assignment
+  // Fetch request items for all requests
+  const { data: allRequestItems } = useQuery({
+    queryKey: ["all-request-items"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("request_items")
+        .select(`
+          *,
+          product:products (id, name, unit, category)
+        `);
+      if (error) throw error;
+      return data as RequestItem[];
+    },
+  });
+
+  // Fetch employees
   const { data: employees } = useQuery({
     queryKey: ["employees-list"],
     queryFn: async () => {
@@ -196,12 +204,56 @@ const RequestsManager = () => {
     },
   });
 
+  // Calculate request sum with items
+  const getRequestSum = (requestId: string) => {
+    const items = allRequestItems?.filter(i => i.request_id === requestId) || [];
+    let serviceSum = 0;
+    let productSum = 0;
+    
+    items.forEach(item => {
+      const itemTotal = item.price * item.quantity;
+      if (item.product?.category === "Товар" || item.product?.category === "товар") {
+        productSum += itemTotal;
+      } else {
+        serviceSum += itemTotal;
+      }
+    });
+    
+    return { serviceSum, productSum, total: serviceSum + productSum, items };
+  };
+
+  // Get filtered requests by status
+  const pendingRequests = useMemo(() => 
+    requests?.filter(r => r.status === "pending") || [], [requests]);
+  const inProgressRequests = useMemo(() => 
+    requests?.filter(r => r.status === "in_progress") || [], [requests]);
+  const completedRequests = useMemo(() => 
+    requests?.filter(r => r.status === "completed") || [], [requests]);
+
+  // Get masters with active requests
+  const mastersWithRequests = useMemo(() => {
+    const masterMap = new Map<string, { employee: Employee; requests: Request[] }>();
+    
+    requests?.forEach(req => {
+      const empId = req.accepted_by;
+      const emp = req.accepted_employee;
+      if (empId && emp) {
+        if (!masterMap.has(empId)) {
+          masterMap.set(empId, { employee: emp, requests: [] });
+        }
+        masterMap.get(empId)!.requests.push(req);
+      }
+    });
+    
+    return Array.from(masterMap.values());
+  }, [requests]);
+
   // Statistics
   const stats = {
     total: requests?.length || 0,
-    pending: requests?.filter(r => r.status === "pending").length || 0,
-    inProgress: requests?.filter(r => r.status === "in_progress").length || 0,
-    completed: requests?.filter(r => r.status === "completed").length || 0,
+    pending: pendingRequests.length,
+    inProgress: inProgressRequests.length,
+    completed: completedRequests.length,
     urgent: requests?.filter(r => r.priority === "urgent").length || 0,
   };
 
@@ -240,6 +292,7 @@ const RequestsManager = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["requests"] });
+      queryClient.invalidateQueries({ queryKey: ["all-request-items"] });
       toast({ title: "Заявка создана" });
       setIsDialogOpen(false);
       resetForm();
@@ -282,7 +335,7 @@ const RequestsManager = () => {
       const now = new Date();
 
       // Create acceptance note
-      let acceptNote = `Принял: `;
+      let acceptNote = `✅ Принял: `;
       if (employee) {
         acceptNote += employee.full_name;
         if (employee.phone) acceptNote += `, тел: ${employee.phone}`;
@@ -403,6 +456,190 @@ const RequestsManager = () => {
     return <Badge variant="secondary" className={cfg.color}>{cfg.label}</Badge>;
   };
 
+  // Render request card
+  const renderRequestCard = (request: Request) => {
+    const { serviceSum, productSum, total, items } = getRequestSum(request.id);
+    
+    return (
+      <Card 
+        key={request.id} 
+        className={`hover:border-primary/50 transition-colors cursor-pointer ${request.priority === 'urgent' ? 'border-red-500/50 border-2' : 'border-border/50'}`}
+        onClick={() => setSelectedRequest(request)}
+      >
+        <CardContent className="p-4 space-y-3">
+          {/* Header row */}
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 flex-wrap mb-1">
+                <User className="h-4 w-4 text-primary" />
+                <span className="font-semibold text-lg">{request.name}</span>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                {getStatusBadge(request.status)}
+                {getPriorityBadge(request.priority)}
+              </div>
+            </div>
+            <div className="text-xs text-muted-foreground text-right">
+              <Calendar className="h-3 w-3 inline mr-1" />
+              {format(new Date(request.created_at), "dd.MM.yy HH:mm")}
+            </div>
+          </div>
+
+          {/* Contact info */}
+          <div className="grid grid-cols-1 gap-2 text-sm">
+            <div className="flex items-center gap-2">
+              <Phone className="h-4 w-4 text-primary flex-shrink-0" />
+              <a
+                href={`tel:${request.phone}`}
+                className="text-primary hover:underline font-medium"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {request.phone}
+              </a>
+            </div>
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <MapPin className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">{request.address}</span>
+            </div>
+          </div>
+
+          {/* Description */}
+          <p className="text-sm text-muted-foreground line-clamp-2 bg-muted/30 p-2 rounded">
+            {request.message}
+          </p>
+
+          {/* Items and sum */}
+          {items.length > 0 && (
+            <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded space-y-2">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <Package className="h-4 w-4 text-blue-600" />
+                <span className="text-blue-700 dark:text-blue-400">Товары/услуги ({items.length})</span>
+              </div>
+              <div className="space-y-1">
+                {items.slice(0, 3).map(item => (
+                  <div key={item.id} className="flex justify-between text-xs">
+                    <span className="text-muted-foreground truncate max-w-[60%]">{item.product?.name}</span>
+                    <span>{item.quantity} × {item.price.toFixed(0)} ₽</span>
+                  </div>
+                ))}
+                {items.length > 3 && (
+                  <div className="text-xs text-muted-foreground">+ ещё {items.length - 3}</div>
+                )}
+              </div>
+              <div className="flex justify-between pt-2 border-t border-blue-200 dark:border-blue-800">
+                <div className="flex gap-3 text-xs">
+                  {serviceSum > 0 && <span>Услуги: {serviceSum.toFixed(0)} ₽</span>}
+                  {productSum > 0 && <span>Товары: {productSum.toFixed(0)} ₽</span>}
+                </div>
+                <div className="flex items-center gap-1 text-sm font-bold text-blue-700 dark:text-blue-400">
+                  <Banknote className="h-3 w-3" />
+                  {total.toFixed(0)} ₽
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Accepted by info */}
+          {request.accepted_employee && (
+            <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded space-y-1">
+              <div className="flex items-center gap-2 text-sm">
+                <HandMetal className="h-4 w-4 text-green-600" />
+                <span className="font-medium text-green-700 dark:text-green-400">
+                  Принял: {request.accepted_employee.full_name}
+                </span>
+              </div>
+              {request.accepted_at && (
+                <div className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  {format(new Date(request.accepted_at), "dd.MM.yyyy HH:mm")}
+                </div>
+              )}
+              {request.accepted_employee.phone && (
+                <div className="text-xs">
+                  <a 
+                    href={`tel:${request.accepted_employee.phone}`} 
+                    className="text-green-600 hover:underline"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {request.accepted_employee.phone}
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Completed info */}
+          {request.completed_at && (
+            <div className="bg-emerald-50 dark:bg-emerald-900/20 p-3 rounded">
+              <div className="flex items-center gap-2 text-sm">
+                <ClipboardCheck className="h-4 w-4 text-emerald-600" />
+                <span className="font-medium text-emerald-700 dark:text-emerald-400">
+                  Выполнено: {format(new Date(request.completed_at), "dd.MM.yyyy HH:mm")}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Action buttons */}
+          <div className="flex gap-2 pt-2 border-t">
+            {request.status === "pending" && (
+              <Button
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  acceptRequestMutation.mutate(request.id);
+                }}
+                disabled={acceptRequestMutation.isPending}
+              >
+                <HandMetal className="h-4 w-4 mr-1" />
+                Принять
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedRequest(request);
+              }}
+            >
+              <Eye className="h-4 w-4 mr-1" />
+              Подробнее
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                <Button variant="ghost" size="icon" className="h-8 w-8 ml-auto">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={(e) => {
+                  e.stopPropagation();
+                  startEdit(request);
+                }}>
+                  <Edit className="h-4 w-4 mr-2" />
+                  Редактировать
+                </DropdownMenuItem>
+                {isManager && (
+                  <DropdownMenuItem 
+                    className="text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteRequestMutation.mutate(request.id);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Удалить
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -426,31 +663,31 @@ const RequestsManager = () => {
     <div className="space-y-6">
       {/* Statistics Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <Card className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => setStatusFilter("all")}>
+        <Card className={`cursor-pointer hover:border-primary/50 transition-colors ${activeTab === 'all' ? 'border-primary' : ''}`} onClick={() => setActiveTab("all")}>
           <CardContent className="p-4 text-center">
             <div className="text-2xl font-bold text-primary">{stats.total}</div>
             <div className="text-xs text-muted-foreground">Всего</div>
           </CardContent>
         </Card>
-        <Card className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => setStatusFilter("pending")}>
+        <Card className={`cursor-pointer hover:border-primary/50 transition-colors ${activeTab === 'pending' ? 'border-yellow-500' : ''}`} onClick={() => setActiveTab("pending")}>
           <CardContent className="p-4 text-center">
             <div className="text-2xl font-bold text-yellow-500">{stats.pending}</div>
             <div className="text-xs text-muted-foreground">Ожидают</div>
           </CardContent>
         </Card>
-        <Card className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => setStatusFilter("in_progress")}>
+        <Card className={`cursor-pointer hover:border-primary/50 transition-colors ${activeTab === 'in_progress' ? 'border-blue-500' : ''}`} onClick={() => setActiveTab("in_progress")}>
           <CardContent className="p-4 text-center">
             <div className="text-2xl font-bold text-blue-500">{stats.inProgress}</div>
             <div className="text-xs text-muted-foreground">В работе</div>
           </CardContent>
         </Card>
-        <Card className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => setStatusFilter("completed")}>
+        <Card className={`cursor-pointer hover:border-primary/50 transition-colors ${activeTab === 'completed' ? 'border-green-500' : ''}`} onClick={() => setActiveTab("completed")}>
           <CardContent className="p-4 text-center">
             <div className="text-2xl font-bold text-green-500">{stats.completed}</div>
             <div className="text-xs text-muted-foreground">Выполнено</div>
           </CardContent>
         </Card>
-        <Card className={`cursor-pointer hover:border-primary/50 transition-colors ${stats.urgent > 0 ? 'border-red-500' : ''}`}>
+        <Card className={`${stats.urgent > 0 ? 'border-red-500' : ''}`}>
           <CardContent className="p-4 text-center">
             <div className={`text-2xl font-bold ${stats.urgent > 0 ? 'text-red-500 animate-pulse' : 'text-muted-foreground'}`}>{stats.urgent}</div>
             <div className="text-xs text-muted-foreground">Срочных</div>
@@ -458,330 +695,305 @@ const RequestsManager = () => {
         </Card>
       </div>
 
-      {/* Header with filters and create button */}
-      <Card>
-        <CardHeader className="pb-4">
-          <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
-            <CardTitle>Заявки</CardTitle>
-            
-            <div className="flex flex-wrap gap-3 w-full sm:w-auto">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[130px]">
-                  <SelectValue placeholder="Статус" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Все статусы</SelectItem>
-                  <SelectItem value="pending">Ожидает</SelectItem>
-                  <SelectItem value="in_progress">В работе</SelectItem>
-                  <SelectItem value="completed">Выполнено</SelectItem>
-                  <SelectItem value="cancelled">Отменено</SelectItem>
-                </SelectContent>
-              </Select>
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+          <TabsList className="flex flex-wrap h-auto gap-1">
+            <TabsTrigger value="pending" className="flex items-center gap-1">
+              <Clock className="h-4 w-4" />
+              <span className="hidden sm:inline">Новые</span>
+              <Badge variant="secondary" className="ml-1">{stats.pending}</Badge>
+            </TabsTrigger>
+            <TabsTrigger value="in_progress" className="flex items-center gap-1">
+              <AlertCircle className="h-4 w-4" />
+              <span className="hidden sm:inline">В работе</span>
+              <Badge variant="secondary" className="ml-1">{stats.inProgress}</Badge>
+            </TabsTrigger>
+            <TabsTrigger value="completed" className="flex items-center gap-1">
+              <CheckCircle2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Выполнено</span>
+            </TabsTrigger>
+            <TabsTrigger value="masters" className="flex items-center gap-1">
+              <HandMetal className="h-4 w-4" />
+              <span className="hidden sm:inline">Мастера</span>
+            </TabsTrigger>
+            <TabsTrigger value="reports" className="flex items-center gap-1">
+              <Banknote className="h-4 w-4" />
+              <span className="hidden sm:inline">Отчёты</span>
+            </TabsTrigger>
+          </TabsList>
 
-              <Select value={employeeFilter} onValueChange={setEmployeeFilter}>
-                <SelectTrigger className="w-[130px]">
-                  <SelectValue placeholder="Мастер" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Все мастера</SelectItem>
-                  {employees?.map(emp => (
-                    <SelectItem key={emp.id} value={emp.id}>{emp.full_name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={resetForm}>
+                <Plus className="h-4 w-4 mr-2" />
+                Создать
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>{editingRequest ? "Редактировать заявку" : "Новая заявка"}</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Имя клиента *</Label>
+                    <Input
+                      id="name"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Телефон *</Label>
+                    <Input
+                      id="phone"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="address">Адрес *</Label>
+                  <Input
+                    id="address"
+                    value={formData.address}
+                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="message">Описание проблемы *</Label>
+                  <Textarea
+                    id="message"
+                    value={formData.message}
+                    onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                    rows={3}
+                    required
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Приоритет</Label>
+                    <Select
+                      value={formData.priority}
+                      onValueChange={(v) => setFormData({ ...formData, priority: v })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="low">Низкий</SelectItem>
+                        <SelectItem value="medium">Средний</SelectItem>
+                        <SelectItem value="high">Высокий</SelectItem>
+                        <SelectItem value="urgent">Срочно</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Назначить мастеру</Label>
+                    <Select
+                      value={formData.assigned_to}
+                      onValueChange={(v) => setFormData({ ...formData, assigned_to: v })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Выберите" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {employees?.map(emp => (
+                          <SelectItem key={emp.id} value={emp.id}>{emp.full_name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
 
-              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button onClick={resetForm}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Создать
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle>{editingRequest ? "Редактировать заявку" : "Новая заявка"}</DialogTitle>
-                  </DialogHeader>
-                  <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="name">Имя клиента *</Label>
-                        <Input
-                          id="name"
-                          value={formData.name}
-                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="phone">Телефон *</Label>
-                        <Input
-                          id="phone"
-                          value={formData.phone}
-                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                          required
-                        />
-                      </div>
-                    </div>
+                {/* Products section */}
+                <div className="border-t pt-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="font-semibold flex items-center gap-2">
+                      <Package className="h-4 w-4" />
+                      Товары и услуги
+                    </Label>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setShowProductDialog(true)}
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Добавить
+                    </Button>
+                  </div>
+                  {requestItems.length > 0 ? (
                     <div className="space-y-2">
-                      <Label htmlFor="address">Адрес *</Label>
-                      <Input
-                        id="address"
-                        value={formData.address}
-                        onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="message">Описание проблемы *</Label>
-                      <Textarea
-                        id="message"
-                        value={formData.message}
-                        onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                        rows={3}
-                        required
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Приоритет</Label>
-                        <Select
-                          value={formData.priority}
-                          onValueChange={(v) => setFormData({ ...formData, priority: v })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="low">Низкий</SelectItem>
-                            <SelectItem value="medium">Средний</SelectItem>
-                            <SelectItem value="high">Высокий</SelectItem>
-                            <SelectItem value="urgent">Срочно</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Назначить мастеру</Label>
-                        <Select
-                          value={formData.assigned_to}
-                          onValueChange={(v) => setFormData({ ...formData, assigned_to: v })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Выберите" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {employees?.map(emp => (
-                              <SelectItem key={emp.id} value={emp.id}>{emp.full_name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    {/* Products section for new request */}
-                    {!editingRequest && (
-                      <div className="border-t pt-4 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <Label className="font-semibold flex items-center gap-2">
-                            <Package className="h-4 w-4" />
-                            Товары и услуги
-                          </Label>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setShowProductDialog(true)}
-                          >
-                            <Plus className="h-4 w-4 mr-1" />
-                            Добавить
-                          </Button>
-                        </div>
-                        {requestItems.length > 0 ? (
-                          <div className="space-y-2">
-                            {requestItems.map((item, idx) => {
-                              const product = products?.find(p => p.id === item.product_id);
-                              return (
-                                <div key={idx} className="flex items-center justify-between p-2 bg-muted/50 rounded text-sm">
-                                  <div>
-                                    <span className="font-medium">{product?.name}</span>
-                                    <span className="text-muted-foreground ml-2">
-                                      {item.quantity} × {item.price.toFixed(0)} ₽
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-semibold">{(item.price * item.quantity).toFixed(0)} ₽</span>
-                                    <Button
-                                      type="button"
-                                      size="icon"
-                                      variant="ghost"
-                                      className="h-6 w-6 text-destructive"
-                                      onClick={() => setRequestItems(requestItems.filter((_, i) => i !== idx))}
-                                    >
-                                      <Trash2 className="h-3 w-3" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                            <div className="flex justify-between pt-2 border-t text-sm font-semibold">
-                              <span>Итого:</span>
-                              <span>{requestItems.reduce((sum, i) => sum + i.price * i.quantity, 0).toFixed(0)} ₽</span>
+                      {requestItems.map((item, idx) => {
+                        const product = products?.find(p => p.id === item.product_id);
+                        return (
+                          <div key={idx} className="flex items-center justify-between p-2 bg-muted/50 rounded text-sm">
+                            <div>
+                              <span className="font-medium">{product?.name}</span>
+                              <span className="text-muted-foreground ml-2">
+                                {item.quantity} × {item.price.toFixed(0)} ₽
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold">{(item.price * item.quantity).toFixed(0)} ₽</span>
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant="ghost"
+                                className="h-6 w-6 text-destructive"
+                                onClick={() => setRequestItems(requestItems.filter((_, i) => i !== idx))}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
                             </div>
                           </div>
-                        ) : (
-                          <p className="text-sm text-muted-foreground">Нет добавленных товаров</p>
-                        )}
+                        );
+                      })}
+                      <div className="flex justify-between pt-2 border-t text-sm font-semibold">
+                        <span>Итого:</span>
+                        <span>{requestItems.reduce((sum, i) => sum + i.price * i.quantity, 0).toFixed(0)} ₽</span>
                       </div>
-                    )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Нет добавленных товаров</p>
+                  )}
+                </div>
 
-                    <Button
-                      type="submit"
-                      className="w-full"
-                      disabled={createRequestMutation.isPending || updateRequestMutation.isPending}
-                    >
-                      {(createRequestMutation.isPending || updateRequestMutation.isPending) && (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      )}
-                      {editingRequest ? "Сохранить" : "Создать заявку"}
-                    </Button>
-                  </form>
-                </DialogContent>
-              </Dialog>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {!requests || requests.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              Нет заявок
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {requests.map((request) => (
-                <Card 
-                  key={request.id} 
-                  className={`hover:border-primary/50 transition-colors cursor-pointer ${request.priority === 'urgent' ? 'border-red-500/50 border-2' : 'border-border/50'}`}
-                  onClick={() => setSelectedRequest(request)}
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={createRequestMutation.isPending || updateRequestMutation.isPending}
                 >
-                  <CardContent className="p-4 space-y-3">
-                    {/* Header row */}
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <User className="h-4 w-4 text-primary" />
-                          <span className="font-semibold text-lg">{request.name}</span>
-                        </div>
-                        <div className="flex gap-2 flex-wrap">
-                          {getStatusBadge(request.status)}
-                          {getPriorityBadge(request.priority)}
-                        </div>
-                      </div>
-                      <div className="text-xs text-muted-foreground text-right">
-                        {format(new Date(request.created_at), "dd MMM", { locale: ru })}
-                        <br />
-                        {format(new Date(request.created_at), "HH:mm")}
-                      </div>
-                    </div>
+                  {(createRequestMutation.isPending || updateRequestMutation.isPending) && (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  )}
+                  {editingRequest ? "Сохранить" : "Создать заявку"}
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
 
-                    {/* Contact info */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+        {/* Pending Requests */}
+        <TabsContent value="pending" className="mt-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Clock className="h-5 w-5 text-yellow-500" />
+                Новые заявки
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {pendingRequests.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Нет новых заявок
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {pendingRequests.map(renderRequestCard)}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* In Progress Requests */}
+        <TabsContent value="in_progress" className="mt-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-blue-500" />
+                В работе
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {inProgressRequests.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Нет заявок в работе
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {inProgressRequests.map(renderRequestCard)}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Completed Requests */}
+        <TabsContent value="completed" className="mt-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-green-500" />
+                Выполненные заявки
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {completedRequests.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Нет выполненных заявок
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {completedRequests.map(renderRequestCard)}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Masters with Requests */}
+        <TabsContent value="masters" className="mt-4">
+          <div className="space-y-4">
+            {mastersWithRequests.length === 0 ? (
+              <Card>
+                <CardContent className="py-8 text-center text-muted-foreground">
+                  Нет мастеров с активными заявками
+                </CardContent>
+              </Card>
+            ) : (
+              mastersWithRequests.map(({ employee, requests: masterRequests }) => (
+                <Card key={employee.id}>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <Phone className="h-4 w-4 text-primary" />
-                        <a
-                          href={`tel:${request.phone}`}
-                          className="text-primary hover:underline font-medium"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {request.phone}
-                        </a>
+                        <HandMetal className="h-5 w-5 text-primary" />
+                        {employee.full_name}
                       </div>
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <MapPin className="h-4 w-4" />
-                        <span className="truncate">{request.address}</span>
-                      </div>
-                    </div>
-
-                    {/* Description */}
-                    <p className="text-sm text-muted-foreground line-clamp-2 bg-muted/30 p-2 rounded">
-                      {request.message}
-                    </p>
-
-                    {/* Accepted by info */}
-                    {request.accepted_employee && (
-                      <div className="flex items-center gap-2 text-sm p-2 bg-green-50 dark:bg-green-900/20 rounded">
-                        <HandMetal className="h-4 w-4 text-green-600" />
-                        <span className="font-medium text-green-700 dark:text-green-400">
-                          {request.accepted_employee.full_name}
-                        </span>
-                        {request.accepted_at && (
-                          <span className="text-muted-foreground">
-                            • {format(new Date(request.accepted_at), "dd.MM HH:mm")}
-                          </span>
-                        )}
-                      </div>
+                      <Badge variant="secondary">{masterRequests.length} заявок</Badge>
+                    </CardTitle>
+                    {employee.phone && (
+                      <a href={`tel:${employee.phone}`} className="text-sm text-primary hover:underline">
+                        {employee.phone}
+                      </a>
                     )}
-
-                    {/* Action buttons */}
-                    <div className="flex gap-2 pt-2 border-t">
-                      {request.status === "pending" && (
-                        <Button
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            acceptRequestMutation.mutate(request.id);
-                          }}
-                          disabled={acceptRequestMutation.isPending}
-                        >
-                          <HandMetal className="h-4 w-4 mr-1" />
-                          Принять
-                        </Button>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedRequest(request);
-                        }}
-                      >
-                        <Eye className="h-4 w-4 mr-1" />
-                        Подробнее
-                      </Button>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={(e) => {
-                            e.stopPropagation();
-                            startEdit(request);
-                          }}>
-                            <Edit className="h-4 w-4 mr-2" />
-                            Редактировать
-                          </DropdownMenuItem>
-                          {isManager && (
-                            <DropdownMenuItem 
-                              className="text-destructive"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                deleteRequestMutation.mutate(request.id);
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Удалить
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {masterRequests.map(renderRequestCard)}
                     </div>
                   </CardContent>
                 </Card>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              ))
+            )}
+          </div>
+        </TabsContent>
+
+        {/* Reports Tab */}
+        <TabsContent value="reports" className="mt-4">
+          <MasterFinancialReports 
+            requests={completedRequests} 
+            allRequestItems={allRequestItems || []}
+            employees={employees || []}
+          />
+        </TabsContent>
+      </Tabs>
 
       {/* Add Product Dialog */}
       <Dialog open={showProductDialog} onOpenChange={setShowProductDialog}>
@@ -844,6 +1056,223 @@ const RequestsManager = () => {
           </div>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+};
+
+// Master Financial Reports Component
+interface MasterFinancialReportsProps {
+  requests: Request[];
+  allRequestItems: RequestItem[];
+  employees: Employee[];
+}
+
+const MasterFinancialReports = ({ requests, allRequestItems, employees }: MasterFinancialReportsProps) => {
+  const [dateFrom, setDateFrom] = useState(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 1);
+    return format(d, "yyyy-MM-dd");
+  });
+  const [dateTo, setDateTo] = useState(() => format(new Date(), "yyyy-MM-dd"));
+  const [selectedMaster, setSelectedMaster] = useState<string>("all");
+
+  // Filter requests by date
+  const filteredRequests = useMemo(() => {
+    return requests.filter(r => {
+      if (!r.completed_at) return false;
+      const completedDate = new Date(r.completed_at);
+      const from = new Date(dateFrom);
+      const to = new Date(dateTo);
+      to.setHours(23, 59, 59);
+      
+      const inDateRange = completedDate >= from && completedDate <= to;
+      const matchesMaster = selectedMaster === "all" || r.accepted_by === selectedMaster;
+      
+      return inDateRange && matchesMaster;
+    });
+  }, [requests, dateFrom, dateTo, selectedMaster]);
+
+  // Calculate totals by master
+  const masterStats = useMemo(() => {
+    const stats: Record<string, {
+      name: string;
+      phone: string | null;
+      requestCount: number;
+      serviceSum: number;
+      productSum: number;
+      total: number;
+    }> = {};
+
+    filteredRequests.forEach(req => {
+      if (!req.accepted_by || !req.accepted_employee) return;
+
+      const masterId = req.accepted_by;
+      if (!stats[masterId]) {
+        stats[masterId] = {
+          name: req.accepted_employee.full_name,
+          phone: req.accepted_employee.phone,
+          requestCount: 0,
+          serviceSum: 0,
+          productSum: 0,
+          total: 0,
+        };
+      }
+
+      stats[masterId].requestCount++;
+
+      const items = allRequestItems.filter(i => i.request_id === req.id);
+      items.forEach(item => {
+        const itemTotal = item.price * item.quantity;
+        if (item.product?.category === "Товар" || item.product?.category === "товар") {
+          stats[masterId].productSum += itemTotal;
+        } else {
+          stats[masterId].serviceSum += itemTotal;
+        }
+        stats[masterId].total += itemTotal;
+      });
+    });
+
+    return Object.entries(stats).map(([id, data]) => ({ id, ...data }));
+  }, [filteredRequests, allRequestItems]);
+
+  const grandTotal = masterStats.reduce((sum, m) => sum + m.total, 0);
+  const grandServices = masterStats.reduce((sum, m) => sum + m.serviceSum, 0);
+  const grandProducts = masterStats.reduce((sum, m) => sum + m.productSum, 0);
+
+  return (
+    <div className="space-y-6">
+      {/* Filters */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Banknote className="h-5 w-5 text-primary" />
+            Финансовый отчёт по мастерам
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-4">
+            <div className="space-y-2">
+              <Label>Период с</Label>
+              <Input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="w-[160px]"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>по</Label>
+              <Input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="w-[160px]"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Мастер</Label>
+              <Select value={selectedMaster} onValueChange={setSelectedMaster}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Все" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Все мастера</SelectItem>
+                  {employees.map(emp => (
+                    <SelectItem key={emp.id} value={emp.id}>{emp.full_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4 text-center">
+            <div className="text-2xl font-bold text-primary">{filteredRequests.length}</div>
+            <div className="text-xs text-muted-foreground">Заявок выполнено</div>
+          </CardContent>
+        </Card>
+        <Card className="bg-blue-50 dark:bg-blue-900/20">
+          <CardContent className="p-4 text-center">
+            <div className="text-2xl font-bold text-blue-600">{grandServices.toFixed(0)} ₽</div>
+            <div className="text-xs text-muted-foreground">Услуги</div>
+          </CardContent>
+        </Card>
+        <Card className="bg-orange-50 dark:bg-orange-900/20">
+          <CardContent className="p-4 text-center">
+            <div className="text-2xl font-bold text-orange-600">{grandProducts.toFixed(0)} ₽</div>
+            <div className="text-xs text-muted-foreground">Товары</div>
+          </CardContent>
+        </Card>
+        <Card className="bg-green-50 dark:bg-green-900/20">
+          <CardContent className="p-4 text-center">
+            <div className="text-2xl font-bold text-green-600">{grandTotal.toFixed(0)} ₽</div>
+            <div className="text-xs text-muted-foreground">Общая сумма</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Master breakdown */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg">По мастерам</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {masterStats.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              Нет данных за выбранный период
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {masterStats.map(master => (
+                <Card key={master.id} className="border-border/50">
+                  <CardContent className="p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <HandMetal className="h-5 w-5 text-primary" />
+                          <span className="font-semibold text-lg">{master.name}</span>
+                        </div>
+                        {master.phone && (
+                          <a href={`tel:${master.phone}`} className="text-sm text-muted-foreground hover:underline">
+                            {master.phone}
+                          </a>
+                        )}
+                        <div className="text-sm text-muted-foreground mt-1">
+                          Выполнено заявок: {master.requestCount}
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-4 text-right">
+                        <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded min-w-[100px]">
+                          <div className="text-lg font-bold text-blue-700 dark:text-blue-400">
+                            {master.serviceSum.toFixed(0)} ₽
+                          </div>
+                          <div className="text-xs text-muted-foreground">Услуги</div>
+                        </div>
+                        <div className="bg-orange-100 dark:bg-orange-900/30 p-2 rounded min-w-[100px]">
+                          <div className="text-lg font-bold text-orange-700 dark:text-orange-400">
+                            {master.productSum.toFixed(0)} ₽
+                          </div>
+                          <div className="text-xs text-muted-foreground">Товары</div>
+                        </div>
+                        <div className="bg-green-100 dark:bg-green-900/30 p-2 rounded min-w-[100px]">
+                          <div className="text-lg font-bold text-green-700 dark:text-green-400">
+                            {master.total.toFixed(0)} ₽
+                          </div>
+                          <div className="text-xs text-muted-foreground">Итого</div>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };
