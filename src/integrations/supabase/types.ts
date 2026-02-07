@@ -331,6 +331,89 @@ export type Database = {
         }
         Relationships: []
       }
+      request_checklists: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          id: string
+          is_completed: boolean | null
+          item_text: string
+          order_index: number | null
+          request_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          is_completed?: boolean | null
+          item_text: string
+          order_index?: number | null
+          request_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          is_completed?: boolean | null
+          item_text?: string
+          order_index?: number | null
+          request_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "request_checklists_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      request_history: {
+        Row: {
+          action: string
+          created_at: string | null
+          description: string | null
+          id: string
+          performed_by: string | null
+          performed_by_name: string | null
+          request_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          performed_by?: string | null
+          performed_by_name?: string | null
+          request_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          performed_by?: string | null
+          performed_by_name?: string | null
+          request_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "request_history_performed_by_fkey"
+            columns: ["performed_by"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "request_history_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       request_items: {
         Row: {
           created_at: string | null
