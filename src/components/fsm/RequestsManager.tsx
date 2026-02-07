@@ -229,6 +229,8 @@ const RequestsManager = () => {
     requests?.filter(r => r.status === "in_progress") || [], [requests]);
   const completedRequests = useMemo(() => 
     requests?.filter(r => r.status === "completed") || [], [requests]);
+  const cancelledRequests = useMemo(() => 
+    requests?.filter(r => r.status === "cancelled") || [], [requests]);
 
   // Get masters with active requests
   const mastersWithRequests = useMemo(() => {
@@ -254,6 +256,7 @@ const RequestsManager = () => {
     pending: pendingRequests.length,
     inProgress: inProgressRequests.length,
     completed: completedRequests.length,
+    cancelled: cancelledRequests.length,
     urgent: requests?.filter(r => r.priority === "urgent").length || 0,
   };
 
@@ -713,6 +716,11 @@ const RequestsManager = () => {
               <CheckCircle2 className="h-4 w-4" />
               <span className="hidden sm:inline">Выполнено</span>
             </TabsTrigger>
+            <TabsTrigger value="cancelled" className="flex items-center gap-1">
+              <CircleDashed className="h-4 w-4" />
+              <span className="hidden sm:inline">Отменено</span>
+              {stats.cancelled > 0 && <Badge variant="secondary" className="ml-1">{stats.cancelled}</Badge>}
+            </TabsTrigger>
             <TabsTrigger value="masters" className="flex items-center gap-1">
               <HandMetal className="h-4 w-4" />
               <span className="hidden sm:inline">Мастера</span>
@@ -948,6 +956,29 @@ const RequestsManager = () => {
           </Card>
         </TabsContent>
 
+        {/* Cancelled Requests */}
+        <TabsContent value="cancelled" className="mt-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <CircleDashed className="h-5 w-5 text-gray-500" />
+                Отменённые заявки
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {cancelledRequests.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Нет отменённых заявок
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {cancelledRequests.map(renderRequestCard)}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         {/* Masters with Requests */}
         <TabsContent value="masters" className="mt-4">
           <div className="space-y-4">
@@ -987,8 +1018,8 @@ const RequestsManager = () => {
 
         {/* Reports Tab */}
         <TabsContent value="reports" className="mt-4">
-          <MasterFinancialReports 
-            requests={completedRequests} 
+          <EmployeeFinancialReports 
+            allRequests={requests || []} 
             allRequestItems={allRequestItems || []}
             employees={employees || []}
           />
@@ -1060,84 +1091,146 @@ const RequestsManager = () => {
   );
 };
 
-// Master Financial Reports Component
-interface MasterFinancialReportsProps {
-  requests: Request[];
+// Employee Financial Reports Component - Updated to show all employees
+interface EmployeeFinancialReportsProps {
+  allRequests: Request[];
   allRequestItems: RequestItem[];
   employees: Employee[];
 }
 
-const MasterFinancialReports = ({ requests, allRequestItems, employees }: MasterFinancialReportsProps) => {
+const EmployeeFinancialReports = ({ allRequests, allRequestItems, employees }: EmployeeFinancialReportsProps) => {
   const [dateFrom, setDateFrom] = useState(() => {
     const d = new Date();
     d.setMonth(d.getMonth() - 1);
     return format(d, "yyyy-MM-dd");
   });
   const [dateTo, setDateTo] = useState(() => format(new Date(), "yyyy-MM-dd"));
-  const [selectedMaster, setSelectedMaster] = useState<string>("all");
+  const [selectedEmployee, setSelectedEmployee] = useState<string>("all");
 
   // Filter requests by date
-  const filteredRequests = useMemo(() => {
-    return requests.filter(r => {
-      if (!r.completed_at) return false;
-      const completedDate = new Date(r.completed_at);
-      const from = new Date(dateFrom);
-      const to = new Date(dateTo);
-      to.setHours(23, 59, 59);
-      
-      const inDateRange = completedDate >= from && completedDate <= to;
-      const matchesMaster = selectedMaster === "all" || r.accepted_by === selectedMaster;
-      
-      return inDateRange && matchesMaster;
+  const filteredByDate = useMemo(() => {
+    const from = new Date(dateFrom);
+    const to = new Date(dateTo);
+    to.setHours(23, 59, 59);
+    
+    return allRequests.filter(r => {
+      const createdDate = new Date(r.created_at);
+      return createdDate >= from && createdDate <= to;
     });
-  }, [requests, dateFrom, dateTo, selectedMaster]);
+  }, [allRequests, dateFrom, dateTo]);
 
-  // Calculate totals by master
-  const masterStats = useMemo(() => {
+  // Filter by employee if selected
+  const filteredRequests = useMemo(() => {
+    if (selectedEmployee === "all") return filteredByDate;
+    return filteredByDate.filter(r => r.accepted_by === selectedEmployee);
+  }, [filteredByDate, selectedEmployee]);
+
+  // Overall statistics
+  const overallStats = useMemo(() => {
+    const completed = filteredRequests.filter(r => r.status === "completed");
+    const cancelled = filteredRequests.filter(r => r.status === "cancelled");
+    const pending = filteredRequests.filter(r => r.status === "pending");
+    const inProgress = filteredRequests.filter(r => r.status === "in_progress");
+    
+    let totalServices = 0;
+    let totalProducts = 0;
+    
+    completed.forEach(req => {
+      const items = allRequestItems.filter(i => i.request_id === req.id);
+      items.forEach(item => {
+        const itemTotal = item.price * item.quantity;
+        if (item.product?.category === "Товар" || item.product?.category === "товар") {
+          totalProducts += itemTotal;
+        } else {
+          totalServices += itemTotal;
+        }
+      });
+    });
+    
+    return {
+      total: filteredRequests.length,
+      completed: completed.length,
+      cancelled: cancelled.length,
+      pending: pending.length,
+      inProgress: inProgress.length,
+      totalServices,
+      totalProducts,
+      grandTotal: totalServices + totalProducts,
+    };
+  }, [filteredRequests, allRequestItems]);
+
+  // Calculate totals by employee
+  const employeeStats = useMemo(() => {
     const stats: Record<string, {
       name: string;
       phone: string | null;
-      requestCount: number;
+      completedCount: number;
+      cancelledCount: number;
+      inProgressCount: number;
       serviceSum: number;
       productSum: number;
       total: number;
     }> = {};
 
-    filteredRequests.forEach(req => {
-      if (!req.accepted_by || !req.accepted_employee) return;
+    // Initialize all employees
+    employees.forEach(emp => {
+      stats[emp.id] = {
+        name: emp.full_name,
+        phone: emp.phone,
+        completedCount: 0,
+        cancelledCount: 0,
+        inProgressCount: 0,
+        serviceSum: 0,
+        productSum: 0,
+        total: 0,
+      };
+    });
 
-      const masterId = req.accepted_by;
-      if (!stats[masterId]) {
-        stats[masterId] = {
+    // Process requests
+    filteredByDate.forEach(req => {
+      if (!req.accepted_by) return;
+      
+      const empId = req.accepted_by;
+      if (!stats[empId] && req.accepted_employee) {
+        stats[empId] = {
           name: req.accepted_employee.full_name,
           phone: req.accepted_employee.phone,
-          requestCount: 0,
+          completedCount: 0,
+          cancelledCount: 0,
+          inProgressCount: 0,
           serviceSum: 0,
           productSum: 0,
           total: 0,
         };
       }
+      
+      if (!stats[empId]) return;
 
-      stats[masterId].requestCount++;
-
-      const items = allRequestItems.filter(i => i.request_id === req.id);
-      items.forEach(item => {
-        const itemTotal = item.price * item.quantity;
-        if (item.product?.category === "Товар" || item.product?.category === "товар") {
-          stats[masterId].productSum += itemTotal;
-        } else {
-          stats[masterId].serviceSum += itemTotal;
-        }
-        stats[masterId].total += itemTotal;
-      });
+      if (req.status === "completed") {
+        stats[empId].completedCount++;
+        
+        const items = allRequestItems.filter(i => i.request_id === req.id);
+        items.forEach(item => {
+          const itemTotal = item.price * item.quantity;
+          if (item.product?.category === "Товар" || item.product?.category === "товар") {
+            stats[empId].productSum += itemTotal;
+          } else {
+            stats[empId].serviceSum += itemTotal;
+          }
+          stats[empId].total += itemTotal;
+        });
+      } else if (req.status === "cancelled") {
+        stats[empId].cancelledCount++;
+      } else if (req.status === "in_progress") {
+        stats[empId].inProgressCount++;
+      }
     });
 
-    return Object.entries(stats).map(([id, data]) => ({ id, ...data }));
-  }, [filteredRequests, allRequestItems]);
-
-  const grandTotal = masterStats.reduce((sum, m) => sum + m.total, 0);
-  const grandServices = masterStats.reduce((sum, m) => sum + m.serviceSum, 0);
-  const grandProducts = masterStats.reduce((sum, m) => sum + m.productSum, 0);
+    return Object.entries(stats)
+      .map(([id, data]) => ({ id, ...data }))
+      .filter(emp => emp.completedCount > 0 || emp.cancelledCount > 0 || emp.inProgressCount > 0)
+      .sort((a, b) => b.total - a.total);
+  }, [filteredByDate, allRequestItems, employees]);
 
   return (
     <div className="space-y-6">
@@ -1146,7 +1239,7 @@ const MasterFinancialReports = ({ requests, allRequestItems, employees }: Master
         <CardHeader className="pb-2">
           <CardTitle className="text-lg flex items-center gap-2">
             <Banknote className="h-5 w-5 text-primary" />
-            Финансовый отчёт по мастерам
+            Финансовый отчёт по сотрудникам
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -1170,13 +1263,13 @@ const MasterFinancialReports = ({ requests, allRequestItems, employees }: Master
               />
             </div>
             <div className="space-y-2">
-              <Label>Мастер</Label>
-              <Select value={selectedMaster} onValueChange={setSelectedMaster}>
+              <Label>Сотрудник</Label>
+              <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
                 <SelectTrigger className="w-[200px]">
                   <SelectValue placeholder="Все" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Все мастера</SelectItem>
+                  <SelectItem value="all">Все сотрудники</SelectItem>
                   {employees.map(emp => (
                     <SelectItem key={emp.id} value={emp.id}>{emp.full_name}</SelectItem>
                   ))}
@@ -1187,84 +1280,129 @@ const MasterFinancialReports = ({ requests, allRequestItems, employees }: Master
         </CardContent>
       </Card>
 
-      {/* Summary Cards */}
+      {/* Summary Cards - Overall Statistics */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-primary">{filteredRequests.length}</div>
-            <div className="text-xs text-muted-foreground">Заявок выполнено</div>
-          </CardContent>
-        </Card>
-        <Card className="bg-blue-50 dark:bg-blue-900/20">
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-blue-600">{grandServices.toFixed(0)} ₽</div>
-            <div className="text-xs text-muted-foreground">Услуги</div>
-          </CardContent>
-        </Card>
-        <Card className="bg-orange-50 dark:bg-orange-900/20">
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-orange-600">{grandProducts.toFixed(0)} ₽</div>
-            <div className="text-xs text-muted-foreground">Товары</div>
+            <div className="text-2xl font-bold text-primary">{overallStats.total}</div>
+            <div className="text-xs text-muted-foreground">Всего заявок</div>
           </CardContent>
         </Card>
         <Card className="bg-green-50 dark:bg-green-900/20">
           <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-green-600">{grandTotal.toFixed(0)} ₽</div>
+            <div className="text-2xl font-bold text-green-600">{overallStats.completed}</div>
+            <div className="text-xs text-muted-foreground">Выполнено</div>
+          </CardContent>
+        </Card>
+        <Card className="bg-blue-50 dark:bg-blue-900/20">
+          <CardContent className="p-4 text-center">
+            <div className="text-2xl font-bold text-blue-600">{overallStats.inProgress}</div>
+            <div className="text-xs text-muted-foreground">В работе</div>
+          </CardContent>
+        </Card>
+        <Card className="bg-gray-50 dark:bg-gray-900/20">
+          <CardContent className="p-4 text-center">
+            <div className="text-2xl font-bold text-gray-600">{overallStats.cancelled}</div>
+            <div className="text-xs text-muted-foreground">Отменено</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Financial Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="bg-blue-50 dark:bg-blue-900/20">
+          <CardContent className="p-4 text-center">
+            <div className="text-2xl font-bold text-blue-600">{overallStats.totalServices.toFixed(0)} ₽</div>
+            <div className="text-xs text-muted-foreground">Услуги (выполнено)</div>
+          </CardContent>
+        </Card>
+        <Card className="bg-orange-50 dark:bg-orange-900/20">
+          <CardContent className="p-4 text-center">
+            <div className="text-2xl font-bold text-orange-600">{overallStats.totalProducts.toFixed(0)} ₽</div>
+            <div className="text-xs text-muted-foreground">Товары (выполнено)</div>
+          </CardContent>
+        </Card>
+        <Card className="bg-emerald-50 dark:bg-emerald-900/20">
+          <CardContent className="p-4 text-center">
+            <div className="text-2xl font-bold text-emerald-600">{overallStats.grandTotal.toFixed(0)} ₽</div>
             <div className="text-xs text-muted-foreground">Общая сумма</div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Master breakdown */}
+      {/* Employee breakdown */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg">По мастерам</CardTitle>
+          <CardTitle className="text-lg">Статистика по сотрудникам</CardTitle>
         </CardHeader>
         <CardContent>
-          {masterStats.length === 0 ? (
+          {employeeStats.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               Нет данных за выбранный период
             </div>
           ) : (
             <div className="space-y-3">
-              {masterStats.map(master => (
-                <Card key={master.id} className="border-border/50">
+              {employeeStats.map(employee => (
+                <Card key={employee.id} className="border-border/50">
                   <CardContent className="p-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <HandMetal className="h-5 w-5 text-primary" />
-                          <span className="font-semibold text-lg">{master.name}</span>
+                    <div className="flex flex-col gap-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <User className="h-5 w-5 text-primary" />
+                            <span className="font-semibold text-lg">{employee.name}</span>
+                          </div>
+                          {employee.phone && (
+                            <a href={`tel:${employee.phone}`} className="text-sm text-muted-foreground hover:underline">
+                              {employee.phone}
+                            </a>
+                          )}
                         </div>
-                        {master.phone && (
-                          <a href={`tel:${master.phone}`} className="text-sm text-muted-foreground hover:underline">
-                            {master.phone}
-                          </a>
+                      </div>
+                      
+                      {/* Request counts */}
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                          Выполнено: {employee.completedCount}
+                        </Badge>
+                        {employee.inProgressCount > 0 && (
+                          <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+                            <AlertCircle className="h-3 w-3 mr-1" />
+                            В работе: {employee.inProgressCount}
+                          </Badge>
                         )}
-                        <div className="text-sm text-muted-foreground mt-1">
-                          Выполнено заявок: {master.requestCount}
-                        </div>
+                        {employee.cancelledCount > 0 && (
+                          <Badge variant="secondary" className="bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400">
+                            <CircleDashed className="h-3 w-3 mr-1" />
+                            Отменено: {employee.cancelledCount}
+                          </Badge>
+                        )}
                       </div>
-                      <div className="flex flex-wrap gap-4 text-right">
-                        <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded min-w-[100px]">
-                          <div className="text-lg font-bold text-blue-700 dark:text-blue-400">
-                            {master.serviceSum.toFixed(0)} ₽
+                      
+                      {/* Financial breakdown */}
+                      {employee.completedCount > 0 && (
+                        <div className="flex flex-wrap gap-4">
+                          <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded min-w-[100px] text-center">
+                            <div className="text-lg font-bold text-blue-700 dark:text-blue-400">
+                              {employee.serviceSum.toFixed(0)} ₽
+                            </div>
+                            <div className="text-xs text-muted-foreground">Услуги</div>
                           </div>
-                          <div className="text-xs text-muted-foreground">Услуги</div>
-                        </div>
-                        <div className="bg-orange-100 dark:bg-orange-900/30 p-2 rounded min-w-[100px]">
-                          <div className="text-lg font-bold text-orange-700 dark:text-orange-400">
-                            {master.productSum.toFixed(0)} ₽
+                          <div className="bg-orange-100 dark:bg-orange-900/30 p-2 rounded min-w-[100px] text-center">
+                            <div className="text-lg font-bold text-orange-700 dark:text-orange-400">
+                              {employee.productSum.toFixed(0)} ₽
+                            </div>
+                            <div className="text-xs text-muted-foreground">Товары</div>
                           </div>
-                          <div className="text-xs text-muted-foreground">Товары</div>
-                        </div>
-                        <div className="bg-green-100 dark:bg-green-900/30 p-2 rounded min-w-[100px]">
-                          <div className="text-lg font-bold text-green-700 dark:text-green-400">
-                            {master.total.toFixed(0)} ₽
+                          <div className="bg-green-100 dark:bg-green-900/30 p-2 rounded min-w-[100px] text-center">
+                            <div className="text-lg font-bold text-green-700 dark:text-green-400">
+                              {employee.total.toFixed(0)} ₽
+                            </div>
+                            <div className="text-xs text-muted-foreground">Итого</div>
                           </div>
-                          <div className="text-xs text-muted-foreground">Итого</div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
