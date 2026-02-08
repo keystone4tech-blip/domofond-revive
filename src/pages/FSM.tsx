@@ -83,6 +83,7 @@ const FSM = () => {
   const getRoleLabel = () => {
     if (roles.includes("admin")) return "Администратор";
     if (roles.includes("director")) return "Директор";
+    if (roles.includes("manager")) return "Менеджер";
     if (roles.includes("dispatcher")) return "Диспетчер";
     if (roles.includes("master")) return "Мастер";
     if (roles.includes("engineer")) return "Инженер";

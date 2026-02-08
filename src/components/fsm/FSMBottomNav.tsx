@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { 
   LayoutDashboard, 
   ClipboardList, 
@@ -6,7 +7,13 @@ import {
   Building2, 
   MapPin, 
   BarChart3,
-  Package
+  Package,
+  ChevronUp,
+  X,
+  Clock,
+  AlertTriangle,
+  CheckCircle2,
+  CircleDashed
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -17,14 +24,17 @@ interface FSMBottomNavProps {
 }
 
 const FSMBottomNav = ({ activeTab, onTabChange, isManager }: FSMBottomNavProps) => {
-  const baseItems = [
+  const [showTasksSubmenu, setShowTasksSubmenu] = useState(false);
+  const [showRequestsSubmenu, setShowRequestsSubmenu] = useState(false);
+
+  const baseItems: { id: string; label: string; icon: typeof LayoutDashboard; hasSubmenu?: boolean }[] = [
     { id: "dashboard", label: "Панель", icon: LayoutDashboard },
-    { id: "tasks", label: "Задачи", icon: ClipboardList },
-    { id: "requests", label: "Заявки", icon: FileText },
+    { id: "tasks", label: "Задачи", icon: ClipboardList, hasSubmenu: true },
+    { id: "requests", label: "Заявки", icon: FileText, hasSubmenu: true },
     { id: "products", label: "Товары", icon: Package },
   ];
 
-  const managerItems = [
+  const managerItems: { id: string; label: string; icon: typeof LayoutDashboard; hasSubmenu?: boolean }[] = [
     { id: "employees", label: "Кадры", icon: Users },
     { id: "clients", label: "Клиенты", icon: Building2 },
     { id: "map", label: "Карта", icon: MapPin },
@@ -33,60 +43,152 @@ const FSMBottomNav = ({ activeTab, onTabChange, isManager }: FSMBottomNavProps) 
 
   const items = isManager ? [...baseItems, ...managerItems] : baseItems;
 
-  // Show max 5 items on mobile, scroll for more
-  const visibleItems = items.slice(0, 5);
-  const hasMore = items.length > 5;
+  const tasksSubmenuItems = [
+    { id: "tasks_pending", label: "Ожидают", icon: Clock, filter: "pending" },
+    { id: "tasks_in_progress", label: "В работе", icon: AlertTriangle, filter: "in_progress" },
+    { id: "tasks_completed", label: "Выполнены", icon: CheckCircle2, filter: "completed" },
+    { id: "tasks_cancelled", label: "Отменены", icon: CircleDashed, filter: "cancelled" },
+  ];
+
+  const requestsSubmenuItems = [
+    { id: "requests_pending", label: "Новые", icon: Clock, filter: "pending" },
+    { id: "requests_in_progress", label: "В работе", icon: AlertTriangle, filter: "in_progress" },
+    { id: "requests_completed", label: "Выполнены", icon: CheckCircle2, filter: "completed" },
+    { id: "requests_cancelled", label: "Отменены", icon: CircleDashed, filter: "cancelled" },
+  ];
+
+  const handleNavClick = (itemId: string, hasSubmenu?: boolean) => {
+    if (hasSubmenu) {
+      if (itemId === "tasks") {
+        setShowTasksSubmenu(!showTasksSubmenu);
+        setShowRequestsSubmenu(false);
+      } else if (itemId === "requests") {
+        setShowRequestsSubmenu(!showRequestsSubmenu);
+        setShowTasksSubmenu(false);
+      }
+    } else {
+      setShowTasksSubmenu(false);
+      setShowRequestsSubmenu(false);
+      onTabChange(itemId);
+    }
+  };
+
+  const handleSubmenuClick = (mainTab: string, filter: string) => {
+    onTabChange(mainTab);
+    setShowTasksSubmenu(false);
+    setShowRequestsSubmenu(false);
+    // The filter will be handled by the parent component through the activeTab
+    // For now, we just navigate to the main tab
+    // A more advanced implementation would pass the filter as well
+    window.dispatchEvent(new CustomEvent('fsm-filter-change', { 
+      detail: { tab: mainTab, filter } 
+    }));
+  };
+
+  const showSubmenu = showTasksSubmenu || showRequestsSubmenu;
+  const currentSubmenuItems = showTasksSubmenu ? tasksSubmenuItems : requestsSubmenuItems;
+  const currentSubmenuType = showTasksSubmenu ? 'tasks' : 'requests';
+
+  // Show max items based on available items
+  const visibleItems = items.slice(0, 8);
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 lg:hidden bg-background/95 backdrop-blur-lg border-t border-border shadow-lg">
-      <div className="flex justify-around items-center h-16 px-1 overflow-x-auto">
-        {visibleItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = activeTab === item.id;
-          
-          return (
-            <button
-              key={item.id}
-              onClick={() => onTabChange(item.id)}
-              className={cn(
-                "flex flex-col items-center justify-center min-w-[60px] py-2 px-2 rounded-lg transition-all",
-                isActive 
-                  ? "text-primary bg-primary/10" 
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-              )}
-            >
-              <Icon className={cn("h-5 w-5 mb-1", isActive && "scale-110")} />
-              <span className="text-[10px] font-medium leading-none">{item.label}</span>
-            </button>
-          );
-        })}
-        
-        {hasMore && (
-          <div className="flex gap-1 overflow-x-auto">
-            {items.slice(5).map((item) => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.id;
-              
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => onTabChange(item.id)}
-                  className={cn(
-                    "flex flex-col items-center justify-center min-w-[60px] py-2 px-2 rounded-lg transition-all",
-                    isActive 
-                      ? "text-primary bg-primary/10" 
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                  )}
-                >
-                  <Icon className={cn("h-5 w-5 mb-1", isActive && "scale-110")} />
-                  <span className="text-[10px] font-medium leading-none">{item.label}</span>
-                </button>
-              );
-            })}
+    <>
+      {/* Submenu overlay */}
+      {showSubmenu && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => {
+            setShowTasksSubmenu(false);
+            setShowRequestsSubmenu(false);
+          }}
+        />
+      )}
+
+      {/* Submenu popup */}
+      {showSubmenu && (
+        <div className="fixed bottom-16 left-0 right-0 z-50 lg:hidden bg-background border-t border-border rounded-t-2xl shadow-2xl animate-in slide-in-from-bottom-4 duration-200">
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-foreground">
+                {showTasksSubmenu ? "Задачи" : "Заявки"}
+              </h3>
+              <button
+                onClick={() => {
+                  setShowTasksSubmenu(false);
+                  setShowRequestsSubmenu(false);
+                }}
+                className="p-1 rounded-full hover:bg-muted transition-colors"
+              >
+                <X className="h-5 w-5 text-muted-foreground" />
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {currentSubmenuItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => handleSubmenuClick(currentSubmenuType, item.filter)}
+                    className={cn(
+                      "flex items-center gap-3 p-3 rounded-xl transition-all",
+                      "bg-muted/50 hover:bg-muted text-foreground"
+                    )}
+                  >
+                    <div className={cn(
+                      "p-2 rounded-lg",
+                      item.filter === "pending" && "bg-yellow-500/20 text-yellow-500",
+                      item.filter === "in_progress" && "bg-blue-500/20 text-blue-500",
+                      item.filter === "completed" && "bg-green-500/20 text-green-500",
+                      item.filter === "cancelled" && "bg-muted-foreground/20 text-muted-foreground"
+                    )}>
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <span className="text-sm font-medium">{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        )}
-      </div>
-    </nav>
+        </div>
+      )}
+
+      {/* Main bottom navigation */}
+      <nav className="fixed bottom-0 left-0 right-0 z-50 lg:hidden bg-background/95 backdrop-blur-lg border-t border-border shadow-lg">
+        <div className="flex justify-around items-center h-16 px-1 overflow-x-auto">
+          {visibleItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id;
+            const isSubmenuOpen = (item.id === "tasks" && showTasksSubmenu) || 
+                                   (item.id === "requests" && showRequestsSubmenu);
+            
+            return (
+              <button
+                key={item.id}
+                onClick={() => handleNavClick(item.id, item.hasSubmenu)}
+                className={cn(
+                  "flex flex-col items-center justify-center min-w-[56px] py-2 px-1 rounded-lg transition-all relative",
+                  isActive || isSubmenuOpen
+                    ? "text-primary bg-primary/10" 
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                )}
+              >
+                <div className="relative">
+                  <Icon className={cn("h-5 w-5 mb-1", (isActive || isSubmenuOpen) && "scale-110")} />
+                  {item.hasSubmenu && (
+                    <ChevronUp className={cn(
+                      "h-3 w-3 absolute -right-2 -top-1 transition-transform",
+                      isSubmenuOpen && "rotate-180"
+                    )} />
+                  )}
+                </div>
+                <span className="text-[10px] font-medium leading-none">{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+    </>
   );
 };
 

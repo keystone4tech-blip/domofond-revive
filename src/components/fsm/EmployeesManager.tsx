@@ -58,7 +58,7 @@ const EmployeesManager = () => {
   const [formData, setFormData] = useState({
     full_name: "",
     phone: "",
-    position: "master" as "master" | "engineer" | "dispatcher",
+    position: "master" as "master" | "engineer" | "dispatcher" | "director" | "manager",
   });
 
   const { data: employees, isLoading } = useQuery({
@@ -105,13 +105,17 @@ const EmployeesManager = () => {
     master: "Мастер",
     dispatcher: "Диспетчер",
     engineer: "Инженер",
+    director: "Директор",
+    manager: "Менеджер",
   };
 
   // Обратный маппинг: русское название -> ключ роли
-  const positionKeys: Record<string, "master" | "engineer" | "dispatcher"> = {
+  const positionKeys: Record<string, "master" | "engineer" | "dispatcher" | "director" | "manager"> = {
     "Мастер": "master",
     "Диспетчер": "dispatcher",
     "Инженер": "engineer",
+    "Директор": "director",
+    "Менеджер": "manager",
   };
 
   const createEmployeeMutation = useMutation({
@@ -388,6 +392,8 @@ const EmployeesManager = () => {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="director">Директор</SelectItem>
+                        <SelectItem value="manager">Менеджер</SelectItem>
                         <SelectItem value="dispatcher">Диспетчер</SelectItem>
                         <SelectItem value="master">Мастер</SelectItem>
                         <SelectItem value="engineer">Инженер</SelectItem>

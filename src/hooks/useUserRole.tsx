@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 
-export type AppRole = "admin" | "user" | "director" | "dispatcher" | "master" | "engineer";
+export type AppRole = "admin" | "user" | "director" | "dispatcher" | "master" | "engineer" | "manager";
 
 interface UseUserRoleResult {
   user: User | null;
@@ -71,11 +71,11 @@ export const useUserRole = (): UseUserRoleResult => {
   const hasRole = (role: AppRole) => roles.includes(role);
   
   const isManager = roles.some((r) => 
-    ["admin", "director", "dispatcher"].includes(r)
+    ["admin", "director", "dispatcher", "manager"].includes(r)
   );
   
   const isFSMUser = roles.some((r) => 
-    ["admin", "director", "dispatcher", "master", "engineer"].includes(r)
+    ["admin", "director", "dispatcher", "master", "engineer", "manager"].includes(r)
   );
   
   const isAdmin = roles.includes("admin");
