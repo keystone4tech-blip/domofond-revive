@@ -571,15 +571,42 @@ const RequestsManager = () => {
             </div>
           )}
 
-          {/* Completed info */}
-          {request.completed_at && (
-            <div className="bg-emerald-50 dark:bg-emerald-900/20 p-3 rounded">
+          {/* Completed info with work result */}
+          {request.status === "completed" && (
+            <div className="bg-emerald-50 dark:bg-emerald-900/20 p-3 rounded space-y-2">
               <div className="flex items-center gap-2 text-sm">
                 <ClipboardCheck className="h-4 w-4 text-emerald-600" />
                 <span className="font-medium text-emerald-700 dark:text-emerald-400">
-                  Выполнено: {format(new Date(request.completed_at), "dd.MM.yyyy HH:mm")}
+                  Выполнено: {request.completed_at && format(new Date(request.completed_at), "dd.MM.yyyy HH:mm")}
                 </span>
               </div>
+              {request.notes && request.notes.includes("Результат:") && (
+                <div className="text-xs text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30 p-2 rounded">
+                  <span className="font-medium">📋 </span>
+                  {request.notes.split("Результат:")[1]?.split("\n")[0]?.trim() || request.notes}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Cancelled info with reason */}
+          {request.status === "cancelled" && (
+            <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded space-y-2">
+              <div className="flex items-center gap-2 text-sm">
+                <CircleDashed className="h-4 w-4 text-red-600" />
+                <span className="font-medium text-red-700 dark:text-red-400">
+                  Отменено
+                </span>
+              </div>
+              {request.notes && (
+                <div className="text-xs text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/30 p-2 rounded">
+                  <span className="font-medium">❌ Причина: </span>
+                  {request.notes.includes("Причина отмены:") 
+                    ? request.notes.split("Причина отмены:")[1]?.split("\n")[0]?.trim()
+                    : request.notes
+                  }
+                </div>
+              )}
             </div>
           )}
 

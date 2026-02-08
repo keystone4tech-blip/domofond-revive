@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Edit, Trash2, Loader2, CheckCircle2, Play, Eye, HandMetal } from "lucide-react";
+import { Plus, Edit, Trash2, Loader2, CheckCircle2, Play, Eye, HandMetal, CircleDashed } from "lucide-react";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 import TaskDetails from "./TaskDetails";
@@ -371,6 +371,7 @@ const TasksManager = ({ isManager }: TasksManagerProps) => {
               <SelectItem value="assigned">Назначены</SelectItem>
               <SelectItem value="in_progress">В работе</SelectItem>
               <SelectItem value="completed">Выполнены</SelectItem>
+              <SelectItem value="cancelled">Отменены</SelectItem>
             </SelectContent>
           </Select>
           {isManager && (
@@ -521,12 +522,44 @@ const TasksManager = ({ isManager }: TasksManagerProps) => {
                         </span>
                       )}
                     </div>
-                    {task.notes && (
+                    {task.notes && task.status !== "cancelled" && task.status !== "completed" && (
                       <div className="mt-1 text-xs text-muted-foreground">
                         ✅ {task.notes}
                       </div>
                     )}
-                    {task.scheduled_time_start && (
+                    {/* Completed task with result */}
+                    {task.status === "completed" && (
+                      <div className="mt-2 p-2 rounded bg-green-50 dark:bg-green-900/20 text-xs">
+                        <div className="flex items-center gap-1 text-green-700 dark:text-green-400 font-medium">
+                          <CheckCircle2 className="h-3 w-3" />
+                          Выполнено: {task.completed_at && format(new Date(task.completed_at), "dd.MM.yyyy HH:mm")}
+                        </div>
+                        {task.notes && (
+                          <div className="mt-1 text-green-600 dark:text-green-400">
+                            📋 {task.notes.includes("Результат:") 
+                              ? task.notes.split("Результат:")[1]?.split("\n")[0]?.trim() 
+                              : task.notes}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {/* Cancelled task with reason */}
+                    {task.status === "cancelled" && (
+                      <div className="mt-2 p-2 rounded bg-red-50 dark:bg-red-900/20 text-xs">
+                        <div className="flex items-center gap-1 text-red-700 dark:text-red-400 font-medium">
+                          <CircleDashed className="h-3 w-3" />
+                          Отменено
+                        </div>
+                        {task.notes && (
+                          <div className="mt-1 text-red-600 dark:text-red-400">
+                            ❌ Причина: {task.notes.includes("Причина отмены:") 
+                              ? task.notes.split("Причина отмены:")[1]?.split("\n")[0]?.trim() 
+                              : task.notes}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {task.scheduled_time_start && task.status !== "completed" && task.status !== "cancelled" && (
                       <div className="mt-1 text-xs text-muted-foreground">
                         ⏱ Начало: {task.scheduled_time_start}
                         {task.scheduled_time_end && ` → Завершено: ${task.scheduled_time_end}`}
