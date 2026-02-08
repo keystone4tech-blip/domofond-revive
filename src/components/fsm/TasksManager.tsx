@@ -50,15 +50,16 @@ interface Task {
 
 interface TasksManagerProps {
   isManager: boolean;
+  initialFilter?: string;
 }
 
-const TasksManager = ({ isManager }: TasksManagerProps) => {
+const TasksManager = ({ isManager, initialFilter = "all" }: TasksManagerProps) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>(initialFilter);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -67,7 +68,13 @@ const TasksManager = ({ isManager }: TasksManagerProps) => {
     priority: "medium",
     scheduled_date: "",
   });
-
+  
+  // Update filter when initialFilter changes
+  useEffect(() => {
+    if (initialFilter && initialFilter !== "all") {
+      setStatusFilter(initialFilter);
+    }
+  }, [initialFilter]);
   const { data: tasks, isLoading } = useQuery({
     queryKey: ["tasks", statusFilter],
     queryFn: async () => {

@@ -8,18 +8,19 @@ import {
   MapPin, 
   BarChart3,
   Package,
-  ChevronUp,
   X,
   Clock,
   AlertTriangle,
   CheckCircle2,
-  CircleDashed
+  CircleDashed,
+  HandMetal,
+  Banknote
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface FSMBottomNavProps {
   activeTab: string;
-  onTabChange: (tab: string) => void;
+  onTabChange: (tab: string, filter?: string) => void;
   isManager: boolean;
 }
 
@@ -55,6 +56,8 @@ const FSMBottomNav = ({ activeTab, onTabChange, isManager }: FSMBottomNavProps) 
     { id: "requests_in_progress", label: "В работе", icon: AlertTriangle, filter: "in_progress" },
     { id: "requests_completed", label: "Выполнены", icon: CheckCircle2, filter: "completed" },
     { id: "requests_cancelled", label: "Отменены", icon: CircleDashed, filter: "cancelled" },
+    { id: "requests_masters", label: "По мастерам", icon: HandMetal, filter: "masters" },
+    { id: "requests_reports", label: "Финансы", icon: Banknote, filter: "reports" },
   ];
 
   const handleNavClick = (itemId: string, hasSubmenu?: boolean) => {
@@ -74,15 +77,11 @@ const FSMBottomNav = ({ activeTab, onTabChange, isManager }: FSMBottomNavProps) 
   };
 
   const handleSubmenuClick = (mainTab: string, filter: string) => {
-    onTabChange(mainTab);
+    // Close submenus
     setShowTasksSubmenu(false);
     setShowRequestsSubmenu(false);
-    // The filter will be handled by the parent component through the activeTab
-    // For now, we just navigate to the main tab
-    // A more advanced implementation would pass the filter as well
-    window.dispatchEvent(new CustomEvent('fsm-filter-change', { 
-      detail: { tab: mainTab, filter } 
-    }));
+    // Navigate to tab with filter
+    onTabChange(mainTab, filter);
   };
 
   const showSubmenu = showTasksSubmenu || showRequestsSubmenu;
@@ -132,7 +131,7 @@ const FSMBottomNav = ({ activeTab, onTabChange, isManager }: FSMBottomNavProps) 
                     onClick={() => handleSubmenuClick(currentSubmenuType, item.filter)}
                     className={cn(
                       "flex items-center gap-3 p-3 rounded-xl transition-all",
-                      "bg-muted/50 hover:bg-muted text-foreground"
+                      "bg-muted/50 hover:bg-muted text-foreground active:scale-95"
                     )}
                   >
                     <div className={cn(
@@ -140,7 +139,9 @@ const FSMBottomNav = ({ activeTab, onTabChange, isManager }: FSMBottomNavProps) 
                       item.filter === "pending" && "bg-yellow-500/20 text-yellow-500",
                       item.filter === "in_progress" && "bg-blue-500/20 text-blue-500",
                       item.filter === "completed" && "bg-green-500/20 text-green-500",
-                      item.filter === "cancelled" && "bg-muted-foreground/20 text-muted-foreground"
+                      item.filter === "cancelled" && "bg-muted-foreground/20 text-muted-foreground",
+                      item.filter === "masters" && "bg-purple-500/20 text-purple-500",
+                      item.filter === "reports" && "bg-emerald-500/20 text-emerald-500"
                     )}>
                       <Icon className="h-5 w-5" />
                     </div>
@@ -173,15 +174,7 @@ const FSMBottomNav = ({ activeTab, onTabChange, isManager }: FSMBottomNavProps) 
                     : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                 )}
               >
-                <div className="relative">
-                  <Icon className={cn("h-5 w-5 mb-1", (isActive || isSubmenuOpen) && "scale-110")} />
-                  {item.hasSubmenu && (
-                    <ChevronUp className={cn(
-                      "h-3 w-3 absolute -right-2 -top-1 transition-transform",
-                      isSubmenuOpen && "rotate-180"
-                    )} />
-                  )}
-                </div>
+                <Icon className={cn("h-5 w-5 mb-1", (isActive || isSubmenuOpen) && "scale-110")} />
                 <span className="text-[10px] font-medium leading-none">{item.label}</span>
               </button>
             );
