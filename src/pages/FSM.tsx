@@ -15,7 +15,6 @@ import {
   Package,
   Home
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import FSMDashboard from "@/components/fsm/FSMDashboard";
 import EmployeesManager from "@/components/fsm/EmployeesManager";
@@ -34,6 +33,7 @@ const FSM = () => {
     content: false
   });
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [statusFilter, setStatusFilter] = useState<string>("pending");
 
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -67,6 +67,19 @@ const FSM = () => {
       }
     }
   }, [user, isFSMUser, isLoading, roles, navigate, toast]);
+
+  // Handle tab change with optional filter
+  const handleTabChange = (tab: string, filter?: string) => {
+    setActiveTab(tab);
+    if (filter) {
+      setStatusFilter(filter);
+    } else {
+      // Default filter when switching tabs
+      if (tab === "requests" || tab === "tasks") {
+        setStatusFilter("pending");
+      }
+    }
+  };
 
   if (isLoading) {
     return (
@@ -126,7 +139,7 @@ const FSM = () => {
 
         <Tabs
           value={activeTab}
-          onValueChange={setActiveTab}
+          onValueChange={(val) => handleTabChange(val)}
           className={`space-y-4 ${
             isVisible.content ? 'opacity-100' : 'opacity-0'
           } transition-opacity duration-500`}
@@ -176,11 +189,11 @@ const FSM = () => {
           </TabsContent>
 
           <TabsContent value="tasks" className="mt-0">
-            <TasksManager isManager={isManager} />
+            <TasksManager isManager={isManager} initialFilter={statusFilter} />
           </TabsContent>
 
           <TabsContent value="requests" className="mt-0">
-            <RequestsManager />
+            <RequestsManager initialFilter={statusFilter} />
           </TabsContent>
 
           <TabsContent value="products" className="mt-0">
@@ -212,7 +225,7 @@ const FSM = () => {
       {/* FSM-specific Bottom Navigation for mobile */}
       <FSMBottomNav 
         activeTab={activeTab} 
-        onTabChange={setActiveTab} 
+        onTabChange={handleTabChange} 
         isManager={isManager} 
       />
     </div>

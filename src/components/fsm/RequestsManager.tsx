@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -48,7 +48,8 @@ import {
   Eye,
   Banknote,
   Calendar,
-  ClipboardCheck
+  ClipboardCheck,
+  FileText
 } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -96,7 +97,11 @@ interface Employee {
   phone: string | null;
 }
 
-const RequestsManager = () => {
+interface RequestsManagerProps {
+  initialFilter?: string;
+}
+
+const RequestsManager = ({ initialFilter = "pending" }: RequestsManagerProps) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user, isManager } = useUserRole();
@@ -104,7 +109,14 @@ const RequestsManager = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<Request | null>(null);
   const [editingRequest, setEditingRequest] = useState<Request | null>(null);
-  const [activeTab, setActiveTab] = useState("pending");
+  const [activeTab, setActiveTab] = useState(initialFilter);
+  
+  // Update tab when initialFilter changes
+  useEffect(() => {
+    if (initialFilter) {
+      setActiveTab(initialFilter);
+    }
+  }, [initialFilter]);
   
   const [formData, setFormData] = useState({
     name: "",
@@ -689,118 +701,78 @@ const RequestsManager = () => {
     );
   }
 
+  // Get title for current tab
+  const getTabTitle = () => {
+    switch (activeTab) {
+      case "pending": return { title: "Новые заявки", icon: Clock, count: stats.pending };
+      case "in_progress": return { title: "В работе", icon: AlertCircle, count: stats.inProgress };
+      case "completed": return { title: "Выполненные", icon: CheckCircle2, count: stats.completed };
+      case "cancelled": return { title: "Отменённые", icon: CircleDashed, count: stats.cancelled };
+      case "masters": return { title: "По мастерам", icon: HandMetal, count: mastersWithRequests.length };
+      case "reports": return { title: "Финансовые отчёты", icon: Banknote, count: null };
+      default: return { title: "Заявки", icon: FileText, count: stats.total };
+    }
+  };
+
+  const tabInfo = getTabTitle();
+  const TabIcon = tabInfo.icon;
+
   return (
-    <div className="space-y-6">
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <Card className={`cursor-pointer hover:border-primary/50 transition-colors ${activeTab === 'all' ? 'border-primary' : ''}`} onClick={() => setActiveTab("all")}>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-primary">{stats.total}</div>
-            <div className="text-xs text-muted-foreground">Всего</div>
-          </CardContent>
-        </Card>
-        <Card className={`cursor-pointer hover:border-primary/50 transition-colors ${activeTab === 'pending' ? 'border-yellow-500' : ''}`} onClick={() => setActiveTab("pending")}>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-yellow-500">{stats.pending}</div>
-            <div className="text-xs text-muted-foreground">Ожидают</div>
-          </CardContent>
-        </Card>
-        <Card className={`cursor-pointer hover:border-primary/50 transition-colors ${activeTab === 'in_progress' ? 'border-blue-500' : ''}`} onClick={() => setActiveTab("in_progress")}>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-blue-500">{stats.inProgress}</div>
-            <div className="text-xs text-muted-foreground">В работе</div>
-          </CardContent>
-        </Card>
-        <Card className={`cursor-pointer hover:border-primary/50 transition-colors ${activeTab === 'completed' ? 'border-green-500' : ''}`} onClick={() => setActiveTab("completed")}>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-green-500">{stats.completed}</div>
-            <div className="text-xs text-muted-foreground">Выполнено</div>
-          </CardContent>
-        </Card>
-        <Card className={`${stats.urgent > 0 ? 'border-red-500' : ''}`}>
-          <CardContent className="p-4 text-center">
-            <div className={`text-2xl font-bold ${stats.urgent > 0 ? 'text-red-500 animate-pulse' : 'text-muted-foreground'}`}>{stats.urgent}</div>
-            <div className="text-xs text-muted-foreground">Срочных</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
-          <TabsList className="flex flex-wrap h-auto gap-1">
-            <TabsTrigger value="pending" className="flex items-center gap-1">
-              <Clock className="h-4 w-4" />
-              <span className="hidden sm:inline">Новые</span>
-              <Badge variant="secondary" className="ml-1">{stats.pending}</Badge>
-            </TabsTrigger>
-            <TabsTrigger value="in_progress" className="flex items-center gap-1">
-              <AlertCircle className="h-4 w-4" />
-              <span className="hidden sm:inline">В работе</span>
-              <Badge variant="secondary" className="ml-1">{stats.inProgress}</Badge>
-            </TabsTrigger>
-            <TabsTrigger value="completed" className="flex items-center gap-1">
-              <CheckCircle2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Выполнено</span>
-            </TabsTrigger>
-            <TabsTrigger value="cancelled" className="flex items-center gap-1">
-              <CircleDashed className="h-4 w-4" />
-              <span className="hidden sm:inline">Отменено</span>
-              {stats.cancelled > 0 && <Badge variant="secondary" className="ml-1">{stats.cancelled}</Badge>}
-            </TabsTrigger>
-            <TabsTrigger value="masters" className="flex items-center gap-1">
-              <HandMetal className="h-4 w-4" />
-              <span className="hidden sm:inline">Мастера</span>
-            </TabsTrigger>
-            <TabsTrigger value="reports" className="flex items-center gap-1">
-              <Banknote className="h-4 w-4" />
-              <span className="hidden sm:inline">Отчёты</span>
-            </TabsTrigger>
-          </TabsList>
-
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={resetForm}>
-                <Plus className="h-4 w-4 mr-2" />
-                Создать
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>{editingRequest ? "Редактировать заявку" : "Новая заявка"}</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Имя клиента *</Label>
-                    <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Телефон *</Label>
-                    <Input
-                      id="phone"
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      required
-                    />
-                  </div>
-                </div>
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <TabIcon className="h-5 w-5 text-primary" />
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">{tabInfo.title}</h2>
+            {tabInfo.count !== null && (
+              <p className="text-sm text-muted-foreground">{tabInfo.count} заявок</p>
+            )}
+          </div>
+        </div>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button onClick={resetForm} size="sm">
+              <Plus className="h-4 w-4 mr-2" />
+              Создать
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{editingRequest ? "Редактировать заявку" : "Новая заявка"}</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="address">Адрес *</Label>
+                  <Label htmlFor="name">Имя клиента *</Label>
                   <Input
-                    id="address"
-                    value={formData.address}
-                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="message">Описание проблемы *</Label>
+                  <Label htmlFor="phone">Телефон *</Label>
+                  <Input
+                    id="phone"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="address">Адрес *</Label>
+                <Input
+                  id="address"
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="message">Описание проблемы *</Label>
                   <Textarea
                     id="message"
                     value={formData.message}
@@ -912,10 +884,12 @@ const RequestsManager = () => {
               </form>
             </DialogContent>
           </Dialog>
-        </div>
+      </div>
 
+      {/* Content based on active tab */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         {/* Pending Requests */}
-        <TabsContent value="pending" className="mt-4">
+        <TabsContent value="pending" className="mt-0">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center gap-2">
