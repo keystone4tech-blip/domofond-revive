@@ -185,7 +185,7 @@ const FSM = () => {
           </TabsList>
 
           <TabsContent value="dashboard" className="mt-0">
-            <FSMDashboard isManager={isManager} />
+            <FSMDashboard isManager={isManager} onNavigate={handleTabChange} />
           </TabsContent>
 
           <TabsContent value="tasks" className="mt-0">
