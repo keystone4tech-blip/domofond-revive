@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { 
   LayoutDashboard, 
   ClipboardList, 
@@ -28,10 +30,44 @@ const FSMBottomNav = ({ activeTab, onTabChange, isManager }: FSMBottomNavProps) 
   const [showTasksSubmenu, setShowTasksSubmenu] = useState(false);
   const [showRequestsSubmenu, setShowRequestsSubmenu] = useState(false);
 
-  const baseItems: { id: string; label: string; icon: typeof LayoutDashboard; hasSubmenu?: boolean }[] = [
+  // Fetch counts for badges
+  const { data: counts } = useQuery({
+    queryKey: ["fsm-nav-counts"],
+    queryFn: async () => {
+      const [tasksRes, requestsRes] = await Promise.all([
+        supabase.from("tasks").select("status"),
+        supabase.from("requests").select("status"),
+      ]);
+      
+      const tasks = tasksRes.data || [];
+      const requests = requestsRes.data || [];
+      
+      return {
+        pendingTasks: tasks.filter((t) => t.status === "pending" || t.status === "assigned").length,
+        inProgressTasks: tasks.filter((t) => t.status === "in_progress").length,
+        pendingRequests: requests.filter((r) => r.status === "pending").length,
+        inProgressRequests: requests.filter((r) => r.status === "in_progress").length,
+      };
+    },
+    refetchInterval: 30000, // Refresh every 30 seconds
+  });
+
+  const baseItems: { id: string; label: string; icon: typeof LayoutDashboard; hasSubmenu?: boolean; badge?: number }[] = [
     { id: "dashboard", label: "Панель", icon: LayoutDashboard },
-    { id: "tasks", label: "Задачи", icon: ClipboardList, hasSubmenu: true },
-    { id: "requests", label: "Заявки", icon: FileText, hasSubmenu: true },
+    { 
+      id: "tasks", 
+      label: "Задачи", 
+      icon: ClipboardList, 
+      hasSubmenu: true,
+      badge: (counts?.pendingTasks || 0) + (counts?.inProgressTasks || 0)
+    },
+    { 
+      id: "requests", 
+      label: "Заявки", 
+      icon: FileText, 
+      hasSubmenu: true,
+      badge: (counts?.pendingRequests || 0) + (counts?.inProgressRequests || 0)
+    },
     { id: "products", label: "Товары", icon: Package },
   ];
 
@@ -45,15 +81,15 @@ const FSMBottomNav = ({ activeTab, onTabChange, isManager }: FSMBottomNavProps) 
   const items = isManager ? [...baseItems, ...managerItems] : baseItems;
 
   const tasksSubmenuItems = [
-    { id: "tasks_pending", label: "Ожидают", icon: Clock, filter: "pending" },
-    { id: "tasks_in_progress", label: "В работе", icon: AlertTriangle, filter: "in_progress" },
+    { id: "tasks_pending", label: "Ожидают", icon: Clock, filter: "pending", count: counts?.pendingTasks },
+    { id: "tasks_in_progress", label: "В работе", icon: AlertTriangle, filter: "in_progress", count: counts?.inProgressTasks },
     { id: "tasks_completed", label: "Выполнены", icon: CheckCircle2, filter: "completed" },
     { id: "tasks_cancelled", label: "Отменены", icon: CircleDashed, filter: "cancelled" },
   ];
 
   const requestsSubmenuItems = [
-    { id: "requests_pending", label: "Новые", icon: Clock, filter: "pending" },
-    { id: "requests_in_progress", label: "В работе", icon: AlertTriangle, filter: "in_progress" },
+    { id: "requests_pending", label: "Новые", icon: Clock, filter: "pending", count: counts?.pendingRequests },
+    { id: "requests_in_progress", label: "В работе", icon: AlertTriangle, filter: "in_progress", count: counts?.inProgressRequests },
     { id: "requests_completed", label: "Выполнены", icon: CheckCircle2, filter: "completed" },
     { id: "requests_cancelled", label: "Отменены", icon: CircleDashed, filter: "cancelled" },
     { id: "requests_masters", label: "По мастерам", icon: HandMetal, filter: "masters" },
@@ -77,10 +113,8 @@ const FSMBottomNav = ({ activeTab, onTabChange, isManager }: FSMBottomNavProps) 
   };
 
   const handleSubmenuClick = (mainTab: string, filter: string) => {
-    // Close submenus
     setShowTasksSubmenu(false);
     setShowRequestsSubmenu(false);
-    // Navigate to tab with filter
     onTabChange(mainTab, filter);
   };
 
@@ -88,7 +122,6 @@ const FSMBottomNav = ({ activeTab, onTabChange, isManager }: FSMBottomNavProps) 
   const currentSubmenuItems = showTasksSubmenu ? tasksSubmenuItems : requestsSubmenuItems;
   const currentSubmenuType = showTasksSubmenu ? 'tasks' : 'requests';
 
-  // Show max items based on available items
   const visibleItems = items.slice(0, 8);
 
   return (
@@ -130,7 +163,7 @@ const FSMBottomNav = ({ activeTab, onTabChange, isManager }: FSMBottomNavProps) 
                     key={item.id}
                     onClick={() => handleSubmenuClick(currentSubmenuType, item.filter)}
                     className={cn(
-                      "flex items-center gap-3 p-3 rounded-xl transition-all",
+                      "flex items-center gap-3 p-3 rounded-xl transition-all relative",
                       "bg-muted/50 hover:bg-muted text-foreground active:scale-95"
                     )}
                   >
@@ -146,6 +179,11 @@ const FSMBottomNav = ({ activeTab, onTabChange, isManager }: FSMBottomNavProps) 
                       <Icon className="h-5 w-5" />
                     </div>
                     <span className="text-sm font-medium">{item.label}</span>
+                    {item.count !== undefined && item.count > 0 && (
+                      <span className="absolute top-2 right-2 min-w-[18px] h-[18px] bg-primary text-primary-foreground text-[10px] font-bold rounded-full flex items-center justify-center">
+                        {item.count}
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -162,6 +200,7 @@ const FSMBottomNav = ({ activeTab, onTabChange, isManager }: FSMBottomNavProps) 
             const isActive = activeTab === item.id;
             const isSubmenuOpen = (item.id === "tasks" && showTasksSubmenu) || 
                                    (item.id === "requests" && showRequestsSubmenu);
+            const badge = 'badge' in item ? item.badge : undefined;
             
             return (
               <button
@@ -174,7 +213,14 @@ const FSMBottomNav = ({ activeTab, onTabChange, isManager }: FSMBottomNavProps) 
                     : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                 )}
               >
-                <Icon className={cn("h-5 w-5 mb-1", (isActive || isSubmenuOpen) && "scale-110")} />
+                <div className="relative">
+                  <Icon className={cn("h-5 w-5 mb-1", (isActive || isSubmenuOpen) && "scale-110")} />
+                  {typeof badge === "number" && badge > 0 && (
+                    <span className="absolute -top-1 -right-2 min-w-[16px] h-[16px] bg-destructive text-destructive-foreground text-[9px] font-bold rounded-full flex items-center justify-center">
+                      {badge > 99 ? "99+" : badge}
+                    </span>
+                  )}
+                </div>
                 <span className="text-[10px] font-medium leading-none">{item.label}</span>
               </button>
             );
