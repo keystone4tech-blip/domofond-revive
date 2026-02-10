@@ -55,6 +55,27 @@ const Cabinet = () => {
     checkUser();
   }, []);
 
+  // Realtime subscription for profile updates
+  useEffect(() => {
+    if (!userId) return;
+    const channel = supabase
+      .channel("cabinet-profile")
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "profiles", filter: `id=eq.${userId}` },
+        (payload) => {
+          const updated = payload.new as any;
+          setProfile(updated);
+          setFullName(updated.full_name || "");
+          setPhone(updated.phone || "");
+          setAddress(updated.address || "");
+          setApartment(updated.apartment || "");
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [userId]);
+
   const checkUser = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -138,7 +159,7 @@ const Cabinet = () => {
     enabled: !!userId,
   });
 
-  const handleSave = async () => {
+  const handleSaveAndVerify = async () => {
     setSaving(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -151,17 +172,18 @@ const Cabinet = () => {
           phone,
           address,
           apartment,
+          is_verified: false,
         })
         .eq("id", session.user.id);
 
       if (error) throw error;
 
-      toast({
-        title: "Данные сохранены",
-        description: "Ваш профиль успешно обновлен",
-      });
+      setProfile((prev: any) => prev ? { ...prev, full_name: fullName, phone, address, apartment, is_verified: false } : prev);
 
-      checkUser();
+      toast({
+        title: "Данные отправлены",
+        description: "Ваши данные сохранены и отправлены на верификацию",
+      });
     } catch (error: any) {
       toast({
         title: "Ошибка сохранения",
@@ -296,29 +318,24 @@ const Cabinet = () => {
             <Card>
               <CardHeader>
                 <CardTitle>Статус верификации</CardTitle>
-                <CardDescription>
-                  Верификация необходима для доступа ко всем функциям личного кабинета
-                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center gap-2">
                   {profile?.is_verified ? (
                     <>
                       <CheckCircle className="h-5 w-5 text-green-600" />
-                      <span className="text-green-600 font-medium">Профиль верифицирован</span>
+                      <span className="text-green-600 font-medium">Верифицирован</span>
                     </>
                   ) : (
                     <>
                       <AlertCircle className="h-5 w-5 text-orange-600" />
-                      <span className="text-orange-600 font-medium">Требуется верификация</span>
+                      <span className="text-orange-600 font-medium">Ожидает верификации</span>
+                      <p className="text-sm text-muted-foreground ml-2">
+                        Заполните данные и нажмите "Сохранить и отправить на верификацию"
+                      </p>
                     </>
                   )}
                 </div>
-                {!profile?.is_verified && (
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Заполните все данные профиля и свяжитесь с нами для завершения верификации
-                  </p>
-                )}
               </CardContent>
             </Card>
 
@@ -370,9 +387,9 @@ const Cabinet = () => {
                   />
                 </div>
 
-                <Button onClick={handleSave} disabled={saving} className="w-full">
+                <Button onClick={handleSaveAndVerify} disabled={saving} className="w-full">
                   {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Сохранить изменения
+                  Сохранить и отправить на верификацию
                 </Button>
               </CardContent>
             </Card>

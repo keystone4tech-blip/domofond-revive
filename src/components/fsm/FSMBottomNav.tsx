@@ -74,6 +74,7 @@ const FSMBottomNav = ({ activeTab, onTabChange, isManager }: FSMBottomNavProps) 
   const managerItems: { id: string; label: string; icon: typeof LayoutDashboard; hasSubmenu?: boolean }[] = [
     { id: "employees", label: "Кадры", icon: Users },
     { id: "clients", label: "Клиенты", icon: Building2 },
+    { id: "verification", label: "Верификация", icon: CheckCircle2 },
     { id: "map", label: "Карта", icon: MapPin },
     { id: "reports", label: "Отчеты", icon: BarChart3 },
   ];

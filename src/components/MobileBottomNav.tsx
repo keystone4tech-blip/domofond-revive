@@ -46,7 +46,7 @@ const MobileBottomNav = () => {
   }, []);
 
   const isFSMUser = userRoles.some((r) => 
-    ["admin", "director", "dispatcher", "master", "engineer"].includes(r)
+    ["admin", "director", "dispatcher", "master", "engineer", "manager"].includes(r)
   );
 
   // Hide on FSM pages - they have their own nav
@@ -94,12 +94,12 @@ const MobileBottomNav = () => {
     },
   ];
 
-  // Add FSM or Cabinet/Login button based on auth state
+  // Add FSM and/or Cabinet/Login button based on auth state
   if (user) {
     if (isFSMUser) {
       navItems.push({
         icon: <LayoutDashboard className="h-5 w-5" />,
-        label: "FSM",
+        label: "Домофондар",
         action: () => navigate("/fsm"),
         isActive: location.pathname === "/fsm",
       });

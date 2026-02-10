@@ -13,7 +13,9 @@ import {
   FileText,
   Loader2,
   Package,
-  Home
+  Home,
+  ShieldCheck,
+  User
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import FSMDashboard from "@/components/fsm/FSMDashboard";
@@ -24,6 +26,7 @@ import LocationMap from "@/components/fsm/LocationMap";
 import FSMReports from "@/components/fsm/FSMReports";
 import RequestsManager from "@/components/fsm/RequestsManager";
 import ProductsManager from "@/components/fsm/ProductsManager";
+import VerificationManager from "@/components/fsm/VerificationManager";
 import FSMBottomNav from "@/components/fsm/FSMBottomNav";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
@@ -117,6 +120,9 @@ const FSM = () => {
           
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground hidden sm:inline">{getRoleLabel()}</span>
+            <Link to="/cabinet" className="p-2 text-muted-foreground hover:text-foreground transition-colors">
+              <User className="h-5 w-5" />
+            </Link>
             <ThemeToggle />
           </div>
         </div>
@@ -130,7 +136,7 @@ const FSM = () => {
         >
           <h1 className="text-xl md:text-2xl font-bold text-foreground flex items-center gap-2">
             <LayoutDashboard className="h-6 w-6 text-primary" />
-            FSM Система
+            Домофондар
           </h1>
           <p className="text-sm text-muted-foreground">
             Управление заявками и сотрудниками • {getRoleLabel()}
@@ -180,6 +186,10 @@ const FSM = () => {
                   <BarChart3 className="h-4 w-4" />
                   Отчеты
                 </TabsTrigger>
+                <TabsTrigger value="verification" className="flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4" />
+                  Верификация
+                </TabsTrigger>
               </>
             )}
           </TabsList>
@@ -216,6 +226,10 @@ const FSM = () => {
 
               <TabsContent value="reports" className="mt-0">
                 <FSMReports />
+              </TabsContent>
+
+              <TabsContent value="verification" className="mt-0">
+                <VerificationManager />
               </TabsContent>
             </>
           )}

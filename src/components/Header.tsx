@@ -39,7 +39,7 @@ const Header = () => {
   }, []);
 
   const isFSMUser = userRoles.some((r) => 
-    ["admin", "director", "dispatcher", "master", "engineer"].includes(r)
+    ["admin", "director", "dispatcher", "master", "engineer", "manager"].includes(r)
   );
 
   const scrollToSection = (sectionId: string) => {
