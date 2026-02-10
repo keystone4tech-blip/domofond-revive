@@ -17,8 +17,8 @@ export default defineConfig(({ mode }) => ({
       registerType: "autoUpdate",
       includeAssets: ["favicon.ico", "robots.txt"],
       manifest: {
-        name: "FSM Домофондар",
-        short_name: "FSM",
+        name: "Домофондар",
+        short_name: "Домофондар",
         description: "Система управления заявками и сотрудниками",
         theme_color: "#1e3a5f",
         background_color: "#0f172a",
