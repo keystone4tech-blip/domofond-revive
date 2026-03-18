@@ -390,7 +390,7 @@ export default function Calculator() {
                                 <li className="flex justify-between py-1 border-b border-border">
                                   <span className="text-muted-foreground">Калитки</span>
                                   <span className="font-semibold">
-                                    {rates.individualGate ? <span className="text-muted-foreground text-xs">индивидуально</span> : `${Math.ceil(gates / entrances) * rates.gate} ₽`}
+                                    {gatePrice} ₽
                                   </span>
                                 </li>
                               )}
