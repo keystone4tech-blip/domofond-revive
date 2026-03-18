@@ -125,6 +125,10 @@ const Admin = () => {
             <SiteStats />
           </TabsContent>
 
+          <TabsContent value="calculations">
+            <CalculationsManager />
+          </TabsContent>
+
           <TabsContent value="promotions">
             <PromotionsManager />
           </TabsContent>
