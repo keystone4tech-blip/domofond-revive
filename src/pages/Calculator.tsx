@@ -188,8 +188,9 @@ export default function Calculator() {
       setShowResult(true);
       setIsDialogOpen(false);
       toast({ title: "Успех", description: "Расчёт сохранён и отправлен в админ-панель." });
-    } catch (e: any) {
-      toast({ title: "Ошибка", description: e.message || "Не удалось сохранить данные", variant: "destructive" });
+    } catch (e: unknown) {
+      const errorMessage = e instanceof Error ? e.message : "Не удалось сохранить данные";
+      toast({ title: "Ошибка", description: errorMessage, variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
