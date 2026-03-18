@@ -14,6 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      calculations: {
+        Row: {
+          additional_cameras: number
+          created_at: string | null
+          elevator_cameras: number
+          entrances: number
+          gates: number
+          id: string
+          is_individual: boolean | null
+          name: string
+          phone: string
+          smart_intercoms: number
+          tariff_details: Json | null
+          tariff_per_apt: number | null
+          total_apartments: number
+          updated_at: string | null
+        }
+        Insert: {
+          additional_cameras?: number
+          created_at?: string | null
+          elevator_cameras?: number
+          entrances?: number
+          gates?: number
+          id?: string
+          is_individual?: boolean | null
+          name: string
+          phone: string
+          smart_intercoms?: number
+          tariff_details?: Json | null
+          tariff_per_apt?: number | null
+          total_apartments?: number
+          updated_at?: string | null
+        }
+        Update: {
+          additional_cameras?: number
+          created_at?: string | null
+          elevator_cameras?: number
+          entrances?: number
+          gates?: number
+          id?: string
+          is_individual?: boolean | null
+          name?: string
+          phone?: string
+          smart_intercoms?: number
+          tariff_details?: Json | null
+          tariff_per_apt?: number | null
+          total_apartments?: number
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       clients: {
         Row: {
           address: string
