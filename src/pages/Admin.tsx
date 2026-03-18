@@ -110,13 +110,14 @@ const Admin = () => {
             isVisible.content ? 'opacity-100' : 'opacity-0'
           } transition-opacity duration-700`}
         >
-          <TabsList className="grid w-full grid-cols-7 mb-8">
+          <TabsList className="grid w-full grid-cols-8 mb-8">
             <TabsTrigger value="stats">Статистика</TabsTrigger>
+            <TabsTrigger value="calculations">Расчёты</TabsTrigger>
             <TabsTrigger value="promotions">Акции</TabsTrigger>
             <TabsTrigger value="news">Новости</TabsTrigger>
             <TabsTrigger value="premium">Премиум</TabsTrigger>
             <TabsTrigger value="comments">Комментарии</TabsTrigger>
-            <TabsTrigger value="statsblocks">Счетчики</TabsTrigger>
+            <TabsTrigger value="statsblocks">Счётчики</TabsTrigger>
             <TabsTrigger value="blocks">Блоки</TabsTrigger>
           </TabsList>
 
