@@ -137,6 +137,12 @@ const Header = () => {
           >
             Контакты
           </button>
+          <button
+            onClick={() => handleNavigation("/calculator")}
+            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Калькулятор
+          </button>
         </nav>
 
         <div className="flex items-center gap-2 sm:gap-3 lg:gap-4">

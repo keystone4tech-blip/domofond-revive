@@ -93,7 +93,7 @@ const SmartIntercom = () => {
                   isVisible.header ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-10'
                 } transition-all duration-700 ease-out`}
               >
-                УМНЫЙ ДОМОФОН
+                Умный домофон
               </h1>
               <p
                 className={`text-lg text-muted-foreground mt-4 mb-6 ${

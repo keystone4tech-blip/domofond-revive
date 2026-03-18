@@ -68,4 +68,9 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  publicDir: "public", // по умолчанию
+  // Добавляем папку media как статическую директорию
+  build: {
+    copyPublicDir: true,
+  },
 }));
