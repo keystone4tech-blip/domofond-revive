@@ -70,8 +70,13 @@ export const CalculationsManager = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Расчёты ({calculations.length})</h2>
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold">Расчёты ({calculations.length})</h2>
+          <p className="text-sm text-muted-foreground">
+            Сюда автоматически приходят заявки из калькулятора с контактами и параметрами дома.
+          </p>
+        </div>
       </div>
 
       {calculations.length === 0 ? (

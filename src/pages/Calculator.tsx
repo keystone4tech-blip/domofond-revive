@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { ChangeEvent, useState } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Input } from "@/components/ui/input";
@@ -23,23 +23,89 @@ const getTariff = (aptsPerIntercom: number) => {
   return { smart: 50, addCam: 10, elev: 15, gate: 10, individualGate: false, valid: true };
 };
 
+type NumericFieldKey =
+  | "entrances"
+  | "totalApartments"
+  | "smartIntercoms"
+  | "additionalCameras"
+  | "elevatorCameras"
+  | "gates";
+
+type FieldErrors = Partial<Record<NumericFieldKey | "name" | "phone", string>>;
+
+const sanitizeNumericInput = (value: string) => value.replace(/\D/g, "");
+
+const parseNumericInput = (value: string, min: number, fallback: number) => {
+  if (!value.trim()) return fallback;
+
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed)) return fallback;
+
+  return Math.max(min, parsed);
+};
+
+interface NumberInputProps {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (event: ChangeEvent<HTMLInputElement>) => void;
+  error?: string;
+  min?: number;
+  placeholder?: string;
+}
+
+const NumberInput = ({ id, label, value, onChange, error, min = 0, placeholder }: NumberInputProps) => (
+  <div className="space-y-1.5">
+    <Label htmlFor={id} className="text-sm text-muted-foreground">
+      {label}
+    </Label>
+    <Input
+      id={id}
+      type="text"
+      inputMode="numeric"
+      pattern="[0-9]*"
+      autoComplete="off"
+      aria-invalid={!!error}
+      aria-describedby={error ? `${id}-error` : undefined}
+      placeholder={placeholder ?? String(min)}
+      value={value}
+      onChange={onChange}
+      className={error ? "border-destructive focus-visible:ring-destructive" : undefined}
+    />
+    {error && (
+      <p id={`${id}-error`} className="text-xs text-destructive">
+        {error}
+      </p>
+    )}
+  </div>
+);
+
 export default function Calculator() {
   const { toast } = useToast();
 
-  const [entrances, setEntrances] = useState<number>(1);
-  const [totalApartments, setTotalApartments] = useState<number>(100);
-  const [smartIntercoms, setSmartIntercoms] = useState<number>(1);
-  const [additionalCameras, setAdditionalCameras] = useState<number>(0);
-  const [elevatorCameras, setElevatorCameras] = useState<number>(0);
-  const [gates, setGates] = useState<number>(0);
-
+  const [numericValues, setNumericValues] = useState<Record<NumericFieldKey, string>>({
+    entrances: "1",
+    totalApartments: "100",
+    smartIntercoms: "1",
+    additionalCameras: "0",
+    elevatorCameras: "0",
+    gates: "0",
+  });
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showResult, setShowResult] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  const aptsPerIntercom = Math.ceil(totalApartments / (smartIntercoms || 1));
+  const entrances = parseNumericInput(numericValues.entrances, 1, 1);
+  const totalApartments = parseNumericInput(numericValues.totalApartments, 1, 100);
+  const smartIntercoms = parseNumericInput(numericValues.smartIntercoms, 1, 1);
+  const additionalCameras = parseNumericInput(numericValues.additionalCameras, 0, 0);
+  const elevatorCameras = parseNumericInput(numericValues.elevatorCameras, 0, 0);
+  const gates = parseNumericInput(numericValues.gates, 0, 0);
+
+  const aptsPerIntercom = Math.ceil(totalApartments / Math.max(smartIntercoms, 1));
   const rates = getTariff(aptsPerIntercom);
 
   let tariffPerApt = 0;
@@ -51,9 +117,41 @@ export default function Calculator() {
     tariffPerApt = smartPrice + addCamPrice + elevPrice + gatePrice;
   }
 
+  const clearFieldError = (field: keyof FieldErrors) => {
+    setFieldErrors((current) => {
+      if (!current[field]) return current;
+      return { ...current, [field]: undefined };
+    });
+  };
+
+  const handleNumericChange = (field: NumericFieldKey) => (event: ChangeEvent<HTMLInputElement>) => {
+    setNumericValues((current) => ({
+      ...current,
+      [field]: sanitizeNumericInput(event.target.value),
+    }));
+    clearFieldError(field);
+  };
+
+  const validateForm = () => {
+    const nextErrors: FieldErrors = {};
+
+    if (!numericValues.entrances.trim()) nextErrors.entrances = "Укажите количество подъездов";
+    if (!numericValues.totalApartments.trim()) nextErrors.totalApartments = "Укажите количество квартир";
+    if (!numericValues.smartIntercoms.trim()) nextErrors.smartIntercoms = "Укажите количество домофонов";
+    if (!name.trim()) nextErrors.name = "Введите имя";
+    if (!phone.trim()) nextErrors.phone = "Введите телефон";
+
+    setFieldErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  };
+
   const handleCalculate = async () => {
-    if (!name.trim() || !phone.trim()) {
-      toast({ title: "Ошибка", description: "Пожалуйста, заполните имя и телефон", variant: "destructive" });
+    if (!validateForm()) {
+      toast({
+        title: "Заполните обязательные поля",
+        description: "Проверьте имя, телефон и основные параметры дома.",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -61,8 +159,8 @@ export default function Calculator() {
 
     try {
       const { error } = await supabase.from("calculations").insert({
-        name,
-        phone,
+        name: name.trim(),
+        phone: phone.trim(),
         entrances,
         total_apartments: totalApartments,
         smart_intercoms: smartIntercoms,
@@ -71,13 +169,21 @@ export default function Calculator() {
         gates,
         tariff_per_apt: rates.valid ? tariffPerApt : 0,
         is_individual: !rates.valid,
+        tariff_details: {
+          aptsPerIntercom,
+          smartRate: rates.smart,
+          additionalCameraRate: rates.addCam,
+          elevatorRate: rates.elev,
+          gateRate: rates.gate,
+          individualGate: rates.individualGate,
+        },
       });
 
       if (error) throw error;
 
       setShowResult(true);
       setIsDialogOpen(false);
-      toast({ title: "Успех", description: "Расчёт выполнен!" });
+      toast({ title: "Успех", description: "Расчёт сохранён и отправлен в админ-панель." });
     } catch (e: any) {
       toast({ title: "Ошибка", description: e.message || "Не удалось сохранить данные", variant: "destructive" });
     } finally {
@@ -85,33 +191,17 @@ export default function Calculator() {
     }
   };
 
-  const NumberInput = ({ id, label, value, onChange, min = 0 }: { id: string; label: string; value: number; onChange: (v: number) => void; min?: number }) => (
-    <div className="space-y-1.5">
-      <Label htmlFor={id} className="text-sm text-muted-foreground">{label}</Label>
-      <Input
-        id={id}
-        type="number"
-        min={min}
-        value={value === 0 && min === 0 ? "0" : value || ""}
-        onChange={(e) => onChange(Math.max(min, parseInt(e.target.value) || min))}
-      />
-    </div>
-  );
-
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
       <main className="flex-1 pt-20">
-        {/* Hero section */}
         <section className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground py-12 md:py-16">
           <div className="container mx-auto px-4">
             <div className="max-w-3xl mx-auto text-center space-y-4">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-sm mb-2">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary-foreground/10 backdrop-blur-sm mb-2">
                 <CalcIcon className="w-8 h-8" />
               </div>
-              <h1 className="text-2xl md:text-4xl font-bold tracking-tight">
-                Рассчитайте стоимость обслуживания
-              </h1>
+              <h1 className="text-2xl md:text-4xl font-bold tracking-tight">Рассчитайте стоимость обслуживания</h1>
               <p className="text-primary-foreground/80 text-sm md:text-base max-w-xl mx-auto">
                 Заполните параметры дома и оборудование. Калькулятор посчитает точный тариф для одной квартиры.
               </p>
@@ -121,17 +211,32 @@ export default function Calculator() {
 
         <div className="container mx-auto px-4 py-8 md:py-12">
           <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Forms */}
             <div className="lg:col-span-7 space-y-6">
               <Card>
                 <CardHeader className="pb-4">
                   <CardTitle className="text-lg">Параметры дома</CardTitle>
-                  <CardDescription>Базовые характеристики всего дома</CardDescription>
+                  <CardDescription>Заполните обязательные поля, чтобы расчёт сохранился корректно.</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-2 gap-4">
-                    <NumberInput id="entrances" label="Подъездов" value={entrances} onChange={setEntrances} min={1} />
-                    <NumberInput id="apartments" label="Квартир всего" value={totalApartments} onChange={setTotalApartments} min={1} />
+                    <NumberInput
+                      id="entrances"
+                      label="Подъездов"
+                      value={numericValues.entrances}
+                      onChange={handleNumericChange("entrances")}
+                      min={1}
+                      placeholder="1"
+                      error={fieldErrors.entrances}
+                    />
+                    <NumberInput
+                      id="apartments"
+                      label="Квартир всего"
+                      value={numericValues.totalApartments}
+                      onChange={handleNumericChange("totalApartments")}
+                      min={1}
+                      placeholder="100"
+                      error={fieldErrors.totalApartments}
+                    />
                   </div>
                 </CardContent>
               </Card>
@@ -139,20 +244,45 @@ export default function Calculator() {
               <Card>
                 <CardHeader className="pb-4">
                   <CardTitle className="text-lg">Оборудование</CardTitle>
-                  <CardDescription>Суммарное количество на весь дом</CardDescription>
+                  <CardDescription>Если оборудования нет, оставьте 0 или очистите поле.</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-2 gap-4">
-                    <NumberInput id="smartIntercoms" label="Умных домофонов" value={smartIntercoms} onChange={setSmartIntercoms} />
-                    <NumberInput id="additionalCameras" label="Доп. камер" value={additionalCameras} onChange={setAdditionalCameras} />
-                    <NumberInput id="elevatorCameras" label="Камер в лифте" value={elevatorCameras} onChange={setElevatorCameras} />
-                    <NumberInput id="gates" label="Калиток" value={gates} onChange={setGates} />
+                    <NumberInput
+                      id="smartIntercoms"
+                      label="Умных домофонов"
+                      value={numericValues.smartIntercoms}
+                      onChange={handleNumericChange("smartIntercoms")}
+                      min={1}
+                      placeholder="1"
+                      error={fieldErrors.smartIntercoms}
+                    />
+                    <NumberInput
+                      id="additionalCameras"
+                      label="Доп. камер"
+                      value={numericValues.additionalCameras}
+                      onChange={handleNumericChange("additionalCameras")}
+                      placeholder="0"
+                    />
+                    <NumberInput
+                      id="elevatorCameras"
+                      label="Камер в лифте"
+                      value={numericValues.elevatorCameras}
+                      onChange={handleNumericChange("elevatorCameras")}
+                      placeholder="0"
+                    />
+                    <NumberInput
+                      id="gates"
+                      label="Калиток"
+                      value={numericValues.gates}
+                      onChange={handleNumericChange("gates")}
+                      placeholder="0"
+                    />
                   </div>
                 </CardContent>
               </Card>
             </div>
 
-            {/* Result card */}
             <div className="lg:col-span-5">
               <Card className="sticky top-24 border-primary/20 shadow-lg overflow-hidden">
                 <CardHeader className="bg-primary/5 border-b border-primary/10">
@@ -174,16 +304,37 @@ export default function Calculator() {
                         <DialogContent className="sm:max-w-md">
                           <DialogHeader>
                             <DialogTitle>Показать результат</DialogTitle>
-                            <DialogDescription>Представьтесь, чтобы мы сохранили ваш расчёт.</DialogDescription>
+                            <DialogDescription>Представьтесь, чтобы мы сохранили ваш расчёт в админ-панель.</DialogDescription>
                           </DialogHeader>
                           <div className="space-y-4 py-4">
                             <div className="space-y-2">
                               <Label htmlFor="name">Ваше имя</Label>
-                              <Input id="name" placeholder="Иван" value={name} onChange={(e) => setName(e.target.value)} />
+                              <Input
+                                id="name"
+                                placeholder="Иван"
+                                value={name}
+                                onChange={(event) => {
+                                  setName(event.target.value);
+                                  clearFieldError("name");
+                                }}
+                                className={fieldErrors.name ? "border-destructive focus-visible:ring-destructive" : undefined}
+                              />
+                              {fieldErrors.name && <p className="text-xs text-destructive">{fieldErrors.name}</p>}
                             </div>
                             <div className="space-y-2">
                               <Label htmlFor="phone">Телефон</Label>
-                              <Input id="phone" placeholder="+7 (999) 000-00-00" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
+                              <Input
+                                id="phone"
+                                placeholder="+7 (999) 000-00-00"
+                                type="tel"
+                                value={phone}
+                                onChange={(event) => {
+                                  setPhone(event.target.value);
+                                  clearFieldError("phone");
+                                }}
+                                className={fieldErrors.phone ? "border-destructive focus-visible:ring-destructive" : undefined}
+                              />
+                              {fieldErrors.phone && <p className="text-xs text-destructive">{fieldErrors.phone}</p>}
                             </div>
                           </div>
                           <DialogFooter>
@@ -201,7 +352,7 @@ export default function Calculator() {
                           <InfoIcon className="h-4 w-4" />
                           <AlertTitle>Внимание</AlertTitle>
                           <AlertDescription>
-                            Для домов с малым количеством квартир на 1 аппарат (менее 15), тариф рассчитывается индивидуально.
+                            Для домов с малым количеством квартир на 1 аппарат тариф рассчитывается индивидуально.
                           </AlertDescription>
                         </Alert>
                       ) : (
@@ -235,7 +386,7 @@ export default function Calculator() {
                                 <li className="flex justify-between py-1 border-b border-border">
                                   <span className="text-muted-foreground">Калитки</span>
                                   <span className="font-semibold">
-                                    {rates.individualGate ? <span className="text-amber-600 text-xs">индивидуально</span> : `${Math.ceil(gates / entrances) * rates.gate} ₽`}
+                                    {rates.individualGate ? <span className="text-muted-foreground text-xs">индивидуально</span> : `${Math.ceil(gates / entrances) * rates.gate} ₽`}
                                   </span>
                                 </li>
                               )}
