@@ -108,12 +108,15 @@ export default function Calculator() {
   const aptsPerIntercom = Math.ceil(totalApartments / Math.max(smartIntercoms, 1));
   const rates = getTariff(aptsPerIntercom);
 
+  const gateMaintenanceCost = 5500;
+  const gatePrice = gates > 0 ? Math.ceil(((gates * gateMaintenanceCost) / totalApartments) / 5) * 5 : 0;
+
   let tariffPerApt = 0;
   if (rates.valid) {
     const smartPrice = smartIntercoms > 0 ? rates.smart : 0;
     const addCamPrice = additionalCameras > 0 ? Math.ceil(additionalCameras / entrances) * rates.addCam : 0;
     const elevPrice = elevatorCameras > 0 ? Math.ceil(elevatorCameras / entrances) * rates.elev : 0;
-    const gatePrice = gates > 0 && !rates.individualGate ? Math.ceil(gates / entrances) * rates.gate : 0;
+    
     tariffPerApt = smartPrice + addCamPrice + elevPrice + gatePrice;
   }
 
@@ -174,8 +177,9 @@ export default function Calculator() {
           smartRate: rates.smart,
           additionalCameraRate: rates.addCam,
           elevatorRate: rates.elev,
-          gateRate: rates.gate,
-          individualGate: rates.individualGate,
+          gateRate: gatePrice,
+          gateTotalCost: gates * gateMaintenanceCost,
+          individualGate: false,
         },
       });
 
