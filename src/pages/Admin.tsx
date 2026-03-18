@@ -20,18 +20,16 @@ const Admin = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [activeTab, setActiveTab] = useState("calculations");
   const [isVisible, setIsVisible] = useState({
     header: false,
-    content: false
+    content: false,
   });
 
   useEffect(() => {
     if (!loading && isAdmin) {
-      // Анимация заголовка (0.5 сек)
-      setTimeout(() => setIsVisible(prev => ({ ...prev, header: true })), 500);
-
-      // Анимация содержимого (1.0 сек)
-      setTimeout(() => setIsVisible(prev => ({ ...prev, content: true })), 1000);
+      setTimeout(() => setIsVisible((prev) => ({ ...prev, header: true })), 500);
+      setTimeout(() => setIsVisible((prev) => ({ ...prev, content: true })), 1000);
     }
   }, [loading, isAdmin]);
 
@@ -41,8 +39,10 @@ const Admin = () => {
 
   const checkAdminAccess = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
       if (!user) {
         toast({
           title: "Доступ запрещен",
@@ -96,37 +96,41 @@ const Admin = () => {
       <Header />
       <main className="container mx-auto px-4 py-8">
         <div
-          className={`flex items-center gap-3 mb-8 ${
-            isVisible.header ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-10'
+          className={`mb-8 space-y-2 ${
+            isVisible.header ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-10"
           } transition-all duration-700 ease-out`}
         >
-          <Shield className="h-8 w-8 text-primary" />
-          <h1 className="text-3xl font-bold">Панель администратора</h1>
+          <div className="flex items-center gap-3">
+            <Shield className="h-8 w-8 text-primary" />
+            <h1 className="text-3xl font-bold">Панель администратора</h1>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Заявки из калькулятора теперь открываются сразу во вкладке «Расчёты».
+          </p>
         </div>
 
         <Tabs
-          defaultValue="stats"
-          className={`w-full ${
-            isVisible.content ? 'opacity-100' : 'opacity-0'
-          } transition-opacity duration-700`}
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className={`w-full ${isVisible.content ? "opacity-100" : "opacity-0"} transition-opacity duration-700`}
         >
-          <TabsList className="grid w-full grid-cols-8 mb-8">
-            <TabsTrigger value="stats">Статистика</TabsTrigger>
-            <TabsTrigger value="calculations">Расчёты</TabsTrigger>
-            <TabsTrigger value="promotions">Акции</TabsTrigger>
-            <TabsTrigger value="news">Новости</TabsTrigger>
-            <TabsTrigger value="premium">Премиум</TabsTrigger>
-            <TabsTrigger value="comments">Комментарии</TabsTrigger>
-            <TabsTrigger value="statsblocks">Счётчики</TabsTrigger>
-            <TabsTrigger value="blocks">Блоки</TabsTrigger>
+          <TabsList className="mb-6 flex h-auto w-full max-w-full items-center justify-start gap-2 overflow-x-auto rounded-xl bg-muted/50 p-1">
+            <TabsTrigger value="calculations" className="shrink-0 whitespace-nowrap">Расчёты</TabsTrigger>
+            <TabsTrigger value="stats" className="shrink-0 whitespace-nowrap">Статистика</TabsTrigger>
+            <TabsTrigger value="promotions" className="shrink-0 whitespace-nowrap">Акции</TabsTrigger>
+            <TabsTrigger value="news" className="shrink-0 whitespace-nowrap">Новости</TabsTrigger>
+            <TabsTrigger value="premium" className="shrink-0 whitespace-nowrap">Премиум</TabsTrigger>
+            <TabsTrigger value="comments" className="shrink-0 whitespace-nowrap">Комментарии</TabsTrigger>
+            <TabsTrigger value="statsblocks" className="shrink-0 whitespace-nowrap">Счётчики</TabsTrigger>
+            <TabsTrigger value="blocks" className="shrink-0 whitespace-nowrap">Блоки</TabsTrigger>
           </TabsList>
-
-          <TabsContent value="stats">
-            <SiteStats />
-          </TabsContent>
 
           <TabsContent value="calculations">
             <CalculationsManager />
+          </TabsContent>
+
+          <TabsContent value="stats">
+            <SiteStats />
           </TabsContent>
 
           <TabsContent value="promotions">

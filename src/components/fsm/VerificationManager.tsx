@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,7 +25,6 @@ import {
   ShieldCheck,
   Clock,
 } from "lucide-react";
-import { useEffect } from "react";
 
 interface Profile {
   id: string;
@@ -62,7 +61,6 @@ const VerificationManager = () => {
     },
   });
 
-  // Realtime subscription
   useEffect(() => {
     const channel = supabase
       .channel("profiles-verification")
@@ -74,37 +72,71 @@ const VerificationManager = () => {
         }
       )
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [queryClient]);
 
-  const pendingProfiles = profiles?.filter((p) => !p.is_verified && p.full_name) || [];
-  const verifiedProfiles = profiles?.filter((p) => p.is_verified) || [];
+  const pendingProfiles = profiles?.filter((profile) => !profile.is_verified && profile.full_name) || [];
+  const verifiedProfiles = profiles?.filter((profile) => profile.is_verified) || [];
+
+  const syncProfileInCache = (updatedProfile: Profile) => {
+    queryClient.setQueryData<Profile[]>(["verification-profiles"], (current) => {
+      const safeCurrent = current ?? [];
+      const exists = safeCurrent.some((profile) => profile.id === updatedProfile.id);
+
+      if (!exists) {
+        return [updatedProfile, ...safeCurrent];
+      }
+
+      return safeCurrent.map((profile) =>
+        profile.id === updatedProfile.id ? { ...profile, ...updatedProfile } : profile
+      );
+    });
+  };
 
   const handleApprove = async (profileId: string) => {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("profiles")
       .update({ is_verified: true })
-      .eq("id", profileId);
+      .eq("id", profileId)
+      .select("*")
+      .single();
 
-    if (error) {
-      toast({ title: "Ошибка", description: error.message, variant: "destructive" });
+    if (error || !data) {
+      toast({
+        title: "Ошибка",
+        description: error?.message || "Не удалось верифицировать пользователя",
+        variant: "destructive",
+      });
       return;
     }
+
+    syncProfileInCache(data as Profile);
     toast({ title: "Одобрено", description: "Пользователь верифицирован" });
     queryClient.invalidateQueries({ queryKey: ["verification-profiles"] });
     setSelectedProfile(null);
   };
 
   const handleReject = async (profileId: string) => {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("profiles")
       .update({ is_verified: false })
-      .eq("id", profileId);
+      .eq("id", profileId)
+      .select("*")
+      .single();
 
-    if (error) {
-      toast({ title: "Ошибка", description: error.message, variant: "destructive" });
+    if (error || !data) {
+      toast({
+        title: "Ошибка",
+        description: error?.message || "Не удалось обновить статус пользователя",
+        variant: "destructive",
+      });
       return;
     }
+
+    syncProfileInCache(data as Profile);
     toast({ title: "Отказано", description: "Верификация отклонена" });
     queryClient.invalidateQueries({ queryKey: ["verification-profiles"] });
     setSelectedProfile(null);
@@ -112,7 +144,8 @@ const VerificationManager = () => {
 
   const handleSaveEdit = async () => {
     if (!selectedProfile) return;
-    const { error } = await supabase
+
+    const { data, error } = await supabase
       .from("profiles")
       .update({
         full_name: editData.full_name,
@@ -120,12 +153,20 @@ const VerificationManager = () => {
         address: editData.address,
         apartment: editData.apartment,
       })
-      .eq("id", selectedProfile.id);
+      .eq("id", selectedProfile.id)
+      .select("*")
+      .single();
 
-    if (error) {
-      toast({ title: "Ошибка", description: error.message, variant: "destructive" });
+    if (error || !data) {
+      toast({
+        title: "Ошибка",
+        description: error?.message || "Не удалось обновить данные пользователя",
+        variant: "destructive",
+      });
       return;
     }
+
+    syncProfileInCache(data as Profile);
     toast({ title: "Сохранено", description: "Данные пользователя обновлены" });
     setEditMode(false);
     queryClient.invalidateQueries({ queryKey: ["verification-profiles"] });
