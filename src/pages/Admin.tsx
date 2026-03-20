@@ -13,6 +13,7 @@ import { SiteStats } from "@/components/admin/SiteStats";
 import { CommentsManager } from "@/components/admin/CommentsManager";
 import { StatsBlocksManager } from "@/components/admin/StatsBlocksManager";
 import { CalculationsManager } from "@/components/admin/CalculationsManager";
+import { ChatWidgetManager } from "@/components/admin/ChatWidgetManager";
 import { Loader2, Shield } from "lucide-react";
 
 const Admin = () => {
