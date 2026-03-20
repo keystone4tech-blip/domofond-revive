@@ -19,6 +19,7 @@ import Payment from "./pages/Payment";
 import Calculator from "./pages/Calculator";
 import MobileBottomNav from "./components/MobileBottomNav";
 import ScrollToTop from "./components/ScrollToTop";
+import ChatWidget from "./components/ChatWidget";
 
 const queryClient = new QueryClient();
 
