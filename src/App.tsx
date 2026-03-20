@@ -50,6 +50,7 @@ const App = () => (
           </Routes>
         </div>
         <MobileBottomNav />
+        <ChatWidget />
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
