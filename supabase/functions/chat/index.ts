@@ -14,7 +14,6 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    // Fetch widget settings from DB
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -33,6 +32,16 @@ serve(async (req) => {
     }
 
     let systemPrompt = settings.system_prompt || "Ты — виртуальный помощник.";
+    
+    // Enforce concise answers
+    systemPrompt += `\n\nВАЖНЫЕ ПРАВИЛА:
+- Отвечай КРАТКО и ПО СУЩЕСТВУ, максимум 2-3 предложения.
+- Не повторяй вопрос пользователя.
+- Не добавляй лишнюю информацию, которую не спрашивали.
+- Если вопрос простой — дай простой короткий ответ.
+- Используй списки только если перечисляешь 3+ пунктов.
+- НЕ используй звёздочки для выделения (**текст**), пиши простым текстом.`;
+
     if (settings.knowledge_base) {
       systemPrompt += `\n\nДополнительная информация для ответов:\n${settings.knowledge_base}`;
     }

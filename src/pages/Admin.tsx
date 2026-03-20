@@ -14,6 +14,7 @@ import { CommentsManager } from "@/components/admin/CommentsManager";
 import { StatsBlocksManager } from "@/components/admin/StatsBlocksManager";
 import { CalculationsManager } from "@/components/admin/CalculationsManager";
 import { ChatWidgetManager } from "@/components/admin/ChatWidgetManager";
+import { ChatHistoryManager } from "@/components/admin/ChatHistoryManager";
 import { Loader2, Shield } from "lucide-react";
 
 const Admin = () => {
@@ -125,6 +126,7 @@ const Admin = () => {
             <TabsTrigger value="statsblocks" className="shrink-0 whitespace-nowrap">Счётчики</TabsTrigger>
             <TabsTrigger value="blocks" className="shrink-0 whitespace-nowrap">Блоки</TabsTrigger>
             <TabsTrigger value="chatwidget" className="shrink-0 whitespace-nowrap">AI-чат</TabsTrigger>
+            <TabsTrigger value="chathistory" className="shrink-0 whitespace-nowrap">История чатов</TabsTrigger>
           </TabsList>
 
           <TabsContent value="calculations">
@@ -161,6 +163,10 @@ const Admin = () => {
 
           <TabsContent value="chatwidget">
             <ChatWidgetManager />
+          </TabsContent>
+
+          <TabsContent value="chathistory">
+            <ChatHistoryManager />
           </TabsContent>
         </Tabs>
       </main>
