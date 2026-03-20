@@ -243,27 +243,27 @@ const Cabinet = () => {
       <Header />
       <main className="flex-1 bg-muted/30 py-8">
         <div className="container max-w-4xl">
-          <div className="flex justify-between items-center mb-8">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
             <h1
-              className={`text-3xl font-bold ${
+              className={`text-2xl sm:text-3xl font-bold ${
                 isVisible.header ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-10'
               } transition-all duration-700 ease-out`}
             >
               Личный кабинет
             </h1>
             <div
-              className={`flex gap-2 ${
+              className={`flex flex-wrap gap-2 ${
                 isVisible.header ? 'opacity-100' : 'opacity-0'
               } transition-opacity duration-700 delay-300`}
             >
               {userRoles.includes("admin") && (
-                <Button variant="outline" onClick={() => navigate("/admin")}>
-                  <Shield className="h-4 w-4 mr-2" />
-                  Админ-панель
+                <Button variant="outline" size="sm" onClick={() => navigate("/admin")}>
+                  <Shield className="h-4 w-4 mr-1" />
+                  Админ
                 </Button>
               )}
-              <Button variant="outline" onClick={handleLogout}>
-                <LogOut className="h-4 w-4 mr-2" />
+              <Button variant="outline" size="sm" onClick={handleLogout}>
+                <LogOut className="h-4 w-4 mr-1" />
                 Выйти
               </Button>
             </div>

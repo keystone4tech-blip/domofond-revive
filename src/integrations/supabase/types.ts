@@ -65,6 +65,36 @@ export type Database = {
         }
         Relationships: []
       }
+      chat_widget_settings: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean
+          knowledge_base: string | null
+          system_prompt: string
+          updated_at: string | null
+          welcome_message: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean
+          knowledge_base?: string | null
+          system_prompt?: string
+          updated_at?: string | null
+          welcome_message?: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean
+          knowledge_base?: string | null
+          system_prompt?: string
+          updated_at?: string | null
+          welcome_message?: string
+        }
+        Relationships: []
+      }
       clients: {
         Row: {
           address: string
