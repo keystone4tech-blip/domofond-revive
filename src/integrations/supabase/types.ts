@@ -65,6 +65,65 @@ export type Database = {
         }
         Relationships: []
       }
+      chat_conversations: {
+        Row: {
+          id: string
+          last_message_at: string
+          messages_count: number
+          session_id: string
+          started_at: string
+          status: string
+        }
+        Insert: {
+          id?: string
+          last_message_at?: string
+          messages_count?: number
+          session_id: string
+          started_at?: string
+          status?: string
+        }
+        Update: {
+          id?: string
+          last_message_at?: string
+          messages_count?: number
+          session_id?: string
+          started_at?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      chat_messages: {
+        Row: {
+          content: string
+          conversation_id: string
+          created_at: string
+          id: string
+          role: string
+        }
+        Insert: {
+          content: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          role: string
+        }
+        Update: {
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "chat_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_widget_settings: {
         Row: {
           created_at: string | null
