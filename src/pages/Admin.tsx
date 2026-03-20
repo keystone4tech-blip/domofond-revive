@@ -158,6 +158,10 @@ const Admin = () => {
           <TabsContent value="blocks">
             <BlocksManager />
           </TabsContent>
+
+          <TabsContent value="chatwidget">
+            <ChatWidgetManager />
+          </TabsContent>
         </Tabs>
       </main>
       <Footer />
