@@ -213,7 +213,20 @@ export default function ChatWidget() {
                 >
                   {msg.role === "assistant" ? (
                     <div className="prose prose-sm dark:prose-invert max-w-none [&>p]:m-0 [&>ul]:m-0 [&>ol]:m-0 [&>p+p]:mt-1">
-                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      <ReactMarkdown
+                        components={{
+                          a: ({ href, children }) => (
+                            <a
+                              href={href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary underline hover:text-primary/80"
+                            >
+                              {children}
+                            </a>
+                          ),
+                        }}
+                      >{msg.content}</ReactMarkdown>
                     </div>
                   ) : (
                     <span className="whitespace-pre-wrap">{msg.content}</span>
