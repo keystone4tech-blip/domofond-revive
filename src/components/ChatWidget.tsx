@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import ReactMarkdown from "react-markdown";
 
-type Msg = { role: "user" | "assistant"; content: string };
+type Msg = { role: "user" | "assistant" | "tool"; content: string; tool_call_id?: string };
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
@@ -81,6 +81,23 @@ export default function ChatWidget() {
       .eq("id", convId);
   };
 
+  const executeToolCall = async (name: string, args: Record<string, string>) => {
+    try {
+      const resp = await fetch(CHAT_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ tool_results: [{ name, arguments: args }] }),
+      });
+      const data = await resp.json();
+      return data.tool_response;
+    } catch {
+      return { success: false, error: "Ошибка сети" };
+    }
+  };
+
   const sendMessage = useCallback(async () => {
     const text = input.trim();
     if (!text || isLoading) return;
@@ -93,7 +110,12 @@ export default function ChatWidget() {
     const convId = await ensureConversation();
     if (convId) saveMessage(convId, "user", text);
 
+    await streamAI([...messages, userMsg], convId);
+  }, [input, isLoading, messages, ensureConversation]);
+
+  const streamAI = async (allMessages: Msg[], convId: string | null) => {
     let assistantSoFar = "";
+    let toolCalls: { id: string; name: string; arguments: string }[] = [];
 
     try {
       const resp = await fetch(CHAT_URL, {
@@ -102,7 +124,7 @@ export default function ChatWidget() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({ messages: [...messages, userMsg] }),
+        body: JSON.stringify({ messages: allMessages.filter(m => m.role !== "tool" || m.tool_call_id) }),
       });
 
       if (!resp.ok || !resp.body) {
@@ -140,13 +162,67 @@ export default function ChatWidget() {
           if (json === "[DONE]") break;
           try {
             const parsed = JSON.parse(json);
-            const content = parsed.choices?.[0]?.delta?.content;
-            if (content) upsert(content);
+            const choice = parsed.choices?.[0];
+            const delta = choice?.delta;
+            if (delta?.content) upsert(delta.content);
+            
+            // Handle tool calls
+            if (delta?.tool_calls) {
+              for (const tc of delta.tool_calls) {
+                if (tc.index !== undefined) {
+                  if (!toolCalls[tc.index]) {
+                    toolCalls[tc.index] = { id: tc.id || "", name: "", arguments: "" };
+                  }
+                  if (tc.id) toolCalls[tc.index].id = tc.id;
+                  if (tc.function?.name) toolCalls[tc.index].name = tc.function.name;
+                  if (tc.function?.arguments) toolCalls[tc.index].arguments += tc.function.arguments;
+                }
+              }
+            }
           } catch {
             textBuffer = line + "\n" + textBuffer;
             break;
           }
         }
+      }
+
+      // Process tool calls if any
+      if (toolCalls.length > 0) {
+        for (const tc of toolCalls) {
+          if (tc.name === "submit_request") {
+            try {
+              const args = JSON.parse(tc.arguments);
+              // Show "submitting" message
+              setMessages(prev => {
+                const filtered = prev.filter(m => m.role === "user" || (m.role === "assistant" && m.content));
+                return [...filtered, { role: "assistant", content: "⏳ Отправляю заявку..." }];
+              });
+              
+              const result = await executeToolCall(tc.name, args);
+              
+              // Now call AI again with the tool result to get a nice confirmation
+              const toolResultMsg: Msg = {
+                role: "assistant",
+                content: result.success
+                  ? `✅ Заявка успешно создана! Имя: ${args.name}, Телефон: ${args.phone}, Адрес: ${args.address}. Мы свяжемся с вами в ближайшее время.`
+                  : `❌ Не удалось отправить заявку. Попробуйте позже или позвоните нам.`,
+              };
+              
+              setMessages(prev => {
+                const filtered = prev.filter(m => !(m.role === "assistant" && m.content === "⏳ Отправляю заявку..."));
+                return [...filtered, toolResultMsg];
+              });
+              
+              if (convId) {
+                saveMessage(convId, "assistant", toolResultMsg.content);
+              }
+            } catch (e) {
+              console.error("Tool call parse error:", e);
+            }
+          }
+        }
+        setIsLoading(false);
+        return;
       }
 
       // Save assistant response
@@ -159,7 +235,7 @@ export default function ChatWidget() {
     } finally {
       setIsLoading(false);
     }
-  }, [input, isLoading, messages, ensureConversation]);
+  };
 
   if (!isActive) return null;
 
@@ -197,7 +273,7 @@ export default function ChatWidget() {
               </div>
             </div>
 
-            {messages.map((msg, i) => (
+            {messages.filter(m => m.role !== "tool").map((msg, i) => (
               <div key={i} className={`flex gap-2 ${msg.role === "user" ? "justify-end" : ""}`}>
                 {msg.role === "assistant" && (
                   <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10">
@@ -213,7 +289,20 @@ export default function ChatWidget() {
                 >
                   {msg.role === "assistant" ? (
                     <div className="prose prose-sm dark:prose-invert max-w-none [&>p]:m-0 [&>ul]:m-0 [&>ol]:m-0 [&>p+p]:mt-1">
-                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      <ReactMarkdown
+                        components={{
+                          a: ({ href, children }) => (
+                            <a
+                              href={href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary underline hover:text-primary/80"
+                            >
+                              {children}
+                            </a>
+                          ),
+                        }}
+                      >{msg.content}</ReactMarkdown>
                     </div>
                   ) : (
                     <span className="whitespace-pre-wrap">{msg.content}</span>

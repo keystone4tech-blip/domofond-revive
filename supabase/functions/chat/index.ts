@@ -10,13 +10,43 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { messages } = await req.json();
+    const { messages, tool_results } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Handle tool execution requests from the client
+    if (tool_results) {
+      for (const toolCall of tool_results) {
+        if (toolCall.name === "submit_request") {
+          const args = toolCall.arguments;
+          const { error } = await supabase.from("requests").insert({
+            name: args.name,
+            phone: args.phone,
+            address: args.address,
+            message: args.message,
+            priority: "medium",
+            status: "pending",
+          });
+          if (error) {
+            console.error("Failed to insert request:", error);
+            return new Response(JSON.stringify({ 
+              tool_response: { success: false, error: "Не удалось создать заявку" } 
+            }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+          return new Response(JSON.stringify({ 
+            tool_response: { success: true, message: "Заявка успешно создана" } 
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+    }
 
     const { data: settings } = await supabase
       .from("chat_widget_settings")
@@ -33,18 +63,45 @@ serve(async (req) => {
 
     let systemPrompt = settings.system_prompt || "Ты — виртуальный помощник.";
     
-    // Enforce concise answers
     systemPrompt += `\n\nВАЖНЫЕ ПРАВИЛА:
 - Отвечай КРАТКО и ПО СУЩЕСТВУ, максимум 2-3 предложения.
 - Не повторяй вопрос пользователя.
 - Не добавляй лишнюю информацию, которую не спрашивали.
 - Если вопрос простой — дай простой короткий ответ.
 - Используй списки только если перечисляешь 3+ пунктов.
-- НЕ используй звёздочки для выделения (**текст**), пиши простым текстом.`;
+- Используй markdown-ссылки в формате [текст](url) когда даёшь ссылки.
+- НЕ используй звёздочки для выделения (**текст**), пиши простым текстом.
+
+ПРИЁМ ЗАЯВОК:
+- Ты можешь принимать заявки от пользователей на установку, ремонт или обслуживание.
+- Для создания заявки тебе нужно собрать: ФИО, телефон, адрес и описание проблемы/услуги.
+- Если пользователь хочет оставить заявку, спроси недостающие данные.
+- Когда все данные собраны, вызови функцию submit_request.
+- После успешной отправки подтверди пользователю что заявка принята.`;
 
     if (settings.knowledge_base) {
       systemPrompt += `\n\nДополнительная информация для ответов:\n${settings.knowledge_base}`;
     }
+
+    const tools = [
+      {
+        type: "function",
+        function: {
+          name: "submit_request",
+          description: "Отправить заявку клиента на установку, ремонт или обслуживание. Используй когда пользователь предоставил все данные: имя, телефон, адрес и описание.",
+          parameters: {
+            type: "object",
+            properties: {
+              name: { type: "string", description: "ФИО клиента" },
+              phone: { type: "string", description: "Номер телефона клиента" },
+              address: { type: "string", description: "Адрес клиента" },
+              message: { type: "string", description: "Описание проблемы или нужной услуги" },
+            },
+            required: ["name", "phone", "address", "message"],
+          },
+        },
+      },
+    ];
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -58,6 +115,7 @@ serve(async (req) => {
           { role: "system", content: systemPrompt },
           ...messages,
         ],
+        tools,
         stream: true,
       }),
     });
