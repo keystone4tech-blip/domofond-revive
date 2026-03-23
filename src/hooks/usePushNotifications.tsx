@@ -49,7 +49,7 @@ export function usePushNotifications() {
     if (!isSupported) return false;
     setIsLoading(true);
     try {
-      await registerServiceWorker();
+      await waitForServiceWorker();
       
       const permResult = await Notification.requestPermission();
       setPermission(permResult);
