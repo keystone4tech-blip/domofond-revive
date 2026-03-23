@@ -39,6 +39,34 @@ serve(async (req) => {
               headers: { ...corsHeaders, "Content-Type": "application/json" },
             });
           }
+
+          // Send push notifications to all managers/dispatchers
+          try {
+            const { data: managerRoles } = await supabase
+              .from("user_roles")
+              .select("user_id")
+              .in("role", ["admin", "director", "dispatcher", "manager"]);
+            
+            if (managerRoles && managerRoles.length > 0) {
+              const userIds = managerRoles.map((r: any) => r.user_id);
+              await fetch(`${supabaseUrl}/functions/v1/send-push`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${supabaseKey}`,
+                },
+                body: JSON.stringify({
+                  user_ids: userIds,
+                  title: "🔔 Новая заявка",
+                  body: `${args.name}: ${args.message.substring(0, 100)}`,
+                  url: "/fsm",
+                }),
+              });
+            }
+          } catch (pushError) {
+            console.error("Push notification error:", pushError);
+          }
+
           return new Response(JSON.stringify({ 
             tool_response: { success: true, message: "Заявка успешно создана" } 
           }), {
