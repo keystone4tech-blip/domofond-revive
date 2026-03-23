@@ -37,11 +37,12 @@ function concat(...arrays: Uint8Array[]): Uint8Array {
 }
 
 async function hkdf(salt: Uint8Array, ikm: Uint8Array, info: Uint8Array, length: number): Promise<Uint8Array> {
-  const key = await crypto.subtle.importKey('raw', ikm, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-  const prk = new Uint8Array(await crypto.subtle.sign('HMAC', key, salt.length ? salt : new Uint8Array(32)));
+  // HKDF-Extract: PRK = HMAC-Hash(salt, IKM)
+  const saltKey = await crypto.subtle.importKey('raw', salt.length ? salt : new Uint8Array(32), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const prk = new Uint8Array(await crypto.subtle.sign('HMAC', saltKey, ikm));
   
+  // HKDF-Expand
   const prkKey = await crypto.subtle.importKey('raw', prk, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-  // HKDF-Expand - single iteration is enough for <=32 bytes
   const infoWithCounter = concat(info, new Uint8Array([1]));
   const okm = new Uint8Array(await crypto.subtle.sign('HMAC', prkKey, infoWithCounter));
   return okm.slice(0, length);
