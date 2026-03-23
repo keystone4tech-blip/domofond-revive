@@ -29,6 +29,7 @@ import ProductsManager from "@/components/fsm/ProductsManager";
 import VerificationManager from "@/components/fsm/VerificationManager";
 import FSMBottomNav from "@/components/fsm/FSMBottomNav";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import PushNotificationToggle from "@/components/fsm/PushNotificationToggle";
 
 const FSM = () => {
   const [isVisible, setIsVisible] = useState({
