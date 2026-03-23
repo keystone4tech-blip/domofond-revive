@@ -9,8 +9,9 @@ const corsHeaders = {
 // ---- Web Push Encryption (RFC 8291 / aes128gcm) ----
 
 function base64UrlDecode(str: string): Uint8Array {
-  const padding = '='.repeat((4 - str.length % 4) % 4);
-  const base64 = (str + padding).replace(/-/g, '+').replace(/_/g, '/');
+  // Replace URL-safe chars and add padding
+  let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+  while (base64.length % 4) base64 += '=';
   const raw = atob(base64);
   const arr = new Uint8Array(raw.length);
   for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
