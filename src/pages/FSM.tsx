@@ -120,6 +120,7 @@ const FSM = () => {
           </div>
           
           <div className="flex items-center gap-2">
+            <PushNotificationToggle />
             <span className="text-sm text-muted-foreground hidden sm:inline">{getRoleLabel()}</span>
             <Link to="/cabinet" className="p-2 text-muted-foreground hover:text-foreground transition-colors">
               <User className="h-5 w-5" />
