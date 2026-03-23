@@ -39,22 +39,17 @@ export function usePushNotifications() {
     }
   };
 
-  const registerServiceWorker = async () => {
-    // Register additional push SW
-    if ('serviceWorker' in navigator) {
-      try {
-        await navigator.serviceWorker.register('/sw-push.js', { scope: '/' });
-      } catch (e) {
-        console.log('Push SW already registered or error:', e);
-      }
-    }
+  const waitForServiceWorker = async () => {
+    // PWA service worker imports sw-push.js via importScripts
+    // Just wait for it to be ready
+    await navigator.serviceWorker.ready;
   };
 
   const subscribe = useCallback(async () => {
     if (!isSupported) return false;
     setIsLoading(true);
     try {
-      await registerServiceWorker();
+      await waitForServiceWorker();
       
       const permResult = await Notification.requestPermission();
       setPermission(permResult);
