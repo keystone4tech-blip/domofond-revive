@@ -21,7 +21,7 @@ const Admin = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [hasConsoleAccess, setHasConsoleAccess] = useState(false);
   const [activeTab, setActiveTab] = useState("calculations");
   const [isVisible, setIsVisible] = useState({
     header: false,
@@ -29,11 +29,11 @@ const Admin = () => {
   });
 
   useEffect(() => {
-    if (!loading && isAdmin) {
+    if (!loading && hasConsoleAccess) {
       setTimeout(() => setIsVisible((prev) => ({ ...prev, header: true })), 500);
       setTimeout(() => setIsVisible((prev) => ({ ...prev, content: true })), 1000);
     }
-  }, [loading, isAdmin]);
+  }, [loading, hasConsoleAccess]);
 
   useEffect(() => {
     checkAdminAccess();
@@ -55,24 +55,24 @@ const Admin = () => {
         return;
       }
 
-      const { data: roles, error } = await supabase
+      const { data: role, error } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", user.id)
-        .eq("role", "admin")
-        .single();
+        .in("role", ["admin", "director"])
+        .maybeSingle();
 
-      if (error || !roles) {
+      if (error || !role) {
         toast({
           title: "Доступ запрещен",
-          description: "У вас нет прав администратора",
+          description: "У вас нет прав для доступа к панели управления",
           variant: "destructive",
         });
         navigate("/");
         return;
       }
 
-      setIsAdmin(true);
+      setHasConsoleAccess(true);
     } catch (error) {
       console.error("Error checking admin access:", error);
       navigate("/");
@@ -89,7 +89,7 @@ const Admin = () => {
     );
   }
 
-  if (!isAdmin) {
+  if (!hasConsoleAccess) {
     return null;
   }
 
@@ -104,10 +104,10 @@ const Admin = () => {
         >
           <div className="flex items-center gap-3">
             <Shield className="h-8 w-8 text-primary" />
-            <h1 className="text-3xl font-bold">Панель администратора</h1>
+            <h1 className="text-3xl font-bold">Панель управления</h1>
           </div>
           <p className="text-sm text-muted-foreground">
-            Заявки из калькулятора теперь открываются сразу во вкладке «Расчёты».
+            Доступ для администратора и директора. Администратор остаётся защищённым от изменения роли.
           </p>
         </div>
 
