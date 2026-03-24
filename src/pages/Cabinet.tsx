@@ -40,6 +40,7 @@ const Cabinet = () => {
   });
   const navigate = useNavigate();
   const { toast } = useToast();
+  const hasAdminConsoleAccess = userRoles.some((role) => ["admin", "director"].includes(role));
 
   useEffect(() => {
     if (!loading) {
@@ -180,6 +181,23 @@ const Cabinet = () => {
 
       setProfile((prev: any) => prev ? { ...prev, full_name: fullName, phone, address, apartment, is_verified: false } : prev);
 
+      try {
+        await supabase.functions.invoke("send-push", {
+          body: {
+            roles: ["admin", "director"],
+            title: "Новая заявка на верификацию",
+            body: `${fullName || "Пользователь"} отправил данные на проверку`,
+            url: "/fsm",
+            data: {
+              type: "verification_request",
+              user_id: session.user.id,
+            },
+          },
+        });
+      } catch (pushError) {
+        console.error("Verification push error:", pushError);
+      }
+
       toast({
         title: "Данные отправлены",
         description: "Ваши данные сохранены и отправлены на верификацию",
@@ -256,10 +274,10 @@ const Cabinet = () => {
                 isVisible.header ? 'opacity-100' : 'opacity-0'
               } transition-opacity duration-700 delay-300`}
             >
-              {userRoles.includes("admin") && (
+              {hasAdminConsoleAccess && (
                 <Button variant="outline" size="sm" onClick={() => navigate("/admin")}>
                   <Shield className="h-4 w-4 mr-1" />
-                  Админ
+                  Панель
                 </Button>
               )}
               <Button variant="outline" size="sm" onClick={handleLogout}>

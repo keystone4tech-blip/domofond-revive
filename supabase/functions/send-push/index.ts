@@ -6,11 +6,20 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
+const getEnv = (name: string): string => {
+  const value = Deno.env.get(name)?.trim();
+  if (!value) {
+    throw new Error(`${name} is not configured`);
+  }
+
+  return value;
+};
+
 // ---- Web Push Encryption (RFC 8291 / aes128gcm) ----
 
 function base64UrlDecode(str: string): Uint8Array {
   // Replace URL-safe chars and add padding
-  let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+  let base64 = str.trim().replace(/\s+/g, '').replace(/-/g, '+').replace(/_/g, '/');
   while (base64.length % 4) base64 += '=';
   const raw = atob(base64);
   const arr = new Uint8Array(raw.length);
@@ -135,8 +144,8 @@ async function encryptPayload(
 // ---- VAPID JWT ----
 
 async function createVapidJwt(audience: string): Promise<{ jwt: string; publicKeyB64: string }> {
-  const publicKeyB64 = Deno.env.get('VAPID_PUBLIC_KEY')!;
-  const privateKeyB64 = Deno.env.get('VAPID_PRIVATE_KEY')!;
+  const publicKeyB64 = getEnv('VAPID_PUBLIC_KEY');
+  const privateKeyB64 = getEnv('VAPID_PRIVATE_KEY');
   
   const privateKeyBytes = base64UrlDecode(privateKeyB64);
   const publicKeyBytes = base64UrlDecode(publicKeyB64);
@@ -195,7 +204,7 @@ async function createVapidJwt(audience: string): Promise<{ jwt: string; publicKe
 async function sendPushNotification(
   sub: { endpoint: string; p256dh: string; auth: string },
   payload: string,
-): Promise<boolean> {
+): Promise<{ success: boolean; removeSubscription: boolean }> {
   try {
     const clientPublicKey = base64UrlDecode(sub.p256dh);
     const clientAuth = base64UrlDecode(sub.auth);
@@ -220,14 +229,14 @@ async function sendPushNotification(
     if (!response.ok) {
       const text = await response.text();
       console.error(`Push failed ${response.status}: ${text} for ${sub.endpoint}`);
-      return false;
+      return { success: false, removeSubscription: response.status === 404 || response.status === 410 };
     }
     await response.text();
     console.log(`Push sent to ${sub.endpoint.substring(0, 60)}...`);
-    return true;
+    return { success: true, removeSubscription: false };
   } catch (error) {
     console.error('Push send error:', error);
-    return false;
+    return { success: false, removeSubscription: false };
   }
 }
 
@@ -239,24 +248,47 @@ serve(async (req) => {
   }
 
   try {
-    const { user_ids, title, body, url, data } = await req.json();
+    const { user_ids, roles, title, body, url, data } = await req.json();
     
-    if (!user_ids || !title || !body) {
+    if ((!Array.isArray(user_ids) || user_ids.length === 0) && (!Array.isArray(roles) || roles.length === 0) || !title || !body) {
       return new Response(
-        JSON.stringify({ error: 'user_ids, title, body required' }),
+        JSON.stringify({ error: 'user_ids or roles, title, body required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+      getEnv('SUPABASE_URL'),
+      getEnv('SUPABASE_SERVICE_ROLE_KEY')
     );
+
+    let recipientUserIds = Array.isArray(user_ids) ? user_ids.filter(Boolean) : [];
+
+    if (Array.isArray(roles) && roles.length > 0) {
+      const { data: roleRecipients, error: rolesError } = await supabaseAdmin
+        .from('user_roles')
+        .select('user_id')
+        .in('role', roles);
+
+      if (rolesError) throw rolesError;
+
+      recipientUserIds = Array.from(new Set([
+        ...recipientUserIds,
+        ...(roleRecipients?.map((row) => row.user_id) ?? []),
+      ]));
+    }
+
+    if (recipientUserIds.length === 0) {
+      return new Response(
+        JSON.stringify({ sent: 0, message: 'No recipients found' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     const { data: subscriptions, error } = await supabaseAdmin
       .from('push_subscriptions')
       .select('*')
-      .in('user_id', user_ids);
+      .in('user_id', recipientUserIds);
 
     if (error) throw error;
     if (!subscriptions || subscriptions.length === 0) {
@@ -273,12 +305,12 @@ serve(async (req) => {
     const expiredEndpoints: string[] = [];
 
     for (const sub of subscriptions) {
-      const success = await sendPushNotification(
+      const result = await sendPushNotification(
         { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth },
         payload,
       );
-      if (success) sent++;
-      else expiredEndpoints.push(sub.endpoint);
+      if (result.success) sent++;
+      else if (result.removeSubscription) expiredEndpoints.push(sub.endpoint);
     }
 
     if (expiredEndpoints.length > 0) {

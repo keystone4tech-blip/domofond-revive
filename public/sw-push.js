@@ -1,6 +1,37 @@
 // Push notification service worker extension
+
+async function setBadge(count) {
+  try {
+    if (self.navigator && typeof self.navigator.setAppBadge === 'function') {
+      await self.navigator.setAppBadge(count);
+      return;
+    }
+
+    if (self.registration && typeof self.registration.setAppBadge === 'function') {
+      await self.registration.setAppBadge(count);
+    }
+  } catch (error) {
+    console.error('Badge set error:', error);
+  }
+}
+
+async function clearBadge() {
+  try {
+    if (self.navigator && typeof self.navigator.clearAppBadge === 'function') {
+      await self.navigator.clearAppBadge();
+      return;
+    }
+
+    if (self.registration && typeof self.registration.clearAppBadge === 'function') {
+      await self.registration.clearAppBadge();
+    }
+  } catch (error) {
+    console.error('Badge clear error:', error);
+  }
+}
+
 self.addEventListener('push', function(event) {
-  let data = { title: 'Домофондар', body: 'Новое уведомление' };
+  let data = { title: 'Домофондар', body: 'Новое уведомление', badgeCount: 1 };
   
   if (event.data) {
     try {
@@ -27,9 +58,10 @@ self.addEventListener('push', function(event) {
     ]
   };
 
-  event.waitUntil(
-    self.registration.showNotification(data.title, options)
-  );
+  event.waitUntil((async () => {
+    await self.registration.showNotification(data.title, options);
+    await setBadge(typeof data.badgeCount === 'number' ? data.badgeCount : 1);
+  })());
 });
 
 self.addEventListener('notificationclick', function(event) {
@@ -39,8 +71,9 @@ self.addEventListener('notificationclick', function(event) {
 
   const urlToOpen = event.notification.data?.url || '/fsm';
   
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
+  event.waitUntil((async () => {
+    await clearBadge();
+    return clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
       for (const client of clientList) {
         if (client.url.includes(self.location.origin) && 'focus' in client) {
           client.navigate(urlToOpen);
@@ -48,6 +81,12 @@ self.addEventListener('notificationclick', function(event) {
         }
       }
       return clients.openWindow(urlToOpen);
-    })
-  );
+    });
+  })());
+});
+
+self.addEventListener('message', function(event) {
+  if (event.data?.type === 'CLEAR_BADGE') {
+    event.waitUntil(clearBadge());
+  }
 });
