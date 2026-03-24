@@ -909,6 +909,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_manage_role: {
+        Args: {
+          _target_role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      has_admin_console_access: { Args: { _user_id: string }; Returns: boolean }
       has_fsm_role: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
