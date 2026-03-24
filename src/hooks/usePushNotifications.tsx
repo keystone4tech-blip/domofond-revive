@@ -147,10 +147,11 @@ export function usePushNotifications() {
       const registration = await navigator.serviceWorker.ready;
 
       const appServerKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
+      const applicationServerKey = new Uint8Array(appServerKey);
       const existing = await registration.pushManager.getSubscription();
       const subscription = existing ?? await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: appServerKey,
+        applicationServerKey,
       });
 
       const synced = await syncSubscriptionWithServer(subscription);
@@ -161,7 +162,7 @@ export function usePushNotifications() {
       setIsLoading(false);
       return false;
     }
-  }, [isSupported]);
+  }, [isSupported, syncSubscriptionWithServer]);
 
   const unsubscribe = useCallback(async () => {
     setIsLoading(true);
