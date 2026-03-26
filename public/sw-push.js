@@ -47,7 +47,7 @@ self.addEventListener('push', function(event) {
     badge: '/pwa-192x192.png',
     vibrate: [200, 100, 200],
     requireInteraction: true,
-    tag: data.tag || 'default',
+    tag: data.tag || `push-${Date.now()}`,
     renotify: true,
     timestamp: Date.now(),
     data: {
