@@ -40,31 +40,23 @@ serve(async (req) => {
             });
           }
 
-          // Send push notifications to all managers/dispatchers
+          // Send notification via unified notify function
           try {
-            const { data: managerRoles } = await supabase
-              .from("user_roles")
-              .select("user_id")
-              .in("role", ["admin", "director", "dispatcher", "manager"]);
-            
-            if (managerRoles && managerRoles.length > 0) {
-              const userIds = managerRoles.map((r: any) => r.user_id);
-              await fetch(`${supabaseUrl}/functions/v1/send-push`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  "Authorization": `Bearer ${supabaseKey}`,
+            await fetch(`${supabaseUrl}/functions/v1/notify`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${supabaseKey}` },
+              body: JSON.stringify({
+                event: "request_created",
+                data: {
+                  name: args.name,
+                  phone: args.phone,
+                  address: args.address,
+                  message: args.message,
                 },
-                body: JSON.stringify({
-                  user_ids: userIds,
-                  title: "🔔 Новая заявка",
-                  body: `${args.name}: ${args.message.substring(0, 100)}`,
-                  url: "/fsm",
-                }),
-              });
-            }
+              }),
+            });
           } catch (pushError) {
-            console.error("Push notification error:", pushError);
+            console.error("Notification error:", pushError);
           }
 
           return new Response(JSON.stringify({ 
