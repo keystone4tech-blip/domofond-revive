@@ -46,8 +46,10 @@ self.addEventListener('push', function(event) {
     icon: '/pwa-192x192.png',
     badge: '/pwa-192x192.png',
     vibrate: [200, 100, 200],
-    tag: data.tag || 'default',
+    requireInteraction: true,
+    tag: data.tag || `push-${Date.now()}`,
     renotify: true,
+    timestamp: Date.now(),
     data: {
       url: data.url || '/fsm',
       ...data.data
