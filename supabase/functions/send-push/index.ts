@@ -15,11 +15,18 @@ const getEnv = (name: string): string => {
   return value;
 };
 
+const sanitizeBase64Value = (value: string): string =>
+  value
+    .trim()
+    .replace(/^['"]+|['"]+$/g, "")
+    .replace(/\s+/g, "");
+
 // ---- Web Push Encryption (RFC 8291 / aes128gcm) ----
 
 function base64UrlDecode(str: string): Uint8Array {
+  const sanitized = sanitizeBase64Value(str);
   // Replace URL-safe chars and add padding
-  let base64 = str.trim().replace(/\s+/g, '').replace(/-/g, '+').replace(/_/g, '/');
+  let base64 = sanitized.replace(/-/g, '+').replace(/_/g, '/');
   while (base64.length % 4) base64 += '=';
   const raw = atob(base64);
   const arr = new Uint8Array(raw.length);
@@ -144,8 +151,8 @@ async function encryptPayload(
 // ---- VAPID JWT ----
 
 async function createVapidJwt(audience: string): Promise<{ jwt: string; publicKeyB64: string }> {
-  const publicKeyB64 = getEnv('VAPID_PUBLIC_KEY');
-  const privateKeyB64 = getEnv('VAPID_PRIVATE_KEY');
+  const publicKeyB64 = sanitizeBase64Value(getEnv('VAPID_PUBLIC_KEY'));
+  const privateKeyB64 = sanitizeBase64Value(getEnv('VAPID_PRIVATE_KEY'));
   
   const privateKeyBytes = base64UrlDecode(privateKeyB64);
   const publicKeyBytes = base64UrlDecode(publicKeyB64);
@@ -303,6 +310,7 @@ serve(async (req) => {
     
     let sent = 0;
     const expiredEndpoints: string[] = [];
+    const failedEndpoints: string[] = [];
 
     for (const sub of subscriptions) {
       const result = await sendPushNotification(
@@ -310,7 +318,10 @@ serve(async (req) => {
         payload,
       );
       if (result.success) sent++;
-      else if (result.removeSubscription) expiredEndpoints.push(sub.endpoint);
+      else {
+        failedEndpoints.push(sub.endpoint);
+        if (result.removeSubscription) expiredEndpoints.push(sub.endpoint);
+      }
     }
 
     if (expiredEndpoints.length > 0) {
@@ -318,7 +329,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ sent, total: subscriptions.length }),
+      JSON.stringify({ sent, total: subscriptions.length, failed: failedEndpoints.length }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
