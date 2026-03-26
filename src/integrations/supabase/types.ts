@@ -883,6 +883,123 @@ export type Database = {
           },
         ]
       }
+      telegram_conversations: {
+        Row: {
+          id: string
+          last_message_at: string | null
+          messages_count: number | null
+          started_at: string | null
+          status: string | null
+          telegram_user_id: string
+        }
+        Insert: {
+          id?: string
+          last_message_at?: string | null
+          messages_count?: number | null
+          started_at?: string | null
+          status?: string | null
+          telegram_user_id: string
+        }
+        Update: {
+          id?: string
+          last_message_at?: string | null
+          messages_count?: number | null
+          started_at?: string | null
+          status?: string | null
+          telegram_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telegram_conversations_telegram_user_id_fkey"
+            columns: ["telegram_user_id"]
+            isOneToOne: false
+            referencedRelation: "telegram_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      telegram_messages_log: {
+        Row: {
+          content: string
+          conversation_id: string
+          created_at: string | null
+          id: string
+          role: string
+        }
+        Insert: {
+          content: string
+          conversation_id: string
+          created_at?: string | null
+          id?: string
+          role: string
+        }
+        Update: {
+          content?: string
+          conversation_id?: string
+          created_at?: string | null
+          id?: string
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telegram_messages_log_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "telegram_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      telegram_users: {
+        Row: {
+          chat_id: number
+          created_at: string | null
+          first_name: string | null
+          id: string
+          is_active: boolean | null
+          last_name: string | null
+          linked_profile_id: string | null
+          phone: string | null
+          telegram_id: number
+          updated_at: string | null
+          username: string | null
+        }
+        Insert: {
+          chat_id: number
+          created_at?: string | null
+          first_name?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_name?: string | null
+          linked_profile_id?: string | null
+          phone?: string | null
+          telegram_id: number
+          updated_at?: string | null
+          username?: string | null
+        }
+        Update: {
+          chat_id?: number
+          created_at?: string | null
+          first_name?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_name?: string | null
+          linked_profile_id?: string | null
+          phone?: string | null
+          telegram_id?: number
+          updated_at?: string | null
+          username?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telegram_users_linked_profile_id_fkey"
+            columns: ["linked_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string | null
