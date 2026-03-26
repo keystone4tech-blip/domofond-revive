@@ -253,6 +253,15 @@ const RequestDetails = ({ request: initialRequest, onBack, isManager }: RequestD
     });
   };
 
+  // Helper to send notification
+  const sendNotification = async (event: string, data: Record<string, unknown>) => {
+    try {
+      await supabase.functions.invoke("notify", { body: { event, data } });
+    } catch (e) {
+      console.error("Notification error:", e);
+    }
+  };
+
   // Accept request mutation
   const acceptRequestMutation = useMutation({
     mutationFn: async () => {
@@ -304,6 +313,12 @@ const RequestDetails = ({ request: initialRequest, onBack, isManager }: RequestD
       queryClient.invalidateQueries({ queryKey: ["request-details", request?.id] });
       refetchHistory();
       toast({ title: "Заявка принята в работу" });
+      sendNotification("request_accepted", {
+        employee_name: currentEmployee?.full_name || "Сотрудник",
+        client_name: request?.name,
+        client_phone: request?.phone,
+        address: request?.address,
+      });
     },
   });
 
@@ -334,6 +349,12 @@ const RequestDetails = ({ request: initialRequest, onBack, isManager }: RequestD
       toast({ title: "Заявка возвращена в общий пул" });
       setShowDeclineDialog(false);
       setDeclineReason("");
+      sendNotification("request_declined", {
+        employee_name: currentEmployee?.full_name || "Сотрудник",
+        client_name: request?.name,
+        address: request?.address,
+        reason: declineReason,
+      });
     },
   });
 
@@ -362,6 +383,12 @@ const RequestDetails = ({ request: initialRequest, onBack, isManager }: RequestD
       toast({ title: "Заявка отменена" });
       setShowCancelDialog(false);
       setCancelReason("");
+      sendNotification("request_cancelled", {
+        client_name: request?.name,
+        client_phone: request?.phone,
+        address: request?.address,
+        reason: cancelReason,
+      });
     },
   });
 
@@ -402,6 +429,16 @@ const RequestDetails = ({ request: initialRequest, onBack, isManager }: RequestD
       refetchHistory();
       toast({ title: "Заявка выполнена" });
       setShowWorkNotesDialog(false);
+      // Calculate total
+      const total = requestItems?.reduce((sum, item) => sum + (item.price * item.quantity), 0) || 0;
+      sendNotification("request_completed", {
+        employee_name: currentEmployee?.full_name || "Сотрудник",
+        client_name: request?.name,
+        client_phone: request?.phone,
+        address: request?.address,
+        work_notes: workNotes,
+        total: total > 0 ? total.toString() : undefined,
+      });
       onBack();
     },
   });

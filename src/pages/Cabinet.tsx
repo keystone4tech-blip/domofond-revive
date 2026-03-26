@@ -182,14 +182,11 @@ const Cabinet = () => {
       setProfile((prev: any) => prev ? { ...prev, full_name: fullName, phone, address, apartment, is_verified: false } : prev);
 
       try {
-        await supabase.functions.invoke("send-push", {
+        await supabase.functions.invoke("notify", {
           body: {
-            roles: ["admin", "director"],
-            title: "Новая заявка на верификацию",
-            body: `${fullName || "Пользователь"} отправил данные на проверку`,
-            url: "/fsm",
+            event: "verification_request",
             data: {
-              type: "verification_request",
+              full_name: fullName,
               user_id: session.user.id,
             },
           },
