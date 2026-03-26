@@ -6,6 +6,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
+const DEFAULT_VAPID_PUBLIC_KEY = 'BKnzAAYc68ghFIetuQXHvo4e2qRUzBmbrQ1xUs_GQsahkrVZd3JX3rCfxUnTah0rRwwzu6xNN-ibL5KoH6UdkSg';
+
 const getEnv = (name: string): string => {
   const value = Deno.env.get(name)?.trim();
   if (!value) {
@@ -151,11 +153,23 @@ async function encryptPayload(
 // ---- VAPID JWT ----
 
 async function createVapidJwt(audience: string): Promise<{ jwt: string; publicKeyB64: string }> {
-  const publicKeyB64 = sanitizeBase64Value(getEnv('VAPID_PUBLIC_KEY'));
+  const envPublicKeyB64 = sanitizeBase64Value(getEnv('VAPID_PUBLIC_KEY'));
   const privateKeyB64 = sanitizeBase64Value(getEnv('VAPID_PRIVATE_KEY'));
-  
+
   const privateKeyBytes = base64UrlDecode(privateKeyB64);
-  const publicKeyBytes = base64UrlDecode(publicKeyB64);
+  let publicKeyB64 = envPublicKeyB64;
+  let publicKeyBytes: Uint8Array;
+
+  try {
+    publicKeyBytes = base64UrlDecode(envPublicKeyB64);
+    if (publicKeyBytes.length !== 65) {
+      throw new Error(`Unexpected VAPID public key length: ${publicKeyBytes.length}`);
+    }
+  } catch (error) {
+    console.warn('Invalid VAPID_PUBLIC_KEY secret, using fallback public key', error instanceof Error ? error.message : error);
+    publicKeyB64 = DEFAULT_VAPID_PUBLIC_KEY;
+    publicKeyBytes = base64UrlDecode(DEFAULT_VAPID_PUBLIC_KEY);
+  }
   
   // Build PKCS8 from raw private key + public key
   const pkcs8Header = new Uint8Array([
