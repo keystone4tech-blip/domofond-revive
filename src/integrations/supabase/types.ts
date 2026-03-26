@@ -1042,6 +1042,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      increment_telegram_messages_count: {
+        Args: { conv_id: string }
+        Returns: undefined
+      }
       is_manager: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
