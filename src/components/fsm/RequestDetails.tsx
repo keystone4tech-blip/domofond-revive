@@ -253,6 +253,15 @@ const RequestDetails = ({ request: initialRequest, onBack, isManager }: RequestD
     });
   };
 
+  // Helper to send notification
+  const sendNotification = async (event: string, data: Record<string, unknown>) => {
+    try {
+      await supabase.functions.invoke("notify", { body: { event, data } });
+    } catch (e) {
+      console.error("Notification error:", e);
+    }
+  };
+
   // Accept request mutation
   const acceptRequestMutation = useMutation({
     mutationFn: async () => {
