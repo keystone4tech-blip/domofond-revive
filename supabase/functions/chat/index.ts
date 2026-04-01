@@ -65,6 +65,36 @@ serve(async (req) => {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
+
+        if (toolCall.name === "check_account") {
+          const args = toolCall.arguments;
+          let query = supabase.from("accounts").select("account_number, address, apartment, period, debt_amount");
+          
+          if (args.apartment) {
+            query = query.ilike("address", `%кв. ${args.apartment}%`);
+          }
+          if (args.address) {
+            query = query.ilike("address", `%${args.address}%`);
+          }
+          
+          const { data, error } = await query.order("period", { ascending: false }).limit(5);
+          
+          if (error) {
+            return new Response(JSON.stringify({ 
+              tool_response: { success: false, error: "Ошибка поиска" } 
+            }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          }
+
+          return new Response(JSON.stringify({ 
+            tool_response: { 
+              success: true, 
+              accounts: data || [],
+              message: data && data.length > 0 
+                ? `Найдено ${data.length} записей` 
+                : "Записи не найдены. Уточните адрес или номер квартиры."
+            } 
+          }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
       }
     }
 
