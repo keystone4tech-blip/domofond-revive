@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, LogOut, CheckCircle, AlertCircle, ClipboardList, Calendar, Shield } from "lucide-react";
+import { Loader2, LogOut, CheckCircle, AlertCircle, ClipboardList, Calendar, Shield, CreditCard, Wallet } from "lucide-react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { format } from "date-fns";
@@ -23,6 +23,84 @@ interface Task {
   notes: string | null;
   clients: { name: string; address: string } | null;
 }
+
+const DebtCard = ({ address, apartment }: { address: string; apartment: string }) => {
+  const [accounts, setAccounts] = useState<{ account_number: string; period: string; debt_amount: number; address: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const loadDebt = async () => {
+      // Search by apartment number in the address field
+      const { data } = await supabase
+        .from("accounts")
+        .select("account_number, period, debt_amount, address")
+        .ilike("address", `%кв. ${apartment}%`)
+        .order("period", { ascending: false })
+        .limit(5);
+
+      setAccounts(data || []);
+      setLoading(false);
+    };
+    loadDebt();
+  }, [address, apartment]);
+
+  const formatPeriod = (period: string) => {
+    if (period.length === 4) {
+      const month = period.substring(0, 2);
+      const year = "20" + period.substring(2);
+      const months = ["", "Янв", "Фев", "Мар", "Апр", "Май", "Июн", "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек"];
+      return `${months[parseInt(month)] || month} ${year}`;
+    }
+    return period;
+  };
+
+  if (loading) return null;
+  if (accounts.length === 0) return null;
+
+  const totalDebt = accounts.reduce((sum, a) => sum + a.debt_amount, 0);
+
+  return (
+    <Card className={totalDebt > 0 ? "border-destructive/30" : "border-green-500/30"}>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Wallet className="h-5 w-5" />
+          Информация по лицевому счёту
+        </CardTitle>
+        <CardDescription>
+          Лицевой счёт: {accounts[0].account_number}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {accounts.map((acc, idx) => (
+          <div key={idx} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
+            <span className="text-sm">{formatPeriod(acc.period)}</span>
+            <span className={`font-bold ${acc.debt_amount > 0 ? "text-destructive" : "text-green-600"}`}>
+              {acc.debt_amount.toFixed(2)} ₽
+            </span>
+          </div>
+        ))}
+        {totalDebt > 0 && (
+          <div className="pt-2 space-y-3">
+            <div className="flex justify-between items-center p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+              <span className="font-medium">Итого задолженность:</span>
+              <span className="text-lg font-bold text-destructive">{totalDebt.toFixed(2)} ₽</span>
+            </div>
+            <Button className="w-full" onClick={() => navigate("/payment")}>
+              <CreditCard className="mr-2 h-4 w-4" />
+              Оплатить
+            </Button>
+          </div>
+        )}
+        {totalDebt === 0 && (
+          <div className="p-3 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 text-center">
+            <span className="text-green-600 font-medium">Задолженности нет ✓</span>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
 
 const Cabinet = () => {
   const [loading, setLoading] = useState(true);
@@ -408,6 +486,11 @@ const Cabinet = () => {
                 </Button>
               </CardContent>
             </Card>
+
+            {/* Задолженность - показываем только верифицированным */}
+            {profile?.is_verified && address && apartment && (
+              <DebtCard address={address} apartment={apartment} />
+            )}
 
             <Card>
               <CardHeader>

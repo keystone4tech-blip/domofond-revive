@@ -65,6 +65,36 @@ serve(async (req) => {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
+
+        if (toolCall.name === "check_account") {
+          const args = toolCall.arguments;
+          let query = supabase.from("accounts").select("account_number, address, apartment, period, debt_amount");
+          
+          if (args.apartment) {
+            query = query.ilike("address", `%кв. ${args.apartment}%`);
+          }
+          if (args.address) {
+            query = query.ilike("address", `%${args.address}%`);
+          }
+          
+          const { data, error } = await query.order("period", { ascending: false }).limit(5);
+          
+          if (error) {
+            return new Response(JSON.stringify({ 
+              tool_response: { success: false, error: "Ошибка поиска" } 
+            }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          }
+
+          return new Response(JSON.stringify({ 
+            tool_response: { 
+              success: true, 
+              accounts: data || [],
+              message: data && data.length > 0 
+                ? `Найдено ${data.length} записей` 
+                : "Записи не найдены. Уточните адрес или номер квартиры."
+            } 
+          }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
       }
     }
 
@@ -97,7 +127,12 @@ serve(async (req) => {
 - Для создания заявки тебе нужно собрать: ФИО, телефон, адрес и описание проблемы/услуги.
 - Если пользователь хочет оставить заявку, спроси недостающие данные.
 - Когда все данные собраны, вызови функцию submit_request.
-- После успешной отправки подтверди пользователю что заявка принята.`;
+- После успешной отправки подтверди пользователю что заявка принята.
+
+ЛИЦЕВЫЕ СЧЕТА И ЗАДОЛЖЕННОСТЬ:
+- Если пользователь спрашивает про задолженность, лицевой счёт, оплату — вызови функцию check_account.
+- Нужно уточнить адрес или номер квартиры для поиска.
+- После получения данных — сообщи пользователю номер счёта и сумму задолженности.`;
 
     if (settings.knowledge_base) {
       systemPrompt += `\n\nДополнительная информация для ответов:\n${settings.knowledge_base}`;
@@ -118,6 +153,21 @@ serve(async (req) => {
               message: { type: "string", description: "Описание проблемы или нужной услуги" },
             },
             required: ["name", "phone", "address", "message"],
+          },
+        },
+      },
+      {
+        type: "function",
+        function: {
+          name: "check_account",
+          description: "Проверить лицевой счёт и задолженность по адресу или номеру квартиры. Используй когда пользователь спрашивает про задолженность, оплату, лицевой счёт.",
+          parameters: {
+            type: "object",
+            properties: {
+              address: { type: "string", description: "Адрес или часть адреса (улица, дом)" },
+              apartment: { type: "string", description: "Номер квартиры" },
+            },
+            required: [],
           },
         },
       },

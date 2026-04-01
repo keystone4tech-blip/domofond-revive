@@ -15,6 +15,7 @@ import { StatsBlocksManager } from "@/components/admin/StatsBlocksManager";
 import { CalculationsManager } from "@/components/admin/CalculationsManager";
 import { ChatWidgetManager } from "@/components/admin/ChatWidgetManager";
 import { ChatHistoryManager } from "@/components/admin/ChatHistoryManager";
+import { AccountsManager } from "@/components/admin/AccountsManager";
 import { Loader2, Shield } from "lucide-react";
 
 const Admin = () => {
@@ -125,6 +126,7 @@ const Admin = () => {
             <TabsTrigger value="comments" className="shrink-0 whitespace-nowrap">Комментарии</TabsTrigger>
             <TabsTrigger value="statsblocks" className="shrink-0 whitespace-nowrap">Счётчики</TabsTrigger>
             <TabsTrigger value="blocks" className="shrink-0 whitespace-nowrap">Блоки</TabsTrigger>
+            <TabsTrigger value="accounts" className="shrink-0 whitespace-nowrap">Лиц. счета</TabsTrigger>
             <TabsTrigger value="chatwidget" className="shrink-0 whitespace-nowrap">AI-чат</TabsTrigger>
             <TabsTrigger value="chathistory" className="shrink-0 whitespace-nowrap">История чатов</TabsTrigger>
           </TabsList>
@@ -159,6 +161,10 @@ const Admin = () => {
 
           <TabsContent value="blocks">
             <BlocksManager />
+          </TabsContent>
+
+          <TabsContent value="accounts">
+            <AccountsManager />
           </TabsContent>
 
           <TabsContent value="chatwidget">
