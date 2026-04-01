@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      accounts: {
+        Row: {
+          account_number: string
+          address: string
+          apartment: string | null
+          created_at: string | null
+          debt_amount: number
+          id: string
+          period: string
+          updated_at: string | null
+        }
+        Insert: {
+          account_number: string
+          address: string
+          apartment?: string | null
+          created_at?: string | null
+          debt_amount?: number
+          id?: string
+          period: string
+          updated_at?: string | null
+        }
+        Update: {
+          account_number?: string
+          address?: string
+          apartment?: string | null
+          created_at?: string | null
+          debt_amount?: number
+          id?: string
+          period?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       calculations: {
         Row: {
           additional_cameras: number
