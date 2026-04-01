@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, LogOut, CheckCircle, AlertCircle, ClipboardList, Calendar, Shield } from "lucide-react";
+import { Loader2, LogOut, CheckCircle, AlertCircle, ClipboardList, Calendar, Shield, CreditCard, Wallet } from "lucide-react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { format } from "date-fns";
