@@ -156,6 +156,21 @@ serve(async (req) => {
           },
         },
       },
+      {
+        type: "function",
+        function: {
+          name: "check_account",
+          description: "Проверить лицевой счёт и задолженность по адресу или номеру квартиры. Используй когда пользователь спрашивает про задолженность, оплату, лицевой счёт.",
+          parameters: {
+            type: "object",
+            properties: {
+              address: { type: "string", description: "Адрес или часть адреса (улица, дом)" },
+              apartment: { type: "string", description: "Номер квартиры" },
+            },
+            required: [],
+          },
+        },
+      },
     ];
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
