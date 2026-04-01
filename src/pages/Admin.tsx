@@ -15,6 +15,7 @@ import { StatsBlocksManager } from "@/components/admin/StatsBlocksManager";
 import { CalculationsManager } from "@/components/admin/CalculationsManager";
 import { ChatWidgetManager } from "@/components/admin/ChatWidgetManager";
 import { ChatHistoryManager } from "@/components/admin/ChatHistoryManager";
+import { AccountsManager } from "@/components/admin/AccountsManager";
 import { Loader2, Shield } from "lucide-react";
 
 const Admin = () => {
