@@ -126,6 +126,7 @@ const Admin = () => {
             <TabsTrigger value="comments" className="shrink-0 whitespace-nowrap">Комментарии</TabsTrigger>
             <TabsTrigger value="statsblocks" className="shrink-0 whitespace-nowrap">Счётчики</TabsTrigger>
             <TabsTrigger value="blocks" className="shrink-0 whitespace-nowrap">Блоки</TabsTrigger>
+            <TabsTrigger value="accounts" className="shrink-0 whitespace-nowrap">Лиц. счета</TabsTrigger>
             <TabsTrigger value="chatwidget" className="shrink-0 whitespace-nowrap">AI-чат</TabsTrigger>
             <TabsTrigger value="chathistory" className="shrink-0 whitespace-nowrap">История чатов</TabsTrigger>
           </TabsList>
