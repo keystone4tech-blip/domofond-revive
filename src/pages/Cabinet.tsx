@@ -409,6 +409,11 @@ const Cabinet = () => {
               </CardContent>
             </Card>
 
+            {/* Задолженность - показываем только верифицированным */}
+            {profile?.is_verified && address && apartment && (
+              <DebtCard address={address} apartment={apartment} />
+            )}
+
             <Card>
               <CardHeader>
                 <CardTitle>Доступ к системе</CardTitle>
