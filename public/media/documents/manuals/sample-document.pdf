@@ -1,0 +1,72 @@
+%PDF-1.4
+%
+1 0 obj
+<<
+/Kids [2 0 R]
+/Count 1
+/Type /Pages
+>>
+endobj
+2 0 obj
+<<
+/MediaBox [0 0 612 792]
+/Parent 1 0 R
+/Resources <<
+/ProcSet [/PDF /Text /ImageB /ImageC /ImageI]
+>> 
+/Group <<
+/CS /DeviceRGB
+/S /Transparency
+>>
+/Contents 3 0 R
+/Type /Page
+>>
+endobj
+3 0 obj
+<<
+/Length 44
+>>
+stream
+q
+BT
+/F1 24 Tf
+50 700 Td
+(Sample Document) Tj
+ET
+Q
+endstream
+endobj
+4 0 obj
+<<
+/BaseFont /Helvetica
+/Encoding /WinAnsiEncoding
+/Subtype /Type1
+/Type /Font
+>>
+endobj
+5 0 obj
+<<
+/Font <<
+/F1 4 0 R
+>>
+/Pages 1 0 R
+/ProcSet [/PDF /Text]
+/Type /Catalog
+>>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000015 00000 n 
+0000000073 00000 n 
+0000000220 00000 n 
+0000000296 00000 n 
+0000000346 00000 n 
+trailer
+<<
+/Root 5 0 R
+/Size 6
+>>
+startxref
+404
+%%EOF
