@@ -4,7 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Trash2, Phone, User, Building2, Calendar } from "lucide-react";
+import { Loader2, Trash2, Phone, User, Building2, Calendar, FileText } from "lucide-react";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 
@@ -21,6 +21,7 @@ interface Calculation {
   tariff_per_apt: number;
   is_individual: boolean;
   created_at: string;
+  tariff_details?: any;
 }
 
 export const CalculationsManager = () => {
@@ -101,11 +102,21 @@ export const CalculationsManager = () => {
                         <Phone className="h-3.5 w-3.5" />
                         <a href={`tel:${calc.phone}`} className="hover:text-primary">{calc.phone}</a>
                       </div>
-                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <Calendar className="h-3.5 w-3.5" />
-                        {format(new Date(calc.created_at), "dd MMM yyyy, HH:mm", { locale: ru })}
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <Calendar className="h-3.5 w-3.5" />
+                          {format(new Date(calc.created_at), "dd MMM yyyy, HH:mm", { locale: ru })}
+                        </div>
                       </div>
-                    </div>
+
+                      {calc.tariff_details?.address_info && (
+                        <div className="flex items-center gap-2 text-sm text-primary font-medium bg-primary/5 p-2 rounded-md border border-primary/10">
+                          <Building2 className="h-4 w-4" />
+                          <span>
+                            {calc.tariff_details.address_info.city}, ул. {calc.tariff_details.address_info.street}, {calc.tariff_details.address_info.house}
+                            {calc.tariff_details.address_info.block && ` (корп. ${calc.tariff_details.address_info.block})`}
+                          </span>
+                        </div>
+                      )}
 
                     <div className="flex flex-wrap gap-2 text-xs">
                       <Badge variant="outline" className="gap-1">
@@ -127,9 +138,24 @@ export const CalculationsManager = () => {
                     </div>
                   </div>
 
-                  <Button variant="ghost" size="icon" onClick={() => handleDelete(calc.id)}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
+                  <div className="flex flex-col gap-2">
+                    {calc.tariff_details?.cp_url && (
+                      <Button 
+                        asChild 
+                        variant="outline" 
+                        size="sm" 
+                        className="gap-2 text-green-600 border-green-200 hover:bg-green-50 hover:text-green-700"
+                      >
+                        <a href={calc.tariff_details.cp_url} target="_blank" rel="noopener noreferrer">
+                          <FileText className="h-4 w-4" />
+                          КП
+                        </a>
+                      </Button>
+                    )}
+                    <Button variant="ghost" size="icon" onClick={() => handleDelete(calc.id)}>
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>

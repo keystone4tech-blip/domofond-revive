@@ -10,6 +10,9 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { downloadProposal, generateProposalDocx } from "@/utils/docxGenerator";
+import { FileText, CheckCircle2, Loader2 as Spinner } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 const getTariff = (aptsPerIntercom: number) => {
   if (aptsPerIntercom < 15) return { smart: 0, addCam: 0, elev: 0, gate: 0, individualGate: false, valid: false };
@@ -97,6 +100,17 @@ export default function Calculator() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showResult, setShowResult] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [lastCalculationId, setLastCalculationId] = useState<string | null>(null);
+  
+  // Состояние для КП
+  const [isCPDialogOpen, setIsCPDialogOpen] = useState(false);
+  const [isGeneratingCP, setIsGeneratingCP] = useState(false);
+  const [address, setAddress] = useState({
+    city: "г. Краснодар",
+    street: "",
+    house: "",
+    block: "",
+  });
 
   const entrances = parseNumericInput(numericValues.entrances, 1, 1);
   const totalApartments = parseNumericInput(numericValues.totalApartments, 1, 100);
@@ -185,6 +199,19 @@ export default function Calculator() {
 
       if (error) throw error;
 
+      // Получаем ID созданной записи
+      const { data: latestCalc } = await supabase
+        .from("calculations")
+        .select("id")
+        .eq("phone", phone.trim())
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+      
+      if (latestCalc) {
+        setLastCalculationId(latestCalc.id);
+      }
+
       setShowResult(true);
       setIsDialogOpen(false);
       toast({ title: "Успех", description: "Расчёт сохранён и отправлен в админ-панель." });
@@ -193,6 +220,100 @@ export default function Calculator() {
       toast({ title: "Ошибка", description: errorMessage, variant: "destructive" });
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleGenerateCP = async () => {
+    if (!address.street.trim() || !address.house.trim()) {
+      toast({
+        title: "Заполните адрес",
+        description: "Укажите улицу и номер дома для формирования КП.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsGeneratingCP(true);
+    try {
+      const proposalData = {
+        address,
+        calculation: {
+          entrances,
+          totalApartments: totalApartments,
+          smartIntercoms: smartIntercoms,
+          additionalCameras: additionalCameras,
+          elevatorCameras: elevatorCameras,
+          gates,
+          tariffPerApt,
+          rates: {
+            smart: rates.smart,
+            addCam: rates.addCam,
+            elev: rates.elev,
+            gate: rates.gate,
+          }
+        }
+      };
+
+      // 1. Генерируем файл
+      const blob = await generateProposalDocx(proposalData);
+      const fileName = `КП_Домофондар_${address.street.replace(/\s+/g, '_')}_${address.house}.docx`;
+      const filePath = `${Date.now()}_${fileName}`;
+
+      // 2. Загружаем в Storage
+      const { error: uploadError, data: uploadData } = await supabase.storage
+        .from("proposals")
+        .upload(filePath, blob);
+
+      let publicUrl = "";
+      if (!uploadError && uploadData) {
+        const { data: { publicUrl: url } } = supabase.storage
+          .from("proposals")
+          .getPublicUrl(filePath);
+        publicUrl = url;
+      } else if (uploadError) {
+        console.error("Storage error:", uploadError);
+        // Если бакета нет, мы все равно дадим скачать файл, но в логах пометим
+      }
+
+      // 3. Обновляем запись в БД
+      if (lastCalculationId) {
+        const { error: updateError } = await supabase
+          .from("calculations")
+          .update({
+            tariff_details: {
+              aptsPerIntercom,
+              smartRate: rates.smart,
+              additionalCameraRate: rates.addCam,
+              elevatorRate: rates.elev,
+              gateRate: gatePrice,
+              gateTotalCost: gates * gateMaintenanceCost,
+              individualGate: false,
+              address_info: address,
+              cp_url: publicUrl || null
+            }
+          })
+          .eq("id", lastCalculationId);
+          
+        if (updateError) console.error("Database update error:", updateError);
+      }
+
+      // 4. Скачиваем пользователю
+      await downloadProposal(proposalData);
+
+      setIsCPDialogOpen(false);
+      toast({
+        title: "Готово!",
+        description: "Коммерческое предложение сформировано и скачано.",
+      });
+    } catch (error) {
+      console.error("CP Generation error:", error);
+      toast({
+        title: "Ошибка",
+        description: "Не удалось создать документ. Попробуйте позже.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingCP(false);
     }
   };
 
@@ -403,9 +524,84 @@ export default function Calculator() {
                   )}
                 </CardContent>
                 {showResult && (
-                  <CardFooter className="bg-muted/50 border-t pt-4">
-                    <p className="text-xs text-center text-muted-foreground w-full">
-                      Расчёт для ознакомления. Итоговая стоимость фиксируется в договоре.
+                  <CardFooter className="flex flex-col gap-4 bg-muted/50 border-t pt-4">
+                    <Dialog open={isCPDialogOpen} onOpenChange={setIsCPDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button className="w-full gap-2 bg-green-600 hover:bg-green-700 transition-colors">
+                          <FileText className="w-4 h-4" />
+                          Оформить КП (DOCX)
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-[425px]">
+                        <DialogHeader>
+                          <DialogTitle>Данные для КП</DialogTitle>
+                          <DialogDescription>
+                            Укажите адрес объекта для автоматического заполнения документа.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4">
+                          <div className="grid gap-2">
+                            <Label htmlFor="city">Город</Label>
+                            <Input
+                              id="city"
+                              value={address.city}
+                              onChange={(e) => setAddress({ ...address, city: e.target.value })}
+                            />
+                          </div>
+                          <div className="grid gap-2">
+                            <Label htmlFor="street">Улица</Label>
+                            <Input
+                              id="street"
+                              placeholder="Прокофьева"
+                              value={address.street}
+                              onChange={(e) => setAddress({ ...address, street: e.target.value })}
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="grid gap-2">
+                              <Label htmlFor="house">Дом</Label>
+                              <Input
+                                id="house"
+                                placeholder="10"
+                                value={address.house}
+                                onChange={(e) => setAddress({ ...address, house: e.target.value })}
+                              />
+                            </div>
+                            <div className="grid gap-2">
+                              <Label htmlFor="block">Корпус/Литер</Label>
+                              <Input
+                                id="block"
+                                placeholder="1"
+                                value={address.block}
+                                onChange={(e) => setAddress({ ...address, block: e.target.value })}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button 
+                            className="w-full gap-2" 
+                            onClick={handleGenerateCP}
+                            disabled={isGeneratingCP}
+                          >
+                            {isGeneratingCP ? (
+                              <>
+                                <Spinner className="w-4 h-4 animate-spin" />
+                                Создаем документ...
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle2 className="w-4 h-4" />
+                                Сгенерировать и скачать
+                              </>
+                            )}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                    
+                    <p className="text-[10px] text-center text-muted-foreground w-full leading-relaxed">
+                      Расчёт для ознакомления. Итоговая стоимость и перечень работ фиксируются в договоре.
                     </p>
                   </CardFooter>
                 )}
