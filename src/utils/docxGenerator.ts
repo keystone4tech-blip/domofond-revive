@@ -43,25 +43,31 @@ export const generateProposalDocx = async (data: ProposalData): Promise<Blob> =>
   const { address, calculation } = data;
   const fullAddress = `${address.city}${address.city ? ", " : ""}ул. ${address.street}, дом ${address.house}${address.block ? ", корп. " + address.block : ""}`;
 
+  // Расчет компонентов тарифа (аналогично Calculator.tsx)
+  const smartPrice = calculation.smartIntercoms > 0 ? calculation.rates.smart : 0;
+  const addCamPrice = calculation.additionalCameras > 0 ? Math.ceil(calculation.additionalCameras / calculation.entrances) * calculation.rates.addCam : 0;
+  const elevPrice = calculation.elevatorCameras > 0 ? Math.ceil(calculation.elevatorCameras / calculation.entrances) * calculation.rates.elev : 0;
+  
+  // Для калитки берем либо расчетную стоимость из калькулятора, либо 0
+  const gateMaintenanceCost = 5500;
+  const gatePrice = calculation.gates > 0 ? Math.ceil(((calculation.gates * gateMaintenanceCost) / calculation.totalApartments) / 5) * 5 : 0;
+
   // Текст тарифа зависит от состава услуг
-  let tariffText = `Ежемесячная оплата за техническое обслуживание домофона – ${calculation.rates.smart} рублей с квартиры в месяц.`;
+  let tariffTextArray = [`Ежемесячная оплата за техническое обслуживание домофона – ${smartPrice} рублей с квартиры в месяц.`];
   
-  if (calculation.additionalCameras > 0) {
-    tariffText += ` За каждую дополнительную камеру ${calculation.rates.addCam} рублей.`;
+  if (addCamPrice > 0) {
+    tariffTextArray.push(`За каждое дополнительное видеонаблюдение (камеры на придомовой территории) – ${addCamPrice} рублей.`);
   }
   
-  if (calculation.elevatorCameras > 0) {
-    tariffText += ` Техническое обслуживание лифтового видеонаблюдения ${calculation.rates.elev} руб.`;
+  if (elevPrice > 0) {
+    tariffTextArray.push(`Техническое обслуживание лифтового видеонаблюдения – ${elevPrice} руб.`);
   }
   
-  if (calculation.gates > 0) {
-    // В калькуляторе калитка рассчитывается как gatePrice * smartIntercoms / totalApartments
-    // Для КП мы просто указываем итоговый вклад в тариф или общую сумму
-    const gateContribution = Math.round((calculation.rates.gate * calculation.smartIntercoms) / calculation.totalApartments);
-    tariffText += ` За обслуживание калитки ${gateContribution} руб.`;
+  if (gatePrice > 0) {
+    tariffTextArray.push(`За обслуживание калитки – ${gatePrice} руб.`);
   }
   
-  tariffText += ` Итого общий тариф составляет ${calculation.tariffPerApt} рублей по квитанциям ООО «ДомофонДар».`;
+  const tariffText = tariffTextArray.join(" ") + ` Итого общий тариф составляет ${calculation.tariffPerApt} рублей по квитанциям ООО «ДомофонДар».`;
 
   // Подготовка логотипа
   let logoImage: ImageRun | null = null;
@@ -150,26 +156,23 @@ export const generateProposalDocx = async (data: ProposalData): Promise<Blob> =>
 
         new Paragraph({ text: "", spacing: { after: 300 } }),
 
-        // Нумерованный список разделов
+        // Разделы 1 и 2
         new Paragraph({
           children: [new TextRun({ text: "1. Модернизация домофонного оборудования", bold: true })],
           spacing: { before: 200 },
         }),
+        new Paragraph({
+          children: [new TextRun({ text: "2. Техническое обслуживание домофонного оборудования", bold: true })]
+        }),
+        // Разделы 3 и 4 (если есть видеонаблюдение)
         ...(calculation.additionalCameras > 0 || calculation.elevatorCameras > 0 ? [
           new Paragraph({
-            children: [new TextRun({ text: "2. Модернизация видеонаблюдения", bold: true })]
-          }),
-          new Paragraph({
-            children: [new TextRun({ text: "3. Техническое обслуживание домофонного оборудования", bold: true })]
+            children: [new TextRun({ text: "3. Установка системы видеонаблюдения", bold: true })]
           }),
           new Paragraph({
             children: [new TextRun({ text: "4. Техническое обслуживание видеонаблюдения", bold: true })]
           })
-        ] : [
-          new Paragraph({
-            children: [new TextRun({ text: "2. Техническое обслуживание домофонного оборудования", bold: true })]
-          })
-        ]),
+        ] : []),
 
         new Paragraph({ text: "", spacing: { after: 200 } }),
 
