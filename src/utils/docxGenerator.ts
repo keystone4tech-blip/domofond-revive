@@ -12,7 +12,8 @@ import {
   TableCell,
   WidthType,
   BorderStyle,
-  ImageRun
+  ImageRun,
+  ExternalHyperlink
 } from "docx";
 import { saveAs } from "file-saver";
 
@@ -210,13 +211,31 @@ export const generateProposalDocx = async (data: ProposalData): Promise<Blob> =>
 
         new Paragraph({ text: "", spacing: { after: 600 } }),
 
-        // Подпись
+        // Футер с уведомлением об автогенерации
         new Paragraph({
+          alignment: AlignmentType.CENTER,
           children: [
             new TextRun({
-              text: "Генеральный директор                                             Ивлев И.А.",
-              bold: true,
-              size: 24,
+              text: "Коммерческое предложение было сформировано автоматически на сайте компании ООО «ДомофонДар»",
+              italics: true,
+              size: 20,
+            }),
+          ],
+          spacing: { before: 400 }
+        }),
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          children: [
+            new ExternalHyperlink({
+              children: [
+                new TextRun({
+                  text: "www.domofondar.ru",
+                  color: "0000FF",
+                  underline: {},
+                  size: 20,
+                }),
+              ],
+              link: "http://www.domofondar.ru",
             }),
           ],
         }),
