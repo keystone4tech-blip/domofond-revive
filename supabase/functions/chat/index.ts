@@ -68,54 +68,72 @@ serve(async (req) => {
 
         if (toolCall.name === "check_account") {
           const args = toolCall.arguments;
-          let query = supabase.from("accounts").select("account_number, address, apartment, period, debt_amount");
+          const addressInput = args.address || "";
           
-          // Extract apartment number from address string if not provided separately
+          // Extract apartment number
           let apartment = args.apartment;
-          let addressSearch = args.address || "";
-          
-          if (!apartment && addressSearch) {
-            const aptMatch = addressSearch.match(/кв\.?\s*(\d+)/i);
+          let cleanAddress = addressInput;
+          if (!apartment) {
+            const aptMatch = addressInput.match(/кв\.?\s*(\d+)/i);
             if (aptMatch) {
               apartment = aptMatch[1];
-              // Remove apartment part from address for cleaner search
-              addressSearch = addressSearch.replace(/кв\.?\s*\d+/i, "").trim().replace(/\s+/g, " ");
+              cleanAddress = addressInput.replace(/кв\.?\s*\d+/i, "").trim();
             }
           }
           
-          if (apartment) {
-            // Search apartment in both the apartment field and address field
-            query = query.or(`apartment.eq.${apartment},address.ilike.%кв. ${apartment}%,address.ilike.%кв.${apartment}%`);
-          }
-          
-          if (addressSearch) {
-            // Split address into meaningful words and search each
-            const words = addressSearch
-              .replace(/[,.\-]/g, " ")
-              .split(/\s+/)
-              .filter(w => w.length > 2);
-            
-            for (const word of words) {
-              query = query.ilike("address", `%${word}%`);
+          // Extract house number (д. N or just a standalone number)
+          let houseNumber = "";
+          const houseMatch = cleanAddress.match(/(?:д\.?\s*|дом\.?\s*)(\d+)/i);
+          if (houseMatch) {
+            houseNumber = houseMatch[1];
+            cleanAddress = cleanAddress.replace(houseMatch[0], "").trim();
+          } else {
+            // Try standalone number at the end
+            const numMatch = cleanAddress.match(/\b(\d{1,4})\s*$/);
+            if (numMatch) {
+              houseNumber = numMatch[1];
+              cleanAddress = cleanAddress.replace(numMatch[0], "").trim();
             }
           }
-          
-          // Also try searching by account number if input looks like a number
-          if (args.address && /^\d{5,}$/.test(args.address.trim())) {
+
+          // Search by account number if input is purely numeric
+          if (/^\d{5,}$/.test(addressInput.trim())) {
             const { data: byAccount } = await supabase
               .from("accounts")
-              .select("account_number, address, apartment, period, debt_amount")
-              .ilike("account_number", `%${args.address.trim()}%`)
+              .select("account_number, address, debt_amount")
+              .ilike("account_number", `%${addressInput.trim()}%`)
               .order("period", { ascending: false })
-              .limit(5);
+              .limit(1);
             if (byAccount && byAccount.length > 0) {
               return new Response(JSON.stringify({ 
-                tool_response: { success: true, accounts: byAccount, message: `Найдено ${byAccount.length} записей` } 
+                tool_response: { success: true, accounts: byAccount } 
               }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
             }
           }
+
+          // Build query
+          let query = supabase.from("accounts").select("account_number, address, debt_amount");
           
-          const { data, error } = await query.order("period", { ascending: false }).limit(5);
+          // Filter by apartment
+          if (apartment) {
+            query = query.or(`apartment.eq.${apartment},address.ilike.%кв. ${apartment}%`);
+          }
+          
+          // Filter by house number
+          if (houseNumber) {
+            query = query.ilike("address", `%д. ${houseNumber}%`);
+          }
+          
+          // Filter by street keywords (words > 2 chars, not numbers)
+          const streetWords = cleanAddress
+            .replace(/[,.\-]/g, " ")
+            .split(/\s+/)
+            .filter(w => w.length > 2 && !/^\d+$/.test(w));
+          for (const word of streetWords) {
+            query = query.ilike("address", `%${word}%`);
+          }
+          
+          const { data, error } = await query.order("period", { ascending: false }).limit(1);
           
           if (error) {
             console.error("Account search error:", error);
@@ -129,7 +147,7 @@ serve(async (req) => {
               success: true, 
               accounts: data || [],
               message: data && data.length > 0 
-                ? `Найдено ${data.length} записей` 
+                ? "Найдено" 
                 : "Записи не найдены. Уточните адрес или номер квартиры."
             } 
           }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -171,7 +189,11 @@ serve(async (req) => {
 ЛИЦЕВЫЕ СЧЕТА И ЗАДОЛЖЕННОСТЬ:
 - Если пользователь спрашивает про задолженность, лицевой счёт, оплату — вызови функцию check_account.
 - Нужно уточнить адрес или номер квартиры для поиска.
-- После получения данных — сообщи пользователю номер счёта и сумму задолженности.`;
+- После получения данных — покажи ТОЛЬКО: Лицевой счёт, Адрес и Сумму задолженности.
+- Сумму пиши в тенге (полностью "тенге", НЕ "тг").
+- НЕ показывай поле "Период".
+- Показывай только ОДИН результат — самый подходящий.
+- Если задолженность 0 — скажи что задолженности нет.`;
 
     if (settings.knowledge_base) {
       systemPrompt += `\n\nДополнительная информация для ответов:\n${settings.knowledge_base}`;
