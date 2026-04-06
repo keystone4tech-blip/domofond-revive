@@ -11,8 +11,14 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { downloadProposal, generateProposalDocx } from "@/utils/docxGenerator";
-import { FileText, CheckCircle2, Loader2 as Spinner } from "lucide-react";
+import { FileText, CheckCircle2, Loader2 as Spinner, HelpCircle } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { 
+  Tooltip, 
+  TooltipContent, 
+  TooltipProvider, 
+  TooltipTrigger 
+} from "@/components/ui/tooltip";
 
 const getTariff = (aptsPerIntercom: number) => {
   if (aptsPerIntercom < 15) return { smart: 0, addCam: 0, elev: 0, gate: 0, individualGate: false, valid: false };
@@ -55,13 +61,28 @@ interface NumberInputProps {
   error?: string;
   min?: number;
   placeholder?: string;
+  tooltip?: string;
 }
 
-const NumberInput = ({ id, label, value, onChange, error, min = 0, placeholder }: NumberInputProps) => (
+const NumberInput = ({ id, label, value, onChange, error, min = 0, placeholder, tooltip }: NumberInputProps) => (
   <div className="space-y-1.5">
-    <Label htmlFor={id} className="text-sm text-muted-foreground">
-      {label}
-    </Label>
+    <div className="flex items-center gap-1.5">
+      <Label htmlFor={id} className="text-sm text-muted-foreground whitespace-nowrap">
+        {label}
+      </Label>
+      {tooltip && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button type="button" className="text-muted-foreground hover:text-primary transition-colors">
+              <HelpCircle className="w-3.5 h-3.5" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-[240px] text-xs">
+            <p>{tooltip}</p>
+          </TooltipContent>
+        </Tooltip>
+      )}
+    </div>
     <Input
       id={id}
       type="text"
@@ -319,7 +340,8 @@ export default function Calculator() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Header />
+      <TooltipProvider>
+        <Header />
       <main className="flex-1 pt-20">
         <section className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground py-12 md:py-16">
           <div className="container mx-auto px-4">
@@ -341,7 +363,7 @@ export default function Calculator() {
               <Card>
                 <CardHeader className="pb-4">
                   <CardTitle className="text-lg">Параметры дома</CardTitle>
-                  <CardDescription>Заполните обязательные поля, чтобы расчёт сохранился корректно.</CardDescription>
+                  <CardDescription>Укажите основные характеристики вашего многоквартирного дома.</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-2 gap-4">
@@ -369,8 +391,11 @@ export default function Calculator() {
 
               <Card>
                 <CardHeader className="pb-4">
-                  <CardTitle className="text-lg">Оборудование</CardTitle>
-                  <CardDescription>Если оборудования нет, оставьте 0 или очистите поле.</CardDescription>
+                  <CardTitle className="text-lg text-primary">Оборудование компании «ДомофонДар»</CardTitle>
+                  <CardDescription className="text-sm font-medium text-foreground/80">
+                    Установка или замена оборудования производится за счёт компании <span className="text-primary font-bold">абсолютно БЕСПЛАТНО</span>. 
+                    Укажите необходимое количество для установки или модернизации.
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-2 gap-4">
@@ -382,6 +407,7 @@ export default function Calculator() {
                       min={1}
                       placeholder="1"
                       error={fieldErrors.smartIntercoms}
+                      tooltip="Вызывная панель на каждую подъездную дверь."
                     />
                     <NumberInput
                       id="additionalCameras"
@@ -389,6 +415,7 @@ export default function Calculator() {
                       value={numericValues.additionalCameras}
                       onChange={handleNumericChange("additionalCameras")}
                       placeholder="0"
+                      tooltip="Камеры, устанавливаемые дополнительно к домофонам или отдельно на придомовую территорию, фасады и подъезды."
                     />
                     <NumberInput
                       id="elevatorCameras"
@@ -396,6 +423,7 @@ export default function Calculator() {
                       value={numericValues.elevatorCameras}
                       onChange={handleNumericChange("elevatorCameras")}
                       placeholder="0"
+                      tooltip="Устанавливаются в кабины лифтов (пассажирских и грузовых), по 1 камере на каждый лифт."
                     />
                     <NumberInput
                       id="gates"
@@ -403,6 +431,7 @@ export default function Calculator() {
                       value={numericValues.gates}
                       onChange={handleNumericChange("gates")}
                       placeholder="0"
+                      tooltip="Входы на придомовую территорию, оснащаемые вызывными панелями (как на подъездах). Если калиток нет, оставьте 0."
                     />
                   </div>
                 </CardContent>
@@ -610,6 +639,7 @@ export default function Calculator() {
           </div>
         </div>
       </main>
+      </TooltipProvider>
       <Footer />
     </div>
   );
