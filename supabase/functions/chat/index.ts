@@ -145,9 +145,11 @@ serve(async (req: any) => {
           // Дополнительная фильтрация по номеру дома в JS для точности
           if (data && houseNumber) {
             const filtered = data.filter((acc: any) => {
-              const addr = acc.address.toLowerCase();
-              // Ищем паттерны "д. 6", "дом 6", "6," или просто 6 на конце слова
-              const houseRegex = new RegExp(`(?:д\\.?|дом|\\b)${houseNumber}(?:\\b|[ ,])`, "i");
+              const addr = (acc.address || "").toLowerCase();
+              // Ищем паттерны "д. 6", "дом 6", "6," или просто 6 на границе слова
+              // Используем экранирование для houseNumber на случай спецсимволов
+              const escapedHN = houseNumber.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+              const houseRegex = new RegExp(`(?:д\\.?|дом|\\b)${escapedHN}(?:\\b|[ ,]|$)`, "i");
               return houseRegex.test(addr);
             });
             if (filtered.length > 0) data = filtered;
