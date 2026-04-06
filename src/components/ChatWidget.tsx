@@ -189,10 +189,11 @@ export default function ChatWidget() {
       // Process tool calls if any
       if (toolCalls.length > 0) {
         for (const tc of toolCalls) {
-          if (tc.name === "submit_request") {
-            try {
-              const args = JSON.parse(tc.arguments);
-              // Show "submitting" message
+          if (!tc.name) continue;
+          try {
+            const args = JSON.parse(tc.arguments);
+            
+            if (tc.name === "submit_request") {
               setMessages(prev => {
                 const filtered = prev.filter(m => m.role === "user" || (m.role === "assistant" && m.content));
                 return [...filtered, { role: "assistant", content: "⏳ Отправляю заявку..." }];
@@ -200,7 +201,6 @@ export default function ChatWidget() {
               
               const result = await executeToolCall(tc.name, args);
               
-              // Now call AI again with the tool result to get a nice confirmation
               const toolResultMsg: Msg = {
                 role: "assistant",
                 content: result.success
@@ -213,12 +213,33 @@ export default function ChatWidget() {
                 return [...filtered, toolResultMsg];
               });
               
-              if (convId) {
-                saveMessage(convId, "assistant", toolResultMsg.content);
-              }
-            } catch (e) {
-              console.error("Tool call parse error:", e);
+              if (convId) saveMessage(convId, "assistant", toolResultMsg.content);
             }
+            
+            if (tc.name === "check_account") {
+              setMessages(prev => {
+                const filtered = prev.filter(m => m.role === "user" || (m.role === "assistant" && m.content));
+                return [...filtered, { role: "assistant", content: "🔍 Ищу информацию..." }];
+              });
+              
+              const result = await executeToolCall(tc.name, args);
+              
+              // Build a tool result message and call AI again to format a nice response
+              const toolResultContent = result.success && result.accounts?.length > 0
+                ? result.accounts.map((a: any) => `Лицевой счёт: ${a.account_number}, Адрес: ${a.address}, Период: ${a.period}, Задолженность: ${a.debt_amount} тг`).join("\n")
+                : result.message || "Записи не найдены.";
+              
+              // Remove loading message and add the result directly
+              const resultMsg: Msg = { role: "assistant", content: toolResultContent };
+              setMessages(prev => {
+                const filtered = prev.filter(m => !(m.role === "assistant" && m.content === "🔍 Ищу информацию..."));
+                return [...filtered, resultMsg];
+              });
+              
+              if (convId) saveMessage(convId, "assistant", toolResultContent);
+            }
+          } catch (e) {
+            console.error("Tool call error:", e);
           }
         }
         setIsLoading(false);

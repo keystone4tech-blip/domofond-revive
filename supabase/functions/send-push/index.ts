@@ -36,7 +36,7 @@ function base64UrlDecode(str: string): Uint8Array {
   return arr;
 }
 
-function base64UrlEncode(buf: ArrayBuffer): string {
+function base64UrlEncode(buf: ArrayBuffer | Uint8Array): string {
   const bytes = new Uint8Array(buf);
   let b = '';
   for (const byte of bytes) b += String.fromCharCode(byte);
@@ -56,13 +56,14 @@ function concat(...arrays: Uint8Array[]): Uint8Array {
 
 async function hkdf(salt: Uint8Array, ikm: Uint8Array, info: Uint8Array, length: number): Promise<Uint8Array> {
   // HKDF-Extract: PRK = HMAC-Hash(salt, IKM)
-  const saltKey = await crypto.subtle.importKey('raw', salt.length ? salt : new Uint8Array(32), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-  const prk = new Uint8Array(await crypto.subtle.sign('HMAC', saltKey, ikm));
+  const saltBuf = (salt.length ? salt : new Uint8Array(32)).buffer as ArrayBuffer;
+  const saltKey = await crypto.subtle.importKey('raw', saltBuf, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const prk = new Uint8Array(await crypto.subtle.sign('HMAC', saltKey, ikm.buffer as ArrayBuffer));
   
   // HKDF-Expand
-  const prkKey = await crypto.subtle.importKey('raw', prk, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const prkKey = await crypto.subtle.importKey('raw', prk.buffer as ArrayBuffer, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   const infoWithCounter = concat(info, new Uint8Array([1]));
-  const okm = new Uint8Array(await crypto.subtle.sign('HMAC', prkKey, infoWithCounter));
+  const okm = new Uint8Array(await crypto.subtle.sign('HMAC', prkKey, infoWithCounter.buffer as ArrayBuffer));
   return okm.slice(0, length);
 }
 
@@ -92,7 +93,7 @@ async function encryptPayload(
   // Import client public key
   const clientPublicKey = await crypto.subtle.importKey(
     'raw',
-    clientPublicKeyBytes,
+    clientPublicKeyBytes.buffer as ArrayBuffer,
     { name: 'ECDH', namedCurve: 'P-256' },
     false,
     []
@@ -127,9 +128,9 @@ async function encryptPayload(
   // Payload needs padding: delimiter byte 0x02 then optional zeros
   const paddedPayload = concat(encoder.encode(payload), new Uint8Array([2]));
   
-  const aesKey = await crypto.subtle.importKey('raw', cek, { name: 'AES-GCM' }, false, ['encrypt']);
+  const aesKey = await crypto.subtle.importKey('raw', cek.buffer as ArrayBuffer, { name: 'AES-GCM' }, false, ['encrypt']);
   const encrypted = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv: nonce, tagLength: 128 },
+    { name: 'AES-GCM', iv: nonce.buffer as ArrayBuffer, tagLength: 128 },
     aesKey,
     paddedPayload
   );
@@ -185,7 +186,7 @@ async function createVapidJwt(audience: string): Promise<{ jwt: string; publicKe
   const pkcs8 = concat(pkcs8Header, privateKeyBytes, pkcs8Middle, pubKeyWithPrefix);
   
   const privateKey = await crypto.subtle.importKey(
-    'pkcs8', pkcs8.buffer,
+    'pkcs8', pkcs8.buffer as ArrayBuffer,
     { name: 'ECDSA', namedCurve: 'P-256' },
     false, ['sign']
   );
@@ -218,7 +219,7 @@ async function createVapidJwt(audience: string): Promise<{ jwt: string; publicKe
     rawSig.set(s.length > 32 ? s.slice(s.length - 32) : s, 64 - Math.min(s.length, 32));
   }
   
-  const jwt = `${unsigned}.${base64UrlEncode(rawSig.buffer)}`;
+  const jwt = `${unsigned}.${base64UrlEncode(rawSig.buffer as ArrayBuffer)}`;
   return { jwt, publicKeyB64 };
 }
 
@@ -349,7 +350,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

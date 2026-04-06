@@ -91,7 +91,7 @@ async function saveMessage(conversationId: string, role: string, content: string
     .eq("id", conversationId);
   
   // Increment messages_count via raw increment
-  await supabaseAdmin.rpc("increment_telegram_messages_count" as any, { conv_id: conversationId }).catch(() => {});
+  try { await supabaseAdmin.rpc("increment_telegram_messages_count" as any, { conv_id: conversationId }); } catch { /* ignore */ }
 }
 
 // Get AI response
