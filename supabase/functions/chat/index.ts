@@ -70,16 +70,55 @@ serve(async (req) => {
           const args = toolCall.arguments;
           let query = supabase.from("accounts").select("account_number, address, apartment, period, debt_amount");
           
-          if (args.apartment) {
-            query = query.ilike("address", `%кв. ${args.apartment}%`);
+          // Extract apartment number from address string if not provided separately
+          let apartment = args.apartment;
+          let addressSearch = args.address || "";
+          
+          if (!apartment && addressSearch) {
+            const aptMatch = addressSearch.match(/кв\.?\s*(\d+)/i);
+            if (aptMatch) {
+              apartment = aptMatch[1];
+              // Remove apartment part from address for cleaner search
+              addressSearch = addressSearch.replace(/кв\.?\s*\d+/i, "").trim().replace(/\s+/g, " ");
+            }
           }
-          if (args.address) {
-            query = query.ilike("address", `%${args.address}%`);
+          
+          if (apartment) {
+            // Search apartment in both the apartment field and address field
+            query = query.or(`apartment.eq.${apartment},address.ilike.%кв. ${apartment}%,address.ilike.%кв.${apartment}%`);
+          }
+          
+          if (addressSearch) {
+            // Split address into meaningful words and search each
+            const words = addressSearch
+              .replace(/[,.\-]/g, " ")
+              .split(/\s+/)
+              .filter(w => w.length > 2);
+            
+            for (const word of words) {
+              query = query.ilike("address", `%${word}%`);
+            }
+          }
+          
+          // Also try searching by account number if input looks like a number
+          if (args.address && /^\d{5,}$/.test(args.address.trim())) {
+            const { data: byAccount } = await supabase
+              .from("accounts")
+              .select("account_number, address, apartment, period, debt_amount")
+              .ilike("account_number", `%${args.address.trim()}%`)
+              .order("period", { ascending: false })
+              .limit(5);
+            if (byAccount && byAccount.length > 0) {
+              return new Response(JSON.stringify({ 
+                tool_response: { success: true, accounts: byAccount, message: `Найдено ${byAccount.length} записей` } 
+              }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+            }
           }
           
           const { data, error } = await query.order("period", { ascending: false }).limit(5);
           
           if (error) {
+            console.error("Account search error:", error);
             return new Response(JSON.stringify({ 
               tool_response: { success: false, error: "Ошибка поиска" } 
             }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
