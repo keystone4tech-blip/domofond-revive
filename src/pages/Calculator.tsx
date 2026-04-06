@@ -135,7 +135,7 @@ export default function Calculator() {
 
   const entrances = parseNumericInput(numericValues.entrances, 1, 1);
   const totalApartments = parseNumericInput(numericValues.totalApartments, 1, 100);
-  const smartIntercoms = parseNumericInput(numericValues.smartIntercoms, 1, 1);
+  const smartIntercoms = parseNumericInput(numericValues.smartIntercoms, 0, 0);
   const additionalCameras = parseNumericInput(numericValues.additionalCameras, 0, 0);
   const elevatorCameras = parseNumericInput(numericValues.elevatorCameras, 0, 0);
   const gates = parseNumericInput(numericValues.gates, 0, 0);
@@ -404,8 +404,8 @@ export default function Calculator() {
                       label="Умных домофонов"
                       value={numericValues.smartIntercoms}
                       onChange={handleNumericChange("smartIntercoms")}
-                      min={1}
-                      placeholder="1"
+                      min={0}
+                      placeholder="0"
                       error={fieldErrors.smartIntercoms}
                       tooltip="Вызывная панель на каждую подъездную дверь."
                     />
