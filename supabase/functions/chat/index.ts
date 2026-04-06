@@ -6,7 +6,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-serve(async (req) => {
+serve(async (req: any) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
@@ -128,7 +128,7 @@ serve(async (req) => {
           const streetWords = cleanAddress
             .replace(/[,.\-]/g, " ")
             .split(/\s+/)
-            .filter(w => w.length > 2 && !/^\d+$/.test(w));
+            .filter((w: any) => w.length > 2 && !/^\d+$/.test(w));
           for (const word of streetWords) {
             query = query.ilike("address", `%${word}%`);
           }
@@ -188,8 +188,12 @@ serve(async (req) => {
 
     let systemPrompt = settings.system_prompt || "Ты — виртуальный помощник.";
 
-    // Очищаем промпт от старых упоминаний тенге, если они там есть
-    systemPrompt = systemPrompt.replace(/тенге/g, "рублях").replace(/ тг/g, " руб.");
+    // Очищаем промпт от старых упоминаний тенге и опечаток
+    systemPrompt = systemPrompt
+      .replace(/тенге/g, "рублях")
+      .replace(/ тг/g, " руб.")
+      .replace(/выез /g, "выезд ")
+      .replace(/html разметку/g, "разметку в формате Markdown [текст](ссылка)");
 
     systemPrompt += `\n\nВАЖНЫЕ ПРАВИЛА:
 - Отвечай КРАТКО и ПО СУЩЕСТВУ, максимум 2-3 предложения.
