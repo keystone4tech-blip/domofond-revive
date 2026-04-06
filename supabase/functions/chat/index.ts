@@ -33,8 +33,8 @@ serve(async (req) => {
           });
           if (error) {
             console.error("Failed to insert request:", error);
-            return new Response(JSON.stringify({ 
-              tool_response: { success: false, error: "Не удалось создать заявку" } 
+            return new Response(JSON.stringify({
+              tool_response: { success: false, error: "Не удалось создать заявку" }
             }), {
               headers: { ...corsHeaders, "Content-Type": "application/json" },
             });
@@ -59,8 +59,8 @@ serve(async (req) => {
             console.error("Notification error:", pushError);
           }
 
-          return new Response(JSON.stringify({ 
-            tool_response: { success: true, message: "Заявка успешно создана" } 
+          return new Response(JSON.stringify({
+            tool_response: { success: true, message: "Заявка успешно создана" }
           }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
@@ -69,7 +69,7 @@ serve(async (req) => {
         if (toolCall.name === "check_account") {
           const args = toolCall.arguments;
           const addressInput = args.address || "";
-          
+
           // Extract apartment number
           let apartment = args.apartment;
           let cleanAddress = addressInput;
@@ -80,7 +80,7 @@ serve(async (req) => {
               cleanAddress = addressInput.replace(/кв\.?\s*\d+/i, "").trim();
             }
           }
-          
+
           // Extract house number (д. N or just a standalone number)
           let houseNumber = "";
           const houseMatch = cleanAddress.match(/(?:д\.?\s*|дом\.?\s*)(\d+)/i);
@@ -105,25 +105,25 @@ serve(async (req) => {
               .order("period", { ascending: false })
               .limit(1);
             if (byAccount && byAccount.length > 0) {
-              return new Response(JSON.stringify({ 
-                tool_response: { success: true, accounts: byAccount } 
+              return new Response(JSON.stringify({
+                tool_response: { success: true, accounts: byAccount }
               }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
             }
           }
 
           // Build query
           let query = supabase.from("accounts").select("account_number, address, debt_amount");
-          
+
           // Filter by apartment
           if (apartment) {
             query = query.or(`apartment.eq.${apartment},address.ilike.%кв. ${apartment}%`);
           }
-          
+
           // Filter by house number
           if (houseNumber) {
             query = query.ilike("address", `%д. ${houseNumber}%`);
           }
-          
+
           // Filter by street keywords (words > 2 chars, not numbers)
           const streetWords = cleanAddress
             .replace(/[,.\-]/g, " ")
@@ -132,24 +132,24 @@ serve(async (req) => {
           for (const word of streetWords) {
             query = query.ilike("address", `%${word}%`);
           }
-          
+
           const { data, error } = await query.order("period", { ascending: false }).limit(1);
-          
+
           if (error) {
             console.error("Account search error:", error);
-            return new Response(JSON.stringify({ 
-              tool_response: { success: false, error: "Ошибка поиска" } 
+            return new Response(JSON.stringify({
+              tool_response: { success: false, error: "Ошибка поиска" }
             }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
           }
 
-          return new Response(JSON.stringify({ 
-            tool_response: { 
-              success: true, 
+          return new Response(JSON.stringify({
+            tool_response: {
+              success: true,
               accounts: data || [],
-              message: data && data.length > 0 
-                ? "Найдено" 
+              message: data && data.length > 0
+                ? "Найдено"
                 : "Записи не найдены. Уточните адрес или номер квартиры."
-            } 
+            }
           }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
       }
@@ -169,7 +169,7 @@ serve(async (req) => {
     }
 
     let systemPrompt = settings.system_prompt || "Ты — виртуальный помощник.";
-    
+
     systemPrompt += `\n\nВАЖНЫЕ ПРАВИЛА:
 - Отвечай КРАТКО и ПО СУЩЕСТВУ, максимум 2-3 предложения.
 - Не повторяй вопрос пользователя.
@@ -183,6 +183,9 @@ serve(async (req) => {
 - Ты можешь принимать заявки от пользователей на установку, ремонт или обслуживание.
 - Для создания заявки тебе нужно собрать: ФИО, телефон, адрес и описание проблемы/услуги.
 - Если пользователь хочет оставить заявку, спроси недостающие данные.
+- Проверяй пользователя на задолженность, и если есть задолженность более 200 рублей попроси оплатить отправив лицевой счет и сумму задолженности, иначе стоимось вызова мастера будет стоить 500 рублей. — вызови функцию check_account.
+- Если задолженность меньше 200 рублей — попроси оплатить в ближайшее время и отправь лицевой счет и задолженность.
+- Уточняй у пользователя создать заявку с платным выездом мастера? Или они оплатят задолженость и вызов мастера будет бесплатным.
 - Когда все данные собраны, вызови функцию submit_request.
 - После успешной отправки подтверди пользователю что заявка принята.
 
