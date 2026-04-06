@@ -78,7 +78,7 @@ export const generateProposalDocx = async (data: ProposalData): Promise<Blob> =>
       logoImage = new ImageRun({
         data: new Uint8Array(buffer),
         transformation: {
-          width: 120, 
+          width: 180, 
           height: 60,
         },
       } as any);
