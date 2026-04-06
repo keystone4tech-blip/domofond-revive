@@ -141,16 +141,20 @@ export default function Calculator() {
   const gates = parseNumericInput(numericValues.gates, 0, 0);
 
   const aptsPerEntrance = Math.ceil(totalApartments / entrances);
-  const rates = getTariff(aptsPerEntrance);
+  const aptsPerIntercom = Math.ceil(totalApartments / Math.max(smartIntercoms, 1));
+  
+  const generalRates = getTariff(aptsPerEntrance);
+  const intercomRates = getTariff(aptsPerIntercom);
 
   const gateMaintenanceCost = 5500;
   const gatePrice = gates > 0 ? Math.ceil(((gates * gateMaintenanceCost) / totalApartments) / 5) * 5 : 0;
 
   let tariffPerApt = 0;
-  if (rates.valid) {
-    const smartPrice = smartIntercoms > 0 ? rates.smart : 0;
-    const addCamPrice = additionalCameras > 0 ? Math.ceil(additionalCameras / entrances) * rates.addCam : 0;
-    const elevPrice = elevatorCameras > 0 ? Math.ceil(elevatorCameras / entrances) * rates.elev : 0;
+  // Используем общую валидность по подъездам
+  if (generalRates.valid) {
+    const smartPrice = smartIntercoms > 0 ? intercomRates.smart : 0;
+    const addCamPrice = additionalCameras > 0 ? Math.ceil(additionalCameras / entrances) * generalRates.addCam : 0;
+    const elevPrice = elevatorCameras > 0 ? Math.ceil(elevatorCameras / entrances) * generalRates.elev : 0;
     
     tariffPerApt = smartPrice + addCamPrice + elevPrice + gatePrice;
   }
@@ -205,13 +209,14 @@ export default function Calculator() {
         additional_cameras: additionalCameras,
         elevator_cameras: elevatorCameras,
         gates,
-        tariff_per_apt: rates.valid ? tariffPerApt : 0,
-        is_individual: !rates.valid,
+        tariff_per_apt: generalRates.valid ? tariffPerApt : 0,
+        is_individual: !generalRates.valid,
         tariff_details: {
           aptsPerEntrance,
-          smartRate: rates.smart,
-          additionalCameraRate: rates.addCam,
-          elevatorRate: rates.elev,
+          aptsPerIntercom,
+          smartRate: smartIntercoms > 0 ? intercomRates.smart : 0,
+          additionalCameraRate: generalRates.addCam,
+          elevatorRate: generalRates.elev,
           gateRate: gatePrice,
           gateTotalCost: gates * gateMaintenanceCost,
           individualGate: false,
@@ -267,10 +272,10 @@ export default function Calculator() {
           gates,
           tariffPerApt,
           rates: {
-            smart: rates.smart,
-            addCam: rates.addCam,
-            elev: rates.elev,
-            gate: rates.gate,
+            smart: intercomRates.smart,
+            addCam: generalRates.addCam,
+            elev: generalRates.elev,
+            gate: generalRates.gate,
           }
         }
       };
@@ -303,9 +308,10 @@ export default function Calculator() {
           .update({
             tariff_details: {
               aptsPerEntrance,
-              smartRate: rates.smart,
-              additionalCameraRate: rates.addCam,
-              elevatorRate: rates.elev,
+              aptsPerIntercom,
+              smartRate: smartIntercoms > 0 ? intercomRates.smart : 0,
+              additionalCameraRate: generalRates.addCam,
+              elevatorRate: generalRates.elev,
               gateRate: gatePrice,
               gateTotalCost: gates * gateMaintenanceCost,
               individualGate: false,
@@ -502,7 +508,7 @@ export default function Calculator() {
                     </div>
                   ) : (
                     <div className="space-y-5 animate-in fade-in zoom-in duration-300">
-                      {!rates.valid ? (
+                      {!generalRates.valid ? (
                         <Alert variant="destructive">
                           <InfoIcon className="h-4 w-4" />
                           <AlertTitle>Внимание</AlertTitle>
@@ -524,19 +530,19 @@ export default function Calculator() {
                               {smartIntercoms > 0 && (
                                 <li className="flex justify-between py-1 border-b border-border">
                                   <span className="text-muted-foreground">Умный домофон</span>
-                                  <span className="font-semibold">{rates.smart} ₽</span>
+                                  <span className="font-semibold">{intercomRates.smart} ₽</span>
                                 </li>
                               )}
                               {additionalCameras > 0 && (
                                 <li className="flex justify-between py-1 border-b border-border">
                                   <span className="text-muted-foreground">Доп. камеры</span>
-                                  <span className="font-semibold">{Math.ceil(additionalCameras / entrances) * rates.addCam} ₽</span>
+                                  <span className="font-semibold">{Math.ceil(additionalCameras / entrances) * generalRates.addCam} ₽</span>
                                 </li>
                               )}
                               {elevatorCameras > 0 && (
                                 <li className="flex justify-between py-1 border-b border-border">
                                   <span className="text-muted-foreground">Камеры в лифте</span>
-                                  <span className="font-semibold">{Math.ceil(elevatorCameras / entrances) * rates.elev} ₽</span>
+                                  <span className="font-semibold">{Math.ceil(elevatorCameras / entrances) * generalRates.elev} ₽</span>
                                 </li>
                               )}
                               {gates > 0 && (
