@@ -160,6 +160,24 @@ export const generateProposalDocx = async (data: ProposalData): Promise<Blob> =>
             }),
           ],
         }),
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          children: [
+            new TextRun({
+              text: `Количество подъездов: ${calculation.entrances}`,
+              size: 20,
+            }),
+          ],
+        }),
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          children: [
+            new TextRun({
+              text: `Количество квартир в доме: ${calculation.totalApartments}`,
+              size: 20,
+            }),
+          ],
+        }),
 
         new Paragraph({ text: "", spacing: { after: 300 } }),
 
