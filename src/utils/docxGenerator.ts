@@ -309,6 +309,7 @@ export const generateProposalDocx = async (data: ProposalData): Promise<Blob> =>
         new Paragraph({ text: "", spacing: { before: 400 } }),
 
         new Paragraph({
+          alignment: AlignmentType.CENTER,
           children: [
             new TextRun({
               text: "ИНФОРМАЦИЯ О КОМПАНИИ",
@@ -319,18 +320,22 @@ export const generateProposalDocx = async (data: ProposalData): Promise<Blob> =>
           spacing: { before: 200, after: 100 },
         }),
         new Paragraph({
+          alignment: AlignmentType.CENTER,
           children: [new TextRun({ text: "Название: ", bold: true }), new TextRun("ООО «ДомофонДар»")],
         }),
         new Paragraph({
+          alignment: AlignmentType.CENTER,
           children: [
             new TextRun({ text: "Адрес офиса: ", bold: true }),
             new TextRun("г. Краснодар, проезд Репина, 1, офис 134 (вход находится с обратной стороны дома, за 1 подъездом)")
           ],
         }),
         new Paragraph({
+          alignment: AlignmentType.CENTER,
           children: [new TextRun({ text: "Телефон: ", bold: true }), new TextRun("+7 (903) 411-83-93")],
         }),
         new Paragraph({
+          alignment: AlignmentType.CENTER,
           children: [new TextRun({ text: "Email: ", bold: true }), new TextRun("domofondar@mail.ru")],
         }),
       ],
