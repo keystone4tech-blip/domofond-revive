@@ -5,8 +5,6 @@ import {
   AlignmentType, 
   HeadingLevel, 
   Packer, 
-  ListParagraph,
-  LevelFormat,
   Table,
   TableRow,
   TableCell,
@@ -48,11 +46,11 @@ export const generateProposalDocx = async (data: ProposalData): Promise<Blob> =>
   // Текст тарифа зависит от состава услуг
   let tariffText = `Ежемесячная оплата за техническое обслуживание домофона – ${calculation.rates.smart} рублей с квартиры в месяц.`;
   
-  if (calculation.additional_cameras > 0) {
+  if (calculation.additionalCameras > 0) {
     tariffText += ` За каждую дополнительную камеру ${calculation.rates.addCam} рублей.`;
   }
   
-  if (calculation.elevator_cameras > 0) {
+  if (calculation.elevatorCameras > 0) {
     tariffText += ` Техническое обслуживание лифтового видеонаблюдения ${calculation.rates.elev} руб.`;
   }
   
@@ -65,10 +63,36 @@ export const generateProposalDocx = async (data: ProposalData): Promise<Blob> =>
   
   tariffText += ` Итого общий тариф составляет ${calculation.tariffPerApt} рублей по квитанциям ООО «ДомофонДар».`;
 
+  // Подготовка логотипа
+  let logoImage: ImageRun | null = null;
+  try {
+    const response = await fetch("/logo.jpg");
+    if (response.ok) {
+      const buffer = await response.arrayBuffer();
+      logoImage = new ImageRun({
+        data: new Uint8Array(buffer),
+        transformation: {
+          width: 120, 
+          height: 60,
+        },
+      } as any);
+    }
+  } catch (error) {
+    console.error("Ошибка загрузки логотипа:", error);
+  }
+
   const doc = new Document({
     sections: [{
       properties: {},
       children: [
+        // Логотип (если загружен)
+        ...(logoImage ? [
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [logoImage],
+            spacing: { after: 200 },
+          })
+        ] : []),
         // Шапка
         new Paragraph({
           alignment: AlignmentType.CENTER,
@@ -131,7 +155,7 @@ export const generateProposalDocx = async (data: ProposalData): Promise<Blob> =>
           children: [new TextRun({ text: "1. Модернизация домофонного оборудования", bold: true })],
           spacing: { before: 200 },
         }),
-        ...(calculation.additional_cameras > 0 || calculation.elevator_cameras > 0 ? [
+        ...(calculation.additionalCameras > 0 || calculation.elevatorCameras > 0 ? [
           new Paragraph({
             children: [new TextRun({ text: "2. Модернизация видеонаблюдения", bold: true })]
           }),
@@ -152,7 +176,7 @@ export const generateProposalDocx = async (data: ProposalData): Promise<Blob> =>
         // Тезисы (маркированный список)
         ...[
           "Модернизация установленного домофонного оборудования с заменой на «умный» IP-домофон за счет компании ООО «Домофондар» (центральные блоки вызова, блоки питания, коммутаторы, считыватели, замки, доводчики).",
-          ...(calculation.additional_cameras > 0 ? [`Установка дополнительных камер в количестве ${calculation.additional_cameras} шт. за счет компании ООО «ДомофонДар», работа камер в одном приложении с камерой домофона «Умный дом» архив 5 суток.`] : []),
+          ...(calculation.additionalCameras > 0 ? [`Установка дополнительных камер в количестве ${calculation.additionalCameras} шт. за счет компании ООО «ДомофонДар», работа камер в одном приложении с камерой домофона «Умный дом» архив 5 суток.`] : []),
           tariffText,
           "Ранее установленные в квартирах трубки подключаются бесплатно. По желанию, собственники за свой счет могут приобрести новую трубку или видеомонитор в случае их отсутствия в квартире;",
           "Ключи с повышенной защитой от копирования: 1 ключ выдается бесплатно, дополнительные ключи 200 рублей на момент монтажа оборудования, 300 рублей в дальнейшем.",
@@ -166,9 +190,13 @@ export const generateProposalDocx = async (data: ProposalData): Promise<Blob> =>
         })),
 
         new Paragraph({
-          text: "Наше домофонное оборудование имеет следующие функциональные возможности и технические характеристики:",
+          children: [
+            new TextRun({
+              text: "Наше домофонное оборудование имеет следующие функциональные возможности и технические характеристики:",
+              bold: true
+            })
+          ],
           spacing: { before: 300, after: 150 },
-          bold: true
         }),
 
         ...[
@@ -187,9 +215,13 @@ export const generateProposalDocx = async (data: ProposalData): Promise<Blob> =>
         })),
 
         new Paragraph({
-          text: "Плановое техническое обслуживание домофонной системы проводится один раз в месяц и включает в себя:",
+          children: [
+            new TextRun({
+              text: "Плановое техническое обслуживание домофонной системы проводится один раз в месяц и включает в себя:",
+              bold: true
+            })
+          ],
           spacing: { before: 300, after: 150 },
-          bold: true
         }),
 
         ...[
