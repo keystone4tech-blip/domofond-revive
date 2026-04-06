@@ -110,7 +110,7 @@ export default function Calculator() {
   const [numericValues, setNumericValues] = useState<Record<NumericFieldKey, string>>({
     entrances: "1",
     totalApartments: "100",
-    smartIntercoms: "1",
+    smartIntercoms: "0",
     additionalCameras: "0",
     elevatorCameras: "0",
     gates: "0",
@@ -140,8 +140,8 @@ export default function Calculator() {
   const elevatorCameras = parseNumericInput(numericValues.elevatorCameras, 0, 0);
   const gates = parseNumericInput(numericValues.gates, 0, 0);
 
-  const aptsPerIntercom = Math.ceil(totalApartments / Math.max(smartIntercoms, 1));
-  const rates = getTariff(aptsPerIntercom);
+  const aptsPerEntrance = Math.ceil(totalApartments / entrances);
+  const rates = getTariff(aptsPerEntrance);
 
   const gateMaintenanceCost = 5500;
   const gatePrice = gates > 0 ? Math.ceil(((gates * gateMaintenanceCost) / totalApartments) / 5) * 5 : 0;
@@ -208,7 +208,7 @@ export default function Calculator() {
         tariff_per_apt: rates.valid ? tariffPerApt : 0,
         is_individual: !rates.valid,
         tariff_details: {
-          aptsPerIntercom,
+          aptsPerEntrance,
           smartRate: rates.smart,
           additionalCameraRate: rates.addCam,
           elevatorRate: rates.elev,
@@ -302,7 +302,7 @@ export default function Calculator() {
           .from("calculations")
           .update({
             tariff_details: {
-              aptsPerIntercom,
+              aptsPerEntrance,
               smartRate: rates.smart,
               additionalCameraRate: rates.addCam,
               elevatorRate: rates.elev,
@@ -521,10 +521,12 @@ export default function Calculator() {
                           <div className="space-y-2">
                             <p className="text-sm font-semibold">Детализация:</p>
                             <ul className="text-sm space-y-1.5">
-                              <li className="flex justify-between py-1 border-b border-border">
-                                <span className="text-muted-foreground">Умный домофон</span>
-                                <span className="font-semibold">{smartIntercoms > 0 ? rates.smart : 0} ₽</span>
-                              </li>
+                              {smartIntercoms > 0 && (
+                                <li className="flex justify-between py-1 border-b border-border">
+                                  <span className="text-muted-foreground">Умный домофон</span>
+                                  <span className="font-semibold">{rates.smart} ₽</span>
+                                </li>
+                              )}
                               {additionalCameras > 0 && (
                                 <li className="flex justify-between py-1 border-b border-border">
                                   <span className="text-muted-foreground">Доп. камеры</span>

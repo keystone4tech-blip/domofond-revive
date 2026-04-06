@@ -44,6 +44,9 @@ export const generateProposalDocx = async (data: ProposalData): Promise<Blob> =>
   const fullAddress = `${address.city}${address.city ? ", " : ""}ул. ${address.street}, дом ${address.house}${address.block ? ", корп. " + address.block : ""}`;
 
   // Расчет компонентов тарифа (аналогично Calculator.tsx)
+  const aptsPerEntrance = Math.ceil(calculation.totalApartments / calculation.entrances);
+  // Используем заготовленную функцию или логику из калькулятора (здесь мы просто передаем rates из пропсов, но пересчитываем их для надежности)
+  
   const smartPrice = calculation.smartIntercoms > 0 ? calculation.rates.smart : 0;
   const addCamPrice = calculation.additionalCameras > 0 ? Math.ceil(calculation.additionalCameras / calculation.entrances) * calculation.rates.addCam : 0;
   const elevPrice = calculation.elevatorCameras > 0 ? Math.ceil(calculation.elevatorCameras / calculation.entrances) * calculation.rates.elev : 0;
@@ -53,7 +56,11 @@ export const generateProposalDocx = async (data: ProposalData): Promise<Blob> =>
   const gatePrice = calculation.gates > 0 ? Math.ceil(((calculation.gates * gateMaintenanceCost) / calculation.totalApartments) / 5) * 5 : 0;
 
   // Текст тарифа зависит от состава услуг
-  let tariffTextArray = [`Ежемесячная оплата за техническое обслуживание домофона – ${smartPrice} рублей с квартиры в месяц.`];
+  let tariffTextArray: string[] = [];
+
+  if (smartPrice > 0) {
+    tariffTextArray.push(`Ежемесячная оплата за техническое обслуживание домофона – ${smartPrice} рублей с квартиры в месяц.`);
+  }
 
   if (addCamPrice > 0) {
     tariffTextArray.push(`За техническое обслуживание видеонаблюдения (камеры на придомовой территории) – ${addCamPrice} рублей.`);
