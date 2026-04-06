@@ -1,10 +1,10 @@
-import { 
-  Document, 
-  Paragraph, 
-  TextRun, 
-  AlignmentType, 
-  HeadingLevel, 
-  Packer, 
+import {
+  Document,
+  Paragraph,
+  TextRun,
+  AlignmentType,
+  HeadingLevel,
+  Packer,
   Table,
   TableRow,
   TableCell,
@@ -47,26 +47,26 @@ export const generateProposalDocx = async (data: ProposalData): Promise<Blob> =>
   const smartPrice = calculation.smartIntercoms > 0 ? calculation.rates.smart : 0;
   const addCamPrice = calculation.additionalCameras > 0 ? Math.ceil(calculation.additionalCameras / calculation.entrances) * calculation.rates.addCam : 0;
   const elevPrice = calculation.elevatorCameras > 0 ? Math.ceil(calculation.elevatorCameras / calculation.entrances) * calculation.rates.elev : 0;
-  
+
   // Для калитки берем либо расчетную стоимость из калькулятора, либо 0
   const gateMaintenanceCost = 5500;
   const gatePrice = calculation.gates > 0 ? Math.ceil(((calculation.gates * gateMaintenanceCost) / calculation.totalApartments) / 5) * 5 : 0;
 
   // Текст тарифа зависит от состава услуг
   let tariffTextArray = [`Ежемесячная оплата за техническое обслуживание домофона – ${smartPrice} рублей с квартиры в месяц.`];
-  
+
   if (addCamPrice > 0) {
     tariffTextArray.push(`За каждое дополнительное видеонаблюдение (камеры на придомовой территории) – ${addCamPrice} рублей.`);
   }
-  
+
   if (elevPrice > 0) {
     tariffTextArray.push(`Техническое обслуживание лифтового видеонаблюдения – ${elevPrice} руб.`);
   }
-  
+
   if (gatePrice > 0) {
     tariffTextArray.push(`За обслуживание калитки – ${gatePrice} руб.`);
   }
-  
+
   const tariffText = tariffTextArray.join(" ") + ` Итого общий тариф составляет ${calculation.tariffPerApt} рублей по квитанциям ООО «ДомофонДар».`;
 
   // Подготовка логотипа
@@ -78,7 +78,7 @@ export const generateProposalDocx = async (data: ProposalData): Promise<Blob> =>
       logoImage = new ImageRun({
         data: new Uint8Array(buffer),
         transformation: {
-          width: 180, 
+          width: 300,
           height: 60,
         },
       } as any);
@@ -128,7 +128,7 @@ export const generateProposalDocx = async (data: ProposalData): Promise<Blob> =>
             }),
           ],
         }),
-        
+
         new Paragraph({ text: "", spacing: { after: 400 } }),
 
         // Заголовок КП
@@ -156,30 +156,61 @@ export const generateProposalDocx = async (data: ProposalData): Promise<Blob> =>
 
         new Paragraph({ text: "", spacing: { after: 300 } }),
 
-        // Разделы 1 и 2
-        new Paragraph({
-          children: [new TextRun({ text: "1. Модернизация домофонного оборудования", bold: true })],
-          spacing: { before: 200 },
-        }),
-        new Paragraph({
-          children: [new TextRun({ text: "2. Техническое обслуживание домофонного оборудования", bold: true })]
-        }),
-        // Разделы 3 и 4 (если есть видеонаблюдение)
-        ...(calculation.additionalCameras > 0 || calculation.elevatorCameras > 0 ? [
-          new Paragraph({
-            children: [new TextRun({ text: "3. Установка системы видеонаблюдения", bold: true })]
-          }),
-          new Paragraph({
-            children: [new TextRun({ text: "4. Техническое обслуживание видеонаблюдения", bold: true })]
-          })
-        ] : []),
+        // Динамические разделы с номерами
+        ...(() => {
+          let sectionIdx = 1;
+          const items: Paragraph[] = [];
+          
+          // 1. Домофон (Всегда)
+          items.push(new Paragraph({
+            children: [new TextRun({ text: `${sectionIdx++}. Модернизация или установка домофонного оборудования за счет компании (бесплатно)`, bold: true })],
+            spacing: { before: 200 },
+          }));
+          items.push(new Paragraph({
+            children: [new TextRun({ text: `${sectionIdx++}. Техническое обслуживание установленного домофонного оборудования`, bold: true })]
+          }));
+          
+          // 2. Доп. камеры
+          if (calculation.additionalCameras > 0) {
+            items.push(new Paragraph({
+              children: [new TextRun({ text: `${sectionIdx++}. Установка системы видеонаблюдения за счет компании (бесплатно)`, bold: true })]
+            }));
+            items.push(new Paragraph({
+              children: [new TextRun({ text: `${sectionIdx++}. Техническое обслуживание установленного видеонаблюдения`, bold: true })]
+            }));
+          }
+          
+          // 3. Камеры в лифте
+          if (calculation.elevatorCameras > 0) {
+            items.push(new Paragraph({
+              children: [new TextRun({ text: `${sectionIdx++}. Установка системы видеонаблюдения в лифте за счет компании (бесплатно)`, bold: true })]
+            }));
+            items.push(new Paragraph({
+              children: [new TextRun({ text: `${sectionIdx++}. Техническое обслуживание видеонаблюдения в лифте`, bold: true })]
+            }));
+          }
+          
+          // 4. Калитки
+          if (calculation.gates > 0) {
+            items.push(new Paragraph({
+              children: [new TextRun({ text: `${sectionIdx++}. Установка или модернизация калитки за счет компании (бесплатно)`, bold: true })]
+            }));
+            items.push(new Paragraph({
+              children: [new TextRun({ text: `${sectionIdx++}. Техническое обслуживание калитки`, bold: true })]
+            }));
+          }
+          
+          return items;
+        })(),
 
         new Paragraph({ text: "", spacing: { after: 200 } }),
 
         // Тезисы (маркированный список)
         ...[
-          "Модернизация установленного домофонного оборудования с заменой на «умный» IP-домофон за счет компании ООО «Домофондар» (центральные блоки вызова, блоки питания, коммутаторы, считыватели, замки, доводчики).",
-          ...(calculation.additionalCameras > 0 ? [`Установка дополнительных камер в количестве ${calculation.additionalCameras} шт. за счет компании ООО «ДомофонДар», работа камер в одном приложении с камерой домофона «Умный дом» архив 5 суток.`] : []),
+          "Установка и модернизация установленного домофонного оборудования с заменой на «умный» IP-домофон за счет компании ООО «Домофондар» (бесплатно).",
+          ...(calculation.additionalCameras > 0 ? [`Установка системы видеонаблюдения на придомовой территории за счет компании ООО «Домофондар» (количество дополнительных камер: ${calculation.additionalCameras} шт.), работа камер в одном приложении с камерой домофона «Умный дом» архив 5 суток.`] : []),
+          ...(calculation.elevatorCameras > 0 ? [`Установка системы видеонаблюдения в кабинах лифтов за счет компании ООО «Домофондар» (количество камер в лифте: ${calculation.elevatorCameras} шт.).`] : []),
+          ...(calculation.gates > 0 ? [`Ранее установленные калитки (двери) на территории дома модернизируются или устанавливаются новые за счет компании ООО «Домофондар».`] : []),
           tariffText,
           "Ранее установленные в квартирах трубки подключаются бесплатно. По желанию, собственники за свой счет могут приобрести новую трубку или видеомонитор в случае их отсутствия в квартире;",
           "Ключи с повышенной защитой от копирования: 1 ключ выдается бесплатно, дополнительные ключи 200 рублей на момент монтажа оборудования, 300 рублей в дальнейшем.",
