@@ -120,6 +120,7 @@ const Admin = () => {
         >
           <TabsList className="mb-6 flex h-auto w-full max-w-full items-center justify-start gap-2 overflow-x-auto rounded-xl bg-muted/50 p-1">
             <TabsTrigger value="calculations" className="shrink-0 whitespace-nowrap">Расчёты</TabsTrigger>
+            <TabsTrigger value="seo" className="shrink-0 whitespace-nowrap">🪄 SEO AI</TabsTrigger>
             <TabsTrigger value="stats" className="shrink-0 whitespace-nowrap">Статистика</TabsTrigger>
             <TabsTrigger value="promotions" className="shrink-0 whitespace-nowrap">Акции</TabsTrigger>
             <TabsTrigger value="news" className="shrink-0 whitespace-nowrap">Новости</TabsTrigger>
@@ -134,6 +135,10 @@ const Admin = () => {
 
           <TabsContent value="calculations">
             <CalculationsManager />
+          </TabsContent>
+
+          <TabsContent value="seo">
+            <SEOManager />
           </TabsContent>
 
           <TabsContent value="stats">
