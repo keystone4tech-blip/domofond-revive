@@ -725,6 +725,245 @@ export type Database = {
           },
         ]
       }
+      seo_history: {
+        Row: {
+          applied_by: string | null
+          created_at: string
+          field_name: string
+          id: string
+          is_rolled_back: boolean
+          new_value: string | null
+          page_path: string
+          previous_value: string | null
+          rolled_back_at: string | null
+          suggestion_id: string | null
+          target_id: string | null
+          target_type: string
+        }
+        Insert: {
+          applied_by?: string | null
+          created_at?: string
+          field_name: string
+          id?: string
+          is_rolled_back?: boolean
+          new_value?: string | null
+          page_path: string
+          previous_value?: string | null
+          rolled_back_at?: string | null
+          suggestion_id?: string | null
+          target_id?: string | null
+          target_type: string
+        }
+        Update: {
+          applied_by?: string | null
+          created_at?: string
+          field_name?: string
+          id?: string
+          is_rolled_back?: boolean
+          new_value?: string | null
+          page_path?: string
+          previous_value?: string | null
+          rolled_back_at?: string | null
+          suggestion_id?: string | null
+          target_id?: string | null
+          target_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seo_history_suggestion_id_fkey"
+            columns: ["suggestion_id"]
+            isOneToOne: false
+            referencedRelation: "seo_suggestions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      seo_keywords: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          keyword: string
+          page_path: string
+          priority: number
+          source: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          keyword: string
+          page_path: string
+          priority?: number
+          source?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          keyword?: string
+          page_path?: string
+          priority?: number
+          source?: string
+        }
+        Relationships: []
+      }
+      seo_page_meta: {
+        Row: {
+          canonical_url: string | null
+          created_at: string
+          description: string | null
+          h1: string | null
+          id: string
+          is_auto_managed: boolean
+          json_ld: Json | null
+          keywords: string | null
+          last_optimized_at: string | null
+          og_description: string | null
+          og_image: string | null
+          og_title: string | null
+          page_path: string
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          canonical_url?: string | null
+          created_at?: string
+          description?: string | null
+          h1?: string | null
+          id?: string
+          is_auto_managed?: boolean
+          json_ld?: Json | null
+          keywords?: string | null
+          last_optimized_at?: string | null
+          og_description?: string | null
+          og_image?: string | null
+          og_title?: string | null
+          page_path: string
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          canonical_url?: string | null
+          created_at?: string
+          description?: string | null
+          h1?: string | null
+          id?: string
+          is_auto_managed?: boolean
+          json_ld?: Json | null
+          keywords?: string | null
+          last_optimized_at?: string | null
+          og_description?: string | null
+          og_image?: string | null
+          og_title?: string | null
+          page_path?: string
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      seo_settings: {
+        Row: {
+          ai_model: string
+          auto_apply: boolean
+          brand_context: string | null
+          created_at: string
+          id: string
+          is_enabled: boolean
+          last_run_at: string | null
+          optimize_alt: boolean
+          optimize_content: boolean
+          optimize_jsonld: boolean
+          optimize_meta: boolean
+          schedule_cron: string | null
+          updated_at: string
+        }
+        Insert: {
+          ai_model?: string
+          auto_apply?: boolean
+          brand_context?: string | null
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          last_run_at?: string | null
+          optimize_alt?: boolean
+          optimize_content?: boolean
+          optimize_jsonld?: boolean
+          optimize_meta?: boolean
+          schedule_cron?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ai_model?: string
+          auto_apply?: boolean
+          brand_context?: string | null
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          last_run_at?: string | null
+          optimize_alt?: boolean
+          optimize_content?: boolean
+          optimize_jsonld?: boolean
+          optimize_meta?: boolean
+          schedule_cron?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      seo_suggestions: {
+        Row: {
+          after_value: string
+          ai_model: string | null
+          applied_at: string | null
+          before_value: string | null
+          created_at: string
+          field_name: string
+          id: string
+          keywords_used: string[] | null
+          page_path: string
+          reasoning: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          target_id: string | null
+          target_type: string
+        }
+        Insert: {
+          after_value: string
+          ai_model?: string | null
+          applied_at?: string | null
+          before_value?: string | null
+          created_at?: string
+          field_name: string
+          id?: string
+          keywords_used?: string[] | null
+          page_path: string
+          reasoning?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          target_id?: string | null
+          target_type: string
+        }
+        Update: {
+          after_value?: string
+          ai_model?: string | null
+          applied_at?: string | null
+          before_value?: string | null
+          created_at?: string
+          field_name?: string
+          id?: string
+          keywords_used?: string[] | null
+          page_path?: string
+          reasoning?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          target_id?: string | null
+          target_type?: string
+        }
+        Relationships: []
+      }
       site_blocks: {
         Row: {
           block_name: string
