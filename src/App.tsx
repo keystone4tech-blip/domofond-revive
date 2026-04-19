@@ -20,6 +20,7 @@ import Calculator from "./pages/Calculator";
 import MobileBottomNav from "./components/MobileBottomNav";
 import ScrollToTop from "./components/ScrollToTop";
 import ChatWidget from "./components/ChatWidget";
+import SEOHead from "./components/SEOHead";
 
 const queryClient = new QueryClient();
 
