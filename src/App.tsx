@@ -32,6 +32,7 @@ const App = () => (
       <BrowserRouter>
         <div className="pb-16 lg:pb-0">
           <ScrollToTop />
+          <SEOHead />
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
