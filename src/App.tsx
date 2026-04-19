@@ -20,6 +20,7 @@ import Calculator from "./pages/Calculator";
 import MobileBottomNav from "./components/MobileBottomNav";
 import ScrollToTop from "./components/ScrollToTop";
 import ChatWidget from "./components/ChatWidget";
+import SEOHead from "./components/SEOHead";
 
 const queryClient = new QueryClient();
 
@@ -31,6 +32,7 @@ const App = () => (
       <BrowserRouter>
         <div className="pb-16 lg:pb-0">
           <ScrollToTop />
+          <SEOHead />
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
