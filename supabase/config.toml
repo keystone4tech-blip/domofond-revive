@@ -8,3 +8,9 @@ verify_jwt = false
 
 [functions.send-push]
 verify_jwt = false
+
+[functions.seo-analyze]
+verify_jwt = false
+
+[functions.seo-apply]
+verify_jwt = false
