@@ -132,7 +132,7 @@ async function encryptPayload(
   const encrypted = await crypto.subtle.encrypt(
     { name: 'AES-GCM', iv: nonce.buffer as ArrayBuffer, tagLength: 128 },
     aesKey,
-    paddedPayload
+    paddedPayload.buffer as ArrayBuffer
   );
   
   // Build aes128gcm header: salt(16) + rs(4) + idlen(1) + keyid(65) + ciphertext
