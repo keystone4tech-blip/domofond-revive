@@ -17,6 +17,7 @@ import { ChatWidgetManager } from "@/components/admin/ChatWidgetManager";
 import { ChatHistoryManager } from "@/components/admin/ChatHistoryManager";
 import { AccountsManager } from "@/components/admin/AccountsManager";
 import { SEOManager } from "@/components/admin/SEOManager";
+import { NewsAutomation } from "@/components/admin/NewsAutomation";
 import { Loader2, Shield } from "lucide-react";
 
 const Admin = () => {
