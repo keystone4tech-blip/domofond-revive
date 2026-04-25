@@ -517,7 +517,7 @@ async function fetchStockPhoto(
 }
 
 async function uploadDataUrlToStorage(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   dataUrl: string,
   bucket: string,
 ): Promise<string | null> {
