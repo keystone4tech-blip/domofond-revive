@@ -431,7 +431,7 @@ async function fetchImage(opts: {
   topic: string;
   post: { title: string; image_prompt?: string };
   lovableKey: string;
-  supabase: ReturnType<typeof createClient>;
+  supabase: any;
 }): Promise<{ url: string | null; prompt: string }> {
   const { strategy, photoSource, topic, post, lovableKey, supabase } = opts;
   const prompt = (post as unknown as { image_prompt?: string }).image_prompt || `${topic}, security, intercom, Krasnodar`;
