@@ -362,8 +362,12 @@ export type Database = {
           excerpt: string | null
           id: string
           image_url: string | null
+          is_auto_generated: boolean
           is_published: boolean | null
           published_at: string | null
+          segment_slug: string | null
+          seo_keywords: string[] | null
+          source_urls: string[] | null
           title: string
           updated_at: string | null
           video_url: string | null
@@ -375,8 +379,12 @@ export type Database = {
           excerpt?: string | null
           id?: string
           image_url?: string | null
+          is_auto_generated?: boolean
           is_published?: boolean | null
           published_at?: string | null
+          segment_slug?: string | null
+          seo_keywords?: string[] | null
+          source_urls?: string[] | null
           title: string
           updated_at?: string | null
           video_url?: string | null
@@ -388,11 +396,188 @@ export type Database = {
           excerpt?: string | null
           id?: string
           image_url?: string | null
+          is_auto_generated?: boolean
           is_published?: boolean | null
           published_at?: string | null
+          segment_slug?: string | null
+          seo_keywords?: string[] | null
+          source_urls?: string[] | null
           title?: string
           updated_at?: string | null
           video_url?: string | null
+        }
+        Relationships: []
+      }
+      news_automation_settings: {
+        Row: {
+          ai_model: string
+          brand_pitch: string | null
+          created_at: string
+          id: string
+          image_strategy: string
+          is_enabled: boolean
+          last_run_at: string | null
+          news_source: string
+          next_run_at: string | null
+          photo_source: string
+          posts_per_run: number
+          publish_mode: string
+          region: string
+          schedule_cron: string | null
+          topics: string[] | null
+          updated_at: string
+        }
+        Insert: {
+          ai_model?: string
+          brand_pitch?: string | null
+          created_at?: string
+          id?: string
+          image_strategy?: string
+          is_enabled?: boolean
+          last_run_at?: string | null
+          news_source?: string
+          next_run_at?: string | null
+          photo_source?: string
+          posts_per_run?: number
+          publish_mode?: string
+          region?: string
+          schedule_cron?: string | null
+          topics?: string[] | null
+          updated_at?: string
+        }
+        Update: {
+          ai_model?: string
+          brand_pitch?: string | null
+          created_at?: string
+          id?: string
+          image_strategy?: string
+          is_enabled?: boolean
+          last_run_at?: string | null
+          news_source?: string
+          next_run_at?: string | null
+          photo_source?: string
+          posts_per_run?: number
+          publish_mode?: string
+          region?: string
+          schedule_cron?: string | null
+          topics?: string[] | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      news_drafts: {
+        Row: {
+          ai_model: string | null
+          content: string
+          created_at: string
+          error_message: string | null
+          excerpt: string | null
+          id: string
+          image_prompt: string | null
+          image_url: string | null
+          published_news_id: string | null
+          raw_research: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          scheduled_for: string | null
+          segment_slug: string | null
+          source_urls: string[] | null
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          ai_model?: string | null
+          content: string
+          created_at?: string
+          error_message?: string | null
+          excerpt?: string | null
+          id?: string
+          image_prompt?: string | null
+          image_url?: string | null
+          published_news_id?: string | null
+          raw_research?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          scheduled_for?: string | null
+          segment_slug?: string | null
+          source_urls?: string[] | null
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          ai_model?: string | null
+          content?: string
+          created_at?: string
+          error_message?: string | null
+          excerpt?: string | null
+          id?: string
+          image_prompt?: string | null
+          image_url?: string | null
+          published_news_id?: string | null
+          raw_research?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          scheduled_for?: string | null
+          segment_slug?: string | null
+          source_urls?: string[] | null
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "news_drafts_published_news_id_fkey"
+            columns: ["published_news_id"]
+            isOneToOne: false
+            referencedRelation: "news"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      news_segments: {
+        Row: {
+          created_at: string
+          cta_style: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          pain_points: string | null
+          publish_mode: string | null
+          slug: string
+          tone: string
+          updated_at: string
+          weight: number
+        }
+        Insert: {
+          created_at?: string
+          cta_style?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          pain_points?: string | null
+          publish_mode?: string | null
+          slug: string
+          tone: string
+          updated_at?: string
+          weight?: number
+        }
+        Update: {
+          created_at?: string
+          cta_style?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          pain_points?: string | null
+          publish_mode?: string | null
+          slug?: string
+          tone?: string
+          updated_at?: string
+          weight?: number
         }
         Relationships: []
       }

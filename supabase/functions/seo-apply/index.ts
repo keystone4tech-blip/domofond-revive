@@ -114,6 +114,7 @@ serve(async (req) => {
         .eq("status", "pending");
 
       let applied = 0;
+      const failed: { id: string; page_path: string; field_name: string; error: string }[] = [];
       for (const s of suggestions || []) {
         try {
           const previous = await applyChange(supabase, {
@@ -147,11 +148,13 @@ serve(async (req) => {
 
           applied++;
         } catch (err) {
-          console.error("Apply error for suggestion", s.id, err);
+          const msg = err instanceof Error ? err.message : String(err);
+          console.error("Apply error for suggestion", s.id, msg);
+          failed.push({ id: s.id, page_path: s.page_path, field_name: s.field_name, error: msg });
         }
       }
 
-      return new Response(JSON.stringify({ success: true, applied }), {
+      return new Response(JSON.stringify({ success: true, applied, failed, total: ids.length }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -219,22 +222,29 @@ async function applyChange(
   }
 
   if (ch.target_type === "site_block" && ch.target_id) {
-    const { data: block } = await supabase
-      .from("site_blocks")
-      .select("content")
-      .eq("id", ch.target_id)
-      .single();
-    if (!block) throw new Error("Блок не найден");
+    // target_id может быть UUID или block_name (например "premium_offer")
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ch.target_id);
+    let blockQuery = supabase.from("site_blocks").select("id, content");
+    blockQuery = isUuid
+      ? blockQuery.eq("id", ch.target_id)
+      : blockQuery.eq("block_name", ch.target_id);
 
-    const content = { ...(block.content || {}) };
+    const { data: blocks, error: bErr } = await blockQuery.limit(1);
+    if (bErr) throw new Error(`Ошибка поиска блока: ${bErr.message}`);
+    const block = blocks && blocks[0];
+    if (!block) throw new Error(`Блок не найден: ${ch.target_id} (на странице ${ch.page_path})`);
+
+    const content = { ...((block.content as Record<string, unknown>) || {}) };
     const previous = content[ch.field_name];
-    const previousStr = previous === undefined ? null : typeof previous === "string" ? previous : JSON.stringify(previous);
+    const previousStr =
+      previous === undefined ? null : typeof previous === "string" ? previous : JSON.stringify(previous);
     content[ch.field_name] = ch.new_value;
 
-    await supabase
+    const { error: uErr } = await supabase
       .from("site_blocks")
       .update({ content })
-      .eq("id", ch.target_id);
+      .eq("id", block.id);
+    if (uErr) throw new Error(`Ошибка обновления блока: ${uErr.message}`);
 
     return previousStr;
   }

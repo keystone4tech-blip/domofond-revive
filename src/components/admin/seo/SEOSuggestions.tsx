@@ -69,13 +69,26 @@ export const SEOSuggestions = () => {
     setBusy(false);
     if (error) {
       toast({ title: "Ошибка", description: error.message, variant: "destructive" });
-    } else {
-      toast({
-        title: action === "apply" ? "Применено" : "Отклонено",
-        description: `Обработано: ${data?.applied || data?.count || ids.length}`,
-      });
-      load();
+      return;
     }
+    if (action === "apply") {
+      const applied = data?.applied ?? 0;
+      const failed = (data?.failed as { error: string; field_name: string }[] | undefined) || [];
+      const total = data?.total ?? ids.length;
+      if (failed.length) {
+        const firstErr = failed[0]?.error || "неизвестная ошибка";
+        toast({
+          title: `Применено ${applied} из ${total}`,
+          description: `Не удалось: ${failed.length}. Причина: ${firstErr}`,
+          variant: failed.length === total ? "destructive" : "default",
+        });
+      } else {
+        toast({ title: "Применено", description: `Обработано: ${applied}` });
+      }
+    } else {
+      toast({ title: "Отклонено", description: `Обработано: ${data?.count ?? ids.length}` });
+    }
+    load();
   };
 
   if (loading) return <Loader2 className="h-6 w-6 animate-spin mx-auto" />;
