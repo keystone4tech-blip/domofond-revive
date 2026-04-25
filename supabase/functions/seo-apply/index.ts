@@ -114,6 +114,7 @@ serve(async (req) => {
         .eq("status", "pending");
 
       let applied = 0;
+      const failed: { id: string; page_path: string; field_name: string; error: string }[] = [];
       for (const s of suggestions || []) {
         try {
           const previous = await applyChange(supabase, {
@@ -147,11 +148,13 @@ serve(async (req) => {
 
           applied++;
         } catch (err) {
-          console.error("Apply error for suggestion", s.id, err);
+          const msg = err instanceof Error ? err.message : String(err);
+          console.error("Apply error for suggestion", s.id, msg);
+          failed.push({ id: s.id, page_path: s.page_path, field_name: s.field_name, error: msg });
         }
       }
 
-      return new Response(JSON.stringify({ success: true, applied }), {
+      return new Response(JSON.stringify({ success: true, applied, failed, total: ids.length }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
