@@ -143,6 +143,10 @@ const Admin = () => {
             <SEOManager />
           </TabsContent>
 
+          <TabsContent value="autonews">
+            <NewsAutomation />
+          </TabsContent>
+
           <TabsContent value="stats">
             <SiteStats />
           </TabsContent>
