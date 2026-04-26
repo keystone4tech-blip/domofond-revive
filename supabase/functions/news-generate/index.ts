@@ -59,6 +59,7 @@ serve(async (req) => {
     const forceTopic = (body?.topic as string) || null;
     const forceCount = body?.count as number | undefined;
     const dryRun = body?.dry_run === true;
+    const triggeredBy = (body?.triggered_by as string) || "manual";
 
     // Загрузка настроек
     const { data: settings } = await supabase
@@ -71,6 +72,31 @@ serve(async (req) => {
 
     if (!cfg.is_enabled && !dryRun && !forceSegment) {
       return json({ success: false, message: "Авто-новости выключены" });
+    }
+
+    // Если запуск по cron — проверяем расписание (МСК = UTC+3)
+    if (triggeredBy === "cron" && !forceSegment) {
+      const now = new Date();
+      const mskHour = (now.getUTCHours() + 3) % 24;
+      const mskMinute = now.getUTCMinutes();
+      // День недели по МСК (приблизительно — без учёта смены даты в полночь, ОК для нашего расписания)
+      const mskDow = (now.getUTCDay() + (now.getUTCHours() + 3 >= 24 ? 1 : 0)) % 7;
+      const [schH, schM] = (cfg.schedule_time || "09:00").split(":").map((n) => parseInt(n, 10));
+      const days = cfg.schedule_days?.length ? cfg.schedule_days : [1, 2, 3, 4, 5];
+
+      const dayMatch = days.includes(mskDow);
+      const hourMatch = mskHour === schH;
+      // Окно ±30 минут от запланированной минуты (cron почасовой, поэтому достаточно сравнить час)
+      if (!dayMatch || !hourMatch) {
+        return json({ success: true, skipped: true, reason: `Не время: МСК ${mskHour}:${mskMinute}, dow=${mskDow}` });
+      }
+      // Защита от двойного запуска в один час
+      if (cfg.last_run_at) {
+        const last = new Date(cfg.last_run_at);
+        if (now.getTime() - last.getTime() < 50 * 60 * 1000) {
+          return json({ success: true, skipped: true, reason: "Уже запускался в этом часу" });
+        }
+      }
     }
 
     // Загрузка сегментов
