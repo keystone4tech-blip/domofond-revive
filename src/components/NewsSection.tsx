@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Newspaper, Calendar, X } from "lucide-react";
+import { Newspaper, Calendar } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { LikesSection } from "./LikesSection";
 import { CommentsSection } from "./CommentsSection";
 import Modal from "./Modal";
@@ -134,9 +136,11 @@ export const NewsSection = () => {
                     {new Date(selectedNews.published_at).toLocaleDateString("ru-RU")}
                   </div>
                 )}
-                <h3 className="text-2xl font-bold mb-2">{selectedNews.title}</h3>
-                <div className="prose max-w-none">
-                  {selectedNews.content || selectedNews.excerpt}
+                <h3 className="text-2xl font-bold mb-4">{selectedNews.title}</h3>
+                <div className="prose prose-sm sm:prose-base max-w-none dark:prose-invert prose-headings:font-bold prose-h2:text-xl prose-h2:mt-6 prose-h2:mb-3 prose-h3:text-lg prose-h3:mt-4 prose-h3:mb-2 prose-p:leading-relaxed prose-strong:text-primary prose-a:text-primary prose-li:my-1 prose-blockquote:border-l-primary prose-blockquote:text-muted-foreground">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {selectedNews.content || selectedNews.excerpt || ""}
+                  </ReactMarkdown>
                 </div>
               </div>
               <div className="mt-6 pt-4 border-t flex justify-between">

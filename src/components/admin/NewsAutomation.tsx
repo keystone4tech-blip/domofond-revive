@@ -6,9 +6,22 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Play, Save, Check, X, Sparkles, Newspaper, RefreshCw } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { Loader2, Play, Save, Check, X, Sparkles, Newspaper, RefreshCw, Clock } from "lucide-react";
+
+const WEEKDAYS = [
+  { value: 1, label: "Пн" },
+  { value: 2, label: "Вт" },
+  { value: 3, label: "Ср" },
+  { value: 4, label: "Чт" },
+  { value: 5, label: "Пт" },
+  { value: 6, label: "Сб" },
+  { value: 0, label: "Вс" },
+];
 
 export const NewsAutomation = () => {
   const { toast } = useToast();
@@ -47,7 +60,11 @@ export const NewsAutomation = () => {
       posts_per_run: settings.posts_per_run,
       brand_pitch: settings.brand_pitch,
       region: settings.region,
-    }).eq("id", settings.id);
+      schedule_time: settings.schedule_time,
+      schedule_days: settings.schedule_days,
+      auto_publish_without_review: settings.auto_publish_without_review,
+      freshness_days: settings.freshness_days,
+    } as any).eq("id", settings.id);
     setSaving(false);
     toast(error ? { title: "Ошибка", description: error.message, variant: "destructive" } : { title: "Сохранено" });
   };
@@ -89,8 +106,16 @@ export const NewsAutomation = () => {
     load();
   };
 
+  const toggleDay = (day: number) => {
+    const days = settings.schedule_days || [];
+    const next = days.includes(day) ? days.filter((d: number) => d !== day) : [...days, day].sort();
+    setSettings({ ...settings, schedule_days: next });
+  };
+
   if (loading) return <Loader2 className="h-6 w-6 animate-spin mx-auto" />;
   if (!settings) return <p>Настройки не найдены</p>;
+
+  const scheduleDays = settings.schedule_days || [1, 2, 3, 4, 5];
 
   return (
     <div className="space-y-4">
@@ -103,12 +128,26 @@ export const NewsAutomation = () => {
         <CardHeader><CardTitle className="text-base">Основные настройки</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           <div className="flex items-center justify-between rounded-lg border p-3">
-            <Label>Авто-генерация включена</Label>
+            <div>
+              <Label>Авто-генерация включена</Label>
+              <p className="text-xs text-muted-foreground">Запуск по расписанию ниже</p>
+            </div>
             <Switch checked={settings.is_enabled} onCheckedChange={(v) => setSettings({ ...settings, is_enabled: v })} />
           </div>
 
+          <div className="flex items-center justify-between rounded-lg border p-3 bg-primary/5">
+            <div>
+              <Label>Публикация без подтверждения</Label>
+              <p className="text-xs text-muted-foreground">Если включено — посты сразу попадают на сайт минуя черновики</p>
+            </div>
+            <Switch
+              checked={settings.auto_publish_without_review || false}
+              onCheckedChange={(v) => setSettings({ ...settings, auto_publish_without_review: v })}
+            />
+          </div>
+
           <div>
-            <Label className="text-sm">Режим публикации</Label>
+            <Label className="text-sm">Режим публикации (если ручное подтверждение)</Label>
             <Select value={settings.publish_mode} onValueChange={(v) => setSettings({ ...settings, publish_mode: v })}>
               <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -117,6 +156,72 @@ export const NewsAutomation = () => {
                 <SelectItem value="mixed">Гибрид (по сегменту)</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="rounded-lg border p-3 space-y-3 bg-muted/30">
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-primary" />
+              <Label className="text-sm font-semibold">Расписание автопостинга (МСК)</Label>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Время запуска</Label>
+                <Input
+                  type="time"
+                  value={settings.schedule_time || "09:00"}
+                  onChange={(e) => setSettings({ ...settings, schedule_time: e.target.value })}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Постов за запуск</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={5}
+                  value={settings.posts_per_run || 1}
+                  onChange={(e) => setSettings({ ...settings, posts_per_run: parseInt(e.target.value) || 1 })}
+                  className="mt-1"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-xs mb-2 block">Дни недели</Label>
+              <div className="flex flex-wrap gap-1.5">
+                {WEEKDAYS.map((d) => {
+                  const active = scheduleDays.includes(d.value);
+                  return (
+                    <button
+                      key={d.value}
+                      type="button"
+                      onClick={() => toggleDay(d.value)}
+                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                        active
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-background border text-muted-foreground hover:bg-muted"
+                      }`}
+                    >
+                      {d.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-xs">Свежесть новостей (дней)</Label>
+              <Input
+                type="number"
+                min={1}
+                max={365}
+                value={settings.freshness_days || 30}
+                onChange={(e) => setSettings({ ...settings, freshness_days: parseInt(e.target.value) || 30 })}
+                className="mt-1"
+              />
+              <p className="text-xs text-muted-foreground mt-1">За какой период искать новости Кубани</p>
+            </div>
           </div>
 
           <div>
@@ -219,8 +324,10 @@ export const NewsAutomation = () => {
                 </div>
               </div>
               <details className="text-xs">
-                <summary className="cursor-pointer text-muted-foreground">Показать текст</summary>
-                <div className="mt-2 whitespace-pre-wrap bg-muted p-2 rounded max-h-60 overflow-y-auto">{d.content}</div>
+                <summary className="cursor-pointer text-muted-foreground py-1">📄 Предпросмотр поста</summary>
+                <div className="mt-2 bg-muted p-3 rounded max-h-80 overflow-y-auto prose prose-sm max-w-none dark:prose-invert prose-headings:font-bold prose-h2:text-base prose-h3:text-sm prose-p:my-2 prose-strong:text-primary">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{d.content}</ReactMarkdown>
+                </div>
               </details>
               <div className="flex gap-1.5">
                 <Button size="sm" onClick={() => approve(d)} className="h-7 text-xs">

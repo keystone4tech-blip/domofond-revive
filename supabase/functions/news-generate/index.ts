@@ -18,6 +18,11 @@ interface Settings {
   posts_per_run: number;
   brand_pitch: string;
   topics: string[];
+  schedule_time: string; // "HH:MM" по МСК
+  schedule_days: number[]; // 0-6
+  auto_publish_without_review: boolean;
+  freshness_days: number;
+  last_run_at: string | null;
 }
 
 interface Segment {
@@ -54,6 +59,7 @@ serve(async (req) => {
     const forceTopic = (body?.topic as string) || null;
     const forceCount = body?.count as number | undefined;
     const dryRun = body?.dry_run === true;
+    const triggeredBy = (body?.triggered_by as string) || "manual";
 
     // Загрузка настроек
     const { data: settings } = await supabase
@@ -66,6 +72,31 @@ serve(async (req) => {
 
     if (!cfg.is_enabled && !dryRun && !forceSegment) {
       return json({ success: false, message: "Авто-новости выключены" });
+    }
+
+    // Если запуск по cron — проверяем расписание (МСК = UTC+3)
+    if (triggeredBy === "cron" && !forceSegment) {
+      const now = new Date();
+      const mskHour = (now.getUTCHours() + 3) % 24;
+      const mskMinute = now.getUTCMinutes();
+      // День недели по МСК (приблизительно — без учёта смены даты в полночь, ОК для нашего расписания)
+      const mskDow = (now.getUTCDay() + (now.getUTCHours() + 3 >= 24 ? 1 : 0)) % 7;
+      const [schH, schM] = (cfg.schedule_time || "09:00").split(":").map((n) => parseInt(n, 10));
+      const days = cfg.schedule_days?.length ? cfg.schedule_days : [1, 2, 3, 4, 5];
+
+      const dayMatch = days.includes(mskDow);
+      const hourMatch = mskHour === schH;
+      // Окно ±30 минут от запланированной минуты (cron почасовой, поэтому достаточно сравнить час)
+      if (!dayMatch || !hourMatch) {
+        return json({ success: true, skipped: true, reason: `Не время: МСК ${mskHour}:${mskMinute}, dow=${mskDow}` });
+      }
+      // Защита от двойного запуска в один час
+      if (cfg.last_run_at) {
+        const last = new Date(cfg.last_run_at);
+        if (now.getTime() - last.getTime() < 50 * 60 * 1000) {
+          return json({ success: true, skipped: true, reason: "Уже запускался в этом часу" });
+        }
+      }
     }
 
     // Загрузка сегментов
@@ -90,7 +121,7 @@ serve(async (req) => {
         const topic = forceTopic || cfg.topics[Math.floor(Math.random() * cfg.topics.length)];
 
         // 3. Сбор фактов из источника
-        const research = await gatherNews({ source: cfg.news_source, topic, region: cfg.region, lovableKey: LOVABLE_API_KEY });
+        const research = await gatherNews({ source: cfg.news_source, topic, region: cfg.region, lovableKey: LOVABLE_API_KEY, freshnessDays: cfg.freshness_days || 30 });
 
         // 4. Генерация поста под сегмент
         const post = await generatePost({
@@ -126,7 +157,8 @@ serve(async (req) => {
           cfg.publish_mode === "mixed"
             ? segmentMode || "review"
             : cfg.publish_mode;
-        const shouldAutoPublish = effectiveMode === "auto" && !dryRun;
+        // Глобальный override: если включена «без подтверждения» — публикуем сразу всегда
+        const shouldAutoPublish = (cfg.auto_publish_without_review || effectiveMode === "auto") && !dryRun;
 
         if (dryRun) {
           results.push({ ok: true, title: post.title });
@@ -231,33 +263,37 @@ async function gatherNews(opts: {
   topic: string;
   region: string;
   lovableKey: string;
+  freshnessDays?: number;
 }): Promise<{ text: string; sources: string[] }> {
   const { source, topic, region, lovableKey } = opts;
+  const freshnessDays = opts.freshnessDays || 30;
+  const currentYear = new Date().getFullYear();
 
   if (source === "perplexity") {
     const key = Deno.env.get("PERPLEXITY_API_KEY");
     if (!key) {
       console.warn("PERPLEXITY_API_KEY не настроен, fallback на gemini_grounding");
-      return gatherViaGemini(topic, region, lovableKey);
+      return gatherViaGemini(topic, region, lovableKey, freshnessDays);
     }
+    const recency = freshnessDays <= 7 ? "week" : freshnessDays <= 31 ? "month" : "year";
     const res = await fetch("https://api.perplexity.ai/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "sonar",
         messages: [
-          { role: "system", content: "Ты — журналист, ищущий свежие, местные новости и факты." },
+          { role: "system", content: `Ты — журналист Кубани, ищешь свежие новости ${currentYear} года про безопасность, ЖКХ, домофоны, видеонаблюдение в Краснодарском крае.` },
           {
             role: "user",
-            content: `Найди 2-3 свежих факта/события за последние 30 дней по теме "${topic}" в регионе ${region}. Также общие тренды отрасли. Кратко, с источниками.`,
+            content: `Найди 3-5 свежих новостей за последние ${freshnessDays} дней по теме "${topic}" в регионе ${region} (Кубань, Краснодар, Сочи, Новороссийск, Анапа, Геленджик). Также — недавние происшествия (кражи, взломы подъездов, аварии в ЖК), на которые мы можем сослаться. Кратко, с источниками. Год: ${currentYear}.`,
           },
         ],
-        search_recency_filter: "month",
+        search_recency_filter: recency,
       }),
     });
     if (!res.ok) {
       console.warn("Perplexity fail:", res.status);
-      return gatherViaGemini(topic, region, lovableKey);
+      return gatherViaGemini(topic, region, lovableKey, freshnessDays);
     }
     const j = await res.json();
     const text = j?.choices?.[0]?.message?.content || "";
@@ -269,19 +305,19 @@ async function gatherNews(opts: {
     const key = Deno.env.get("FIRECRAWL_API_KEY");
     if (!key) {
       console.warn("FIRECRAWL_API_KEY не настроен, fallback");
-      return gatherViaGemini(topic, region, lovableKey);
+      return gatherViaGemini(topic, region, lovableKey, freshnessDays);
     }
     const res = await fetch("https://api.firecrawl.dev/v2/search", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        query: `${topic} ${region} новости 2025 2026`,
+        query: `${topic} Краснодар Кубань ${currentYear} новости безопасность ЖКХ`,
         limit: 5,
-        tbs: "qdr:m",
+        tbs: freshnessDays <= 7 ? "qdr:w" : "qdr:m",
         scrapeOptions: { formats: ["markdown"] },
       }),
     });
-    if (!res.ok) return gatherViaGemini(topic, region, lovableKey);
+    if (!res.ok) return gatherViaGemini(topic, region, lovableKey, freshnessDays);
     const j = await res.json();
     const items = (j?.data || []) as Array<{ url: string; title: string; markdown?: string; description?: string }>;
     const text = items
@@ -290,11 +326,12 @@ async function gatherNews(opts: {
     return { text, sources: items.map((i) => i.url) };
   }
 
-  return gatherViaGemini(topic, region, lovableKey);
+  return gatherViaGemini(topic, region, lovableKey, freshnessDays);
 }
 
-async function gatherViaGemini(topic: string, region: string, lovableKey: string) {
-  // У Lovable AI gateway нет явного web grounding — используем модель как research-агента
+async function gatherViaGemini(topic: string, region: string, lovableKey: string, freshnessDays = 30) {
+  const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().toLocaleString("ru-RU", { month: "long", year: "numeric" });
   const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" },
@@ -304,11 +341,11 @@ async function gatherViaGemini(topic: string, region: string, lovableKey: string
         {
           role: "system",
           content:
-            "Ты — эксперт по безопасности, домофонам и видеонаблюдению. Опиши актуальные тренды и типичные кейсы из практики.",
+            `Ты — эксперт по безопасности, домофонам и видеонаблюдению в Краснодарском крае. Сегодня ${currentMonth}. Описывай актуальные тренды и кейсы ${currentYear} года.`,
         },
         {
           role: "user",
-          content: `Опиши 2-3 актуальные ситуации/тренда по теме "${topic}" применительно к региону ${region}. Включи: реальные проблемы жильцов и УК, технологические новинки, изменения в нормативах. Используй свои общие знания (без выдуманных фактов и без конкретных дат/цифр, если не уверен).`,
+          content: `Опиши 2-3 актуальных тренда/ситуации (последние ${freshnessDays} дней, ${currentYear} год) по теме "${topic}" применительно к региону ${region}. Включи: типичные проблемы жильцов и УК Кубани, технологические новинки ${currentYear} года, изменения в нормативах. Не выдумывай конкретные адреса, даты и цифры — пиши обобщённо. НЕ упоминай 2024 год.`,
         },
       ],
     }),
@@ -333,18 +370,35 @@ async function generatePost(opts: {
 }): Promise<{ title: string; excerpt: string; content: string; keywords: string[] }> {
   const { model, lovableKey, research, topic, region, segment, brandPitch } = opts;
 
-  const systemPrompt = `Ты — SEO-копирайтер компании Домофондар (Краснодар).
-Твоя задача — написать рекламно-полезный пост для блога компании.
+  const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().toLocaleString("ru-RU", { month: "long", year: "numeric" });
+
+  const systemPrompt = `Ты — SEO-копирайтер компании Домофондар (Краснодар, Кубань).
+Сегодня ${currentMonth}. Все факты и контекст должны быть актуальны на ${currentYear} год.
 
 ОБЯЗАТЕЛЬНЫЕ ПРАВИЛА:
-1. Пост ВСЕГДА завершается коммерческим предложением от Домофондар
-2. Упоминай "Домофондар" минимум 2 раза по тексту
-3. Адаптируй стиль под целевой сегмент
-4. Используй SEO-ключи естественно
-5. Никаких выдуманных дат, цифр, конкретных адресов
-6. Длина основного текста: 350-600 слов
-7. Структура: цепляющий заголовок → проблема → анализ → решение от Домофондар → CTA
-8. Региональная привязка: ${region}
+1. Пост ВСЕГДА завершается коммерческим предложением от Домофондар с призывом к действию
+2. Упоминай "Домофондар" минимум 2-3 раза по тексту естественно
+3. Адаптируй тон и боли под целевой сегмент
+4. Используй SEO-ключи естественно, без переспама
+5. Никаких выдуманных конкретных адресов, дат, цифр и имён. Используй обобщения ("во многих ЖК Краснодара", "по данным УК края")
+6. Длина: 400-700 слов
+7. Структура: цепляющий лид → проблема жильцов/УК Кубани → почему это важно сейчас (${currentYear}) → как Домофондар решает → выгоды → призыв связаться
+8. Региональная привязка: ${region}. Упоминай конкретные локации (Краснодар, Сочи, Анапа, Геленджик, Новороссийск, Армавир, ст. Динская и т.п.) и кубанские реалии (жара, влажность, межсезонье, пробки на Северном мосту, поток туристов летом)
+9. Где уместно — ссылайся на свежие тренды/события ${currentYear} года из исходных фактов
+
+ФОРМАТИРОВАНИЕ ТЕКСТА (КРИТИЧНО):
+- Используй Markdown ПРАВИЛЬНО: заголовки разделов начинай с "## " (без пустых ##), подзаголовки с "### "
+- Жирный — двойными звёздочками **только** для важных слов и фраз внутри предложения
+- Списки — через "- " с новой строки, между пунктами должна быть полезная информация
+- НЕ ставь "**" вокруг целых абзацев и заголовков
+- НЕ оставляй "##" или "###" без текста после них
+- НЕ используй "###" для оформления абзацев — только для подзаголовков
+- Между блоками оставляй пустую строку
+- Цитаты экспертов оформляй через "> " в начале строки
+- НЕ используй HTML-теги в content
+- Обязательно 2-3 подзаголовка ## для удобства чтения
+- В конце — отдельный блок с CTA жирным
 
 КОМПАНИЯ: ${brandPitch}
 
@@ -354,11 +408,12 @@ async function generatePost(opts: {
 - Стиль призыва к действию: ${segment.cta_style}`;
 
   const userPrompt = `ТЕМА: ${topic}
+ГОД: ${currentYear}
 
-ИСХОДНЫЕ ФАКТЫ/ТРЕНДЫ ДЛЯ ОПОРЫ:
+ИСХОДНЫЕ ФАКТЫ И СВЕЖИЕ НОВОСТИ КУБАНИ ДЛЯ ОПОРЫ:
 ${research.text}
 
-Напиши SEO-оптимизированный пост для сегмента "${segment.name}". Верни через инструмент output_post.`;
+Напиши SEO-оптимизированный пост для сегмента "${segment.name}" на ${currentYear} год. Опирайся на свежие новости/тренды Кубани выше. Верни через инструмент output_post с чистым Markdown без мусорных символов.`;
 
   const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
@@ -378,9 +433,9 @@ ${research.text}
             parameters: {
               type: "object",
               properties: {
-                title: { type: "string", description: "SEO-заголовок 50-70 символов с ключевым словом" },
-                excerpt: { type: "string", description: "Анонс 150-200 символов для карточки и meta-description" },
-                content: { type: "string", description: "Полный текст в Markdown с заголовками ## и списками" },
+                title: { type: "string", description: `SEO-заголовок 50-70 символов с ключевым словом и упоминанием Краснодара или ${currentYear}` },
+                excerpt: { type: "string", description: "Анонс 150-200 символов для карточки и meta-description, без markdown-символов" },
+                content: { type: "string", description: "Полный текст в чистом Markdown: ## заголовки, **жирный** только для акцентов, списки через -, без мусорных ## и **" },
                 keywords: {
                   type: "array",
                   items: { type: "string" },
@@ -412,16 +467,43 @@ ${research.text}
   const tc = j?.choices?.[0]?.message?.tool_calls?.[0];
   if (!tc) throw new Error("AI не вернул структурированный пост");
   const args = JSON.parse(tc.function.arguments);
-  // Сохраним image_prompt чтобы потом использовать
   return {
-    title: args.title,
-    excerpt: args.excerpt,
-    content: args.content,
+    title: cleanInline(args.title),
+    excerpt: cleanInline(args.excerpt),
+    content: cleanMarkdown(args.content),
     keywords: args.keywords || [],
-    // image_prompt передаётся отдельно через возвращаемое значение fetchImage
-    // @ts-ignore — добавляем для удобства
+    // @ts-ignore — image_prompt используется в fetchImage
     image_prompt: args.image_prompt,
   } as never;
+}
+
+// =================== ОЧИСТКА MARKDOWN ===================
+function cleanInline(s: string): string {
+  if (!s) return s;
+  return s
+    .replace(/\*\*/g, "")
+    .replace(/^#+\s*/g, "")
+    .replace(/`/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function cleanMarkdown(s: string): string {
+  if (!s) return s;
+  let out = s;
+  // Удаляем пустые заголовки "## " без текста
+  out = out.replace(/^#{1,6}\s*$/gm, "");
+  // Заголовок не должен быть обёрнут в **
+  out = out.replace(/^(#{1,6})\s*\*\*(.+?)\*\*\s*$/gm, "$1 $2");
+  // Пустой жирный
+  out = out.replace(/\*\*\s*\*\*/g, "");
+  // 3+ звёздочек подряд → 2
+  out = out.replace(/\*{3,}/g, "**");
+  // Список без текста
+  out = out.replace(/^-\s*$/gm, "");
+  // Сжимаем 3+ переноса до 2
+  out = out.replace(/\n{3,}/g, "\n\n");
+  return out.trim();
 }
 
 // =================== КАРТИНКИ ===================

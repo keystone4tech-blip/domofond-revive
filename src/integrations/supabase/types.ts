@@ -411,8 +411,10 @@ export type Database = {
       news_automation_settings: {
         Row: {
           ai_model: string
+          auto_publish_without_review: boolean
           brand_pitch: string | null
           created_at: string
+          freshness_days: number
           id: string
           image_strategy: string
           is_enabled: boolean
@@ -424,13 +426,17 @@ export type Database = {
           publish_mode: string
           region: string
           schedule_cron: string | null
+          schedule_days: number[]
+          schedule_time: string
           topics: string[] | null
           updated_at: string
         }
         Insert: {
           ai_model?: string
+          auto_publish_without_review?: boolean
           brand_pitch?: string | null
           created_at?: string
+          freshness_days?: number
           id?: string
           image_strategy?: string
           is_enabled?: boolean
@@ -442,13 +448,17 @@ export type Database = {
           publish_mode?: string
           region?: string
           schedule_cron?: string | null
+          schedule_days?: number[]
+          schedule_time?: string
           topics?: string[] | null
           updated_at?: string
         }
         Update: {
           ai_model?: string
+          auto_publish_without_review?: boolean
           brand_pitch?: string | null
           created_at?: string
+          freshness_days?: number
           id?: string
           image_strategy?: string
           is_enabled?: boolean
@@ -460,6 +470,8 @@ export type Database = {
           publish_mode?: string
           region?: string
           schedule_cron?: string | null
+          schedule_days?: number[]
+          schedule_time?: string
           topics?: string[] | null
           updated_at?: string
         }
