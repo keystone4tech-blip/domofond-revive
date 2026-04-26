@@ -514,6 +514,12 @@ function cleanMarkdown(s: string): string {
   out = out.replace(/\*{3,}/g, "**");
   // Список без текста
   out = out.replace(/^-\s*$/gm, "");
+  // Удалить хвостовые служебные метки tool-arg ("excerpt:", "keywords:", "image_prompt:", "title:") и всё после них
+  out = out.replace(/[\s,;.]*\b(excerpt|keywords|image_prompt|title|content)\s*[:=][\s\S]*$/i, "");
+  // Удалить одиночные обрывки вида ",excerpt" / ", excerpt" в конце строки
+  out = out.replace(/[\s,;]+(excerpt|keywords|image_prompt|title|content)\s*$/gim, "");
+  // Удалить непарные ** в конце строк
+  out = out.replace(/\*\*([^*\n]{0,200})$/gm, "$1");
   // Сжимаем 3+ переноса до 2
   out = out.replace(/\n{3,}/g, "\n\n");
   return out.trim();
