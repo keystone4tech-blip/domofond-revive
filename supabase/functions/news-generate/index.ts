@@ -467,16 +467,43 @@ ${research.text}
   const tc = j?.choices?.[0]?.message?.tool_calls?.[0];
   if (!tc) throw new Error("AI не вернул структурированный пост");
   const args = JSON.parse(tc.function.arguments);
-  // Сохраним image_prompt чтобы потом использовать
   return {
-    title: args.title,
-    excerpt: args.excerpt,
-    content: args.content,
+    title: cleanInline(args.title),
+    excerpt: cleanInline(args.excerpt),
+    content: cleanMarkdown(args.content),
     keywords: args.keywords || [],
-    // image_prompt передаётся отдельно через возвращаемое значение fetchImage
-    // @ts-ignore — добавляем для удобства
+    // @ts-ignore — image_prompt используется в fetchImage
     image_prompt: args.image_prompt,
   } as never;
+}
+
+// =================== ОЧИСТКА MARKDOWN ===================
+function cleanInline(s: string): string {
+  if (!s) return s;
+  return s
+    .replace(/\*\*/g, "")
+    .replace(/^#+\s*/g, "")
+    .replace(/`/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function cleanMarkdown(s: string): string {
+  if (!s) return s;
+  let out = s;
+  // Удаляем пустые заголовки "## " без текста
+  out = out.replace(/^#{1,6}\s*$/gm, "");
+  // Заголовок не должен быть обёрнут в **
+  out = out.replace(/^(#{1,6})\s*\*\*(.+?)\*\*\s*$/gm, "$1 $2");
+  // Пустой жирный
+  out = out.replace(/\*\*\s*\*\*/g, "");
+  // 3+ звёздочек подряд → 2
+  out = out.replace(/\*{3,}/g, "**");
+  // Список без текста
+  out = out.replace(/^-\s*$/gm, "");
+  // Сжимаем 3+ переноса до 2
+  out = out.replace(/\n{3,}/g, "\n\n");
+  return out.trim();
 }
 
 // =================== КАРТИНКИ ===================
