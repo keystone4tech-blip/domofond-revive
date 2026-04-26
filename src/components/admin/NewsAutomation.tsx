@@ -11,7 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Loader2, Play, Save, Check, X, Sparkles, Newspaper, RefreshCw, Clock } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Loader2, Play, Save, Check, X, Sparkles, Newspaper, RefreshCw, Clock, Pencil } from "lucide-react";
 
 const WEEKDAYS = [
   { value: 1, label: "Пн" },
