@@ -11,7 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Loader2, Play, Save, Check, X, Sparkles, Newspaper, RefreshCw, Clock } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Loader2, Play, Save, Check, X, Sparkles, Newspaper, RefreshCw, Clock, Pencil } from "lucide-react";
 
 const WEEKDAYS = [
   { value: 1, label: "Пн" },
@@ -31,6 +32,8 @@ export const NewsAutomation = () => {
   const [settings, setSettings] = useState<any>(null);
   const [segments, setSegments] = useState<any[]>([]);
   const [drafts, setDrafts] = useState<any[]>([]);
+  const [editing, setEditing] = useState<any | null>(null);
+  const [savingDraft, setSavingDraft] = useState(false);
 
   useEffect(() => { load(); }, []);
 
@@ -104,6 +107,29 @@ export const NewsAutomation = () => {
   const reject = async (id: string) => {
     await supabase.from("news_drafts").update({ status: "rejected", reviewed_at: new Date().toISOString() }).eq("id", id);
     load();
+  };
+
+  const saveDraftEdits = async () => {
+    if (!editing) return;
+    setSavingDraft(true);
+    const { error } = await supabase.from("news_drafts").update({
+      title: editing.title,
+      excerpt: editing.excerpt,
+      content: editing.content,
+      image_url: editing.image_url,
+    }).eq("id", editing.id);
+    setSavingDraft(false);
+    if (error) return toast({ title: "Ошибка", description: error.message, variant: "destructive" });
+    toast({ title: "Изменения сохранены" });
+    setEditing(null);
+    load();
+  };
+
+  const saveAndPublish = async () => {
+    if (!editing) return;
+    await saveDraftEdits();
+    await approve(editing);
+    setEditing(null);
   };
 
   const toggleDay = (day: number) => {
@@ -329,9 +355,12 @@ export const NewsAutomation = () => {
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{d.content}</ReactMarkdown>
                 </div>
               </details>
-              <div className="flex gap-1.5">
+              <div className="flex flex-wrap gap-1.5">
                 <Button size="sm" onClick={() => approve(d)} className="h-7 text-xs">
                   <Check className="h-3 w-3 mr-1" /> Опубликовать
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setEditing({ ...d })} className="h-7 text-xs">
+                  <Pencil className="h-3 w-3 mr-1" /> Изменить
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => reject(d.id)} className="h-7 text-xs">
                   <X className="h-3 w-3 mr-1" /> Отклонить
@@ -341,6 +370,57 @@ export const NewsAutomation = () => {
           </Card>
         ))
       )}
+
+      <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Редактирование черновика</DialogTitle>
+          </DialogHeader>
+          {editing && (
+            <div className="space-y-3">
+              <div>
+                <Label className="text-xs">Заголовок</Label>
+                <Input value={editing.title || ""} onChange={(e) => setEditing({ ...editing, title: e.target.value })} className="mt-1" />
+              </div>
+              <div>
+                <Label className="text-xs">Анонс (excerpt)</Label>
+                <Textarea rows={2} value={editing.excerpt || ""} onChange={(e) => setEditing({ ...editing, excerpt: e.target.value })} className="mt-1" />
+              </div>
+              <div>
+                <Label className="text-xs">URL картинки</Label>
+                <Input value={editing.image_url || ""} onChange={(e) => setEditing({ ...editing, image_url: e.target.value })} className="mt-1" />
+                {editing.image_url && (
+                  <img src={editing.image_url} alt="" className="mt-2 w-full max-h-48 object-cover rounded" />
+                )}
+              </div>
+              <div>
+                <Label className="text-xs">Содержимое (Markdown)</Label>
+                <Textarea
+                  rows={16}
+                  value={editing.content || ""}
+                  onChange={(e) => setEditing({ ...editing, content: e.target.value })}
+                  className="mt-1 font-mono text-xs"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Превью</Label>
+                <div className="mt-1 bg-muted p-3 rounded max-h-80 overflow-y-auto prose prose-sm max-w-none dark:prose-invert prose-headings:font-bold prose-h2:text-base prose-h3:text-sm prose-strong:text-primary">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{editing.content || ""}</ReactMarkdown>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2 flex-col sm:flex-row">
+            <Button variant="ghost" onClick={() => setEditing(null)}>Отмена</Button>
+            <Button variant="outline" onClick={saveDraftEdits} disabled={savingDraft}>
+              {savingDraft ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />} Сохранить
+            </Button>
+            <Button onClick={saveAndPublish} disabled={savingDraft}>
+              <Check className="h-4 w-4 mr-1" /> Сохранить и опубликовать
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
