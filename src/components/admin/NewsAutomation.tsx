@@ -109,6 +109,29 @@ export const NewsAutomation = () => {
     load();
   };
 
+  const saveDraftEdits = async () => {
+    if (!editing) return;
+    setSavingDraft(true);
+    const { error } = await supabase.from("news_drafts").update({
+      title: editing.title,
+      excerpt: editing.excerpt,
+      content: editing.content,
+      image_url: editing.image_url,
+    }).eq("id", editing.id);
+    setSavingDraft(false);
+    if (error) return toast({ title: "Ошибка", description: error.message, variant: "destructive" });
+    toast({ title: "Изменения сохранены" });
+    setEditing(null);
+    load();
+  };
+
+  const saveAndPublish = async () => {
+    if (!editing) return;
+    await saveDraftEdits();
+    await approve(editing);
+    setEditing(null);
+  };
+
   const toggleDay = (day: number) => {
     const days = settings.schedule_days || [];
     const next = days.includes(day) ? days.filter((d: number) => d !== day) : [...days, day].sort();
