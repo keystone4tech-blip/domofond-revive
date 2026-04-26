@@ -121,7 +121,7 @@ serve(async (req) => {
         const topic = forceTopic || cfg.topics[Math.floor(Math.random() * cfg.topics.length)];
 
         // 3. Сбор фактов из источника
-        const research = await gatherNews({ source: cfg.news_source, topic, region: cfg.region, lovableKey: LOVABLE_API_KEY });
+        const research = await gatherNews({ source: cfg.news_source, topic, region: cfg.region, lovableKey: LOVABLE_API_KEY, freshnessDays: cfg.freshness_days || 30 });
 
         // 4. Генерация поста под сегмент
         const post = await generatePost({
