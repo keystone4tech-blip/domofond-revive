@@ -263,33 +263,37 @@ async function gatherNews(opts: {
   topic: string;
   region: string;
   lovableKey: string;
+  freshnessDays?: number;
 }): Promise<{ text: string; sources: string[] }> {
   const { source, topic, region, lovableKey } = opts;
+  const freshnessDays = opts.freshnessDays || 30;
+  const currentYear = new Date().getFullYear();
 
   if (source === "perplexity") {
     const key = Deno.env.get("PERPLEXITY_API_KEY");
     if (!key) {
       console.warn("PERPLEXITY_API_KEY не настроен, fallback на gemini_grounding");
-      return gatherViaGemini(topic, region, lovableKey);
+      return gatherViaGemini(topic, region, lovableKey, freshnessDays);
     }
+    const recency = freshnessDays <= 7 ? "week" : freshnessDays <= 31 ? "month" : "year";
     const res = await fetch("https://api.perplexity.ai/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "sonar",
         messages: [
-          { role: "system", content: "Ты — журналист, ищущий свежие, местные новости и факты." },
+          { role: "system", content: `Ты — журналист Кубани, ищешь свежие новости ${currentYear} года про безопасность, ЖКХ, домофоны, видеонаблюдение в Краснодарском крае.` },
           {
             role: "user",
-            content: `Найди 2-3 свежих факта/события за последние 30 дней по теме "${topic}" в регионе ${region}. Также общие тренды отрасли. Кратко, с источниками.`,
+            content: `Найди 3-5 свежих новостей за последние ${freshnessDays} дней по теме "${topic}" в регионе ${region} (Кубань, Краснодар, Сочи, Новороссийск, Анапа, Геленджик). Также — недавние происшествия (кражи, взломы подъездов, аварии в ЖК), на которые мы можем сослаться. Кратко, с источниками. Год: ${currentYear}.`,
           },
         ],
-        search_recency_filter: "month",
+        search_recency_filter: recency,
       }),
     });
     if (!res.ok) {
       console.warn("Perplexity fail:", res.status);
-      return gatherViaGemini(topic, region, lovableKey);
+      return gatherViaGemini(topic, region, lovableKey, freshnessDays);
     }
     const j = await res.json();
     const text = j?.choices?.[0]?.message?.content || "";
@@ -301,19 +305,19 @@ async function gatherNews(opts: {
     const key = Deno.env.get("FIRECRAWL_API_KEY");
     if (!key) {
       console.warn("FIRECRAWL_API_KEY не настроен, fallback");
-      return gatherViaGemini(topic, region, lovableKey);
+      return gatherViaGemini(topic, region, lovableKey, freshnessDays);
     }
     const res = await fetch("https://api.firecrawl.dev/v2/search", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        query: `${topic} ${region} новости 2025 2026`,
+        query: `${topic} Краснодар Кубань ${currentYear} новости безопасность ЖКХ`,
         limit: 5,
-        tbs: "qdr:m",
+        tbs: freshnessDays <= 7 ? "qdr:w" : "qdr:m",
         scrapeOptions: { formats: ["markdown"] },
       }),
     });
-    if (!res.ok) return gatherViaGemini(topic, region, lovableKey);
+    if (!res.ok) return gatherViaGemini(topic, region, lovableKey, freshnessDays);
     const j = await res.json();
     const items = (j?.data || []) as Array<{ url: string; title: string; markdown?: string; description?: string }>;
     const text = items
@@ -322,11 +326,12 @@ async function gatherNews(opts: {
     return { text, sources: items.map((i) => i.url) };
   }
 
-  return gatherViaGemini(topic, region, lovableKey);
+  return gatherViaGemini(topic, region, lovableKey, freshnessDays);
 }
 
-async function gatherViaGemini(topic: string, region: string, lovableKey: string) {
-  // У Lovable AI gateway нет явного web grounding — используем модель как research-агента
+async function gatherViaGemini(topic: string, region: string, lovableKey: string, freshnessDays = 30) {
+  const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().toLocaleString("ru-RU", { month: "long", year: "numeric" });
   const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" },
@@ -336,11 +341,11 @@ async function gatherViaGemini(topic: string, region: string, lovableKey: string
         {
           role: "system",
           content:
-            "Ты — эксперт по безопасности, домофонам и видеонаблюдению. Опиши актуальные тренды и типичные кейсы из практики.",
+            `Ты — эксперт по безопасности, домофонам и видеонаблюдению в Краснодарском крае. Сегодня ${currentMonth}. Описывай актуальные тренды и кейсы ${currentYear} года.`,
         },
         {
           role: "user",
-          content: `Опиши 2-3 актуальные ситуации/тренда по теме "${topic}" применительно к региону ${region}. Включи: реальные проблемы жильцов и УК, технологические новинки, изменения в нормативах. Используй свои общие знания (без выдуманных фактов и без конкретных дат/цифр, если не уверен).`,
+          content: `Опиши 2-3 актуальных тренда/ситуации (последние ${freshnessDays} дней, ${currentYear} год) по теме "${topic}" применительно к региону ${region}. Включи: типичные проблемы жильцов и УК Кубани, технологические новинки ${currentYear} года, изменения в нормативах. Не выдумывай конкретные адреса, даты и цифры — пиши обобщённо. НЕ упоминай 2024 год.`,
         },
       ],
     }),
