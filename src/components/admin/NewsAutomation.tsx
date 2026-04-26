@@ -32,6 +32,8 @@ export const NewsAutomation = () => {
   const [settings, setSettings] = useState<any>(null);
   const [segments, setSegments] = useState<any[]>([]);
   const [drafts, setDrafts] = useState<any[]>([]);
+  const [editing, setEditing] = useState<any | null>(null);
+  const [savingDraft, setSavingDraft] = useState(false);
 
   useEffect(() => { load(); }, []);
 
