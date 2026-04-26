@@ -157,7 +157,8 @@ serve(async (req) => {
           cfg.publish_mode === "mixed"
             ? segmentMode || "review"
             : cfg.publish_mode;
-        const shouldAutoPublish = effectiveMode === "auto" && !dryRun;
+        // Глобальный override: если включена «без подтверждения» — публикуем сразу всегда
+        const shouldAutoPublish = (cfg.auto_publish_without_review || effectiveMode === "auto") && !dryRun;
 
         if (dryRun) {
           results.push({ ok: true, title: post.title });
