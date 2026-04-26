@@ -355,9 +355,12 @@ export const NewsAutomation = () => {
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{d.content}</ReactMarkdown>
                 </div>
               </details>
-              <div className="flex gap-1.5">
+              <div className="flex flex-wrap gap-1.5">
                 <Button size="sm" onClick={() => approve(d)} className="h-7 text-xs">
                   <Check className="h-3 w-3 mr-1" /> Опубликовать
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setEditing({ ...d })} className="h-7 text-xs">
+                  <Pencil className="h-3 w-3 mr-1" /> Изменить
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => reject(d.id)} className="h-7 text-xs">
                   <X className="h-3 w-3 mr-1" /> Отклонить
@@ -367,6 +370,57 @@ export const NewsAutomation = () => {
           </Card>
         ))
       )}
+
+      <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Редактирование черновика</DialogTitle>
+          </DialogHeader>
+          {editing && (
+            <div className="space-y-3">
+              <div>
+                <Label className="text-xs">Заголовок</Label>
+                <Input value={editing.title || ""} onChange={(e) => setEditing({ ...editing, title: e.target.value })} className="mt-1" />
+              </div>
+              <div>
+                <Label className="text-xs">Анонс (excerpt)</Label>
+                <Textarea rows={2} value={editing.excerpt || ""} onChange={(e) => setEditing({ ...editing, excerpt: e.target.value })} className="mt-1" />
+              </div>
+              <div>
+                <Label className="text-xs">URL картинки</Label>
+                <Input value={editing.image_url || ""} onChange={(e) => setEditing({ ...editing, image_url: e.target.value })} className="mt-1" />
+                {editing.image_url && (
+                  <img src={editing.image_url} alt="" className="mt-2 w-full max-h-48 object-cover rounded" />
+                )}
+              </div>
+              <div>
+                <Label className="text-xs">Содержимое (Markdown)</Label>
+                <Textarea
+                  rows={16}
+                  value={editing.content || ""}
+                  onChange={(e) => setEditing({ ...editing, content: e.target.value })}
+                  className="mt-1 font-mono text-xs"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Превью</Label>
+                <div className="mt-1 bg-muted p-3 rounded max-h-80 overflow-y-auto prose prose-sm max-w-none dark:prose-invert prose-headings:font-bold prose-h2:text-base prose-h3:text-sm prose-strong:text-primary">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{editing.content || ""}</ReactMarkdown>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2 flex-col sm:flex-row">
+            <Button variant="ghost" onClick={() => setEditing(null)}>Отмена</Button>
+            <Button variant="outline" onClick={saveDraftEdits} disabled={savingDraft}>
+              {savingDraft ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />} Сохранить
+            </Button>
+            <Button onClick={saveAndPublish} disabled={savingDraft}>
+              <Check className="h-4 w-4 mr-1" /> Сохранить и опубликовать
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
