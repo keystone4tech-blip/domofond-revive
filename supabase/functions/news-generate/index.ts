@@ -18,6 +18,11 @@ interface Settings {
   posts_per_run: number;
   brand_pitch: string;
   topics: string[];
+  schedule_time: string; // "HH:MM" по МСК
+  schedule_days: number[]; // 0-6
+  auto_publish_without_review: boolean;
+  freshness_days: number;
+  last_run_at: string | null;
 }
 
 interface Segment {
