@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
+import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -11,7 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Vote, Calendar, MapPin, Loader2, CheckCircle2, ShieldCheck } from "lucide-react";
+import { Vote, Calendar, MapPin, Loader2, CheckCircle2, ShieldCheck, ChevronLeft, ChevronRight, AlertCircle, User, Home, Phone, KeyRound } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface Voting {
@@ -282,104 +283,348 @@ const Golosovanie = () => {
               </CardContent>
             </Card>
           ) : (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Бюллетень</CardTitle>
-                <CardDescription>
-                  Заполните поля, ответьте на вопросы и подтвердите личность по SMS.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid sm:grid-cols-2 gap-3">
-                  <div>
-                    <Label className="text-xs">ФИО собственника *</Label>
-                    <Input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Иванов Иван Иванович" className="mt-1" />
-                  </div>
-                  <div>
-                    <Label className="text-xs">№ квартиры *</Label>
-                    <Input value={apartment} onChange={(e) => setApartment(e.target.value)} placeholder="42" className="mt-1" />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Площадь, м² (необязательно)</Label>
-                    <Input
-                      type="text"
-                      inputMode="decimal"
-                      value={areaSqm}
-                      onChange={(e) => setAreaSqm(e.target.value.replace(",", "."))}
-                      placeholder="56.3"
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Телефон для SMS *</Label>
-                    <Input
-                      type="tel"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="+7 (___) ___-__-__"
-                      className="mt-1"
-                    />
-                  </div>
+            <StepperBallot
+              voting={voting}
+              questions={questions}
+              fullName={fullName} setFullName={setFullName}
+              phone={phone} setPhone={setPhone}
+              apartment={apartment} setApartment={setApartment}
+              areaSqm={areaSqm} setAreaSqm={setAreaSqm}
+              isOwner={isOwner} setIsOwner={setIsOwner}
+              answers={answers} setAnswers={setAnswers}
+              code={code} setCode={setCode}
+              codeRequested={codeRequested}
+              requestingCode={requestingCode}
+              submitting={submitting}
+              onRequestCode={requestCode}
+              onSubmit={submit}
+              onChangePhone={() => setCodeRequested(false)}
+            />
+          )}
+        </div>
+      </main>
+      <Footer />
+    </div>
+  );
+};
+
+// =============== STEPPER ===============
+
+const fioSchema = z
+  .string()
+  .trim()
+  .min(5, "ФИО должно содержать минимум 5 символов")
+  .max(120, "ФИО слишком длинное")
+  .regex(/^[А-Яа-яЁё\s\-]+$/u, "Используйте только русские буквы, пробел и дефис")
+  .refine((v) => v.split(/\s+/).filter(Boolean).length >= 2, "Укажите фамилию, имя и (желательно) отчество");
+
+const apartmentSchema = z
+  .string()
+  .trim()
+  .min(1, "Укажите номер квартиры")
+  .max(10, "Слишком длинный номер")
+  .regex(/^[0-9]+[А-Яа-я]?$/u, "Только цифры, можно с буквой (например, 12А)");
+
+const phoneSchema = z
+  .string()
+  .trim()
+  .refine((v) => v.replace(/\D/g, "").length >= 11, "Введите телефон полностью (11 цифр)")
+  .refine((v) => /^[+]?[78]/.test(v.replace(/\D/g, "").replace(/^/, "+")), "Номер должен начинаться с +7 или 8");
+
+const areaSchema = z
+  .string()
+  .trim()
+  .optional()
+  .refine((v) => !v || (Number(v) > 5 && Number(v) < 1000), "Площадь должна быть в диапазоне 5–1000 м²");
+
+const codeSchema = z.string().regex(/^\d{6}$/, "Код состоит из 6 цифр");
+
+interface StepperProps {
+  voting: Voting;
+  questions: Question[];
+  fullName: string; setFullName: (v: string) => void;
+  phone: string; setPhone: (v: string) => void;
+  apartment: string; setApartment: (v: string) => void;
+  areaSqm: string; setAreaSqm: (v: string) => void;
+  isOwner: boolean; setIsOwner: (v: boolean) => void;
+  answers: Record<string, string>; setAnswers: (cb: (p: Record<string, string>) => Record<string, string>) => void;
+  code: string; setCode: (v: string) => void;
+  codeRequested: boolean;
+  requestingCode: boolean;
+  submitting: boolean;
+  onRequestCode: () => void;
+  onSubmit: () => void;
+  onChangePhone: () => void;
+}
+
+const StepperBallot = (p: StepperProps) => {
+  const [step, setStep] = useState(0);
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  const formatPhone = (raw: string) => {
+    const d = raw.replace(/\D/g, "").replace(/^8/, "7").slice(0, 11);
+    if (!d) return "";
+    const parts = ["+7"];
+    if (d.length > 1) parts.push(" (" + d.slice(1, 4));
+    if (d.length >= 4) parts[1] += ")";
+    if (d.length >= 5) parts.push(" " + d.slice(4, 7));
+    if (d.length >= 8) parts.push("-" + d.slice(7, 9));
+    if (d.length >= 10) parts.push("-" + d.slice(9, 11));
+    return parts.join("");
+  };
+
+  const errors = useMemo(() => {
+    const e: Record<string, string> = {};
+    const fio = fioSchema.safeParse(p.fullName); if (!fio.success) e.fullName = fio.error.issues[0].message;
+    const apt = apartmentSchema.safeParse(p.apartment); if (!apt.success) e.apartment = apt.error.issues[0].message;
+    const ph = phoneSchema.safeParse(p.phone); if (!ph.success) e.phone = ph.error.issues[0].message;
+    const ar = areaSchema.safeParse(p.areaSqm); if (!ar.success) e.areaSqm = ar.error.issues[0].message;
+    if (!p.isOwner) e.isOwner = "Подтвердите статус собственника";
+    p.questions.forEach((q) => { if (!p.answers[q.id]) e[`q_${q.id}`] = "Выберите вариант ответа"; });
+    if (p.codeRequested) {
+      const c = codeSchema.safeParse(p.code); if (!c.success) e.code = c.error.issues[0].message;
+    }
+    return e;
+  }, [p]);
+
+  const steps = [
+    { key: "personal", title: "Собственник", icon: User, fields: ["fullName", "apartment", "areaSqm"] },
+    { key: "questions", title: "Вопросы", icon: Vote, fields: p.questions.map((q) => `q_${q.id}`) },
+    { key: "confirm", title: "Подтверждение", icon: KeyRound, fields: ["phone", "isOwner", "code"] },
+  ];
+
+  const stepHasErrors = (idx: number) => steps[idx].fields.some((f) => errors[f]);
+
+  const markStepTouched = (idx: number) => {
+    const next = { ...touched };
+    steps[idx].fields.forEach((f) => { next[f] = true; });
+    setTouched(next);
+  };
+
+  const goNext = () => {
+    markStepTouched(step);
+    if (stepHasErrors(step)) return;
+    setStep((s) => Math.min(s + 1, steps.length - 1));
+  };
+
+  const showError = (k: string) => touched[k] && errors[k];
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Бюллетень</CardTitle>
+        <CardDescription>
+          Заполните данные собственника, ответьте на вопросы и подтвердите личность по SMS.
+        </CardDescription>
+        {/* Прогресс */}
+        <div className="flex items-center gap-1 pt-3">
+          {steps.map((s, i) => {
+            const Icon = s.icon;
+            const active = i === step;
+            const done = i < step && !stepHasErrors(i);
+            return (
+              <div key={s.key} className="flex items-center flex-1">
+                <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-colors ${
+                  active ? "bg-primary text-primary-foreground" :
+                  done ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                }`}>
+                  <Icon className="h-3 w-3" />
+                  <span className="hidden sm:inline">{s.title}</span>
+                  <span className="sm:hidden">{i + 1}</span>
                 </div>
+                {i < steps.length - 1 && <div className={`flex-1 h-0.5 mx-1 ${done ? "bg-primary" : "bg-muted"}`} />}
+              </div>
+            );
+          })}
+        </div>
+      </CardHeader>
 
-                <Separator />
+      <CardContent className="space-y-4">
+        {/* ШАГ 1: ЛИЧНЫЕ ДАННЫЕ */}
+        {step === 0 && (
+          <div className="space-y-3 animate-in fade-in-50">
+            <Field label="ФИО собственника *" icon={User} error={showError("fullName") ? errors.fullName : ""}>
+              <Input
+                value={p.fullName}
+                onChange={(e) => p.setFullName(e.target.value)}
+                onBlur={() => setTouched((t) => ({ ...t, fullName: true }))}
+                placeholder="Иванов Иван Иванович"
+                aria-invalid={!!showError("fullName")}
+              />
+            </Field>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <Field label="№ квартиры *" icon={Home} error={showError("apartment") ? errors.apartment : ""}>
+                <Input
+                  inputMode="text"
+                  value={p.apartment}
+                  onChange={(e) => p.setApartment(e.target.value.toUpperCase())}
+                  onBlur={() => setTouched((t) => ({ ...t, apartment: true }))}
+                  placeholder="42 или 12А"
+                  aria-invalid={!!showError("apartment")}
+                />
+              </Field>
+              <Field label="Площадь, м²" hint="не обязательно, но повысит юр. вес голоса" error={showError("areaSqm") ? errors.areaSqm : ""}>
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  value={p.areaSqm}
+                  onChange={(e) => p.setAreaSqm(e.target.value.replace(",", ".").replace(/[^\d.]/g, ""))}
+                  onBlur={() => setTouched((t) => ({ ...t, areaSqm: true }))}
+                  placeholder="56.3"
+                  aria-invalid={!!showError("areaSqm")}
+                />
+              </Field>
+            </div>
+          </div>
+        )}
 
-                <div className="space-y-4">
-                  {questions.map((q, idx) => (
-                    <div key={q.id} className="rounded-lg border p-3">
-                      <div className="font-medium text-sm mb-2">
-                        Вопрос {idx + 1}. {q.question_text}
+        {/* ШАГ 2: ВОПРОСЫ */}
+        {step === 1 && (
+          <div className="space-y-4 animate-in fade-in-50">
+            {p.questions.length === 0 && (
+              <p className="text-sm text-muted-foreground">У этого голосования пока нет вопросов.</p>
+            )}
+            {p.questions.map((q, idx) => {
+              const errKey = `q_${q.id}`;
+              const err = showError(errKey) ? errors[errKey] : "";
+              return (
+                <div key={q.id} className={`rounded-lg border p-3 ${err ? "border-destructive" : ""}`}>
+                  <div className="font-medium text-sm mb-2">
+                    Вопрос {idx + 1}. {q.question_text}
+                  </div>
+                  <RadioGroup
+                    value={p.answers[q.id] || ""}
+                    onValueChange={(v) => {
+                      p.setAnswers((prev) => ({ ...prev, [q.id]: v }));
+                      setTouched((t) => ({ ...t, [errKey]: true }));
+                    }}
+                  >
+                    {q.options.map((opt) => (
+                      <div key={opt} className="flex items-center space-x-2">
+                        <RadioGroupItem value={opt} id={`${q.id}-${opt}`} />
+                        <Label htmlFor={`${q.id}-${opt}`} className="cursor-pointer text-sm font-normal">{opt}</Label>
                       </div>
-                      <RadioGroup
-                        value={answers[q.id] || ""}
-                        onValueChange={(v) => setAnswers((p) => ({ ...p, [q.id]: v }))}
-                      >
-                        {q.options.map((opt) => (
-                          <div key={opt} className="flex items-center space-x-2">
-                            <RadioGroupItem value={opt} id={`${q.id}-${opt}`} />
-                            <Label htmlFor={`${q.id}-${opt}`} className="cursor-pointer">{opt}</Label>
-                          </div>
-                        ))}
-                      </RadioGroup>
-                    </div>
-                  ))}
+                    ))}
+                  </RadioGroup>
+                  {err && <ErrorLine text={err} />}
                 </div>
+              );
+            })}
+          </div>
+        )}
 
-                <div className="flex items-start gap-2 rounded-lg border p-3 bg-muted/30">
-                  <Checkbox id="is_owner" checked={isOwner} onCheckedChange={(v) => setIsOwner(!!v)} className="mt-0.5" />
-                  <Label htmlFor="is_owner" className="text-xs font-normal cursor-pointer">
-                    Я подтверждаю, что являюсь собственником указанной квартиры и согласен на обработку персональных данных
-                    в целях проведения голосования. Понимаю, что заведомо ложные данные могут повлечь оспаривание решения.
-                  </Label>
-                </div>
+        {/* ШАГ 3: ПОДТВЕРЖДЕНИЕ */}
+        {step === 2 && (
+          <div className="space-y-3 animate-in fade-in-50">
+            <Field label="Телефон для SMS *" icon={Phone} error={showError("phone") ? errors.phone : ""}>
+              <Input
+                type="tel"
+                inputMode="tel"
+                value={p.phone}
+                onChange={(e) => p.setPhone(formatPhone(e.target.value))}
+                onBlur={() => setTouched((t) => ({ ...t, phone: true }))}
+                placeholder="+7 (___) ___-__-__"
+                aria-invalid={!!showError("phone")}
+                disabled={p.codeRequested}
+              />
+            </Field>
 
-                {!codeRequested ? (
-                  <Button onClick={requestCode} disabled={requestingCode || !phone || !isOwner} className="w-full">
-                    {requestingCode ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-                    Получить SMS-код
-                  </Button>
-                ) : (
-                  <div className="space-y-3">
-                    <div>
-                      <Label className="text-xs">Код из SMS *</Label>
-                      <Input
-                        value={code}
-                        onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                        placeholder="6 цифр"
-                        className="mt-1 tracking-widest text-center font-mono text-lg"
-                      />
-                    </div>
-                    <Button onClick={submit} disabled={submitting || !code} className="w-full">
-                      {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-                      Подтвердить и проголосовать
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => setCodeRequested(false)} className="w-full">
-                      Изменить телефон
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <div className={`flex items-start gap-2 rounded-lg border p-3 bg-muted/30 ${showError("isOwner") ? "border-destructive" : ""}`}>
+              <Checkbox
+                id="is_owner"
+                checked={p.isOwner}
+                onCheckedChange={(v) => { p.setIsOwner(!!v); setTouched((t) => ({ ...t, isOwner: true })); }}
+                className="mt-0.5"
+              />
+              <Label htmlFor="is_owner" className="text-xs font-normal cursor-pointer">
+                Я подтверждаю, что являюсь собственником указанной квартиры и согласен на обработку
+                персональных данных в целях проведения голосования. Понимаю, что заведомо ложные
+                данные могут повлечь оспаривание решения собрания.
+              </Label>
+            </div>
+            {showError("isOwner") && <ErrorLine text={errors.isOwner} />}
+
+            {!p.codeRequested ? (
+              <Button
+                onClick={() => { markStepTouched(2); if (!errors.phone && !errors.isOwner) p.onRequestCode(); }}
+                disabled={p.requestingCode}
+                className="w-full"
+              >
+                {p.requestingCode && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+                Получить SMS-код
+              </Button>
+            ) : (
+              <div className="space-y-3 rounded-lg border p-3 bg-primary/5">
+                <Field label="Код из SMS *" icon={KeyRound} error={showError("code") ? errors.code : ""}>
+                  <Input
+                    value={p.code}
+                    onChange={(e) => { p.setCode(e.target.value.replace(/\D/g, "").slice(0, 6)); setTouched((t) => ({ ...t, code: true })); }}
+                    placeholder="------"
+                    className="tracking-widest text-center font-mono text-lg"
+                    aria-invalid={!!showError("code")}
+                    autoFocus
+                  />
+                </Field>
+                <Button
+                  onClick={() => { markStepTouched(2); if (Object.keys(errors).length === 0) p.onSubmit(); }}
+                  disabled={p.submitting || !p.code}
+                  className="w-full"
+                >
+                  {p.submitting && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+                  Подтвердить и проголосовать
+                </Button>
+                <Button variant="ghost" size="sm" onClick={p.onChangePhone} className="w-full">
+                  Изменить телефон
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* НАВИГАЦИЯ */}
+        <div className="flex items-center justify-between gap-2 pt-2">
+          <Button
+            variant="outline"
+            onClick={() => setStep((s) => Math.max(0, s - 1))}
+            disabled={step === 0}
+            className="flex-1"
+          >
+            <ChevronLeft className="h-4 w-4 mr-1" /> Назад
+          </Button>
+          {step < steps.length - 1 && (
+            <Button onClick={goNext} className="flex-1">
+              Далее <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+          )}
+        </div>
+      </main>
+      <Footer />
+    </div>
+  );
+};
+
+// ============== Вспомогательные ==============
+const Field = ({
+  label, hint, error, icon: Icon, children,
+}: { label: string; hint?: string; error?: string; icon?: any; children: React.ReactNode }) => (
+  <div>
+    <Label className="text-xs flex items-center gap-1">
+      {Icon && <Icon className="h-3 w-3 text-muted-foreground" />} {label}
+    </Label>
+    <div className="mt-1">{children}</div>
+    {error ? <ErrorLine text={error} /> : hint ? <p className="text-[11px] text-muted-foreground mt-1">{hint}</p> : null}
+  </div>
+);
+
+const ErrorLine = ({ text }: { text: string }) => (
+  <p className="text-[11px] text-destructive mt-1 flex items-center gap-1">
+    <AlertCircle className="h-3 w-3" /> {text}
+  </p>
+);
           )}
         </div>
       </main>
