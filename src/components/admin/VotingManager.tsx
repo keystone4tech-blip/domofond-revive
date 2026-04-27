@@ -361,7 +361,7 @@ export const VotingManager = () => {
               </Card>
               {(results.data.questions || []).map((q: any, i: number) => {
                 const tot = results.data.totals[q.id] || {};
-                const sum = Object.values(tot).reduce((s: number, n: any) => s + Number(n), 0) || 1;
+                const sum = (Object.values(tot) as number[]).reduce((s, n) => s + Number(n), 0) || 1;
                 return (
                   <Card key={q.id}>
                     <CardHeader className="pb-2"><CardTitle className="text-sm">Вопрос {i + 1}. {q.question_text}</CardTitle></CardHeader>
