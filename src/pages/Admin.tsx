@@ -124,6 +124,7 @@ const Admin = () => {
             <TabsTrigger value="calculations" className="shrink-0 whitespace-nowrap">Расчёты</TabsTrigger>
             <TabsTrigger value="seo" className="shrink-0 whitespace-nowrap">🪄 SEO AI</TabsTrigger>
             <TabsTrigger value="autonews" className="shrink-0 whitespace-nowrap">📰 Авто-новости</TabsTrigger>
+            <TabsTrigger value="voting" className="shrink-0 whitespace-nowrap">🗳️ Голосования</TabsTrigger>
             <TabsTrigger value="stats" className="shrink-0 whitespace-nowrap">Статистика</TabsTrigger>
             <TabsTrigger value="promotions" className="shrink-0 whitespace-nowrap">Акции</TabsTrigger>
             <TabsTrigger value="news" className="shrink-0 whitespace-nowrap">Новости</TabsTrigger>
