@@ -17,6 +17,7 @@ import NotFound from "./pages/NotFound";
 import SmartIntercom from "./pages/SmartIntercom";
 import Payment from "./pages/Payment";
 import Calculator from "./pages/Calculator";
+import Golosovanie from "./pages/Golosovanie";
 import MobileBottomNav from "./components/MobileBottomNav";
 import ScrollToTop from "./components/ScrollToTop";
 import ChatWidget from "./components/ChatWidget";
