@@ -17,6 +17,7 @@ import NotFound from "./pages/NotFound";
 import SmartIntercom from "./pages/SmartIntercom";
 import Payment from "./pages/Payment";
 import Calculator from "./pages/Calculator";
+import Golosovanie from "./pages/Golosovanie";
 import MobileBottomNav from "./components/MobileBottomNav";
 import ScrollToTop from "./components/ScrollToTop";
 import ChatWidget from "./components/ChatWidget";
@@ -47,6 +48,8 @@ const App = () => (
             <Route path="/smart-intercom" element={<SmartIntercom />} />
             <Route path="/payment" element={<Payment />} />
             <Route path="/calculator" element={<Calculator />} />
+            <Route path="/golosovanie" element={<Golosovanie />} />
+            <Route path="/golosovanie/:id" element={<Golosovanie />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

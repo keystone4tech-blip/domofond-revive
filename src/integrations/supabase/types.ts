@@ -1490,6 +1490,243 @@ export type Database = {
         }
         Relationships: []
       }
+      voting_answers: {
+        Row: {
+          ballot_id: string
+          created_at: string
+          id: string
+          question_id: string
+          selected_option: string
+        }
+        Insert: {
+          ballot_id: string
+          created_at?: string
+          id?: string
+          question_id: string
+          selected_option: string
+        }
+        Update: {
+          ballot_id?: string
+          created_at?: string
+          id?: string
+          question_id?: string
+          selected_option?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voting_answers_ballot_id_fkey"
+            columns: ["ballot_id"]
+            isOneToOne: false
+            referencedRelation: "voting_ballots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voting_answers_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "voting_questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      voting_ballots: {
+        Row: {
+          created_at: string
+          id: string
+          ip_address: string | null
+          is_owner_confirmed: boolean
+          is_revoked: boolean
+          ownership_doc_url: string | null
+          phone_verified_at: string | null
+          user_agent: string | null
+          user_id: string | null
+          voter_apartment: string
+          voter_area_sqm: number | null
+          voter_full_name: string
+          voter_phone: string
+          voting_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          is_owner_confirmed?: boolean
+          is_revoked?: boolean
+          ownership_doc_url?: string | null
+          phone_verified_at?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+          voter_apartment: string
+          voter_area_sqm?: number | null
+          voter_full_name: string
+          voter_phone: string
+          voting_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          is_owner_confirmed?: boolean
+          is_revoked?: boolean
+          ownership_doc_url?: string | null
+          phone_verified_at?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+          voter_apartment?: string
+          voter_area_sqm?: number | null
+          voter_full_name?: string
+          voter_phone?: string
+          voting_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voting_ballots_voting_id_fkey"
+            columns: ["voting_id"]
+            isOneToOne: false
+            referencedRelation: "votings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      voting_phone_codes: {
+        Row: {
+          attempts: number
+          code: string
+          created_at: string
+          expires_at: string
+          id: string
+          is_used: boolean
+          phone: string
+          voting_id: string
+        }
+        Insert: {
+          attempts?: number
+          code: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          is_used?: boolean
+          phone: string
+          voting_id: string
+        }
+        Update: {
+          attempts?: number
+          code?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          is_used?: boolean
+          phone?: string
+          voting_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voting_phone_codes_voting_id_fkey"
+            columns: ["voting_id"]
+            isOneToOne: false
+            referencedRelation: "votings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      voting_questions: {
+        Row: {
+          created_at: string
+          id: string
+          options: Json
+          order_index: number
+          question_text: string
+          voting_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          options?: Json
+          order_index?: number
+          question_text: string
+          voting_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          options?: Json
+          order_index?: number
+          question_text?: string
+          voting_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voting_questions_voting_id_fkey"
+            columns: ["voting_id"]
+            isOneToOne: false
+            referencedRelation: "votings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      votings: {
+        Row: {
+          building_address: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          ends_at: string | null
+          id: string
+          initiator_apartment: string | null
+          initiator_name: string | null
+          legal_basis: string | null
+          pass_threshold_percent: number
+          quorum_percent: number
+          starts_at: string | null
+          status: string
+          title: string
+          total_apartments: number | null
+          total_area_sqm: number | null
+          updated_at: string
+          voting_type: string
+        }
+        Insert: {
+          building_address: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          ends_at?: string | null
+          id?: string
+          initiator_apartment?: string | null
+          initiator_name?: string | null
+          legal_basis?: string | null
+          pass_threshold_percent?: number
+          quorum_percent?: number
+          starts_at?: string | null
+          status?: string
+          title: string
+          total_apartments?: number | null
+          total_area_sqm?: number | null
+          updated_at?: string
+          voting_type?: string
+        }
+        Update: {
+          building_address?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          ends_at?: string | null
+          id?: string
+          initiator_apartment?: string | null
+          initiator_name?: string | null
+          legal_basis?: string | null
+          pass_threshold_percent?: number
+          quorum_percent?: number
+          starts_at?: string | null
+          status?: string
+          title?: string
+          total_apartments?: number | null
+          total_area_sqm?: number | null
+          updated_at?: string
+          voting_type?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

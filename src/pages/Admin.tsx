@@ -18,6 +18,7 @@ import { ChatHistoryManager } from "@/components/admin/ChatHistoryManager";
 import { AccountsManager } from "@/components/admin/AccountsManager";
 import { SEOManager } from "@/components/admin/SEOManager";
 import { NewsAutomation } from "@/components/admin/NewsAutomation";
+import { VotingManager } from "@/components/admin/VotingManager";
 import { Loader2, Shield } from "lucide-react";
 
 const Admin = () => {
@@ -123,6 +124,7 @@ const Admin = () => {
             <TabsTrigger value="calculations" className="shrink-0 whitespace-nowrap">Расчёты</TabsTrigger>
             <TabsTrigger value="seo" className="shrink-0 whitespace-nowrap">🪄 SEO AI</TabsTrigger>
             <TabsTrigger value="autonews" className="shrink-0 whitespace-nowrap">📰 Авто-новости</TabsTrigger>
+            <TabsTrigger value="voting" className="shrink-0 whitespace-nowrap">🗳️ Голосования</TabsTrigger>
             <TabsTrigger value="stats" className="shrink-0 whitespace-nowrap">Статистика</TabsTrigger>
             <TabsTrigger value="promotions" className="shrink-0 whitespace-nowrap">Акции</TabsTrigger>
             <TabsTrigger value="news" className="shrink-0 whitespace-nowrap">Новости</TabsTrigger>
@@ -145,6 +147,10 @@ const Admin = () => {
 
           <TabsContent value="autonews">
             <NewsAutomation />
+          </TabsContent>
+
+          <TabsContent value="voting">
+            <VotingManager />
           </TabsContent>
 
           <TabsContent value="stats">
