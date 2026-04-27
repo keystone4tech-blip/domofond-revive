@@ -599,11 +599,6 @@ const StepperBallot = (p: StepperProps) => {
         </div>
       </CardContent>
     </Card>
-          )}
-        </div>
-      </main>
-      <Footer />
-    </div>
   );
 };
 
@@ -625,12 +620,5 @@ const ErrorLine = ({ text }: { text: string }) => (
     <AlertCircle className="h-3 w-3" /> {text}
   </p>
 );
-          )}
-        </div>
-      </main>
-      <Footer />
-    </div>
-  );
-};
 
 export default Golosovanie;
