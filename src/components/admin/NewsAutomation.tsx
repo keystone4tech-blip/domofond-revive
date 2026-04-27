@@ -11,8 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Loader2, Play, Save, Check, X, Sparkles, Newspaper, RefreshCw, Clock, Pencil } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Loader2, Play, Save, Check, X, Sparkles, Newspaper, RefreshCw, Clock, Pencil, Plus, Trash2, ChevronUp, ChevronDown, Info } from "lucide-react";
+import { sanitizeMarkdown } from "@/lib/sanitizeMarkdown";
+import { SegmentsManager } from "./SegmentsManager";
 
 const WEEKDAYS = [
   { value: 1, label: "Пн" },
@@ -308,20 +310,7 @@ export const NewsAutomation = () => {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader><CardTitle className="text-base">Сегменты ({segments.length})</CardTitle></CardHeader>
-        <CardContent className="space-y-2">
-          {segments.map((s) => (
-            <div key={s.id} className="flex items-center justify-between rounded border p-2 text-sm">
-              <div>
-                <div className="font-medium">{s.name}</div>
-                <div className="text-xs text-muted-foreground">{s.description}</div>
-              </div>
-              <Badge variant="outline">вес: {s.weight}</Badge>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+      <SegmentsManager onChange={load} segments={segments} />
 
       <div className="flex items-center justify-between mt-4">
         <h3 className="font-semibold flex items-center gap-2">
@@ -352,7 +341,7 @@ export const NewsAutomation = () => {
               <details className="text-xs">
                 <summary className="cursor-pointer text-muted-foreground py-1">📄 Предпросмотр поста</summary>
                 <div className="mt-2 bg-muted p-3 rounded max-h-80 overflow-y-auto prose prose-sm max-w-none dark:prose-invert prose-headings:font-bold prose-h2:text-base prose-h3:text-sm prose-p:my-2 prose-strong:text-primary">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{d.content}</ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{sanitizeMarkdown(d.content)}</ReactMarkdown>
                 </div>
               </details>
               <div className="flex flex-wrap gap-1.5">
@@ -405,7 +394,7 @@ export const NewsAutomation = () => {
               <div>
                 <Label className="text-xs">Превью</Label>
                 <div className="mt-1 bg-muted p-3 rounded max-h-80 overflow-y-auto prose prose-sm max-w-none dark:prose-invert prose-headings:font-bold prose-h2:text-base prose-h3:text-sm prose-strong:text-primary">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{editing.content || ""}</ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{sanitizeMarkdown(editing.content || "")}</ReactMarkdown>
                 </div>
               </div>
             </div>
