@@ -48,6 +48,8 @@ const App = () => (
             <Route path="/smart-intercom" element={<SmartIntercom />} />
             <Route path="/payment" element={<Payment />} />
             <Route path="/calculator" element={<Calculator />} />
+            <Route path="/golosovanie" element={<Golosovanie />} />
+            <Route path="/golosovanie/:id" element={<Golosovanie />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
