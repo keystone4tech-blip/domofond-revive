@@ -4,6 +4,7 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Newspaper, Calendar } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import { sanitizeMarkdown } from "@/lib/sanitizeMarkdown";
 import remarkGfm from "remark-gfm";
 import { LikesSection } from "./LikesSection";
 import { CommentsSection } from "./CommentsSection";
@@ -93,7 +94,7 @@ export const NewsSection = () => {
                 <h3 className="text-lg sm:text-xl font-semibold mb-2">{item.title}</h3>
                 {item.excerpt && (
                   <p className="text-sm sm:text-base text-muted-foreground line-clamp-3">
-                    {item.excerpt}
+                    {sanitizeMarkdown(item.excerpt || "").replace(/[#*>`_~]/g, "")}
                   </p>
                 )}
               </CardContent>
@@ -139,7 +140,7 @@ export const NewsSection = () => {
                 <h3 className="text-2xl font-bold mb-4">{selectedNews.title}</h3>
                 <div className="prose prose-sm sm:prose-base max-w-none dark:prose-invert prose-headings:font-bold prose-h2:text-xl prose-h2:mt-6 prose-h2:mb-3 prose-h3:text-lg prose-h3:mt-4 prose-h3:mb-2 prose-p:leading-relaxed prose-strong:text-primary prose-a:text-primary prose-li:my-1 prose-blockquote:border-l-primary prose-blockquote:text-muted-foreground">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {selectedNews.content || selectedNews.excerpt || ""}
+                    {sanitizeMarkdown(selectedNews.content || selectedNews.excerpt || "")}
                   </ReactMarkdown>
                 </div>
               </div>
