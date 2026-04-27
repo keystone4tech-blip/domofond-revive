@@ -149,6 +149,10 @@ const Admin = () => {
             <NewsAutomation />
           </TabsContent>
 
+          <TabsContent value="voting">
+            <VotingManager />
+          </TabsContent>
+
           <TabsContent value="stats">
             <SiteStats />
           </TabsContent>
