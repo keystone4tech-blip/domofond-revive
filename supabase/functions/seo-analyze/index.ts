@@ -111,8 +111,17 @@ ${settings.brand_context || "Компания по обслуживанию до
 Текущие meta-теги:
 ${JSON.stringify(context.current_meta, null, 2)}
 
-Текущие блоки контента:
-${JSON.stringify(context.content_blocks.map((b) => ({ name: b.block_name, content: b.content })), null, 2)}
+Текущие блоки контента (block_id — это РЕАЛЬНЫЙ UUID, который ОБЯЗАН использоваться в block_changes без изменений; не выдумывай свои id):
+${JSON.stringify(
+  context.content_blocks.map((b) => ({
+    block_id: b.id,
+    block_name: b.block_name,
+    fields: Object.keys((b.content as Record<string, unknown>) || {}),
+    content: b.content,
+  })),
+  null,
+  2,
+)}
 
 Предложи улучшения для:
 ${settings.optimize_meta ? "- title, description, og_title, og_description, keywords (meta)\n" : ""}${settings.optimize_content ? "- H1 заголовок, тексты блоков (поля title/text/heading в content)\n" : ""}${settings.optimize_jsonld ? "- JSON-LD структурированные данные (Schema.org)\n" : ""}${settings.optimize_alt ? "- предложения alt-тегов для изображений (если упоминаются)\n" : ""}
