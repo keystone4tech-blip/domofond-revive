@@ -224,9 +224,25 @@ export default function ChatWidget() {
               
               const result = await executeToolCall(tc.name, args);
               
+              // Format period MMYY → "Месяц YYYY"
+              const formatPeriod = (period: string | null | undefined): string => {
+                if (!period) return "не указан";
+                const months = ["", "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
+                if (/^\d{4}$/.test(period)) {
+                  const m = parseInt(period.substring(0, 2), 10);
+                  const y = "20" + period.substring(2);
+                  return `${months[m] || period.substring(0, 2)} ${y}`;
+                }
+                if (/^\d{1,2}$/.test(period)) {
+                  const m = parseInt(period, 10);
+                  return months[m] || period;
+                }
+                return period;
+              };
+
               // Build a tool result message and call AI again to format a nice response
               const toolResultContent = result.success && result.accounts?.length > 0
-                ? result.accounts.map((a: any) => `Лицевой счёт: ${a.account_number}, Адрес: ${a.address}, Период: ${a.period}, Задолженность: ${a.debt_amount} тг`).join("\n")
+                ? result.accounts.map((a: any) => `Лицевой счёт: ${a.account_number}, Адрес: ${a.address}, Период начисления: ${formatPeriod(a.period)}, Задолженность: ${a.debt_amount} руб.`).join("\n")
                 : result.message || "Записи не найдены.";
               
               // Remove loading message and add the result directly
