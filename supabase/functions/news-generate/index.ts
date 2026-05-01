@@ -202,6 +202,54 @@ serve(async (req) => {
             .select()
             .single();
           if (nErr) throw new Error(`Публикация: ${nErr.message}`);
+
+          // SEO meta для поста (для /news/<id> и для индексации главной)
+          try {
+            const metaTitle = post.title.length > 60 ? post.title.slice(0, 57) + "…" : post.title;
+            const metaDesc = (post.excerpt || "").slice(0, 160);
+            const kwStr = (post.keywords || []).join(", ");
+            await supabase.from("seo_page_meta").upsert(
+              {
+                page_path: `/news/${news.id}`,
+                title: metaTitle,
+                description: metaDesc,
+                keywords: kwStr,
+                og_title: metaTitle,
+                og_description: metaDesc,
+                og_image: imageUrl,
+                h1: post.title,
+                is_auto_managed: true,
+                last_optimized_at: new Date().toISOString(),
+                json_ld: {
+                  "@context": "https://schema.org",
+                  "@type": "NewsArticle",
+                  headline: post.title,
+                  description: metaDesc,
+                  image: imageUrl ? [imageUrl] : undefined,
+                  datePublished: new Date().toISOString(),
+                  author: { "@type": "Organization", name: "Домофондар" },
+                  publisher: {
+                    "@type": "Organization",
+                    name: "Домофондар",
+                    url: "https://domofond-revive.lovable.app",
+                  },
+                  keywords: kwStr,
+                  articleSection: segment.name,
+                },
+              },
+              { onConflict: "page_path" },
+            );
+            // Сохраняем ключи в seo_keywords для дальнейшего использования
+            for (const kw of post.keywords || []) {
+              await supabase.from("seo_keywords").upsert(
+                { page_path: `/news/${news.id}`, keyword: kw, source: "ai", priority: 5, is_active: true },
+                { onConflict: "page_path,keyword", ignoreDuplicates: true },
+              );
+            }
+          } catch (seoErr) {
+            console.warn("Не удалось сохранить SEO meta для новости:", seoErr);
+          }
+
           await supabase
             .from("news_drafts")
             .update({ status: "published", published_news_id: news.id, reviewed_at: new Date().toISOString() })
