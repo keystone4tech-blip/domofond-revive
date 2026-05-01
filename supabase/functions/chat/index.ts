@@ -96,23 +96,46 @@ serve(async (req: any) => {
             }
           }
 
+          // Format period MMYY → "Месяц YYYY"
+          const formatPeriod = (period: string | null | undefined): string => {
+            if (!period) return "не указан";
+            const months = ["", "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
+            const p = String(period).trim();
+            if (/^\d{4}$/.test(p)) {
+              const m = parseInt(p.substring(0, 2), 10);
+              const y = "20" + p.substring(2);
+              return `${months[m] || p.substring(0, 2)} ${y}`;
+            }
+            if (/^\d{1,2}$/.test(p)) {
+              const m = parseInt(p, 10);
+              return months[m] || p;
+            }
+            return p;
+          };
+
           // Search by account number if input is purely numeric
           if (/^\d{5,}$/.test(addressInput.trim())) {
             const { data: byAccount } = await supabase
               .from("accounts")
-              .select("account_number, address, debt_amount")
+              .select("account_number, address, debt_amount, period")
               .ilike("account_number", `%${addressInput.trim()}%`)
               .order("period", { ascending: false })
               .limit(1);
             if (byAccount && byAccount.length > 0) {
               return new Response(JSON.stringify({
-                tool_response: { success: true, accounts: byAccount }
+                tool_response: {
+                  success: true,
+                  accounts: byAccount.map((acc: any) => ({
+                    ...acc,
+                    period: formatPeriod(acc.period),
+                  })),
+                }
               }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
             }
           }
 
           // Build query
-          let query = supabase.from("accounts").select("account_number, address, debt_amount");
+          let query = supabase.from("accounts").select("account_number, address, debt_amount, period");
 
           // Filter by apartment
           if (apartment) {
@@ -146,8 +169,6 @@ serve(async (req: any) => {
           if (data && houseNumber) {
             const filtered = data.filter((acc: any) => {
               const addr = (acc.address || "").toLowerCase();
-              // Ищем паттерны "д. 6", "дом 6", "6," или просто 6 на границе слова
-              // Используем экранирование для houseNumber на случай спецсимволов
               const escapedHN = houseNumber.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
               const houseRegex = new RegExp(`(?:д\\.?|дом|\\b)${escapedHN}(?:\\b|[ ,]|$)`, "i");
               return houseRegex.test(addr);
@@ -161,10 +182,9 @@ serve(async (req: any) => {
           return new Response(JSON.stringify({
             tool_response: {
               success: true,
-              accounts: finalResult.map(acc => ({
+              accounts: finalResult.map((acc: any) => ({
                 ...acc,
-                // Для надежности добавляем валюту прямо в данные
-                debt_amount: `${acc.debt_amount} руб.`
+                period: formatPeriod(acc.period),
               })),
               message: finalResult.length > 0
                 ? "Найдено"
