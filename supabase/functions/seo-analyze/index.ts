@@ -242,10 +242,20 @@ ${settings.optimize_meta ? "- title, description, og_title, og_description, keyw
         });
       }
 
-      // Изменения блоков
+      // Изменения блоков (только реально существующие блоки и поля)
+      const validBlockIds = new Set((blocks || []).map((b: any) => b.id));
       for (const ch of args.block_changes || []) {
+        if (!validBlockIds.has(ch.block_id)) {
+          console.warn(`Skipped hallucinated block_id="${ch.block_id}" for ${pagePath}`);
+          continue;
+        }
         const block = blocks?.find((b: any) => b.id === ch.block_id);
-        const before = block?.content?.[ch.field_path];
+        const content = (block?.content as Record<string, unknown>) || {};
+        if (!(ch.field_path in content)) {
+          console.warn(`Skipped non-existent field "${ch.field_path}" in block ${ch.block_id}`);
+          continue;
+        }
+        const before = content[ch.field_path];
         if (before === ch.new_value) continue;
         suggestionsToInsert.push({
           page_path: pagePath,
