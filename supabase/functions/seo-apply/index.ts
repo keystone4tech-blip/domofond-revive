@@ -150,6 +150,18 @@ serve(async (req) => {
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           console.error("Apply error for suggestion", s.id, msg);
+          // Если AI выдумал несуществующий блок — сразу отклоняем, чтобы не висело
+          if (/Блок не найден|Неизвестный target_type/i.test(msg)) {
+            await supabase
+              .from("seo_suggestions")
+              .update({
+                status: "rejected",
+                reviewed_by: user.id,
+                reviewed_at: new Date().toISOString(),
+                reasoning: (s.reasoning || "") + ` [Авто-отклонено: ${msg}]`,
+              })
+              .eq("id", s.id);
+          }
           failed.push({ id: s.id, page_path: s.page_path, field_name: s.field_name, error: msg });
         }
       }

@@ -111,8 +111,17 @@ ${settings.brand_context || "Компания по обслуживанию до
 Текущие meta-теги:
 ${JSON.stringify(context.current_meta, null, 2)}
 
-Текущие блоки контента:
-${JSON.stringify(context.content_blocks.map((b) => ({ name: b.block_name, content: b.content })), null, 2)}
+Текущие блоки контента (block_id — это РЕАЛЬНЫЙ UUID, который ОБЯЗАН использоваться в block_changes без изменений; не выдумывай свои id):
+${JSON.stringify(
+  context.content_blocks.map((b) => ({
+    block_id: b.id,
+    block_name: b.block_name,
+    fields: Object.keys((b.content as Record<string, unknown>) || {}),
+    content: b.content,
+  })),
+  null,
+  2,
+)}
 
 Предложи улучшения для:
 ${settings.optimize_meta ? "- title, description, og_title, og_description, keywords (meta)\n" : ""}${settings.optimize_content ? "- H1 заголовок, тексты блоков (поля title/text/heading в content)\n" : ""}${settings.optimize_jsonld ? "- JSON-LD структурированные данные (Schema.org)\n" : ""}${settings.optimize_alt ? "- предложения alt-тегов для изображений (если упоминаются)\n" : ""}
@@ -233,10 +242,20 @@ ${settings.optimize_meta ? "- title, description, og_title, og_description, keyw
         });
       }
 
-      // Изменения блоков
+      // Изменения блоков (только реально существующие блоки и поля)
+      const validBlockIds = new Set((blocks || []).map((b: any) => b.id));
       for (const ch of args.block_changes || []) {
+        if (!validBlockIds.has(ch.block_id)) {
+          console.warn(`Skipped hallucinated block_id="${ch.block_id}" for ${pagePath}`);
+          continue;
+        }
         const block = blocks?.find((b: any) => b.id === ch.block_id);
-        const before = block?.content?.[ch.field_path];
+        const content = (block?.content as Record<string, unknown>) || {};
+        if (!(ch.field_path in content)) {
+          console.warn(`Skipped non-existent field "${ch.field_path}" in block ${ch.block_id}`);
+          continue;
+        }
+        const before = content[ch.field_path];
         if (before === ch.new_value) continue;
         suggestionsToInsert.push({
           page_path: pagePath,
