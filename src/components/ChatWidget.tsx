@@ -163,7 +163,7 @@ export default function ChatWidget() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({ messages: allMessages.filter(m => m.role !== "tool" || m.tool_call_id) }),
+        body: JSON.stringify({ messages: allMessages.filter(m => m.role !== "tool" || m.tool_call_id), user_context: userContext }),
       });
 
       if (!resp.ok || !resp.body) {
