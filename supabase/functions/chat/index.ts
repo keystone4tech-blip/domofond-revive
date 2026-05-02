@@ -262,13 +262,34 @@ serve(async (req: any) => {
           // Оставляем только один результат (самый свежий)
           const finalResult = data && data.length > 0 ? [data[0]] : [];
 
+          const mappedAccounts = finalResult.map((acc: any) => {
+            const debt = Number(acc.debt_amount) || 0;
+            if (isFullAccess) {
+              return {
+                account_number: acc.account_number,
+                address: acc.address,
+                debt_amount: debt,
+                period: formatPeriod(acc.period),
+                has_debt: debt > 0,
+                debt_over_300: debt > 300,
+              };
+            }
+            // Restricted: hide amount and period
+            return {
+              account_number: acc.account_number,
+              address: acc.address,
+              has_debt: debt > 0,
+              debt_over_300: debt > 300,
+              restricted: true,
+            };
+          });
+
           return new Response(JSON.stringify({
             tool_response: {
               success: true,
-              accounts: finalResult.map((acc: any) => ({
-                ...acc,
-                period: formatPeriod(acc.period),
-              })),
+              accounts: mappedAccounts,
+              user_authenticated: ctx.isAuthenticated,
+              user_verified: ctx.isVerified,
               message: finalResult.length > 0
                 ? "Найдено"
                 : "Записи не найдены. Уточните адрес или номер дома."
