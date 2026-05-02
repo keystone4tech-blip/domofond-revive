@@ -128,7 +128,7 @@ export default function ChatWidget() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({ tool_results: [{ name, arguments: args }] }),
+        body: JSON.stringify({ tool_results: [{ name, arguments: args }], user_context: userContext }),
       });
       const data = await resp.json();
       return data.tool_response;
