@@ -26,6 +26,14 @@ export default function ChatWidget() {
   const [welcomeMessage, setWelcomeMessage] = useState("Здравствуйте! 👋 Чем могу помочь?");
   const [isActive, setIsActive] = useState(true);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [userContext, setUserContext] = useState<{
+    isAuthenticated: boolean;
+    isVerified: boolean;
+    fullName?: string;
+    address?: string;
+    apartment?: string;
+    phone?: string;
+  }>({ isAuthenticated: false, isVerified: false });
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -40,6 +48,37 @@ export default function ChatWidget() {
           setIsActive(data.is_active);
         }
       });
+  }, []);
+
+  // Track auth state and load profile (verification status)
+  useEffect(() => {
+    const loadProfile = async (userId: string) => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("full_name, address, apartment, phone, is_verified")
+        .eq("id", userId)
+        .maybeSingle();
+      setUserContext({
+        isAuthenticated: true,
+        isVerified: !!data?.is_verified,
+        fullName: data?.full_name || undefined,
+        address: data?.address || undefined,
+        apartment: data?.apartment || undefined,
+        phone: data?.phone || undefined,
+      });
+    };
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+      if (session?.user) {
+        setTimeout(() => loadProfile(session.user.id), 0);
+      } else {
+        setUserContext({ isAuthenticated: false, isVerified: false });
+      }
+    });
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) loadProfile(session.user.id);
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
