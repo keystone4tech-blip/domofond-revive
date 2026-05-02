@@ -23,12 +23,87 @@ serve(async (req: any) => {
       for (const toolCall of tool_results) {
         if (toolCall.name === "submit_request") {
           const args = toolCall.arguments;
+
+          // Format period helper (used for debt info)
+          const formatPeriodForRequest = (period: string | null | undefined): string => {
+            if (!period) return "не указан";
+            const months = ["", "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
+            const p = String(period).trim();
+            if (/^\d{4}$/.test(p)) {
+              const m = parseInt(p.substring(0, 2), 10);
+              const y = "20" + p.substring(2);
+              return `${months[m] || p.substring(0, 2)} ${y}`;
+            }
+            if (/^\d{1,2}$/.test(p)) {
+              const m = parseInt(p, 10);
+              return months[m] || p;
+            }
+            return p;
+          };
+
+          // Auto-check debt for the submitted address
+          let debtInfo = "";
+          let priority: string = "medium";
+          try {
+            const addr = args.address || "";
+            // Extract apartment
+            let apt = "";
+            let cleanAddr = addr;
+            const aptMatch = addr.match(/кв\.?\s*(\d+)/i);
+            if (aptMatch) {
+              apt = aptMatch[1];
+              cleanAddr = addr.replace(/кв\.?\s*\d+/i, "").trim();
+            }
+            // Extract house
+            let house = "";
+            const hMatch = cleanAddr.match(/(?:д\.?\s*|дом\.?\s*)(\d+)/i);
+            if (hMatch) {
+              house = hMatch[1];
+              cleanAddr = cleanAddr.replace(hMatch[0], "").trim();
+            } else {
+              const nMatch = cleanAddr.match(/\b(\d{1,4})\s*$/);
+              if (nMatch) {
+                house = nMatch[1];
+                cleanAddr = cleanAddr.replace(nMatch[0], "").trim();
+              }
+            }
+
+            let q = supabase.from("accounts").select("account_number, address, debt_amount, period");
+            if (apt) q = q.or(`apartment.eq.${apt},address.ilike.%кв. ${apt}%`);
+            if (house) q = q.ilike("address", `%д. ${house}%`);
+            const streetWords = cleanAddr.replace(/[,.\-]/g, " ").split(/\s+/).filter((w: any) => w.length > 2 && !/^\d+$/.test(w));
+            for (const w of streetWords) q = q.ilike("address", `%${w}%`);
+
+            const { data: accs } = await q.order("period", { ascending: false }).limit(5);
+            let acc = accs && accs.length > 0 ? accs[0] : null;
+            if (acc && house) {
+              const filtered = accs!.filter((a: any) => {
+                const ad = (a.address || "").toLowerCase();
+                const esc = house.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+                return new RegExp(`(?:д\\.?|дом|\\b)${esc}(?:\\b|[ ,]|$)`, "i").test(ad);
+              });
+              if (filtered.length > 0) acc = filtered[0];
+            }
+
+            if (acc && Number(acc.debt_amount) > 0) {
+              debtInfo = `\n\n⚠️ ЗАДОЛЖЕННОСТЬ КЛИЕНТА:\n• Лицевой счёт: ${acc.account_number}\n• Сумма долга: ${acc.debt_amount} руб.\n• Период начисления: ${formatPeriodForRequest(acc.period)}\n• Адрес по счёту: ${acc.address}`;
+              if (Number(acc.debt_amount) > 200) {
+                debtInfo += `\n• Выезд платный (500 руб.) либо требуется погашение долга.`;
+                priority = "high";
+              }
+            }
+          } catch (debtErr) {
+            console.error("Debt check on submit failed:", debtErr);
+          }
+
+          const fullMessage = `ФИО: ${args.name}\nТелефон: ${args.phone}\nАдрес: ${args.address}\n\nОписание: ${args.message}${debtInfo}`;
+
           const { error } = await supabase.from("requests").insert({
             name: args.name,
             phone: args.phone,
             address: args.address,
-            message: args.message,
-            priority: "medium",
+            message: fullMessage,
+            priority,
             status: "pending",
           });
           if (error) {
@@ -51,7 +126,7 @@ serve(async (req: any) => {
                   name: args.name,
                   phone: args.phone,
                   address: args.address,
-                  message: args.message,
+                  message: fullMessage,
                 },
               }),
             });
@@ -60,7 +135,12 @@ serve(async (req: any) => {
           }
 
           return new Response(JSON.stringify({
-            tool_response: { success: true, message: "Заявка успешно создана" }
+            tool_response: {
+              success: true,
+              message: debtInfo
+                ? "Заявка создана. Информация о задолженности приложена для мастера."
+                : "Заявка успешно создана"
+            }
           }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
