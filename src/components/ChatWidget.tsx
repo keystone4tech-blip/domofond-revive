@@ -26,6 +26,14 @@ export default function ChatWidget() {
   const [welcomeMessage, setWelcomeMessage] = useState("Здравствуйте! 👋 Чем могу помочь?");
   const [isActive, setIsActive] = useState(true);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [userContext, setUserContext] = useState<{
+    isAuthenticated: boolean;
+    isVerified: boolean;
+    fullName?: string;
+    address?: string;
+    apartment?: string;
+    phone?: string;
+  }>({ isAuthenticated: false, isVerified: false });
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -40,6 +48,37 @@ export default function ChatWidget() {
           setIsActive(data.is_active);
         }
       });
+  }, []);
+
+  // Track auth state and load profile (verification status)
+  useEffect(() => {
+    const loadProfile = async (userId: string) => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("full_name, address, apartment, phone, is_verified")
+        .eq("id", userId)
+        .maybeSingle();
+      setUserContext({
+        isAuthenticated: true,
+        isVerified: !!data?.is_verified,
+        fullName: data?.full_name || undefined,
+        address: data?.address || undefined,
+        apartment: data?.apartment || undefined,
+        phone: data?.phone || undefined,
+      });
+    };
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+      if (session?.user) {
+        setTimeout(() => loadProfile(session.user.id), 0);
+      } else {
+        setUserContext({ isAuthenticated: false, isVerified: false });
+      }
+    });
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) loadProfile(session.user.id);
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -89,7 +128,7 @@ export default function ChatWidget() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({ tool_results: [{ name, arguments: args }] }),
+        body: JSON.stringify({ tool_results: [{ name, arguments: args }], user_context: userContext }),
       });
       const data = await resp.json();
       return data.tool_response;
@@ -124,7 +163,7 @@ export default function ChatWidget() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({ messages: allMessages.filter(m => m.role !== "tool" || m.tool_call_id) }),
+        body: JSON.stringify({ messages: allMessages.filter(m => m.role !== "tool" || m.tool_call_id), user_context: userContext }),
       });
 
       if (!resp.ok || !resp.body) {
@@ -240,9 +279,34 @@ export default function ChatWidget() {
                 return period;
               };
 
-              // Build a tool result message and call AI again to format a nice response
+              // Build display: if user is not verified, hide debt amount
+              const buildAccountLine = (a: any): string => {
+                const period = formatPeriod(a.period);
+                const debt = Number(a.debt_amount) || 0;
+                const base = `Лицевой счёт: ${a.account_number}\nАдрес: ${a.address}`;
+                if (!userContext.isAuthenticated || !userContext.isVerified) {
+                  let extra = "";
+                  if (debt > 0) {
+                    extra = `\n⚠️ По счёту имеется задолженность.`;
+                    if (debt > 300) {
+                      extra += ` Сумма превышает 300 руб., поэтому выезд мастера будет платным (500 руб.). Рекомендуем сначала оплатить задолженность по указанному лицевому счёту.`;
+                    } else {
+                      extra += ` Просим оплатить задолженность в ближайшее время.`;
+                    }
+                  }
+                  if (!userContext.isAuthenticated) {
+                    extra += `\n\n💡 [Зарегистрируйтесь в личном кабинете](/auth), чтобы видеть полную информацию (сумма, период) и удобно взаимодействовать с компанией.`;
+                  } else if (!userContext.isVerified) {
+                    extra += `\n\n💡 Подтвердите аккаунт в [личном кабинете](/cabinet) — после верификации вы увидите полную информацию по счёту.`;
+                  }
+                  return base + extra;
+                }
+                // Authenticated + verified → full info
+                return `${base}\nПериод начисления: ${period}\nЗадолженность: ${debt} руб.`;
+              };
+
               const toolResultContent = result.success && result.accounts?.length > 0
-                ? result.accounts.map((a: any) => `Лицевой счёт: ${a.account_number}, Адрес: ${a.address}, Период начисления: ${formatPeriod(a.period)}, Задолженность: ${a.debt_amount} руб.`).join("\n")
+                ? result.accounts.map(buildAccountLine).join("\n\n")
                 : result.message || "Записи не найдены.";
               
               // Remove loading message and add the result directly

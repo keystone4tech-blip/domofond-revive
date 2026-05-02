@@ -10,13 +10,16 @@ serve(async (req: any) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { messages, tool_results } = await req.json();
+    const { messages, tool_results, user_context } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    const ctx = user_context || { isAuthenticated: false, isVerified: false };
+    const isFullAccess = !!(ctx.isAuthenticated && ctx.isVerified);
 
     // Handle tool execution requests from the client
     if (tool_results) {
@@ -259,13 +262,34 @@ serve(async (req: any) => {
           // Оставляем только один результат (самый свежий)
           const finalResult = data && data.length > 0 ? [data[0]] : [];
 
+          const mappedAccounts = finalResult.map((acc: any) => {
+            const debt = Number(acc.debt_amount) || 0;
+            if (isFullAccess) {
+              return {
+                account_number: acc.account_number,
+                address: acc.address,
+                debt_amount: debt,
+                period: formatPeriod(acc.period),
+                has_debt: debt > 0,
+                debt_over_300: debt > 300,
+              };
+            }
+            // Restricted: hide amount and period
+            return {
+              account_number: acc.account_number,
+              address: acc.address,
+              has_debt: debt > 0,
+              debt_over_300: debt > 300,
+              restricted: true,
+            };
+          });
+
           return new Response(JSON.stringify({
             tool_response: {
               success: true,
-              accounts: finalResult.map((acc: any) => ({
-                ...acc,
-                period: formatPeriod(acc.period),
-              })),
+              accounts: mappedAccounts,
+              user_authenticated: ctx.isAuthenticated,
+              user_verified: ctx.isVerified,
               message: finalResult.length > 0
                 ? "Найдено"
                 : "Записи не найдены. Уточните адрес или номер дома."
@@ -308,20 +332,35 @@ serve(async (req: any) => {
 - ВАЖНО: ВСЕГДА ПИШИ СУММЫ В РУБЛЯХ (РУБ.). НИКАКИХ ТЕНГЕ.
 - Если поиск по адресу вернул несколько вариантов (что маловероятно), попроси пользователя уточнить номер дома, не выводи всё сразу.
 
+КОНТЕКСТ ПОЛЬЗОВАТЕЛЯ:
+- Авторизован: ${ctx.isAuthenticated ? "ДА" : "НЕТ"}
+- Верифицирован: ${ctx.isVerified ? "ДА" : "НЕТ"}
+${ctx.fullName ? `- Имя: ${ctx.fullName}` : ""}
+${ctx.address ? `- Адрес из профиля: ${ctx.address}${ctx.apartment ? `, кв. ${ctx.apartment}` : ""}` : ""}
+${ctx.phone ? `- Телефон: ${ctx.phone}` : ""}
+
 ПРИЁМ ЗАЯВОК:
 - Ты можешь принимать заявки от пользователей на установку, ремонт или обслуживание.
 - Для создания заявки тебе нужно собрать: ФИО, телефон, адрес и описание проблемы/услуги.
-- Перед созданием заявки — Проверяй пользователя на задолженность (функция check_account).
-- Если есть задолженность более 200 рублей, скажи: выезд платный (500 рублей), либо нужно погасить долг. Отправь лицевой счет и сумму долга.
-- Если задолженность меньше 200 рублей — попроси оплатить в ближайшее время.
-- Уточняй у пользователя: создать платную заявку или он оплатит задолженность?
+- Если пользователь авторизован — используй его данные из профиля и не спрашивай повторно.
+- Перед созданием заявки проверяй пользователя на задолженность (функция check_account).
 
-ЛИЦЕВЫЕ СЧЕТА И ЗАДОЛЖЕННОСТЬ:
-- Если пользователь спрашивает про задолженность — вызови функцию check_account.
-- Показывай ТОЛЬКО ОДИН результат — самый свежий.
-- Покажи: Лицевой счёт, Адрес и Сумму задолженности (в рублях).
-- НЕ показывай поле "Период".
-- Если задолженность 0 — скажи что задолженности нет.`;
+ЛИЦЕВЫЕ СЧЕТА И ЗАДОЛЖЕННОСТЬ — РАЗНОЕ ПОВЕДЕНИЕ:
+
+${isFullAccess ? `РЕЖИМ ПОЛНОГО ДОСТУПА (пользователь верифицирован):
+- Показывай ВСЮ информацию: лицевой счёт, адрес, точную сумму задолженности в рублях.
+- Если задолженность больше 300 руб. — предупреди что выезд платный (500 руб.) либо нужно погасить долг.
+- Если 0 — скажи что задолженности нет.` 
+: `РЕЖИМ ОГРАНИЧЕННОГО ДОСТУПА (пользователь НЕ авторизован или НЕ верифицирован):
+- КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО называть точную сумму задолженности и период.
+- Можно сообщить ТОЛЬКО: лицевой счёт и адрес.
+- Если по счёту есть долг — предупреди о наличии задолженности БЕЗ суммы.
+- Если поле debt_over_300 = true — предупреди что выезд будет платным (500 руб.) либо предложи сначала оплатить задолженность по указанному лицевому счёту.
+- Если debt_over_300 = false но есть долг — попроси оплатить в ближайшее время.
+- ${ctx.isAuthenticated ? "Предложи пройти верификацию в [личном кабинете](/cabinet) для просмотра полной информации." : "Если нашёл лицевой счёт по адресу — предложи [зарегистрироваться в личном кабинете](/auth) для полного взаимодействия с компанией: видеть точную сумму, период, оплачивать онлайн."}
+- НЕ упоминай поле "Период" вообще.`}
+
+- Показывай ТОЛЬКО ОДИН результат — самый свежий.`;
 
     if (settings.knowledge_base) {
       systemPrompt += `\n\nДополнительная информация для ответов:\n${settings.knowledge_base}`;
