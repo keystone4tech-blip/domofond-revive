@@ -690,8 +690,11 @@ const Cabinet = () => {
             </Card>
 
             {/* Состояние счёта - показываем только верифицированным */}
-            {profile?.is_verified && address && apartment && (
-              <DebtCard address={address} apartment={apartment} />
+            {profile?.is_verified && address && (
+              <>
+                <DebtCard address={address} apartment={apartment} fullName={fullName} phone={phone} />
+                <MyRequestsCard phone={phone} />
+              </>
             )}
 
             <Card>
