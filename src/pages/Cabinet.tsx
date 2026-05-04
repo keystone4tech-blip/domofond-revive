@@ -131,9 +131,11 @@ const Cabinet = () => {
     header: false,
     content: false
   });
+  const [editing, setEditing] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
   const hasAdminConsoleAccess = userRoles.some((role) => ["admin", "director"].includes(role));
+  const isLocked = !!profile?.is_verified && !editing;
 
   useEffect(() => {
     if (!loading) {
