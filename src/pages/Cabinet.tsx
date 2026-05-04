@@ -294,6 +294,7 @@ const Cabinet = () => {
         title: "Данные отправлены",
         description: "Ваши данные сохранены и отправлены на верификацию",
       });
+      setEditing(false);
     } catch (error: any) {
       toast({
         title: "Ошибка сохранения",
