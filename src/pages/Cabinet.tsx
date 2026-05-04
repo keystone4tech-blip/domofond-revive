@@ -25,21 +25,31 @@ interface Task {
 }
 
 const DebtCard = ({ address, apartment }: { address: string; apartment: string }) => {
-  const [accounts, setAccounts] = useState<{ account_number: string; period: string; debt_amount: number; address: string }[]>([]);
+  const [account, setAccount] = useState<{ account_number: string; period: string; debt_amount: number; address: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
     const loadDebt = async () => {
-      // Search by apartment number in the address field
-      const { data } = await supabase
+      setLoading(true);
+      // Filter by apartment AND street keywords from user's profile address
+      let query = supabase
         .from("accounts")
-        .select("account_number, period, debt_amount, address")
-        .ilike("address", `%кв. ${apartment}%`)
-        .order("period", { ascending: false })
-        .limit(5);
+        .select("account_number, period, debt_amount, address");
 
-      setAccounts(data || []);
+      if (apartment) {
+        query = query.or(`apartment.eq.${apartment},address.ilike.%кв. ${apartment}%`);
+      }
+      const streetWords = (address || "")
+        .replace(/[,.\-]/g, " ")
+        .split(/\s+/)
+        .filter((w) => w.length > 2 && !/^\d+$/.test(w));
+      for (const word of streetWords) {
+        query = query.ilike("address", `%${word}%`);
+      }
+
+      const { data } = await query.order("period", { ascending: false }).limit(1);
+      setAccount(data && data.length > 0 ? data[0] : null);
       setLoading(false);
     };
     loadDebt();
@@ -49,54 +59,55 @@ const DebtCard = ({ address, apartment }: { address: string; apartment: string }
     if (period.length === 4) {
       const month = period.substring(0, 2);
       const year = "20" + period.substring(2);
-      const months = ["", "Янв", "Фев", "Мар", "Апр", "Май", "Июн", "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек"];
+      const months = ["", "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
       return `${months[parseInt(month)] || month} ${year}`;
     }
     return period;
   };
 
-  if (loading) return null;
-  if (accounts.length === 0) return null;
+  if (loading || !account) return null;
 
-  const totalDebt = accounts.reduce((sum, a) => sum + a.debt_amount, 0);
+  const debt = Number(account.debt_amount) || 0;
+  const isOverpayment = debt < 0;
+  const isDebt = debt > 0;
+  const absAmount = Math.abs(debt);
 
   return (
-    <Card className={totalDebt > 0 ? "border-destructive/30" : "border-green-500/30"}>
+    <Card className={isDebt ? "border-destructive/30" : "border-green-500/30"}>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Wallet className="h-5 w-5" />
-          Информация по лицевому счёту
+          Состояние лицевого счёта
         </CardTitle>
         <CardDescription>
-          Лицевой счёт: {accounts[0].account_number}
+          Лицевой счёт: <span className="font-mono font-medium">{account.account_number}</span>
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        {accounts.map((acc, idx) => (
-          <div key={idx} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
-            <span className="text-sm">{formatPeriod(acc.period)}</span>
-            <span className={`font-bold ${acc.debt_amount > 0 ? "text-destructive" : "text-green-600"}`}>
-              {acc.debt_amount.toFixed(2)} ₽
-            </span>
-          </div>
-        ))}
-        {totalDebt > 0 && (
-          <div className="pt-2 space-y-3">
-            <div className="flex justify-between items-center p-3 rounded-lg bg-destructive/10 border border-destructive/20">
-              <span className="font-medium">Итого задолженность:</span>
-              <span className="text-lg font-bold text-destructive">{totalDebt.toFixed(2)} ₽</span>
-            </div>
-            <Button className="w-full" onClick={() => navigate("/payment")}>
-              <CreditCard className="mr-2 h-4 w-4" />
-              Оплатить
-            </Button>
-          </div>
-        )}
-        {totalDebt === 0 && (
-          <div className="p-3 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 text-center">
-            <span className="text-green-600 font-medium">Задолженности нет ✓</span>
-          </div>
-        )}
+        <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
+          <span className="text-sm text-muted-foreground">Период начисления</span>
+          <span className="text-sm font-medium">{formatPeriod(account.period)}</span>
+        </div>
+
+        <div className={`flex items-center justify-between p-4 rounded-lg border ${
+          isDebt
+            ? "bg-destructive/10 border-destructive/20"
+            : "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800"
+        }`}>
+          <span className="font-medium">
+            {isDebt ? "Задолженность" : isOverpayment ? "Переплата" : "Баланс"}
+          </span>
+          <span className={`text-xl font-bold ${
+            isDebt ? "text-destructive" : "text-green-600"
+          }`}>
+            {isDebt ? "−" : isOverpayment ? "+" : ""}{absAmount.toFixed(2)} ₽
+          </span>
+        </div>
+
+        <Button className="w-full" size="lg" onClick={() => navigate("/payment")}>
+          <CreditCard className="mr-2 h-4 w-4" />
+          Оплатить
+        </Button>
       </CardContent>
     </Card>
   );
