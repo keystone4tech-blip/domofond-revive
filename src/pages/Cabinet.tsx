@@ -448,31 +448,52 @@ const Cabinet = () => {
                 <CardTitle>Статус верификации</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center gap-2">
-                  {profile?.is_verified ? (
-                    <>
-                      <CheckCircle className="h-5 w-5 text-green-600" />
-                      <span className="text-green-600 font-medium">Верифицирован</span>
-                    </>
-                  ) : (
-                    <>
-                      <AlertCircle className="h-5 w-5 text-orange-600" />
-                      <span className="text-orange-600 font-medium">Ожидает верификации</span>
-                      <p className="text-sm text-muted-foreground ml-2">
-                        Заполните данные и нажмите "Сохранить и отправить на верификацию"
-                      </p>
-                    </>
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {profile?.is_verified ? (
+                      <>
+                        <CheckCircle className="h-5 w-5 text-green-600" />
+                        <span className="text-green-600 font-medium">Верифицирован</span>
+                      </>
+                    ) : (
+                      <>
+                        <AlertCircle className="h-5 w-5 text-orange-600" />
+                        <span className="text-orange-600 font-medium">Ожидает верификации</span>
+                      </>
+                    )}
+                  </div>
+                  {!profile?.is_verified && (
+                    <p className="text-sm text-muted-foreground">
+                      Заполните данные ниже и нажмите «Сохранить и отправить на верификацию».
+                    </p>
                   )}
                 </div>
               </CardContent>
             </Card>
 
+            {/* Состояние счёта - показываем только верифицированным */}
+            {profile?.is_verified && address && apartment && (
+              <DebtCard address={address} apartment={apartment} />
+            )}
+
             <Card>
               <CardHeader>
-                <CardTitle>Личная информация</CardTitle>
-                <CardDescription>
-                  Заполните данные для верификации вашего аккаунта
-                </CardDescription>
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div>
+                    <CardTitle>Личная информация</CardTitle>
+                    <CardDescription>
+                      {isLocked
+                        ? "Чтобы изменить адрес или другие данные — нажмите «Изменить»"
+                        : "Заполните данные для верификации вашего аккаунта"}
+                    </CardDescription>
+                  </div>
+                  {profile?.is_verified && !editing && (
+                    <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+                      <Pencil className="h-4 w-4 mr-1" />
+                      Изменить
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
@@ -482,6 +503,7 @@ const Cabinet = () => {
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="Иван Иванович Иванов"
+                    disabled={isLocked}
                   />
                 </div>
 
@@ -492,6 +514,7 @@ const Cabinet = () => {
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="+7 (999) 123-45-67"
+                    disabled={isLocked}
                   />
                 </div>
 
@@ -502,6 +525,7 @@ const Cabinet = () => {
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
                     placeholder="г. Москва, ул. Примерная, д. 1"
+                    disabled={isLocked}
                   />
                 </div>
 
@@ -512,20 +536,57 @@ const Cabinet = () => {
                     value={apartment}
                     onChange={(e) => setApartment(e.target.value)}
                     placeholder="123"
+                    disabled={isLocked}
                   />
                 </div>
 
-                <Button onClick={handleSaveAndVerify} disabled={saving} className="w-full">
-                  {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Сохранить и отправить на верификацию
-                </Button>
+                {!isLocked && (
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <Button onClick={handleSaveAndVerify} disabled={saving} className="flex-1">
+                      {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      {profile?.is_verified ? "Сохранить и переотправить" : "Сохранить и отправить на верификацию"}
+                    </Button>
+                    {editing && (
+                      <Button variant="outline" onClick={() => {
+                        setEditing(false);
+                        setFullName(profile?.full_name || "");
+                        setPhone(profile?.phone || "");
+                        setAddress(profile?.address || "");
+                        setApartment(profile?.apartment || "");
+                      }}>
+                        Отмена
+                      </Button>
+                    )}
+                  </div>
+                )}
+
+                {(profile?.is_verified || profile?.full_name) && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="sm" className="w-full text-destructive hover:text-destructive">
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Удалить данные верификации
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Удалить данные?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Все данные профиля (ФИО, адрес, телефон, квартира) будут удалены, верификация снята.
+                          Вы сможете заполнить форму заново.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Отмена</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleClearData} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                          Удалить
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
               </CardContent>
             </Card>
-
-            {/* Задолженность - показываем только верифицированным */}
-            {profile?.is_verified && address && apartment && (
-              <DebtCard address={address} apartment={apartment} />
-            )}
 
             <Card>
               <CardHeader>
