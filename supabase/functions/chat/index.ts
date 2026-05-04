@@ -151,7 +151,13 @@ serve(async (req: any) => {
 
         if (toolCall.name === "check_account") {
           const args = toolCall.arguments;
-          const addressInput = args.address || "";
+          let addressInput = args.address || "";
+
+          // SECURITY: Verified users may only see their own address. Override any other input.
+          if (isFullAccess && ctx.address) {
+            addressInput = ctx.address + (ctx.apartment ? ` кв. ${ctx.apartment}` : "");
+            args.apartment = ctx.apartment || args.apartment;
+          }
 
           // Extract apartment number
           let apartment = args.apartment;
