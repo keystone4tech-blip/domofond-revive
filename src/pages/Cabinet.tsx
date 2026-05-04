@@ -310,6 +310,24 @@ const Cabinet = () => {
     navigate("/");
   };
 
+  const handleClearData = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const { error } = await supabase
+        .from("profiles")
+        .update({ full_name: "", phone: "", address: "", apartment: "", is_verified: false })
+        .eq("id", session.user.id);
+      if (error) throw error;
+      setProfile((prev: any) => prev ? { ...prev, full_name: "", phone: "", address: "", apartment: "", is_verified: false } : prev);
+      setFullName(""); setPhone(""); setAddress(""); setApartment("");
+      setEditing(false);
+      toast({ title: "Данные удалены", description: "Заполните форму заново для верификации" });
+    } catch (e: any) {
+      toast({ title: "Ошибка", description: e.message, variant: "destructive" });
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
       pending: "bg-yellow-100 text-yellow-800",
