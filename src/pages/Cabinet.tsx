@@ -8,7 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, LogOut, CheckCircle, AlertCircle, ClipboardList, Calendar, Shield, CreditCard, Wallet } from "lucide-react";
+import { Loader2, LogOut, CheckCircle, AlertCircle, ClipboardList, Calendar, Shield, CreditCard, Wallet, Pencil, Trash2 } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { format } from "date-fns";
@@ -25,21 +29,31 @@ interface Task {
 }
 
 const DebtCard = ({ address, apartment }: { address: string; apartment: string }) => {
-  const [accounts, setAccounts] = useState<{ account_number: string; period: string; debt_amount: number; address: string }[]>([]);
+  const [account, setAccount] = useState<{ account_number: string; period: string; debt_amount: number; address: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
     const loadDebt = async () => {
-      // Search by apartment number in the address field
-      const { data } = await supabase
+      setLoading(true);
+      // Filter by apartment AND street keywords from user's profile address
+      let query = supabase
         .from("accounts")
-        .select("account_number, period, debt_amount, address")
-        .ilike("address", `%кв. ${apartment}%`)
-        .order("period", { ascending: false })
-        .limit(5);
+        .select("account_number, period, debt_amount, address");
 
-      setAccounts(data || []);
+      if (apartment) {
+        query = query.or(`apartment.eq.${apartment},address.ilike.%кв. ${apartment}%`);
+      }
+      const streetWords = (address || "")
+        .replace(/[,.\-]/g, " ")
+        .split(/\s+/)
+        .filter((w) => w.length > 2 && !/^\d+$/.test(w));
+      for (const word of streetWords) {
+        query = query.ilike("address", `%${word}%`);
+      }
+
+      const { data } = await query.order("period", { ascending: false }).limit(1);
+      setAccount(data && data.length > 0 ? data[0] : null);
       setLoading(false);
     };
     loadDebt();
@@ -49,54 +63,55 @@ const DebtCard = ({ address, apartment }: { address: string; apartment: string }
     if (period.length === 4) {
       const month = period.substring(0, 2);
       const year = "20" + period.substring(2);
-      const months = ["", "Янв", "Фев", "Мар", "Апр", "Май", "Июн", "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек"];
+      const months = ["", "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
       return `${months[parseInt(month)] || month} ${year}`;
     }
     return period;
   };
 
-  if (loading) return null;
-  if (accounts.length === 0) return null;
+  if (loading || !account) return null;
 
-  const totalDebt = accounts.reduce((sum, a) => sum + a.debt_amount, 0);
+  const debt = Number(account.debt_amount) || 0;
+  const isOverpayment = debt < 0;
+  const isDebt = debt > 0;
+  const absAmount = Math.abs(debt);
 
   return (
-    <Card className={totalDebt > 0 ? "border-destructive/30" : "border-green-500/30"}>
+    <Card className={isDebt ? "border-destructive/30" : "border-green-500/30"}>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Wallet className="h-5 w-5" />
-          Информация по лицевому счёту
+          Состояние лицевого счёта
         </CardTitle>
         <CardDescription>
-          Лицевой счёт: {accounts[0].account_number}
+          Лицевой счёт: <span className="font-mono font-medium">{account.account_number}</span>
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        {accounts.map((acc, idx) => (
-          <div key={idx} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
-            <span className="text-sm">{formatPeriod(acc.period)}</span>
-            <span className={`font-bold ${acc.debt_amount > 0 ? "text-destructive" : "text-green-600"}`}>
-              {acc.debt_amount.toFixed(2)} ₽
-            </span>
-          </div>
-        ))}
-        {totalDebt > 0 && (
-          <div className="pt-2 space-y-3">
-            <div className="flex justify-between items-center p-3 rounded-lg bg-destructive/10 border border-destructive/20">
-              <span className="font-medium">Итого задолженность:</span>
-              <span className="text-lg font-bold text-destructive">{totalDebt.toFixed(2)} ₽</span>
-            </div>
-            <Button className="w-full" onClick={() => navigate("/payment")}>
-              <CreditCard className="mr-2 h-4 w-4" />
-              Оплатить
-            </Button>
-          </div>
-        )}
-        {totalDebt === 0 && (
-          <div className="p-3 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 text-center">
-            <span className="text-green-600 font-medium">Задолженности нет ✓</span>
-          </div>
-        )}
+        <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
+          <span className="text-sm text-muted-foreground">Период начисления</span>
+          <span className="text-sm font-medium">{formatPeriod(account.period)}</span>
+        </div>
+
+        <div className={`flex items-center justify-between p-4 rounded-lg border ${
+          isDebt
+            ? "bg-destructive/10 border-destructive/20"
+            : "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800"
+        }`}>
+          <span className="font-medium">
+            {isDebt ? "Задолженность" : isOverpayment ? "Переплата" : "Баланс"}
+          </span>
+          <span className={`text-xl font-bold ${
+            isDebt ? "text-destructive" : "text-green-600"
+          }`}>
+            {isDebt ? "−" : isOverpayment ? "+" : ""}{absAmount.toFixed(2)} ₽
+          </span>
+        </div>
+
+        <Button className="w-full" size="lg" onClick={() => navigate("/payment")}>
+          <CreditCard className="mr-2 h-4 w-4" />
+          Оплатить
+        </Button>
       </CardContent>
     </Card>
   );
@@ -116,9 +131,11 @@ const Cabinet = () => {
     header: false,
     content: false
   });
+  const [editing, setEditing] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
   const hasAdminConsoleAccess = userRoles.some((role) => ["admin", "director"].includes(role));
+  const isLocked = !!profile?.is_verified && !editing;
 
   useEffect(() => {
     if (!loading) {
@@ -277,6 +294,7 @@ const Cabinet = () => {
         title: "Данные отправлены",
         description: "Ваши данные сохранены и отправлены на верификацию",
       });
+      setEditing(false);
     } catch (error: any) {
       toast({
         title: "Ошибка сохранения",
@@ -291,6 +309,24 @@ const Cabinet = () => {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate("/");
+  };
+
+  const handleClearData = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const { error } = await supabase
+        .from("profiles")
+        .update({ full_name: "", phone: "", address: "", apartment: "", is_verified: false })
+        .eq("id", session.user.id);
+      if (error) throw error;
+      setProfile((prev: any) => prev ? { ...prev, full_name: "", phone: "", address: "", apartment: "", is_verified: false } : prev);
+      setFullName(""); setPhone(""); setAddress(""); setApartment("");
+      setEditing(false);
+      toast({ title: "Данные удалены", description: "Заполните форму заново для верификации" });
+    } catch (e: any) {
+      toast({ title: "Ошибка", description: e.message, variant: "destructive" });
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -413,31 +449,52 @@ const Cabinet = () => {
                 <CardTitle>Статус верификации</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center gap-2">
-                  {profile?.is_verified ? (
-                    <>
-                      <CheckCircle className="h-5 w-5 text-green-600" />
-                      <span className="text-green-600 font-medium">Верифицирован</span>
-                    </>
-                  ) : (
-                    <>
-                      <AlertCircle className="h-5 w-5 text-orange-600" />
-                      <span className="text-orange-600 font-medium">Ожидает верификации</span>
-                      <p className="text-sm text-muted-foreground ml-2">
-                        Заполните данные и нажмите "Сохранить и отправить на верификацию"
-                      </p>
-                    </>
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {profile?.is_verified ? (
+                      <>
+                        <CheckCircle className="h-5 w-5 text-green-600" />
+                        <span className="text-green-600 font-medium">Верифицирован</span>
+                      </>
+                    ) : (
+                      <>
+                        <AlertCircle className="h-5 w-5 text-orange-600" />
+                        <span className="text-orange-600 font-medium">Ожидает верификации</span>
+                      </>
+                    )}
+                  </div>
+                  {!profile?.is_verified && (
+                    <p className="text-sm text-muted-foreground">
+                      Заполните данные ниже и нажмите «Сохранить и отправить на верификацию».
+                    </p>
                   )}
                 </div>
               </CardContent>
             </Card>
 
+            {/* Состояние счёта - показываем только верифицированным */}
+            {profile?.is_verified && address && apartment && (
+              <DebtCard address={address} apartment={apartment} />
+            )}
+
             <Card>
               <CardHeader>
-                <CardTitle>Личная информация</CardTitle>
-                <CardDescription>
-                  Заполните данные для верификации вашего аккаунта
-                </CardDescription>
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div>
+                    <CardTitle>Личная информация</CardTitle>
+                    <CardDescription>
+                      {isLocked
+                        ? "Чтобы изменить адрес или другие данные — нажмите «Изменить»"
+                        : "Заполните данные для верификации вашего аккаунта"}
+                    </CardDescription>
+                  </div>
+                  {profile?.is_verified && !editing && (
+                    <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+                      <Pencil className="h-4 w-4 mr-1" />
+                      Изменить
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
@@ -447,6 +504,7 @@ const Cabinet = () => {
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="Иван Иванович Иванов"
+                    disabled={isLocked}
                   />
                 </div>
 
@@ -457,6 +515,7 @@ const Cabinet = () => {
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="+7 (999) 123-45-67"
+                    disabled={isLocked}
                   />
                 </div>
 
@@ -467,6 +526,7 @@ const Cabinet = () => {
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
                     placeholder="г. Москва, ул. Примерная, д. 1"
+                    disabled={isLocked}
                   />
                 </div>
 
@@ -477,20 +537,57 @@ const Cabinet = () => {
                     value={apartment}
                     onChange={(e) => setApartment(e.target.value)}
                     placeholder="123"
+                    disabled={isLocked}
                   />
                 </div>
 
-                <Button onClick={handleSaveAndVerify} disabled={saving} className="w-full">
-                  {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Сохранить и отправить на верификацию
-                </Button>
+                {!isLocked && (
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <Button onClick={handleSaveAndVerify} disabled={saving} className="flex-1">
+                      {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      {profile?.is_verified ? "Сохранить и переотправить" : "Сохранить и отправить на верификацию"}
+                    </Button>
+                    {editing && (
+                      <Button variant="outline" onClick={() => {
+                        setEditing(false);
+                        setFullName(profile?.full_name || "");
+                        setPhone(profile?.phone || "");
+                        setAddress(profile?.address || "");
+                        setApartment(profile?.apartment || "");
+                      }}>
+                        Отмена
+                      </Button>
+                    )}
+                  </div>
+                )}
+
+                {(profile?.is_verified || profile?.full_name) && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="sm" className="w-full text-destructive hover:text-destructive">
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Удалить данные верификации
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Удалить данные?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Все данные профиля (ФИО, адрес, телефон, квартира) будут удалены, верификация снята.
+                          Вы сможете заполнить форму заново.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Отмена</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleClearData} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                          Удалить
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
               </CardContent>
             </Card>
-
-            {/* Задолженность - показываем только верифицированным */}
-            {profile?.is_verified && address && apartment && (
-              <DebtCard address={address} apartment={apartment} />
-            )}
 
             <Card>
               <CardHeader>
