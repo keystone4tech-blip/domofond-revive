@@ -30,32 +30,47 @@ interface Task {
   clients: { name: string; address: string } | null;
 }
 
-const DebtCard = ({ address, apartment }: { address: string; apartment: string }) => {
+const DebtCard = ({ address, apartment, fullName, phone }: { address: string; apartment: string; fullName: string; phone: string }) => {
   const [account, setAccount] = useState<{ account_number: string; period: string; debt_amount: number; address: string } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [requestOpen, setRequestOpen] = useState(false);
+  const [requestText, setRequestText] = useState("");
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   useEffect(() => {
     const loadDebt = async () => {
       setLoading(true);
-      // Filter by apartment AND street keywords from user's profile address
-      let query = supabase
-        .from("accounts")
-        .select("account_number, period, debt_amount, address");
-
-      if (apartment) {
-        query = query.or(`apartment.eq.${apartment},address.ilike.%кв. ${apartment}%`);
-      }
+      // Build a flexible query: street keywords first
       const streetWords = (address || "")
         .replace(/[,.\-]/g, " ")
         .split(/\s+/)
         .filter((w) => w.length > 2 && !/^\d+$/.test(w));
+
+      let query = supabase
+        .from("accounts")
+        .select("account_number, period, debt_amount, address, apartment");
       for (const word of streetWords) {
         query = query.ilike("address", `%${word}%`);
       }
+      const { data } = await query.order("period", { ascending: false }).limit(20);
 
-      const { data } = await query.order("period", { ascending: false }).limit(1);
-      setAccount(data && data.length > 0 ? data[0] : null);
+      // Try to filter by apartment in JS — apartment may be "1", "Офис 1" etc.
+      let best = data && data.length > 0 ? data[0] : null;
+      if (data && data.length > 0 && apartment) {
+        const aptDigits = (apartment.match(/\d+/) || [])[0];
+        if (aptDigits) {
+          const filtered = data.filter((a: any) => {
+            if (a.apartment && String(a.apartment) === aptDigits) return true;
+            const addr = (a.address || "").toLowerCase();
+            return new RegExp(`кв\\.?\\s*${aptDigits}\\b`, "i").test(addr);
+          });
+          if (filtered.length > 0) best = filtered[0];
+          else best = null; // Address matches but apartment doesn't — treat as not found
+        }
+      }
+      setAccount(best);
       setLoading(false);
     };
     loadDebt();
@@ -71,49 +86,249 @@ const DebtCard = ({ address, apartment }: { address: string; apartment: string }
     return period;
   };
 
-  if (loading || !account) return null;
+  const handleCreateRequest = async () => {
+    if (!requestText.trim()) {
+      toast({ title: "Опишите задачу", variant: "destructive" });
+      return;
+    }
+    setCreating(true);
+    try {
+      const fullAddress = `${address}${apartment ? `, ${apartment}` : ""}`;
+      const { error } = await supabase.from("requests").insert({
+        name: fullName || "Клиент",
+        phone: phone || "не указан",
+        address: fullAddress,
+        message: `${requestText}\n\n— Частный клиент (адрес не на обслуживании)`,
+        priority: "medium",
+        status: "pending",
+      });
+      if (error) throw error;
+      try {
+        await supabase.functions.invoke("notify", {
+          body: {
+            event: "request_created",
+            data: { name: fullName, phone, address: fullAddress, message: requestText },
+          },
+        });
+      } catch (e) { console.error(e); }
+      toast({ title: "Заявка отправлена", description: "Мы свяжемся с вами в ближайшее время" });
+      setRequestText("");
+      setRequestOpen(false);
+    } catch (e: any) {
+      toast({ title: "Ошибка", description: e.message, variant: "destructive" });
+    } finally {
+      setCreating(false);
+    }
+  };
 
-  const debt = Number(account.debt_amount) || 0;
-  const isOverpayment = debt < 0;
-  const isDebt = debt > 0;
-  const absAmount = Math.abs(debt);
+  if (loading) return null;
+
+  // Found in accounts — show debt info
+  if (account) {
+    const debt = Number(account.debt_amount) || 0;
+    const isOverpayment = debt < 0;
+    const isDebt = debt > 0;
+    const absAmount = Math.abs(debt);
+
+    return (
+      <Card className={isDebt ? "border-destructive/30" : "border-green-500/30"}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Wallet className="h-5 w-5" />
+            Состояние лицевого счёта
+          </CardTitle>
+          <CardDescription>
+            Лицевой счёт: <span className="font-mono font-medium">{account.account_number}</span>
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
+            <span className="text-sm text-muted-foreground">Период начисления</span>
+            <span className="text-sm font-medium">{formatPeriod(account.period)}</span>
+          </div>
+
+          <div className={`flex items-center justify-between p-4 rounded-lg border ${
+            isDebt
+              ? "bg-destructive/10 border-destructive/20"
+              : "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800"
+          }`}>
+            <span className="font-medium">
+              {isDebt ? "Задолженность" : isOverpayment ? "Переплата" : "Баланс"}
+            </span>
+            <span className={`text-xl font-bold ${
+              isDebt ? "text-destructive" : "text-green-600"
+            }`}>
+              {isDebt ? "−" : isOverpayment ? "+" : ""}{absAmount.toFixed(2)} ₽
+            </span>
+          </div>
+
+          <Button className="w-full" size="lg" onClick={() => navigate("/payment")}>
+            <CreditCard className="mr-2 h-4 w-4" />
+            Оплатить
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Not found — private client
+  return (
+    <Card className="border-primary/30">
+      <CardHeader>
+        <div className="flex items-start gap-3">
+          <div className="p-2 rounded-lg bg-primary/10">
+            <UserCheck className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <CardTitle>Частный клиент</CardTitle>
+            <CardDescription className="mt-1">
+              Ваш адрес не находится на обслуживании по абонентской системе.
+              Вы можете оставить разовую заявку — мы свяжемся с вами.
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <Dialog open={requestOpen} onOpenChange={setRequestOpen}>
+          <DialogTrigger asChild>
+            <Button className="w-full" size="lg">
+              <Plus className="mr-2 h-4 w-4" />
+              Оставить заявку
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Новая заявка</DialogTitle>
+              <DialogDescription>
+                Опишите, что вам нужно: установка, ремонт, обслуживание и т. д.
+                Контакты возьмём из вашего профиля.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 py-2">
+              <div className="text-sm text-muted-foreground space-y-1">
+                <div>👤 {fullName}</div>
+                <div>📞 {phone}</div>
+                <div>📍 {address}{apartment ? `, ${apartment}` : ""}</div>
+              </div>
+              <Textarea
+                placeholder="Опишите задачу..."
+                value={requestText}
+                onChange={(e) => setRequestText(e.target.value)}
+                rows={5}
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setRequestOpen(false)}>Отмена</Button>
+              <Button onClick={handleCreateRequest} disabled={creating}>
+                {creating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                <Send className="h-4 w-4 mr-2" />
+                Отправить
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </CardContent>
+    </Card>
+  );
+};
+
+interface ClientRequest {
+  id: string;
+  message: string;
+  status: string;
+  priority: string;
+  created_at: string;
+  accepted_at: string | null;
+  completed_at: string | null;
+  notes: string | null;
+}
+
+const statusMeta: Record<string, { label: string; icon: any; cls: string }> = {
+  pending: { label: "Ожидает", icon: Clock, cls: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300" },
+  accepted: { label: "Принята", icon: CheckCircle, cls: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300" },
+  in_progress: { label: "В работе", icon: Wrench, cls: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300" },
+  completed: { label: "Выполнена", icon: CheckCircle2, cls: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" },
+  cancelled: { label: "Отменена", icon: XCircle, cls: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300" },
+};
+
+const MyRequestsCard = ({ phone }: { phone: string }) => {
+  const [requests, setRequests] = useState<ClientRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!phone) { setLoading(false); return; }
+    const load = async () => {
+      const { data } = await supabase
+        .from("requests")
+        .select("id, message, status, priority, created_at, accepted_at, completed_at, notes")
+        .eq("phone", phone)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      setRequests((data as ClientRequest[]) || []);
+      setLoading(false);
+    };
+    load();
+
+    const channel = supabase
+      .channel("my-requests")
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "requests", filter: `phone=eq.${phone}` },
+        () => load()
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [phone]);
+
+  if (loading) return null;
+  if (requests.length === 0) return null;
 
   return (
-    <Card className={isDebt ? "border-destructive/30" : "border-green-500/30"}>
+    <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Wallet className="h-5 w-5" />
-          Состояние лицевого счёта
+          <ClipboardList className="h-5 w-5" />
+          История заявок
         </CardTitle>
         <CardDescription>
-          Лицевой счёт: <span className="font-mono font-medium">{account.account_number}</span>
+          Здесь отображается статус всех ваших заявок в реальном времени
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
-          <span className="text-sm text-muted-foreground">Период начисления</span>
-          <span className="text-sm font-medium">{formatPeriod(account.period)}</span>
-        </div>
-
-        <div className={`flex items-center justify-between p-4 rounded-lg border ${
-          isDebt
-            ? "bg-destructive/10 border-destructive/20"
-            : "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800"
-        }`}>
-          <span className="font-medium">
-            {isDebt ? "Задолженность" : isOverpayment ? "Переплата" : "Баланс"}
-          </span>
-          <span className={`text-xl font-bold ${
-            isDebt ? "text-destructive" : "text-green-600"
-          }`}>
-            {isDebt ? "−" : isOverpayment ? "+" : ""}{absAmount.toFixed(2)} ₽
-          </span>
-        </div>
-
-        <Button className="w-full" size="lg" onClick={() => navigate("/payment")}>
-          <CreditCard className="mr-2 h-4 w-4" />
-          Оплатить
-        </Button>
+        {requests.map((req) => {
+          const meta = statusMeta[req.status] || statusMeta.pending;
+          const Icon = meta.icon;
+          // Strip enrichment metadata appended by the bot
+          const cleanMessage = (req.message || "").split(/\n+(ФИО:|—|⚠️)/)[0].trim();
+          return (
+            <div key={req.id} className="p-3 rounded-lg border bg-card space-y-2">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <Badge className={meta.cls} variant="secondary">
+                  <Icon className="h-3 w-3 mr-1" />
+                  {meta.label}
+                </Badge>
+                <span className="text-xs text-muted-foreground">
+                  {format(new Date(req.created_at), "dd MMM yyyy, HH:mm", { locale: ru })}
+                </span>
+              </div>
+              <p className="text-sm">{cleanMessage}</p>
+              {req.notes && (
+                <p className="text-xs text-muted-foreground border-l-2 border-primary/40 pl-2">
+                  Комментарий мастера: {req.notes}
+                </p>
+              )}
+              {req.accepted_at && (
+                <p className="text-xs text-muted-foreground">
+                  Принята: {format(new Date(req.accepted_at), "dd MMM, HH:mm", { locale: ru })}
+                </p>
+              )}
+              {req.completed_at && (
+                <p className="text-xs text-green-600">
+                  Выполнена: {format(new Date(req.completed_at), "dd MMM, HH:mm", { locale: ru })}
+                </p>
+              )}
+            </div>
+          );
+        })}
       </CardContent>
     </Card>
   );
