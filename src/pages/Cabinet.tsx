@@ -331,7 +331,7 @@ const MyRequestsCard = ({ phone, fullName }: { phone: string; fullName: string }
         {requests.map((req) => {
           const meta = statusMeta[req.status] || statusMeta.pending;
           const Icon = meta.icon;
-          const canCancel = req.status === "pending" || req.status === "accepted";
+          const canCancel = req.status === "pending" || req.status === "accepted" || req.status === "in_progress";
           // Strip enrichment metadata appended by the bot
           const cleanMessage = (req.message || "").split(/\n+(ФИО:|—|⚠️)/)[0].trim();
           return (
@@ -759,14 +759,26 @@ const Cabinet = () => {
               </CardContent>
             </Card>
 
+            {/* Доступ к системе - в верху страницы */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Доступ к системе</CardTitle>
+                <CardDescription>
+                  Информация о подключенных услугах
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  {profile?.is_verified
+                    ? "Ваш аккаунт верифицирован. Ниже доступны: состояние лицевого счёта, оплата, история заявок и личные данные. Видеоархив с домофона и расширенные функции появятся здесь по мере подключения."
+                    : "После верификации здесь будет доступна информация о ваших подключенных услугах, видеоархив с домофона и другие функции."}
+                </p>
+              </CardContent>
+            </Card>
+
             {/* Состояние счёта - показываем только верифицированным */}
             {profile?.is_verified && address && (
               <DebtCard address={address} apartment={apartment} fullName={fullName} phone={phone} />
-            )}
-
-            {/* История заявок - показываем всем авторизованным */}
-            {(phone || fullName) && (
-              <MyRequestsCard phone={phone} fullName={fullName} />
             )}
 
             <Card>
@@ -881,20 +893,10 @@ const Cabinet = () => {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Доступ к системе</CardTitle>
-                <CardDescription>
-                  Информация о подключенных услугах
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  После верификации здесь будет доступна информация о ваших подключенных услугах,
-                  видеоархив с домофона и другие функции.
-                </p>
-              </CardContent>
-            </Card>
+            {/* История заявок - в конце страницы, чтобы не мешала основной информации */}
+            {(phone || fullName) && (
+              <MyRequestsCard phone={phone} fullName={fullName} />
+            )}
           </div>
         </div>
       </main>
