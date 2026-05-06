@@ -30,7 +30,7 @@ interface Task {
   clients: { name: string; address: string } | null;
 }
 
-const DebtCard = ({ address, apartment, fullName, phone }: { address: string; apartment: string; fullName: string; phone: string }) => {
+const DebtCard = ({ address, apartment, fullName, phone, embedded = false }: { address: string; apartment: string; fullName: string; phone: string; embedded?: boolean }) => {
   const [account, setAccount] = useState<{ account_number: string; period: string; debt_amount: number; address: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
