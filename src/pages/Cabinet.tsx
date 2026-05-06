@@ -759,14 +759,26 @@ const Cabinet = () => {
               </CardContent>
             </Card>
 
+            {/* Доступ к системе - в верху страницы */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Доступ к системе</CardTitle>
+                <CardDescription>
+                  Информация о подключенных услугах
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  {profile?.is_verified
+                    ? "Ваш аккаунт верифицирован. Ниже доступны: состояние лицевого счёта, оплата, история заявок и личные данные. Видеоархив с домофона и расширенные функции появятся здесь по мере подключения."
+                    : "После верификации здесь будет доступна информация о ваших подключенных услугах, видеоархив с домофона и другие функции."}
+                </p>
+              </CardContent>
+            </Card>
+
             {/* Состояние счёта - показываем только верифицированным */}
             {profile?.is_verified && address && (
               <DebtCard address={address} apartment={apartment} fullName={fullName} phone={phone} />
-            )}
-
-            {/* История заявок - показываем всем авторизованным */}
-            {(phone || fullName) && (
-              <MyRequestsCard phone={phone} fullName={fullName} />
             )}
 
             <Card>
