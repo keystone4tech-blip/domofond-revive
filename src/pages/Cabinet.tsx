@@ -331,7 +331,7 @@ const MyRequestsCard = ({ phone, fullName }: { phone: string; fullName: string }
         {requests.map((req) => {
           const meta = statusMeta[req.status] || statusMeta.pending;
           const Icon = meta.icon;
-          const canCancel = req.status === "pending" || req.status === "accepted";
+          const canCancel = req.status === "pending" || req.status === "accepted" || req.status === "in_progress";
           // Strip enrichment metadata appended by the bot
           const cleanMessage = (req.message || "").split(/\n+(ФИО:|—|⚠️)/)[0].trim();
           return (
