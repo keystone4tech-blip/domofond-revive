@@ -251,36 +251,65 @@ const statusMeta: Record<string, { label: string; icon: any; cls: string }> = {
   cancelled: { label: "Отменена", icon: XCircle, cls: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300" },
 };
 
-const MyRequestsCard = ({ phone }: { phone: string }) => {
+const normalizePhone = (p: string) => (p || "").replace(/\D/g, "").replace(/^8/, "7");
+
+const MyRequestsCard = ({ phone, fullName }: { phone: string; fullName: string }) => {
   const [requests, setRequests] = useState<ClientRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  const load = async () => {
+    const normPhone = normalizePhone(phone);
+    // Fetch a generous batch and filter by normalized phone or name in JS,
+    // because phone formats may differ between submission sources.
+    const { data } = await supabase
+      .from("requests")
+      .select("id, message, status, priority, created_at, accepted_at, completed_at, notes, phone, name")
+      .order("created_at", { ascending: false })
+      .limit(200);
+    const filtered = ((data as any[]) || []).filter((r) => {
+      if (normPhone && normalizePhone(r.phone || "") === normPhone) return true;
+      if (fullName && r.name && r.name.trim().toLowerCase() === fullName.trim().toLowerCase()) return true;
+      return false;
+    });
+    setRequests(filtered as ClientRequest[]);
+    setLoading(false);
+  };
 
   useEffect(() => {
-    if (!phone) { setLoading(false); return; }
-    const load = async () => {
-      const { data } = await supabase
-        .from("requests")
-        .select("id, message, status, priority, created_at, accepted_at, completed_at, notes")
-        .eq("phone", phone)
-        .order("created_at", { ascending: false })
-        .limit(20);
-      setRequests((data as ClientRequest[]) || []);
-      setLoading(false);
-    };
+    if (!phone && !fullName) { setLoading(false); return; }
     load();
 
     const channel = supabase
       .channel("my-requests")
       .on("postgres_changes",
-        { event: "*", schema: "public", table: "requests", filter: `phone=eq.${phone}` },
+        { event: "*", schema: "public", table: "requests" },
         () => load()
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [phone]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phone, fullName]);
+
+  const handleCancel = async (id: string) => {
+    setCancellingId(id);
+    try {
+      const { error } = await supabase
+        .from("requests")
+        .update({ status: "cancelled" })
+        .eq("id", id);
+      if (error) throw error;
+      toast({ title: "Заявка отменена" });
+      load();
+    } catch (e: any) {
+      toast({ title: "Не удалось отменить", description: e.message, variant: "destructive" });
+    } finally {
+      setCancellingId(null);
+    }
+  };
 
   if (loading) return null;
-  if (requests.length === 0) return null;
 
   return (
     <Card>
