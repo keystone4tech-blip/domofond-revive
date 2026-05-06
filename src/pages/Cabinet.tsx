@@ -761,10 +761,12 @@ const Cabinet = () => {
 
             {/* Состояние счёта - показываем только верифицированным */}
             {profile?.is_verified && address && (
-              <>
-                <DebtCard address={address} apartment={apartment} fullName={fullName} phone={phone} />
-                <MyRequestsCard phone={phone} />
-              </>
+              <DebtCard address={address} apartment={apartment} fullName={fullName} phone={phone} />
+            )}
+
+            {/* История заявок - показываем всем авторизованным */}
+            {(phone || fullName) && (
+              <MyRequestsCard phone={phone} fullName={fullName} />
             )}
 
             <Card>
