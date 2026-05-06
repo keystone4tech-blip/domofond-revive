@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, LogOut, CheckCircle, AlertCircle, ClipboardList, Calendar, Shield, CreditCard, Wallet, Pencil, Trash2, UserCheck, Plus, Clock, Wrench, CheckCircle2, XCircle, Send } from "lucide-react";
+import { Loader2, LogOut, CheckCircle, AlertCircle, ClipboardList, Calendar, Shield, CreditCard, Wallet, Pencil, Trash2, UserCheck, Plus, Clock, Wrench, CheckCircle2, XCircle, Send, Smartphone, KeyRound, PhoneCall, DoorOpen } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -30,7 +30,7 @@ interface Task {
   clients: { name: string; address: string } | null;
 }
 
-const DebtCard = ({ address, apartment, fullName, phone }: { address: string; apartment: string; fullName: string; phone: string }) => {
+const DebtCard = ({ address, apartment, fullName, phone, embedded = false }: { address: string; apartment: string; fullName: string; phone: string; embedded?: boolean }) => {
   const [account, setAccount] = useState<{ account_number: string; period: string; debt_amount: number; address: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -130,18 +130,16 @@ const DebtCard = ({ address, apartment, fullName, phone }: { address: string; ap
     const isDebt = debt > 0;
     const absAmount = Math.abs(debt);
 
-    return (
-      <Card className={isDebt ? "border-destructive/30" : "border-green-500/30"}>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Wallet className="h-5 w-5" />
-            Состояние лицевого счёта
-          </CardTitle>
-          <CardDescription>
-            Лицевой счёт: <span className="font-mono font-medium">{account.account_number}</span>
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
+    const inner = (
+      <>
+        <div className="flex items-center gap-2 mb-1">
+          <Wallet className="h-5 w-5 text-primary" />
+          <span className="font-semibold">Состояние лицевого счёта</span>
+        </div>
+        <p className="text-xs text-muted-foreground mb-3">
+          Лицевой счёт: <span className="font-mono font-medium text-foreground">{account.account_number}</span>
+        </p>
+        <div className="space-y-3">
           <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
             <span className="text-sm text-muted-foreground">Период начисления</span>
             <span className="text-sm font-medium">{formatPeriod(account.period)}</span>
@@ -166,69 +164,137 @@ const DebtCard = ({ address, apartment, fullName, phone }: { address: string; ap
             <CreditCard className="mr-2 h-4 w-4" />
             Оплатить
           </Button>
-        </CardContent>
+        </div>
+      </>
+    );
+
+    if (embedded) {
+      return (
+        <div className={`p-4 rounded-lg border ${isDebt ? "border-destructive/30" : "border-green-500/30"} bg-card`}>
+          {inner}
+        </div>
+      );
+    }
+
+    return (
+      <Card className={isDebt ? "border-destructive/30" : "border-green-500/30"}>
+        <CardContent className="pt-6">{inner}</CardContent>
       </Card>
     );
   }
 
   // Not found — private client
+  const privateInner = (
+    <>
+      <div className="flex items-start gap-3 mb-3">
+        <div className="p-2 rounded-lg bg-primary/10">
+          <UserCheck className="h-5 w-5 text-primary" />
+        </div>
+        <div>
+          <p className="font-semibold">Частный клиент</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Ваш адрес не находится на обслуживании по абонентской системе.
+            Вы можете оставить разовую заявку — мы свяжемся с вами.
+          </p>
+        </div>
+      </div>
+      <Dialog open={requestOpen} onOpenChange={setRequestOpen}>
+        <DialogTrigger asChild>
+          <Button className="w-full" size="lg">
+            <Plus className="mr-2 h-4 w-4" />
+            Оставить заявку
+          </Button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Новая заявка</DialogTitle>
+            <DialogDescription>
+              Опишите, что вам нужно: установка, ремонт, обслуживание и т. д.
+              Контакты возьмём из вашего профиля.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="text-sm text-muted-foreground space-y-1">
+              <div>👤 {fullName}</div>
+              <div>📞 {phone}</div>
+              <div>📍 {address}{apartment ? `, ${apartment}` : ""}</div>
+            </div>
+            <Textarea
+              placeholder="Опишите задачу..."
+              value={requestText}
+              onChange={(e) => setRequestText(e.target.value)}
+              rows={5}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRequestOpen(false)}>Отмена</Button>
+            <Button onClick={handleCreateRequest} disabled={creating}>
+              {creating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              <Send className="h-4 w-4 mr-2" />
+              Отправить
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <div className="p-4 rounded-lg border border-primary/30 bg-card">
+        {privateInner}
+      </div>
+    );
+  }
+
   return (
     <Card className="border-primary/30">
-      <CardHeader>
-        <div className="flex items-start gap-3">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <UserCheck className="h-5 w-5 text-primary" />
-          </div>
-          <div>
-            <CardTitle>Частный клиент</CardTitle>
-            <CardDescription className="mt-1">
-              Ваш адрес не находится на обслуживании по абонентской системе.
-              Вы можете оставить разовую заявку — мы свяжемся с вами.
-            </CardDescription>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <Dialog open={requestOpen} onOpenChange={setRequestOpen}>
-          <DialogTrigger asChild>
-            <Button className="w-full" size="lg">
-              <Plus className="mr-2 h-4 w-4" />
-              Оставить заявку
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Новая заявка</DialogTitle>
-              <DialogDescription>
-                Опишите, что вам нужно: установка, ремонт, обслуживание и т. д.
-                Контакты возьмём из вашего профиля.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-3 py-2">
-              <div className="text-sm text-muted-foreground space-y-1">
-                <div>👤 {fullName}</div>
-                <div>📞 {phone}</div>
-                <div>📍 {address}{apartment ? `, ${apartment}` : ""}</div>
-              </div>
-              <Textarea
-                placeholder="Опишите задачу..."
-                value={requestText}
-                onChange={(e) => setRequestText(e.target.value)}
-                rows={5}
-              />
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setRequestOpen(false)}>Отмена</Button>
-              <Button onClick={handleCreateRequest} disabled={creating}>
-                {creating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                <Send className="h-4 w-4 mr-2" />
-                Отправить
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </CardContent>
+      <CardContent className="pt-6">{privateInner}</CardContent>
     </Card>
+  );
+};
+
+const RemoteAccessCard = ({ address, apartment }: { address: string; apartment: string }) => {
+  // TODO: проверить наличие логина/пароля во внешней БД (будет добавлено позже).
+  // Пока показываем предложение приобрести удалённый доступ всем верифицированным
+  // пользователям, у которых есть адрес.
+  const navigate = useNavigate();
+
+  return (
+    <div className="p-4 rounded-lg border border-primary/30 bg-gradient-to-br from-primary/5 to-transparent">
+      <div className="flex items-start gap-3 mb-3">
+        <div className="p-2 rounded-lg bg-primary/10 shrink-0">
+          <Smartphone className="h-5 w-5 text-primary" />
+        </div>
+        <div>
+          <p className="font-semibold">Удалённый доступ к домофону</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Приобретите личный кабинет в мобильном приложении для удобного управления
+            домофоном по адресу: <span className="font-medium text-foreground">{address}{apartment ? `, ${apartment}` : ""}</span>
+          </p>
+        </div>
+      </div>
+
+      <ul className="space-y-2 text-sm mb-4">
+        <li className="flex items-center gap-2">
+          <DoorOpen className="h-4 w-4 text-primary shrink-0" />
+          <span>Открывайте дверь без ключей со смартфона</span>
+        </li>
+        <li className="flex items-center gap-2">
+          <PhoneCall className="h-4 w-4 text-primary shrink-0" />
+          <span>Принимайте звонки с домофона на мобильный телефон</span>
+        </li>
+        <li className="flex items-center gap-2">
+          <KeyRound className="h-4 w-4 text-primary shrink-0" />
+          <span>Логин и пароль с инструкцией придут после оплаты</span>
+        </li>
+      </ul>
+
+      <Button className="w-full" size="lg" onClick={() => navigate("/payment")}>
+        <CreditCard className="mr-2 h-4 w-4" />
+        Оплатить и получить доступ
+      </Button>
+    </div>
   );
 };
 
@@ -762,24 +828,23 @@ const Cabinet = () => {
             {/* Доступ к системе - в верху страницы */}
             <Card>
               <CardHeader>
-                <CardTitle>Доступ к системе</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="h-5 w-5" />
+                  Доступ к системе
+                </CardTitle>
                 <CardDescription>
-                  Информация о подключенных услугах
+                  {profile?.is_verified
+                    ? "Информация о ваших услугах и удалённом доступе"
+                    : "После верификации здесь появится информация о ваших подключенных услугах, видеоархив с домофона и другие функции."}
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  {profile?.is_verified
-                    ? "Ваш аккаунт верифицирован. Ниже доступны: состояние лицевого счёта, оплата, история заявок и личные данные. Видеоархив с домофона и расширенные функции появятся здесь по мере подключения."
-                    : "После верификации здесь будет доступна информация о ваших подключенных услугах, видеоархив с домофона и другие функции."}
-                </p>
-              </CardContent>
+              {profile?.is_verified && address && (
+                <CardContent className="space-y-4">
+                  <DebtCard address={address} apartment={apartment} fullName={fullName} phone={phone} embedded />
+                  <RemoteAccessCard address={address} apartment={apartment} />
+                </CardContent>
+              )}
             </Card>
-
-            {/* Состояние счёта - показываем только верифицированным */}
-            {profile?.is_verified && address && (
-              <DebtCard address={address} apartment={apartment} fullName={fullName} phone={phone} />
-            )}
 
             <Card>
               <CardHeader>
