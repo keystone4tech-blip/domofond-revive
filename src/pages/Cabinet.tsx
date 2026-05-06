@@ -323,9 +323,15 @@ const MyRequestsCard = ({ phone, fullName }: { phone: string; fullName: string }
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
+        {requests.length === 0 && (
+          <p className="text-sm text-muted-foreground text-center py-4">
+            У вас пока нет заявок
+          </p>
+        )}
         {requests.map((req) => {
           const meta = statusMeta[req.status] || statusMeta.pending;
           const Icon = meta.icon;
+          const canCancel = req.status === "pending" || req.status === "accepted";
           // Strip enrichment metadata appended by the bot
           const cleanMessage = (req.message || "").split(/\n+(ФИО:|—|⚠️)/)[0].trim();
           return (
@@ -355,6 +361,40 @@ const MyRequestsCard = ({ phone, fullName }: { phone: string; fullName: string }
                   Выполнена: {format(new Date(req.completed_at), "dd MMM, HH:mm", { locale: ru })}
                 </p>
               )}
+              {canCancel && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-destructive hover:text-destructive w-full sm:w-auto"
+                      disabled={cancellingId === req.id}
+                    >
+                      {cancellingId === req.id
+                        ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                        : <XCircle className="h-4 w-4 mr-1" />}
+                      Отменить заявку
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Отменить заявку?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Заявка будет помечена как отменённая. Это действие нельзя отменить.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Назад</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => handleCancel(req.id)}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        Отменить заявку
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
             </div>
           );
         })}
@@ -362,6 +402,7 @@ const MyRequestsCard = ({ phone, fullName }: { phone: string; fullName: string }
     </Card>
   );
 };
+
 
 const Cabinet = () => {
   const [loading, setLoading] = useState(true);
