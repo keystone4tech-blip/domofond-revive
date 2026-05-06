@@ -251,36 +251,65 @@ const statusMeta: Record<string, { label: string; icon: any; cls: string }> = {
   cancelled: { label: "Отменена", icon: XCircle, cls: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300" },
 };
 
-const MyRequestsCard = ({ phone }: { phone: string }) => {
+const normalizePhone = (p: string) => (p || "").replace(/\D/g, "").replace(/^8/, "7");
+
+const MyRequestsCard = ({ phone, fullName }: { phone: string; fullName: string }) => {
   const [requests, setRequests] = useState<ClientRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  const load = async () => {
+    const normPhone = normalizePhone(phone);
+    // Fetch a generous batch and filter by normalized phone or name in JS,
+    // because phone formats may differ between submission sources.
+    const { data } = await supabase
+      .from("requests")
+      .select("id, message, status, priority, created_at, accepted_at, completed_at, notes, phone, name")
+      .order("created_at", { ascending: false })
+      .limit(200);
+    const filtered = ((data as any[]) || []).filter((r) => {
+      if (normPhone && normalizePhone(r.phone || "") === normPhone) return true;
+      if (fullName && r.name && r.name.trim().toLowerCase() === fullName.trim().toLowerCase()) return true;
+      return false;
+    });
+    setRequests(filtered as ClientRequest[]);
+    setLoading(false);
+  };
 
   useEffect(() => {
-    if (!phone) { setLoading(false); return; }
-    const load = async () => {
-      const { data } = await supabase
-        .from("requests")
-        .select("id, message, status, priority, created_at, accepted_at, completed_at, notes")
-        .eq("phone", phone)
-        .order("created_at", { ascending: false })
-        .limit(20);
-      setRequests((data as ClientRequest[]) || []);
-      setLoading(false);
-    };
+    if (!phone && !fullName) { setLoading(false); return; }
     load();
 
     const channel = supabase
       .channel("my-requests")
       .on("postgres_changes",
-        { event: "*", schema: "public", table: "requests", filter: `phone=eq.${phone}` },
+        { event: "*", schema: "public", table: "requests" },
         () => load()
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [phone]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phone, fullName]);
+
+  const handleCancel = async (id: string) => {
+    setCancellingId(id);
+    try {
+      const { error } = await supabase
+        .from("requests")
+        .update({ status: "cancelled" })
+        .eq("id", id);
+      if (error) throw error;
+      toast({ title: "Заявка отменена" });
+      load();
+    } catch (e: any) {
+      toast({ title: "Не удалось отменить", description: e.message, variant: "destructive" });
+    } finally {
+      setCancellingId(null);
+    }
+  };
 
   if (loading) return null;
-  if (requests.length === 0) return null;
 
   return (
     <Card>
@@ -294,9 +323,15 @@ const MyRequestsCard = ({ phone }: { phone: string }) => {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
+        {requests.length === 0 && (
+          <p className="text-sm text-muted-foreground text-center py-4">
+            У вас пока нет заявок
+          </p>
+        )}
         {requests.map((req) => {
           const meta = statusMeta[req.status] || statusMeta.pending;
           const Icon = meta.icon;
+          const canCancel = req.status === "pending" || req.status === "accepted";
           // Strip enrichment metadata appended by the bot
           const cleanMessage = (req.message || "").split(/\n+(ФИО:|—|⚠️)/)[0].trim();
           return (
@@ -326,6 +361,40 @@ const MyRequestsCard = ({ phone }: { phone: string }) => {
                   Выполнена: {format(new Date(req.completed_at), "dd MMM, HH:mm", { locale: ru })}
                 </p>
               )}
+              {canCancel && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-destructive hover:text-destructive w-full sm:w-auto"
+                      disabled={cancellingId === req.id}
+                    >
+                      {cancellingId === req.id
+                        ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                        : <XCircle className="h-4 w-4 mr-1" />}
+                      Отменить заявку
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Отменить заявку?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Заявка будет помечена как отменённая. Это действие нельзя отменить.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Назад</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => handleCancel(req.id)}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        Отменить заявку
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
             </div>
           );
         })}
@@ -333,6 +402,7 @@ const MyRequestsCard = ({ phone }: { phone: string }) => {
     </Card>
   );
 };
+
 
 const Cabinet = () => {
   const [loading, setLoading] = useState(true);
@@ -691,10 +761,12 @@ const Cabinet = () => {
 
             {/* Состояние счёта - показываем только верифицированным */}
             {profile?.is_verified && address && (
-              <>
-                <DebtCard address={address} apartment={apartment} fullName={fullName} phone={phone} />
-                <MyRequestsCard phone={phone} />
-              </>
+              <DebtCard address={address} apartment={apartment} fullName={fullName} phone={phone} />
+            )}
+
+            {/* История заявок - показываем всем авторизованным */}
+            {(phone || fullName) && (
+              <MyRequestsCard phone={phone} fullName={fullName} />
             )}
 
             <Card>
