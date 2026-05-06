@@ -762,24 +762,23 @@ const Cabinet = () => {
             {/* Доступ к системе - в верху страницы */}
             <Card>
               <CardHeader>
-                <CardTitle>Доступ к системе</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="h-5 w-5" />
+                  Доступ к системе
+                </CardTitle>
                 <CardDescription>
-                  Информация о подключенных услугах
+                  {profile?.is_verified
+                    ? "Информация о ваших услугах и удалённом доступе"
+                    : "После верификации здесь появится информация о ваших подключенных услугах, видеоархив с домофона и другие функции."}
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  {profile?.is_verified
-                    ? "Ваш аккаунт верифицирован. Ниже доступны: состояние лицевого счёта, оплата, история заявок и личные данные. Видеоархив с домофона и расширенные функции появятся здесь по мере подключения."
-                    : "После верификации здесь будет доступна информация о ваших подключенных услугах, видеоархив с домофона и другие функции."}
-                </p>
-              </CardContent>
+              {profile?.is_verified && address && (
+                <CardContent className="space-y-4">
+                  <DebtCard address={address} apartment={apartment} fullName={fullName} phone={phone} embedded />
+                  <RemoteAccessCard address={address} apartment={apartment} />
+                </CardContent>
+              )}
             </Card>
-
-            {/* Состояние счёта - показываем только верифицированным */}
-            {profile?.is_verified && address && (
-              <DebtCard address={address} apartment={apartment} fullName={fullName} phone={phone} />
-            )}
 
             <Card>
               <CardHeader>
