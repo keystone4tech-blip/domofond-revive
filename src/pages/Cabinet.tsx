@@ -893,20 +893,10 @@ const Cabinet = () => {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Доступ к системе</CardTitle>
-                <CardDescription>
-                  Информация о подключенных услугах
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  После верификации здесь будет доступна информация о ваших подключенных услугах,
-                  видеоархив с домофона и другие функции.
-                </p>
-              </CardContent>
-            </Card>
+            {/* История заявок - в конце страницы, чтобы не мешала основной информации */}
+            {(phone || fullName) && (
+              <MyRequestsCard phone={phone} fullName={fullName} />
+            )}
           </div>
         </div>
       </main>
