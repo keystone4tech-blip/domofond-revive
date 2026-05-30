@@ -19,7 +19,9 @@ const Auth = () => {
   const { toast } = useToast();
 
   const envApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-  const API_URL = envApiUrl.startsWith('http') ? envApiUrl : `${window.location.origin}${envApiUrl}`;
+  const API_URL = typeof envApiUrl === 'string' && envApiUrl.startsWith('http') 
+    ? envApiUrl 
+    : `${window.location.origin}${envApiUrl}`;
 
   useEffect(() => {
     // Check local session
