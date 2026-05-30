@@ -108,12 +108,12 @@ export default function Calculator() {
   const { toast } = useToast();
 
   const [numericValues, setNumericValues] = useState<Record<NumericFieldKey, string>>({
-    entrances: "1",
-    totalApartments: "100",
-    smartIntercoms: "0",
-    additionalCameras: "0",
-    elevatorCameras: "0",
-    gates: "0",
+    entrances: "",
+    totalApartments: "",
+    smartIntercoms: "",
+    additionalCameras: "",
+    elevatorCameras: "",
+    gates: "",
   });
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -373,24 +373,24 @@ export default function Calculator() {
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-2 gap-4">
-                    <NumberInput
-                      id="entrances"
-                      label="Подъездов"
-                      value={numericValues.entrances}
-                      onChange={handleNumericChange("entrances")}
-                      min={1}
-                      placeholder="1"
-                      error={fieldErrors.entrances}
-                    />
-                    <NumberInput
-                      id="apartments"
-                      label="Квартир всего"
-                      value={numericValues.totalApartments}
-                      onChange={handleNumericChange("totalApartments")}
-                      min={1}
-                      placeholder="100"
-                      error={fieldErrors.totalApartments}
-                    />
+                      <NumberInput
+                        id="entrances"
+                        label="Подъездов"
+                        value={numericValues.entrances}
+                        onChange={handleNumericChange("entrances")}
+                        min={1}
+                        placeholder="Укажите количество подъездов"
+                        error={fieldErrors.entrances}
+                      />
+                      <NumberInput
+                        id="apartments"
+                        label="Квартир всего"
+                        value={numericValues.totalApartments}
+                        onChange={handleNumericChange("totalApartments")}
+                        min={1}
+                        placeholder="Укажите общее количество квартир на весь дом"
+                        error={fieldErrors.totalApartments}
+                      />
                   </div>
                 </CardContent>
               </Card>
@@ -405,40 +405,40 @@ export default function Calculator() {
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-2 gap-4">
-                    <NumberInput
-                      id="smartIntercoms"
-                      label="Умных домофонов"
-                      value={numericValues.smartIntercoms}
-                      onChange={handleNumericChange("smartIntercoms")}
-                      min={0}
-                      placeholder="0"
-                      error={fieldErrors.smartIntercoms}
-                      tooltip="Вызывная панель на каждую подъездную дверь."
-                    />
-                    <NumberInput
-                      id="additionalCameras"
-                      label="Доп. камер"
-                      value={numericValues.additionalCameras}
-                      onChange={handleNumericChange("additionalCameras")}
-                      placeholder="0"
-                      tooltip="Камеры, устанавливаемые дополнительно к домофонам или отдельно на придомовую территорию, фасады и подъезды."
-                    />
-                    <NumberInput
-                      id="elevatorCameras"
-                      label="Камер в лифте"
-                      value={numericValues.elevatorCameras}
-                      onChange={handleNumericChange("elevatorCameras")}
-                      placeholder="0"
-                      tooltip="Устанавливаются в кабины лифтов (пассажирских и грузовых), по 1 камере на каждый лифт."
-                    />
-                    <NumberInput
-                      id="gates"
-                      label="Калиток"
-                      value={numericValues.gates}
-                      onChange={handleNumericChange("gates")}
-                      placeholder="0"
-                      tooltip="Входы на придомовую территорию, оснащаемые вызывными панелями (как на подъездах). Если калиток нет, оставьте 0."
-                    />
+                      <NumberInput
+                        id="smartIntercoms"
+                        label="Умных домофонов"
+                        value={numericValues.smartIntercoms}
+                        onChange={handleNumericChange("smartIntercoms")}
+                        min={0}
+                        placeholder="Укажите количество дверей с домофонами"
+                        error={fieldErrors.smartIntercoms}
+                        tooltip="Вызывная панель на каждую подъездную дверь."
+                      />
+                      <NumberInput
+                        id="additionalCameras"
+                        label="Доп. камер"
+                        value={numericValues.additionalCameras}
+                        onChange={handleNumericChange("additionalCameras")}
+                        placeholder="Сколько вам требуется дополнительных камер?"
+                        tooltip="Камеры, устанавливаемые дополнительно к домофонам или отдельно на придомовую территорию, фасады и подъезды."
+                      />
+                      <NumberInput
+                        id="elevatorCameras"
+                        label="Камер в лифте"
+                        value={numericValues.elevatorCameras}
+                        onChange={handleNumericChange("elevatorCameras")}
+                        placeholder="Укажите количество лифтов, в которых требуются камеры"
+                        tooltip="Устанавливаются в кабины лифтов (пассажирских и грузовых), по 1 камере на каждый лифт."
+                      />
+                      <NumberInput
+                        id="gates"
+                        label="Калиток"
+                        value={numericValues.gates}
+                        onChange={handleNumericChange("gates")}
+                        placeholder="Укажите количество калиток, на которые нужно установить домофон"
+                        tooltip="Входы на придомовую территорию, оснащаемые вызывными панелями (как на подъездах). Если калиток нет, оставьте пустым."
+                      />
                   </div>
                 </CardContent>
               </Card>
