@@ -5,7 +5,7 @@ import cctvCamera from "@/assets/cctv-camera.jpg";
 import barrierGate from "@/assets/barrier-gate.jpg";
 import repairWork from "@/assets/repair-work.jpg";
 import maintenanceService from "@/assets/maintenance-service.jpg";
-import constructionWork from "@/assets/construction-work.jpg";
+import constructionWork from "@/assets/construction-work.png";
 
 const services = [
   {

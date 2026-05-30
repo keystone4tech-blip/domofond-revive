@@ -1,5 +1,34 @@
 # PROJECT_LOG.md
 
+## Дата: 2026-05-30 (Полная перестройка схемы БД и E2E-тестирование)
+### Причина:
+- Таблица `requests` в БД имела структуру `title/description` с FK на `users`, а фронтенд ожидал `name/message` с FK на `employees`.
+- Отсутствовали таблицы: `products`, `request_items`, `tasks`, `task_photos`, `task_checklists`, `promotions`, `site_blocks`, `stats_blocks`, `premium_blocks`, `chat_messages`, `seo_pages`, `votings`, `voting_questions`, `voting_responses`, `news_segments`.
+- Метод `supabase.auth.getUser()` не был реализован в polyfill, из-за чего AdminPanel и FSM не пускали пользователя.
+
+### Изменения:
+- **Перестроена таблица `requests`**: Удалена и создана заново с колонками `name`, `phone`, `address`, `message`, `status`, `priority`, `assigned_to→employees(id)`, `accepted_by→employees(id)`, `accepted_at`, `completed_at`, `notes`.
+- **Созданы 16 недостающих таблиц**: `products`, `request_items`, `request_checklists`, `request_history`, `task_photos`, `task_checklists`, `promotions`, `site_blocks`, `stats_blocks`, `premium_blocks`, `chat_messages`, `seo_pages`, `votings`, `voting_questions`, `voting_responses`, `news_segments`.
+- **RLS отключен** на всех 29 таблицах.
+- **Права** выданы ролям `anon` и `authenticated` на все таблицы.
+- **Добавлен polyfill `getUser()`** в `src/integrations/supabase/client.ts` для корректной работы авторизации в AdminPanel и FSM.
+- **PostgREST**: После рестарта видит 29 Relations (было 14), 17 Relationships.
+
+### Изменённые файлы:
+- `src/integrations/supabase/client.ts` — добавлен polyfill `getUser()`
+
+### E2E-тестирование (100% прохождение):
+| Компонент | Статус | Детали |
+|-----------|--------|--------|
+| Главная страница | ✅ | Изображения, навигация, дизайн |
+| Калькулятор | ✅ | Расчёт 80₽/кв, сохранение в БД |
+| Авторизация | ✅ | viruscorp4@gmail.com / SuperNatural24! |
+| Личный кабинет | ✅ | Профиль, кнопка «Панель» |
+| Админ-панель | ✅ | Расчёты, Статистика загружаются |
+| FSM (Заявки) | ✅ | Создание, отображение, кнопки |
+| FSM (Задачи) | ✅ | Панель загружается без ошибок |
+
+
 ## Дата: 2026-05-30 (Документирование и резервное копирование)
 ### Изменения:
 - **Создан файл `CONFIG_BACKUP.md`**: 
