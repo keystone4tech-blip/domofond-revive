@@ -73,7 +73,10 @@ export function usePushNotifications() {
   }, [syncSubscriptionWithServer]);
 
   useEffect(() => {
-    const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+    // Only support push notifications on mobile devices to prevent unwanted prompts on desktop
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    const supported = isMobile && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
     setIsSupported(supported);
     if (supported) {
       setPermission(Notification.permission);
