@@ -51,5 +51,5 @@ jobs:
             
             # Останавливаем старые контейнеры, собираем новые и запускаем в фоне
             echo "🚀 Сборка и запуск контейнеров..."
-            docker-compose down
-            docker-compose up -d --build
+            docker compose down || true
+            docker compose up -d --build
