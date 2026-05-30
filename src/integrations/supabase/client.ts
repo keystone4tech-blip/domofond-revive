@@ -2,8 +2,9 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-// Redirect to our local PostgREST instance
-const SUPABASE_URL = 'http://localhost:3000';
+// Redirect to our local PostgREST instance or production API
+const envUrl = import.meta.env.VITE_SUPABASE_URL || 'http://localhost:3000';
+const SUPABASE_URL = envUrl.startsWith('http') ? envUrl : `${window.location.origin}${envUrl}`;
 // Dummy key since PostgREST relies on JWT
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'dummy';
 
