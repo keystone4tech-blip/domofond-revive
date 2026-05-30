@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: domofond_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-domofond}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: domofond_backend
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-domofond}
+      - PORT=5000
+    ports:
+      - "5000:5000"
+    depends_on:
+      - db
+    # Убраны volumes с исходным кодом, в продакшене код запекается в образ
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: domofond_frontend
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      - VITE_API_URL=http://localhost:5000
+    depends_on:
+      - backend
+    # Убраны volumes, Nginx раздает собранную статику
+
+  postgrest:
+    image: postgrest/postgrest:latest
+    container_name: domofond_postgrest
+    ports:
+      - "3000:3000"
+    environment:
+      PGRST_DB_URI: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-domofond}
+      PGRST_DB_SCHEMA: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: super-secret-jwt-token-with-at-least-32-characters-long
+    depends_on:
+      - db
+
+volumes:
+  pgdata:

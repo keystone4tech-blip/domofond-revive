@@ -2,16 +2,64 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
-// Import the supabase client like this:
-// import { supabase } from "@/integrations/supabase/client";
+// Redirect to our local PostgREST instance
+const SUPABASE_URL = 'http://localhost:3000';
+// Dummy key since PostgREST relies on JWT
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'dummy';
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
+  },
+  global: {
+    fetch: (url, options) => {
+      // Подменяем пути Supabase API на пути локального PostgREST
+      if (typeof url === 'string') {
+        url = url.replace('/rest/v1/', '/');
+      }
+      const token = localStorage.getItem('auth_token');
+      options = options || {};
+      options.headers = options.headers || {};
+      if (token) {
+        (options.headers as any).Authorization = `Bearer ${token}`;
+      } else {
+        (options.headers as any).Authorization = `Bearer anon`;
+      }
+      return fetch(url, options);
+    }
   }
 });
+
+// Polyfill for session checking so components don't crash when using supabase.auth.getSession()
+const authPolyfill = {
+  getSession: async () => {
+    const token = localStorage.getItem('auth_token');
+    const userStr = localStorage.getItem('user');
+    if (token && userStr) {
+      return { data: { session: { access_token: token, user: JSON.parse(userStr) } }, error: null };
+    }
+    return { data: { session: null }, error: null };
+  },
+  onAuthStateChange: (callback: any) => {
+    const token = localStorage.getItem('auth_token');
+    const userStr = localStorage.getItem('user');
+    let session = null;
+    if (token && userStr) {
+      session = { access_token: token, user: JSON.parse(userStr) };
+    }
+    // Async call to prevent blocking rendering
+    setTimeout(() => {
+      if (callback) callback('INITIAL_SESSION', session);
+    }, 0);
+    return { data: { subscription: { unsubscribe: () => {} } } };
+  },
+  signOut: async () => {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('user');
+    return { error: null };
+  }
+};
+
+Object.assign(supabase.auth, authPolyfill);

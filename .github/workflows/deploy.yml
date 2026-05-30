@@ -1,0 +1,55 @@
+name: Auto Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main # Срабатывает при пуше в ветку main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🚚 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📂 Copy files to VPS via SCP
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          source: "."
+          target: "/opt/domofond_project"
+
+      - name: 🚀 Build and Run Docker Compose on VPS
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          script: |
+            # Переходим в папку проекта на сервере
+            cd /opt/domofond_project
+            
+            # Установка Docker и Docker Compose (если их нет на новом сервере)
+            if ! [ -x "$(command -v docker)" ]; then
+              echo "Установка Docker..."
+              curl -fsSL https://get.docker.com -o get-docker.sh
+              sudo sh get-docker.sh
+              sudo systemctl enable docker
+              sudo systemctl start docker
+            fi
+            
+            # Если плагин docker-compose не установлен, качаем старый бинарник (на всякий случай)
+            if ! docker compose version > /dev/null 2>&1; then
+               if ! [ -x "$(command -v docker-compose)" ]; then
+                  echo "Установка Docker Compose..."
+                  sudo curl -L "https://github.com/docker/compose/releases/download/v2.24.5/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+                  sudo chmod +x /usr/local/bin/docker-compose
+               fi
+            fi
+            
+            # Останавливаем старые контейнеры, собираем новые и запускаем в фоне
+            echo "🚀 Сборка и запуск контейнеров..."
+            docker-compose down
+            docker-compose up -d --build
