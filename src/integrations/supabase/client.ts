@@ -43,6 +43,13 @@ const authPolyfill = {
     }
     return { data: { session: null }, error: null };
   },
+  getUser: async () => {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      return { data: { user: JSON.parse(userStr) }, error: null };
+    }
+    return { data: { user: null }, error: null };
+  },
   onAuthStateChange: (callback: any) => {
     const token = localStorage.getItem('auth_token');
     const userStr = localStorage.getItem('user');
