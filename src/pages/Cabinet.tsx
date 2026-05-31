@@ -434,12 +434,20 @@ const Cabinet = () => {
     
     if (!cleanInput) return 0;
 
-    // Точное вхождение дает максимальный приоритет
+    // 1. Точное совпадение начала строки дает максимальный приоритет
+    if (cleanTarget.startsWith(cleanInput)) {
+      return 150 + (cleanInput.length / cleanTarget.length) * 20;
+    }
+
+    // 2. Точное вхождение в любой части строки
     if (cleanTarget.includes(cleanInput)) {
       return 100 + (cleanInput.length / cleanTarget.length) * 10;
     }
     
-    // Коэффициент Сёренсена-Диса для исправления опечаток
+    // Для коротких запросов (меньше 3 символов) опечатки не ищем, только точное совпадение
+    if (cleanInput.length < 3) return 0;
+    
+    // 3. Коэффициент Сёренсена-Диса для исправления опечаток
     const getBigrams = (str: string) => {
       const bigrams = new Set<string>();
       for (let i = 0; i < str.length - 1; i++) {
@@ -459,7 +467,15 @@ const Cabinet = () => {
     const total = inputBigrams.size + targetBigrams.size;
     if (total === 0) return 0;
     
-    return ((2 * intersection) / total) * 100;
+    const diceScore = ((2 * intersection) / total) * 100;
+    
+    // Если пересечение биграмм слишком маленькое (меньше половины длины ввода),
+    // то это случайное совпадение слогов, сбрасываем балл в 0
+    if (intersection < Math.floor(cleanInput.length / 2)) {
+      return 0;
+    }
+
+    return diceScore;
   };
 
   // Загрузка кэша уникальных домов из БД
@@ -593,13 +609,14 @@ const Cabinet = () => {
   // Обработка ручного ввода в поле «Улица»
   const handleStreetInputChange = async (val: string) => {
     setDisplayStreet(val);
-    setSelectedStreet(null); // Сбрасываем выбранную улицу при изменении ввода
+    setSelectedStreet(val); // Сохраняем текущий ручной ввод улицы для разблокировки инпута дома и передачи контекста в DaData
     setDisplayHouse(""); // Сбрасываем дом при смене улицы
     setHouseSuggestions([]);
     setShowStreetSuggestions(true);
     setShowHouseSuggestions(false);
     
     if (val.trim().length === 0) {
+      setSelectedStreet(null);
       setStreetSuggestions([]);
       setDadataStreetSuggestions([]);
       return;
@@ -614,7 +631,7 @@ const Cabinet = () => {
         isLocal: true,
         score: scoreSimilarity(val, street)
       }))
-      .filter((item) => item.score > 20) // Порог схожести
+      .filter((item) => item.score > 40) // Повышенный порог схожести (отсекает левые адреса вроде Ратных Славы при вводе Главной)
       .sort((a, b) => b.score - a.score)
       .slice(0, 4);
 
@@ -1845,7 +1862,7 @@ const Cabinet = () => {
                     </CardDescription>
                   </div>
                   {profile?.is_verified && !editing && (
-                    <Button variant="outline" size="sm" onClick={() => setEditing(true)} className="hover:bg-primary/10 transition-colors">
+                    <Button variant="outline" size="sm" onClick={() => { setEditing(true); setAgreedToTerms(true); }} className="hover:bg-primary/10 transition-colors">
                       <Pencil className="h-4 w-4 mr-1" />
                       Изменить
                     </Button>
@@ -1995,10 +2012,10 @@ const Cabinet = () => {
                         id="house"
                         value={displayHouse}
                         onChange={(e) => handleHouseInputChange(e.target.value)}
-                        onFocus={() => { if (!isLocked && selectedStreet) setShowHouseSuggestions(true); }}
+                        onFocus={() => { if (!isLocked && displayStreet?.trim()) setShowHouseSuggestions(true); }}
                         onBlur={() => setTimeout(() => setShowHouseSuggestions(false), 250)}
-                        placeholder={selectedStreet ? "Введите номер дома" : "Сначала выберите улицу"}
-                        disabled={isLocked || !selectedStreet}
+                        placeholder={displayStreet?.trim() ? "Введите номер дома" : "Сначала введите улицу"}
+                        disabled={isLocked || !displayStreet?.trim()}
                         className="bg-background/50 border-border/80 focus:border-primary/50 font-medium h-10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                       />
                     </div>
@@ -2045,9 +2062,9 @@ const Cabinet = () => {
                         }
                       }}
                       onBlur={() => setTimeout(() => setShowApartmentSuggestions(false), 200)}
-                      placeholder="Номер квартиры, офиса или бокса (например: 12)"
-                      disabled={isLocked}
-                      className="bg-background/50 border-border/80 focus:border-primary/50 font-medium h-10 transition-all"
+                      placeholder={displayHouse?.trim() ? "Номер квартиры, офиса или бокса (например: 12)" : "Сначала введите номер дома"}
+                      disabled={isLocked || !displayStreet?.trim() || !displayHouse?.trim()}
+                      className="bg-background/50 border-border/80 focus:border-primary/50 font-medium h-10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     />
 
                     {/* Всплывающая сетка доступных квартир */}
@@ -2080,14 +2097,14 @@ const Cabinet = () => {
                 {/* 7. Этаж */}
                 {premiseType === "apartment" && (
                   <div className="space-y-2 animate-in fade-in slide-in-from-top-1 duration-300">
-                    <Label htmlFor="floor" className="text-sm font-semibold flex items-center gap-1">🏢 Этаж (необязательно)</Label>
+                    <Label htmlFor="floor" className="text-sm font-semibold flex items-center gap-1">🏢 Этаж *</Label>
                     <Input
                       id="floor"
                       value={floor}
                       onChange={(e) => setFloor(e.target.value)}
-                      placeholder="Номер этажа (например: 3)"
-                      disabled={isLocked}
-                      className="bg-background/50 border-border/80 focus:border-primary/50 font-medium h-10 transition-all"
+                      placeholder={apartment?.trim() ? "Номер этажа (например: 3)" : "Сначала введите номер квартиры"}
+                      disabled={isLocked || !displayStreet?.trim() || !displayHouse?.trim() || !apartment?.trim()}
+                      className="bg-background/50 border-border/80 focus:border-primary/50 font-medium h-10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                   </div>
                 )}
@@ -2115,7 +2132,7 @@ const Cabinet = () => {
                     phone?.trim() &&
                     displayStreet?.trim() &&
                     displayHouse?.trim() &&
-                    (premiseType === "private" || apartment?.trim()) &&
+                    (premiseType === "private" || (apartment?.trim() && floor?.trim())) && // Этаж обязателен для квартир/офисов
                     emailInput?.trim() &&
                     agreedToTerms
                   );
@@ -2139,6 +2156,7 @@ const Cabinet = () => {
                       {editing && (
                         <Button variant="outline" onClick={() => {
                           setEditing(false);
+                          setAgreedToTerms(true); // Принудительно возвращаем согласие
                           setFullName(profile?.full_name || "");
                           setPhone(profile?.phone || "");
                           setAddress(profile?.address || "");
