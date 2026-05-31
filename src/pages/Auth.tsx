@@ -59,6 +59,10 @@ const Auth = () => {
       localStorage.setItem("auth_token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
 
+      // Генерируем событие для мгновенного реактивного обновления сессии в шапке сайта
+      console.log("[Auth Page] Регистрация успешна, генерируем событие auth-change..."); // Логирование
+      window.dispatchEvent(new Event("auth-change"));
+
       navigate("/cabinet");
     } catch (error: any) {
       toast({
@@ -90,6 +94,10 @@ const Auth = () => {
 
       localStorage.setItem("auth_token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
+
+      // Генерируем событие для мгновенного реактивного обновления сессии в шапке сайта
+      console.log("[Auth Page] Вход выполнен, генерируем событие auth-change..."); // Логирование
+      window.dispatchEvent(new Event("auth-change"));
 
       toast({
         title: "Вход выполнен!",

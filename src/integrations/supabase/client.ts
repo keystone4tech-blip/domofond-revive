@@ -54,21 +54,53 @@ const authPolyfill = {
     return { data: { user: null }, error: null };
   },
   onAuthStateChange: (callback: any) => {
+    // Слушатель кастомного события изменения авторизации
+    const handler = () => {
+      const token = localStorage.getItem('auth_token');
+      const userStr = localStorage.getItem('user');
+      let session = null;
+      if (token && userStr) {
+        session = { access_token: token, user: JSON.parse(userStr) };
+      }
+      console.log('[Supabase Auth] Получено событие auth-change, уведомляем слушателей о смене сессии...'); // Логирование
+      callback('SIGNED_IN', session);
+    };
+
+    // Регистрируем глобальный слушатель события
+    window.addEventListener('auth-change', handler);
+
+    // Первоначальное уведомление о сессии при монтировании (INITIAL_SESSION)
     const token = localStorage.getItem('auth_token');
     const userStr = localStorage.getItem('user');
     let session = null;
     if (token && userStr) {
       session = { access_token: token, user: JSON.parse(userStr) };
     }
-    // Async call to prevent blocking rendering
     setTimeout(() => {
-      if (callback) callback('INITIAL_SESSION', session);
+      if (callback) {
+        console.log('[Supabase Auth] Первоначальное уведомление о сессии INITIAL_SESSION...'); // Логирование
+        callback('INITIAL_SESSION', session);
+      }
     }, 0);
-    return { data: { subscription: { unsubscribe: () => {} } } };
+
+    // Возвращаем объект отписки
+    return {
+      data: {
+        subscription: {
+          unsubscribe: () => {
+            console.log('[Supabase Auth] Отписка от событий auth-change'); // Логирование
+            window.removeEventListener('auth-change', handler);
+          }
+        }
+      }
+    };
   },
   signOut: async () => {
+    console.log('[Supabase Auth] Вызов signOut, очищаем localStorage и генерируем событие auth-change...'); // Логирование
     localStorage.removeItem('auth_token');
     localStorage.removeItem('user');
+    // Генерируем событие для мгновенного реактивного обновления во всех компонентах
+    window.dispatchEvent(new Event("auth-change"));
     return { error: null };
   }
 };
