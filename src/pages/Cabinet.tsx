@@ -292,9 +292,9 @@ const RemoteAccessCard = ({ address, apartment }: { address: string; apartment: 
         </li>
       </ul>
 
-      <Button className="w-full" size="lg" onClick={() => navigate("/payment")}>
-        <CreditCard className="mr-2 h-4 w-4" />
-        Оплатить и получить доступ
+      <Button className="w-full whitespace-normal h-auto py-3 flex items-center justify-center gap-2" size="lg" onClick={() => navigate("/payment")}>
+        <CreditCard className="h-5 w-5 shrink-0" />
+        <span className="text-center">Оплатить и получить доступ</span>
       </Button>
     </div>
   );
@@ -963,7 +963,7 @@ const Cabinet = () => {
     <div className="min-h-screen flex flex-col">
       <Header />
       <main className="flex-1 bg-muted/30 py-8">
-        <div className="container max-w-4xl">
+        <div className="container max-w-4xl mx-auto px-4">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
             <h1
               className={`text-2xl sm:text-3xl font-bold ${
@@ -1198,7 +1198,7 @@ const Cabinet = () => {
                         <DoorOpen className="h-3.5 w-3.5 text-primary" />
                         <span>Доступные квартиры в этом доме:</span>
                       </div>
-                      <div className="grid grid-cols-5 sm:grid-cols-8 gap-1.5">
+                      <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-1.5">
                         {apartmentSuggestions.map((apt, index) => (
                           <button
                             key={index}
@@ -1219,9 +1219,9 @@ const Cabinet = () => {
 
                 {!isLocked && (
                   <div className="flex flex-col sm:flex-row gap-2">
-                    <Button onClick={handleSaveAndVerify} disabled={saving} className="flex-1">
-                      {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      {profile?.is_verified ? "Сохранить и переотправить" : "Сохранить и отправить на верификацию"}
+                    <Button onClick={handleSaveAndVerify} disabled={saving} className="flex-1 whitespace-normal h-auto py-2.5">
+                      {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin shrink-0" />}
+                      <span className="text-center">{profile?.is_verified ? "Сохранить и переотправить" : "Сохранить и отправить на верификацию"}</span>
                     </Button>
                     {editing && (
                       <Button variant="outline" onClick={() => {
@@ -1242,9 +1242,9 @@ const Cabinet = () => {
                 {(profile?.is_verified || profile?.full_name) && (
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button variant="ghost" size="sm" className="w-full text-destructive hover:text-destructive">
-                        <Trash2 className="h-4 w-4 mr-1" />
-                        Удалить данные верификации
+                      <Button variant="ghost" size="sm" className="w-full text-destructive hover:text-destructive whitespace-normal h-auto py-2 flex items-center justify-center gap-1">
+                        <Trash2 className="h-4 w-4 shrink-0" />
+                        <span className="text-center">Удалить данные верификации</span>
                       </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
