@@ -30,7 +30,7 @@ interface Task {
   clients: { name: string; address: string } | null;
 }
 
-const DebtCard = ({ address, apartment, fullName, phone, embedded = false }: { address: string; apartment: string; fullName: string; phone: string; embedded?: boolean }) => {
+const DebtCard = ({ address, apartment, fullName, phone, embedded = false, setParentAccount }: { address: string; apartment: string; fullName: string; phone: string; embedded?: boolean; setParentAccount?: (acc: any) => void }) => {
   const [account, setAccount] = useState<{ account_number: string; period: string; debt_amount: number; address: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -73,10 +73,13 @@ const DebtCard = ({ address, apartment, fullName, phone, embedded = false }: { a
         best = data[0];
       }
       setAccount(best);
+      if (setParentAccount) {
+        setParentAccount(best);
+      }
       setLoading(false);
     };
     loadDebt();
-  }, [address, apartment]);
+  }, [address, apartment, setParentAccount]);
 
   const formatPeriod = (period: string) => {
     if (period.length === 4) {
@@ -514,6 +517,7 @@ const Cabinet = () => {
   const [isSuccessPaymentOpen, setIsSuccessPaymentOpen] = useState(false); // Открытие окна с подтверждением перехода к оплате
   const [lastCreatedRequestId, setLastCreatedRequestId] = useState<string | null>(null); // ID созданной заявки для оплаты
   const [lastOrderTotals, setLastOrderTotals] = useState<any>(null); // Рассчитанные суммы платежа для передачи в шлюз
+  const [userAccount, setUserAccount] = useState<any>(null); // Лицевой счет пользователя, проброшенный из карточки баланса
 
   // Загрузка активных товаров и услуг из БД
   const loadProducts = async () => {
@@ -1340,7 +1344,7 @@ const Cabinet = () => {
               </CardHeader>
               {profile?.is_verified && address && (
                 <CardContent className="space-y-4">
-                  <DebtCard address={address} apartment={apartment} fullName={fullName} phone={phone} embedded />
+                  <DebtCard address={address} apartment={apartment} fullName={fullName} phone={phone} embedded setParentAccount={setUserAccount} />
                   <RemoteAccessCard address={address} apartment={apartment} />
                   
                   {/* Кнопка создания заявки / заказа платных услуг */}
@@ -1883,7 +1887,7 @@ const Cabinet = () => {
                     <div className="w-full p-4 rounded-lg bg-muted/40 border text-left text-xs space-y-2 font-medium">
                       <div className="text-muted-foreground border-b pb-1 flex justify-between">
                         <span>Лицевой счет:</span>
-                        <span className="font-semibold text-foreground">{account?.account_number || "000000"}</span>
+                        <span className="font-semibold text-foreground">{userAccount?.account_number || "000000"}</span>
                       </div>
                       
                       {lastOrderTotals.sum1 > 0 && (
@@ -1928,7 +1932,7 @@ const Cabinet = () => {
                         const entrance = entranceMatch ? entranceMatch[1] : "1";
 
                         const payUrl = `https://ref.kubankredit.ru/2?h=1A21EE45CCA81735A998DDFAA76BBB37` +
-                          `&ACCOUNTNUMBER=${encodeURIComponent(account?.account_number || "000000")}` +
+                          `&ACCOUNTNUMBER=${encodeURIComponent(userAccount?.account_number || "000000")}` +
                           `&FIO=${encodeURIComponent(fullName || profile?.full_name || "")}` +
                           `&ADDRESS=${encodeURIComponent(street)}` +
                           `&HOUSE=${encodeURIComponent(house)}` +

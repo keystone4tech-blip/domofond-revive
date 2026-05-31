@@ -133,16 +133,12 @@ const RequestsManager = ({ initialFilter = "pending" }: RequestsManagerProps) =>
   const [newItem, setNewItem] = useState({ product_id: "", quantity: 1 });
 
   // Fetch all requests
-  const { data: requests, isLoading } = useQuery({
+  const { data: rawRequests, isLoading } = useQuery({
     queryKey: ["requests"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("requests")
-        .select(`
-          *,
-          assigned_employee:employees!requests_assigned_to_fkey (id, full_name, phone),
-          accepted_employee:employees!requests_accepted_by_fkey (id, full_name, phone)
-        `)
+        .select("*")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -201,6 +197,20 @@ const RequestsManager = ({ initialFilter = "pending" }: RequestsManagerProps) =>
       return data as Employee[];
     },
   });
+
+  // Локальный маппинг сотрудников для исключения падения PostgREST-запроса из-за джоина внешних ключей
+  const requests = useMemo(() => {
+    if (!rawRequests) return null;
+    return rawRequests.map(req => {
+      const assigned = employees?.find(e => e.id === req.assigned_to);
+      const accepted = employees?.find(e => e.id === req.accepted_by);
+      return {
+        ...req,
+        assigned_employee: assigned ? { id: assigned.id, full_name: assigned.full_name, phone: assigned.phone } : null,
+        accepted_employee: accepted ? { id: accepted.id, full_name: accepted.full_name, phone: accepted.phone } : null,
+      };
+    }) as Request[];
+  }, [rawRequests, employees]);
 
   // Fetch products
   const { data: products } = useQuery({
