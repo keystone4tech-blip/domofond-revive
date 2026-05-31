@@ -61,21 +61,15 @@ const VerificationManager = () => {
     },
   });
 
+  // Polling вместо Supabase Realtime (PostgREST не поддерживает WebSocket)
+  // Инвалидируем кэш профилей каждые 30 секунд для имитации реального времени
   useEffect(() => {
-    const channel = supabase
-      .channel("profiles-verification")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "profiles" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["verification-profiles"] });
-        }
-      )
-      .subscribe();
+    const pollInterval = setInterval(() => {
+      console.log("[Верификация] Polling: обновление списка профилей..."); // Логирование
+      queryClient.invalidateQueries({ queryKey: ["verification-profiles"] });
+    }, 30000);
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { clearInterval(pollInterval); }; // Очистка при размонтировании
   }, [queryClient]);
 
   const pendingProfiles = profiles?.filter((profile) => !profile.is_verified && profile.full_name) || [];

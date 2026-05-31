@@ -30,16 +30,16 @@ export const CalculationsManager = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchCalculations();
+    fetchCalculations(); // Первая загрузка расчётов
 
-    const channel = supabase
-      .channel("calculations-changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "calculations" }, () => {
-        fetchCalculations();
-      })
-      .subscribe();
+    // Polling вместо Supabase Realtime (PostgREST не поддерживает WebSocket)
+    // Обновляем данные каждые 30 секунд для имитации реального времени
+    const pollInterval = setInterval(() => {
+      console.log("[Расчёты] Polling: обновление списка расчётов..."); // Логирование
+      fetchCalculations();
+    }, 30000);
 
-    return () => { supabase.removeChannel(channel); };
+    return () => { clearInterval(pollInterval); }; // Очистка при размонтировании
   }, []);
 
   const fetchCalculations = async () => {

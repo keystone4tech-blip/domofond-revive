@@ -1,5 +1,17 @@
 # PROJECT_LOG.md
 
+## Дата: 2026-05-31 (Отказ от WebSocket-подписок Supabase Realtime и переход на Polling во всех компонентах)
+### Изменения:
+- **Полная замена `supabase.channel` на Polling (`setInterval`)**:
+  * **Причина**: Локальный PostgREST API не поддерживает WebSocket-подписки Supabase Realtime (`supabase.channel`), что вызывало тихие падения соединений или необработанные ошибки WebSocket в браузере.
+  * **`src/components/admin/CalculationsManager.tsx`**: Realtime-подписка заменена на Polling с интервалом 30 секунд.
+  * **`src/components/fsm/TasksManager.tsx`**: Realtime-подписка заменена на Polling (инвалидация кэша React Query `tasks`) каждые 30 секунд.
+  * **`src/components/fsm/VerificationManager.tsx`**: Realtime-подписка заменена на Polling (инвалидация кэша React Query `verification-profiles`) каждые 30 секунд.
+  * **`src/pages/Cabinet.tsx`**:
+    * Обновление списка заявок абонента переведено на Polling каждые 30 секунд.
+    * Обновление профиля абонента переведено на Polling (периодический REST-запрос к `profiles`) каждые 60 секунд.
+- **Цель**: Полная стабилизация работы Личного кабинета, Админки и FSM-панели. Исключены ошибки WebSocket, данные обновляются реактивно и надежно без утечек памяти.
+
 ## Дата: 2026-05-31 (Разработка истории обращений в Личном кабинете + Две кнопки оплаты + Прямой платежный шлюз pay.kk.ru)
 ### Изменения:
 - **База данных PostgreSQL (на продакшене VPS)**:

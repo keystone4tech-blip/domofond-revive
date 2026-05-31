@@ -123,22 +123,15 @@ const TasksManager = ({ isManager, initialFilter = "all" }: TasksManagerProps) =
     enabled: isManager,
   });
 
-  // Realtime subscription
+  // Polling вместо Supabase Realtime (PostgREST не поддерживает WebSocket)
+  // Инвалидируем кэш заявок каждые 30 секунд для имитации реального времени
   useEffect(() => {
-    const channel = supabase
-      .channel("tasks-changes")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "tasks" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["tasks"] });
-        }
-      )
-      .subscribe();
+    const pollInterval = setInterval(() => {
+      console.log("[Задачи] Polling: обновление списка задач..."); // Логирование
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    }, 30000);
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { clearInterval(pollInterval); }; // Очистка при размонтировании
   }, [queryClient]);
 
   const createTaskMutation = useMutation({

@@ -350,16 +350,16 @@ const MyRequestsCard = ({ phone, fullName }: { phone: string; fullName: string }
 
   useEffect(() => {
     if (!phone && !fullName) { setLoading(false); return; }
-    load();
+    load(); // Первая загрузка заявок
 
-    const channel = supabase
-      .channel("my-requests")
-      .on("postgres_changes",
-        { event: "*", schema: "public", table: "requests" },
-        () => load()
-      )
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    // Polling вместо Supabase Realtime (PostgREST не поддерживает WebSocket)
+    // Обновляем данные каждые 30 секунд для имитации реального времени
+    const pollInterval = setInterval(() => {
+      console.log("[MyRequests] Polling: обновление списка заявок..."); // Логирование
+      load();
+    }, 30000);
+
+    return () => { clearInterval(pollInterval); }; // Очистка при размонтировании
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phone, fullName]);
 
@@ -1052,26 +1052,39 @@ const Cabinet = () => {
     loadProducts(); // Подгружаем товары и услуги при входе в ЛК
   }, []);
 
-  // Realtime subscription for profile updates
+  // Polling вместо Supabase Realtime для обновления профиля
+  // PostgREST не поддерживает WebSocket, поэтому используем setInterval
   useEffect(() => {
     if (!userId) return;
-    const channel = supabase
-      .channel("cabinet-profile")
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "profiles", filter: `id=eq.${userId}` },
-        (payload) => {
-          const updated = payload.new as any;
-          setProfile(updated);
-          setFullName(updated.full_name || "");
-          setPhone(updated.phone || "");
-          setAddress(updated.address || "");
-          setDisplayAddress(getDisplayAddress(updated.address || ""));
-          setApartment(updated.apartment || "");
+
+    const pollProfile = async () => {
+      try {
+        const { data } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", userId)
+          .single();
+
+        if (data) {
+          setProfile(data);
+          setFullName(data.full_name || "");
+          setPhone(data.phone || "");
+          setAddress(data.address || "");
+          setDisplayAddress(getDisplayAddress(data.address || ""));
+          setApartment(data.apartment || "");
         }
-      )
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+      } catch (err) {
+        console.error("[Кабинет] Ошибка polling профиля:", err); // Логирование
+      }
+    };
+
+    // Обновляем профиль каждые 60 секунд
+    const pollInterval = setInterval(() => {
+      console.log("[Кабинет] Polling: обновление профиля..."); // Логирование
+      pollProfile();
+    }, 60000);
+
+    return () => { clearInterval(pollInterval); }; // Очистка при размонтировании
   }, [userId]);
 
   // Эффект перехвата успешной оплаты из банка (Success URL)
@@ -1115,7 +1128,7 @@ const Cabinet = () => {
       };
       confirmPayment();
     }
-  }, [window.location.search, refetchUserRequests]);
+  }, []); // Проверяем URL-параметры оплаты только при первом рендере кабинета
 
   const checkUser = async () => {
     try {
