@@ -23,7 +23,7 @@ export default function ChatWidget() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [welcomeMessage, setWelcomeMessage] = useState("Здравствуйте! 👋 Я ваш виртуальный помощник «Домофондар». Здесь вы можете мгновенно узнать тарифы, проверить баланс лицевого счёта, создать заявку на ремонт или задать любой вопрос о наших услугах. Если вам потребуется помощь — я всегда рядом!");
+  const [welcomeMessage, setWelcomeMessage] = useState("Здравствуйте! 👋 Если вам понадобится помощь — просто напишите мне. Я всегда рядом!");
   const [isActive, setIsActive] = useState(true);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [userContext, setUserContext] = useState<{
@@ -94,7 +94,7 @@ export default function ChatWidget() {
       setOpen(true);
       setAutoOpened(true);
 
-      // Запускаем таймер автоматического сворачивания через 3 секунды привлечения внимания
+      // Запускаем таймер автоматического сворачивания через 6 секунд привлечения внимания
       const closeTimer = setTimeout(() => {
         // Проверяем активность пользователя перед закрытием:
         // Чат закроется только если в нем нет отправленных сообщений и пользователь не начал писать текст в инпут
@@ -110,7 +110,7 @@ export default function ChatWidget() {
           });
           return currentMessages; // возвращаем сообщения без изменений
         });
-      }, 3000);
+      }, 6000);
 
       // Очищаем таймер закрытия при размонтировании
       return () => {
