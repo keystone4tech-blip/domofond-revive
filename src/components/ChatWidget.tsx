@@ -23,7 +23,7 @@ export default function ChatWidget() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [welcomeMessage, setWelcomeMessage] = useState("Здравствуйте! 👋 Чем могу помочь?");
+  const [welcomeMessage, setWelcomeMessage] = useState("Здравствуйте! 👋 Я ваш виртуальный помощник «Домофондар». Здесь вы можете мгновенно узнать тарифы, проверить баланс лицевого счёта, создать заявку на ремонт или задать любой вопрос о наших услугах. Если вам потребуется помощь — я всегда рядом!");
   const [isActive, setIsActive] = useState(true);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [userContext, setUserContext] = useState<{
@@ -81,15 +81,49 @@ export default function ChatWidget() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Эффект автоматического открытия и последующего закрытия чата для привлечения внимания пользователя
   useEffect(() => {
-    if (!isActive) return;
-    const timer = setTimeout(() => {
-      if (!autoOpened) {
-        setOpen(true);
-        setAutoOpened(true);
-      }
+    // Если виджет неактивен в настройках или уже авто-открывался ранее, выходим
+    if (!isActive || autoOpened) return;
+
+    console.log("[Чат-виджет] Запуск 5-секундного таймера авто-открытия...");
+
+    // Раскрываем чат через 5 секунд после монтирования
+    const openTimer = setTimeout(() => {
+      console.log("[Чат-виджет] Автоматическое открытие виджета для привлечения внимания");
+      setOpen(true);
+      setAutoOpened(true);
+
+      // Запускаем таймер автоматического сворачивания через 3 секунды привлечения внимания
+      const closeTimer = setTimeout(() => {
+        // Проверяем активность пользователя перед закрытием:
+        // Чат закроется только если в нем нет отправленных сообщений и пользователь не начал писать текст в инпут
+        setMessages((currentMessages) => {
+          setInput((currentInput) => {
+            if (currentMessages.length === 0 && !currentInput.trim()) {
+              console.log("[Чат-виджет] Пользователь не проявил активности. Сворачиваем чат...");
+              setOpen(false);
+            } else {
+              console.log("[Чат-виджет] Авто-сворачивание отменено: обнаружена активность пользователя");
+            }
+            return currentInput; // возвращаем значение инпута без изменений
+          });
+          return currentMessages; // возвращаем сообщения без изменений
+        });
+      }, 3000);
+
+      // Очищаем таймер закрытия при размонтировании
+      return () => {
+        console.log("[Чат-виджет] Очистка таймера авто-закрытия");
+        clearTimeout(closeTimer);
+      };
     }, 5000);
-    return () => clearTimeout(timer);
+
+    // Очищаем таймер открытия при размонтировании
+    return () => {
+      console.log("[Чат-виджет] Очистка таймера авто-открытия");
+      clearTimeout(openTimer);
+    };
   }, [isActive, autoOpened]);
 
   useEffect(() => {
