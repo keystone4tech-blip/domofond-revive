@@ -25,8 +25,11 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
       options.headers = options.headers || {};
       if (token) {
         (options.headers as any).Authorization = `Bearer ${token}`;
+        console.log(`[Supabase Client] Запрос к API авторизован токеном JWT`); // Логирование авторизации
       } else {
-        (options.headers as any).Authorization = `Bearer anon`;
+        // При отсутствии токена НЕ передаем заголовок Authorization,
+        // чтобы PostgREST мог использовать встроенную анонимную роль anon (PGRST_DB_ANON_ROLE)
+        console.log(`[Supabase Client] Анонимный запрос к API без заголовка Authorization`); // Логирование анонимного доступа
       }
       return fetch(url, options);
     }
