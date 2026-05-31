@@ -1824,26 +1824,36 @@ const Cabinet = () => {
                 </CardTitle>
                 <CardDescription>
                   {profile?.is_verified
-                    ? "Информация о ваших услугах и удалённом доступе"
+                    ? userAccount
+                      ? "Информация о ваших услугах и удалённом доступе"
+                      : "Статус обслуживания вашего адреса в компании «Домофондар»"
                     : "После верификации здесь появится информация о ваших подключенных услугах, видеоархив с домофона и другие функции."}
                 </CardDescription>
               </CardHeader>
               {profile?.is_verified && address && (
                 <CardContent className="space-y-4">
+                  {/* Карточка задолженности/статуса. Если адреса нет в БД обслуживания, она сама выведет блок "Частный клиент" */}
                   <DebtCard address={address} apartment={apartment} fullName={fullName} phone={phone} embedded setParentAccount={setUserAccount} />
-                  <RemoteAccessCard address={address} apartment={apartment} />
                   
-                  {/* Кнопка создания заявки / заказа платных услуг */}
-                  <div className="p-4 rounded-lg border border-primary/20 bg-muted/20 flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div className="text-left w-full">
-                      <p className="font-semibold text-sm flex items-center gap-1.5"><Wrench className="h-4 w-4 text-primary shrink-0" /> Заявки и заказ услуг</p>
-                      <p className="text-xs text-muted-foreground mt-1">Нужен ремонт трубки, новые ключи или установка оборудования? Оформить заявку прямо сейчас.</p>
-                    </div>
-                    <Button onClick={() => { setOrderType("repair"); setIsOrderDialogOpen(true); }} className="w-full sm:w-auto shrink-0 flex items-center gap-1.5 hover:scale-105 transition-transform">
-                      <Plus className="h-4 w-4" />
-                      Создать заявку
-                    </Button>
-                  </div>
+                  {/* Отображаем плашки удаленного доступа и заказа услуг исключительно для абонентов на обслуживании (у которых есть лицевой счет) */}
+                  {userAccount && (
+                    <>
+                      {/* Удаленный доступ к домофону */}
+                      <RemoteAccessCard address={address} apartment={apartment} />
+                      
+                      {/* Кнопка создания заявки / заказа платных услуг */}
+                      <div className="p-4 rounded-lg border border-primary/20 bg-muted/20 flex flex-col sm:flex-row items-center justify-between gap-4">
+                        <div className="text-left w-full">
+                          <p className="font-semibold text-sm flex items-center gap-1.5"><Wrench className="h-4 w-4 text-primary shrink-0" /> Заявки и заказ услуг</p>
+                          <p className="text-xs text-muted-foreground mt-1">Нужен ремонт трубки, новые ключи или установка оборудования? Оформить заявку прямо сейчас.</p>
+                        </div>
+                        <Button onClick={() => { setOrderType("repair"); setIsOrderDialogOpen(true); }} className="w-full sm:w-auto shrink-0 flex items-center gap-1.5 hover:scale-105 transition-transform">
+                          <Plus className="h-4 w-4" />
+                          Создать заявку
+                        </Button>
+                      </div>
+                    </>
+                  )}
                 </CardContent>
               )}
             </Card>
