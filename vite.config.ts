@@ -9,6 +9,27 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    // Настройка прокси для перенаправления запросов в локальной среде разработки
+    proxy: {
+      // Все запросы к /api перенаправляем на локальный PostgREST (порт 3000)
+      "/api": {
+        target: "http://localhost:3000",
+        changeOrigin: true,
+        rewrite: (path) => {
+          console.log(`[Vite Proxy] Перенаправление /api запроса: ${path}`); // Логирование проксируемых путей
+          return path.replace(/^\/api/, "");
+        },
+      },
+      // Все запросы к /auth перенаправляем на локальный Express-бэкенд (порт 5000)
+      "/auth": {
+        target: "http://localhost:5000",
+        changeOrigin: true,
+        rewrite: (path) => {
+          console.log(`[Vite Proxy] Перенаправление /auth запроса: ${path}`); // Логирование проксируемых путей
+          return path.replace(/^\/auth/, "");
+        },
+      },
+    },
   },
   plugins: [
     react(),
