@@ -70,6 +70,9 @@ interface Request {
   accepted_at: string | null;
   completed_at: string | null;
   notes: string | null;
+  payment_status?: string | null;
+  payment_amount?: number | null;
+  payment_method?: string | null;
   assigned_employee?: { id: string; full_name: string; phone: string | null } | null;
   accepted_employee?: { id: string; full_name: string; phone: string | null } | null;
 }
@@ -502,6 +505,15 @@ const RequestsManager = ({ initialFilter = "pending" }: RequestsManagerProps) =>
               <div className="flex gap-2 flex-wrap">
                 {getStatusBadge(request.status)}
                 {getPriorityBadge(request.priority)}
+                {request.payment_amount && Number(request.payment_amount) > 0 && (() => {
+                  if (request.payment_status === "paid") {
+                    return <Badge className="bg-green-600 hover:bg-green-600 dark:bg-green-700 text-white border-none text-[10px] h-5 py-0">✓ Оплачено онлайн</Badge>;
+                  }
+                  if (request.payment_status === "on_site") {
+                    return <Badge className="bg-blue-600 hover:bg-blue-600 dark:bg-blue-700 text-white border-none text-[10px] h-5 py-0">💵 Оплата на месте</Badge>;
+                  }
+                  return <Badge className="bg-orange-500 hover:bg-orange-500 dark:bg-orange-600 text-white border-none text-[10px] h-5 py-0">⏳ Ожидает оплаты</Badge>;
+                })()}
               </div>
             </div>
             <div className="text-xs text-muted-foreground text-right">
@@ -552,13 +564,29 @@ const RequestsManager = ({ initialFilter = "pending" }: RequestsManagerProps) =>
                 )}
               </div>
               <div className="flex justify-between pt-2 border-t border-blue-200 dark:border-blue-800">
-                <div className="flex gap-3 text-xs">
-                  {serviceSum > 0 && <span>Услуги: {serviceSum.toFixed(0)} ₽</span>}
-                  {productSum > 0 && <span>Товары: {productSum.toFixed(0)} ₽</span>}
+                <div className="flex flex-col text-xs text-muted-foreground gap-0.5 text-left">
+                  <div className="flex gap-3">
+                    {serviceSum > 0 && <span>Услуги: {serviceSum.toFixed(0)} ₽</span>}
+                    {productSum > 0 && <span>Товары: {productSum.toFixed(0)} ₽</span>}
+                  </div>
+                  {request.payment_method && (
+                    <div>
+                      Способ оплаты: <span className="font-semibold text-foreground">{request.payment_method === 'online' ? 'Картой онлайн' : 'Наличными мастеру'}</span>
+                    </div>
+                  )}
                 </div>
-                <div className="flex items-center gap-1 text-sm font-bold text-blue-700 dark:text-blue-400">
-                  <Banknote className="h-3 w-3" />
-                  {total.toFixed(0)} ₽
+                <div className="flex flex-col items-end gap-0.5">
+                  <div className="flex items-center gap-1 text-sm font-bold text-blue-700 dark:text-blue-400">
+                    <Banknote className="h-3 w-3" />
+                    {total.toFixed(0)} ₽
+                  </div>
+                  {request.payment_status && (
+                    <div className="text-[10px] font-medium text-muted-foreground">
+                      Статус: <span className={`font-bold uppercase ${request.payment_status === 'paid' ? 'text-green-600' : request.payment_status === 'on_site' ? 'text-blue-600' : 'text-orange-500'}`}>
+                        {request.payment_status === 'paid' ? 'Оплачено' : request.payment_status === 'on_site' ? 'На месте' : 'Ожидает'}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

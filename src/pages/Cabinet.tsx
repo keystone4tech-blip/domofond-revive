@@ -856,7 +856,8 @@ const Cabinet = () => {
 
       const fullAddress = `${address}${apartment ? `, кв. ${apartment}` : ""}`;
 
-      // 2. Вставляем запись в таблицу requests
+      // 2. Вставляем запись в таблицу requests с параметрами оплаты
+      const isPaidOrder = orderType === "order";
       const { data: requestData, error: requestError } = await supabase
         .from("requests")
         .insert({
@@ -866,6 +867,9 @@ const Cabinet = () => {
           message: messageText,
           status: "pending",
           priority: orderType === "repair" ? "medium" : "low",
+          payment_status: isPaidOrder ? "pending" : null,
+          payment_amount: isPaidOrder ? totals.total : 0,
+          payment_method: isPaidOrder ? "online" : null,
         })
         .select("id")
         .single();
@@ -953,6 +957,10 @@ const Cabinet = () => {
       }
 
       // 5. Обрабатываем успешное завершение
+      if (refetchUserRequests) {
+        refetchUserRequests();
+      }
+      
       if (orderType === "repair") {
         toast({
           title: "Заявка отправлена",
@@ -980,6 +988,44 @@ const Cabinet = () => {
         title: "Не удалось создать заявку",
         description: err.message,
         variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handlePayLaterOnSite = async () => {
+    if (!lastCreatedRequestId) return;
+    
+    setSaving(true);
+    console.log(`[Оплата] Перевод заявки ${lastCreatedRequestId} на оплату на месте`);
+    try {
+      const { error } = await supabase
+        .from("requests")
+        .update({
+          payment_method: "cash",
+          payment_status: "on_site"
+        })
+        .eq("id", lastCreatedRequestId);
+        
+      if (error) throw error;
+      
+      toast({
+        title: "Заказ оформлен!",
+        description: "Выбран способ оплаты на месте. Наряд передан в службу FSM.",
+        variant: "default"
+      });
+      
+      if (refetchUserRequests) {
+        refetchUserRequests();
+      }
+      setIsSuccessPaymentOpen(false);
+    } catch (err: any) {
+      console.error("[Оплата] Ошибка перевода на оплату на месте:", err);
+      toast({
+        title: "Ошибка",
+        description: "Не удалось изменить способ оплаты.",
+        variant: "destructive"
       });
     } finally {
       setSaving(false);
@@ -1027,6 +1073,49 @@ const Cabinet = () => {
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [userId]);
+
+  // Эффект перехвата успешной оплаты из банка (Success URL)
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const paymentSuccess = urlParams.get("payment_success");
+    const reqId = urlParams.get("request_id");
+    
+    if (paymentSuccess === "true" && reqId) {
+      const confirmPayment = async () => {
+        console.log(`[Оплата] Подтверждение успешной оплаты для заявки: ${reqId}`);
+        
+        const { error } = await supabase
+          .from("requests")
+          .update({ 
+            payment_status: "paid",
+            status: "pending" // оставляем активным в FSM, но помечаем как оплаченный
+          })
+          .eq("id", reqId);
+          
+        if (error) {
+          console.error("[Оплата] Ошибка подтверждения оплаты:", error);
+          toast({
+            title: "Ошибка подтверждения",
+            description: "Не удалось обновить статус оплаты в базе данных.",
+            variant: "destructive"
+          });
+        } else {
+          console.log("[Оплата] Статус оплаты успешно обновлен на 'paid'!");
+          toast({
+            title: "🎉 Оплата успешно получена!",
+            description: "Ваш заказ оплачен картой. Наряд передан в службу FSM.",
+            variant: "default",
+          });
+          // Перезагружаем историю заявок
+          if (refetchUserRequests) refetchUserRequests();
+          
+          // Очищаем URL-параметры из строки браузера
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      };
+      confirmPayment();
+    }
+  }, [window.location.search, refetchUserRequests]);
 
   const checkUser = async () => {
     try {
@@ -1110,6 +1199,24 @@ const Cabinet = () => {
       );
     },
     enabled: !!userId,
+  });
+
+  // Получаем историю заявок абонента по его номеру телефона для отображения в Личном кабинете
+  const userPhoneForHistory = phone || profile?.phone;
+  const { data: userRequests, refetch: refetchUserRequests } = useQuery({
+    queryKey: ["user-requests", userPhoneForHistory],
+    enabled: !!userPhoneForHistory,
+    queryFn: async () => {
+      console.log(`[История] Загрузка истории заявок для телефона: "${userPhoneForHistory}"`);
+      const { data, error } = await supabase
+        .from("requests")
+        .select("*")
+        .eq("phone", userPhoneForHistory)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    },
   });
 
   const handleSaveAndVerify = async () => {
@@ -1361,6 +1468,127 @@ const Cabinet = () => {
                 </CardContent>
               )}
             </Card>
+
+            {/* --- РАЗДЕЛ: ИСТОРИЯ ЗАЯВОК И ОПЛАТ --- */}
+            {profile?.is_verified && userRequests && userRequests.length > 0 && (
+              <Card className="border-primary/20 shadow-lg bg-card/65 backdrop-blur-md animate-in fade-in-50 duration-300">
+                <CardHeader className="pb-3 border-b">
+                  <CardTitle className="text-lg font-bold flex items-center gap-2">
+                    <ClipboardList className="h-5 w-5 text-primary" />
+                    История ваших обращений и оплат
+                  </CardTitle>
+                  <CardDescription>
+                    Список всех ваших заявок, их статус выполнения в службе FSM и статус оплаты
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="pt-4 px-3 sm:px-6">
+                  <div className="space-y-4 max-h-[480px] overflow-y-auto pr-1">
+                    {userRequests.map((req: any) => {
+                      const isPaid = req.payment_status === "paid";
+                      const isOnSite = req.payment_status === "on_site";
+                      const isPending = req.payment_status === "pending";
+                      const isOrder = Number(req.payment_amount) > 0;
+                      
+                      // Форматируем статус заявки
+                      const getStatusBadge = (status: string) => {
+                        switch (status) {
+                          case "pending":
+                            return <Badge className="bg-orange-500/10 text-orange-600 dark:text-orange-400 hover:bg-orange-500/10 border-orange-200/50">Новая</Badge>;
+                          case "in_progress":
+                            return <Badge className="bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 border-blue-200/50">В работе</Badge>;
+                          case "completed":
+                            return <Badge className="bg-green-500/10 text-green-600 dark:text-green-400 hover:bg-green-500/10 border-green-200/50">Выполнена</Badge>;
+                          case "cancelled":
+                            return <Badge className="bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/10 border-red-200/50">Отклонена</Badge>;
+                          default:
+                            return <Badge variant="outline">{status}</Badge>;
+                        }
+                      };
+
+                      // Форматируем статус оплаты
+                      const getPaymentBadge = () => {
+                        if (!isOrder) return null;
+                        if (isPaid) {
+                          return <Badge className="bg-green-600 text-white dark:bg-green-700 hover:bg-green-600 border-none">✓ Оплачено онлайн</Badge>;
+                        }
+                        if (isOnSite) {
+                          return <Badge className="bg-blue-600 text-white dark:bg-blue-700 hover:bg-blue-600 border-none">💵 Оплата на месте</Badge>;
+                        }
+                        if (isPending) {
+                          return <Badge className="bg-orange-500 text-white dark:bg-orange-600 hover:bg-orange-500 border-none">⏳ Ожидает оплаты</Badge>;
+                        }
+                        return null;
+                      };
+
+                      return (
+                        <div key={req.id} className="p-4 rounded-xl border bg-muted/20 hover:bg-muted/40 transition-colors flex flex-col md:flex-row justify-between gap-4">
+                          <div className="space-y-2 flex-1 text-left">
+                            <div className="flex items-center justify-between sm:justify-start gap-3 flex-wrap">
+                              <span className="text-xs font-mono text-muted-foreground">
+                                {format(new Date(req.created_at), "dd MMMM yyyy, HH:mm", { locale: ru })}
+                              </span>
+                              <div className="flex gap-1.5 items-center">
+                                {getStatusBadge(req.status)}
+                                {getPaymentBadge()}
+                              </div>
+                            </div>
+                            
+                            <p className="text-sm font-semibold text-foreground border-b pb-1">
+                              {req.address}
+                            </p>
+                            
+                            <p className="text-xs text-muted-foreground whitespace-pre-line leading-relaxed">
+                              {req.message}
+                            </p>
+                          </div>
+
+                          {/* Кнопка "Оплатить сейчас" для неоплаченных онлайн-заявок */}
+                          {isOrder && isPending && (
+                            <div className="flex items-center justify-end shrink-0 pt-2 md:pt-0 md:pl-4 border-t md:border-t-0 md:border-l border-muted/50">
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  // Парсим суммы из сообщения или берем payment_amount
+                                  const totalAmount = Number(req.payment_amount) || 0;
+                                  
+                                  // Парсим адрес на улицу, дом, корпус, подъезд и квартиру
+                                  const street = address ? address.split(",")[1]?.replace(/(?:ул\.?|улица)\s*/gi, "").trim() || address : "";
+                                  const house = address ? address.split(",")[2]?.replace(/(?:д\.?|дом)\s*/gi, "").trim() || "" : "";
+                                  const entranceMatch = address ? address.match(/(?:подъезд|п\.?)\s*(\d+)/i) : null;
+                                  const entrance = entranceMatch ? entranceMatch[1] : "1";
+
+                                  // Передаем всю сумму в SUMMA_OPL2 (услуги)
+                                  const payUrl = `https://pay.kk.ru/services/117425?` +
+                                    `&ACCOUNTNUMBER=${encodeURIComponent(userAccount?.account_number || "000000")}` +
+                                    `&FIO=${encodeURIComponent(fullName || profile?.full_name || "")}` +
+                                    `&ADDRESS=${encodeURIComponent(street)}` +
+                                    `&HOUSE=${encodeURIComponent(house)}` +
+                                    `&FLAT=${encodeURIComponent(apartment || profile?.apartment || "")}` +
+                                    `&ENTRANCE=${encodeURIComponent(entrance)}` +
+                                    `&PHONE=${encodeURIComponent(phone || profile?.phone || "")}` +
+                                    `&SUMMA_OPL1=0.00` +
+                                    `&SUMMA_OPL2=${totalAmount.toFixed(2)}` +
+                                    `&SUMMA_OPL3=0.00` +
+                                    `&DENGI_F=${totalAmount.toFixed(2)}` +
+                                    `&INFO=${encodeURIComponent(`Оплата услуг по заявке #${req.id}`)}` +
+                                    `&SuccessURL=${encodeURIComponent(`https://domofon.mozhnovpn.tech/cabinet?payment_success=true&request_id=${req.id}`)}`;
+
+                                  window.open(payUrl, "_blank");
+                                }}
+                                className="w-full md:w-auto flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs py-1.5"
+                              >
+                                <CreditCard className="h-3.5 w-3.5" />
+                                Оплатить сейчас
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             <Card>
               <CardHeader>
@@ -1931,7 +2159,7 @@ const Cabinet = () => {
                         const entranceMatch = address ? address.match(/(?:подъезд|п\.?)\s*(\d+)/i) : null;
                         const entrance = entranceMatch ? entranceMatch[1] : "1";
 
-                        const payUrl = `https://ref.kubankredit.ru/2?h=1A21EE45CCA81735A998DDFAA76BBB37` +
+                        const payUrl = `https://pay.kk.ru/services/117425?` +
                           `&ACCOUNTNUMBER=${encodeURIComponent(userAccount?.account_number || "000000")}` +
                           `&FIO=${encodeURIComponent(fullName || profile?.full_name || "")}` +
                           `&ADDRESS=${encodeURIComponent(street)}` +
@@ -1943,7 +2171,8 @@ const Cabinet = () => {
                           `&SUMMA_OPL2=${lastOrderTotals.sum2.toFixed(2)}` +
                           `&SUMMA_OPL3=${lastOrderTotals.sum3.toFixed(2)}` +
                           `&DENGI_F=${lastOrderTotals.total.toFixed(2)}` +
-                          `&INFO=${encodeURIComponent(`Оплата услуг по заявке #${lastCreatedRequestId}`)}`;
+                          `&INFO=${encodeURIComponent(`Оплата услуг по заявке #${lastCreatedRequestId}`)}` +
+                          `&SuccessURL=${encodeURIComponent(`https://domofon.mozhnovpn.tech/cabinet?payment_success=true&request_id=${lastCreatedRequestId}`)}`;
 
                         window.open(payUrl, "_blank");
                         setIsSuccessPaymentOpen(false);
@@ -1952,10 +2181,16 @@ const Cabinet = () => {
                       size="lg"
                     >
                       <CreditCard className="h-5 w-5 shrink-0" />
-                      Оплатить банковской картой
+                      Оплатить сейчас (картой онлайн)
                     </Button>
-                    <Button variant="outline" onClick={() => setIsSuccessPaymentOpen(false)} className="w-full">
-                      Оплатить позже
+                    <Button 
+                      variant="outline" 
+                      onClick={handlePayLaterOnSite}
+                      disabled={saving}
+                      className="w-full flex items-center justify-center gap-1.5"
+                    >
+                      {saving && <Loader2 className="h-4 w-4 animate-spin shrink-0" />}
+                      Оплатить позже наличными (мастеру)
                     </Button>
                   </div>
                 </div>
