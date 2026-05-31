@@ -1798,27 +1798,27 @@ const Cabinet = () => {
               </Card>
             )}
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Статус верификации</CardTitle>
+            <Card className="glass-premium rounded-[24px] border-none shadow-lg">
+              <CardHeader className="pb-3">
+                <CardTitle className="font-display text-lg font-bold">Статус верификации</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex flex-col gap-3">
                   <div className="flex items-center gap-2 flex-wrap">
                     {profile?.is_verified ? (
                       <>
-                        <CheckCircle className="h-5 w-5 text-green-600" />
-                        <span className="text-green-600 font-medium">Верифицирован</span>
+                        <CheckCircle className="h-5 w-5 text-green-500 animate-bounce" />
+                        <span className="text-green-500 font-semibold text-sm">Профиль подтверждён</span>
                       </>
                     ) : (
                       <>
-                        <AlertCircle className="h-5 w-5 text-orange-600" />
-                        <span className="text-orange-600 font-medium">Ожидает верификации</span>
+                        <AlertCircle className="h-5 w-5 text-amber-500 animate-pulse" />
+                        <span className="text-amber-500 font-semibold text-sm">Ожидает верификации</span>
                       </>
                     )}
                   </div>
                   {!profile?.is_verified && (
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-xs text-muted-foreground leading-relaxed">
                       Заполните данные ниже и нажмите «Сохранить и отправить на верификацию».
                     </p>
                   )}
@@ -1827,13 +1827,13 @@ const Cabinet = () => {
             </Card>
 
             {/* Доступ к системе - в верху страницы */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Shield className="h-5 w-5" />
+            <Card className="glass-premium rounded-[24px] border-none shadow-lg">
+              <CardHeader className="pb-4 border-b border-slate-100 dark:border-slate-800">
+                <CardTitle className="flex items-center gap-2 font-display text-lg font-bold text-slate-800 dark:text-slate-100">
+                  <Shield className="h-5 w-5 text-amber-500 animate-pulse" />
                   Доступ к системе
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-xs text-muted-foreground mt-1 leading-relaxed">
                   {profile?.is_verified
                     ? userAccount
                       ? "Информация о ваших услугах и удалённом доступе"
@@ -1842,7 +1842,7 @@ const Cabinet = () => {
                 </CardDescription>
               </CardHeader>
               {profile?.is_verified && address && (
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-4 pt-4">
                   {/* Карточка задолженности/статуса. Если адреса нет в БД обслуживания, она сама выведет блок "Частный клиент" */}
                   <DebtCard address={address} apartment={apartment} fullName={fullName} phone={phone} embedded setParentAccount={setUserAccount} />
                   
@@ -1853,12 +1853,12 @@ const Cabinet = () => {
                       <RemoteAccessCard address={address} apartment={apartment} />
                       
                       {/* Кнопка создания заявки / заказа платных услуг */}
-                      <div className="p-4 rounded-lg border border-primary/20 bg-muted/20 flex flex-col sm:flex-row items-center justify-between gap-4">
+                      <div className="p-4 rounded-2xl border border-slate-200/50 dark:border-slate-700/50 bg-slate-50/30 dark:bg-slate-900/30 flex flex-col sm:flex-row items-center justify-between gap-4 transition-all hover:border-primary/20">
                         <div className="text-left w-full">
                           <p className="font-semibold text-sm flex items-center gap-1.5"><Wrench className="h-4 w-4 text-primary shrink-0" /> Заявки и заказ услуг</p>
                           <p className="text-xs text-muted-foreground mt-1">Нужен ремонт трубки, новые ключи или установка оборудования? Оформить заявку прямо сейчас.</p>
                         </div>
-                        <Button onClick={() => { setOrderType("repair"); setIsOrderDialogOpen(true); }} className="w-full sm:w-auto shrink-0 flex items-center gap-1.5 hover:scale-105 transition-transform">
+                        <Button onClick={() => { setOrderType("repair"); setIsOrderDialogOpen(true); }} className="w-full sm:w-auto shrink-0 flex items-center gap-1.5 btn-premium-gold px-5 py-2.5 h-10">
                           <Plus className="h-4 w-4" />
                           Создать заявку
                         </Button>
@@ -1871,56 +1871,56 @@ const Cabinet = () => {
 
 
 
-            <Card className="border-primary/10 shadow-xl bg-card/75 backdrop-blur-md">
-              <CardHeader>
+            <Card className="glass-premium rounded-[24px] border-none shadow-xl">
+              <CardHeader className="pb-4 border-b border-slate-100 dark:border-slate-800">
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div>
-                    <CardTitle className="text-xl font-bold text-foreground">Личная информация</CardTitle>
-                    <CardDescription className="text-sm text-muted-foreground mt-1">
+                    <CardTitle className="text-xl font-bold text-foreground font-display">Личная информация</CardTitle>
+                    <CardDescription className="text-xs text-muted-foreground mt-1 leading-relaxed">
                       {isLocked
                         ? "Данные профиля верифицированы. Чтобы внести изменения — нажмите «Изменить»."
                         : "Пожалуйста, заполните обязательные графы для отправки профиля на верификацию."}
                     </CardDescription>
                   </div>
                   {profile?.is_verified && !editing && (
-                    <Button variant="outline" size="sm" onClick={() => { setEditing(true); setAgreedToTerms(true); }} className="hover:bg-primary/10 transition-colors">
-                      <Pencil className="h-4 w-4 mr-1" />
+                    <Button onClick={() => { setEditing(true); setAgreedToTerms(true); }} className="btn-premium-gold hover:shadow-gold-glow px-4 h-9">
+                      <Pencil className="h-4 w-4 mr-1.5" />
                       Изменить
                     </Button>
                   )}
                 </div>
               </CardHeader>
-              <CardContent className="space-y-5">
+              <CardContent className="space-y-5 pt-5">
                 
                 {/* 1. ФИО Абонента */}
-                <div className="space-y-2">
-                  <Label htmlFor="fullName" className="text-sm font-semibold flex items-center gap-1">👤 Полное имя (ФИО) *</Label>
+                <div className="space-y-2 text-left">
+                  <Label htmlFor="fullName" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">👤 Полное имя (ФИО) *</Label>
                   <Input
                     id="fullName"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="Иван Иванович Иванов"
                     disabled={isLocked}
-                    className="bg-background/50 border-border/80 focus:border-primary/50 font-medium h-10 transition-all"
+                    className="bg-white/40 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 font-medium h-10 transition-all rounded-xl placeholder-slate-400"
                   />
                 </div>
 
                 {/* 2. Контактный Телефон */}
-                <div className="space-y-2">
-                  <Label htmlFor="phone" className="text-sm font-semibold flex items-center gap-1">📞 Контактный телефон *</Label>
+                <div className="space-y-2 text-left">
+                  <Label htmlFor="phone" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">📞 Контактный телефон *</Label>
                   <Input
                     id="phone"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="+7 (999) 123-45-67"
                     disabled={isLocked}
-                    className="bg-background/50 border-border/80 focus:border-primary/50 font-medium h-10 transition-all"
+                    className="bg-white/40 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 font-medium h-10 transition-all rounded-xl placeholder-slate-400"
                   />
                 </div>
 
                 {/* 3. Электронная почта (заполнено при регистрации, только для чтения) */}
-                <div className="space-y-2">
-                  <Label htmlFor="emailInput" className="text-sm font-semibold flex items-center gap-1">📧 Электронная почта (Email) *</Label>
+                <div className="space-y-2 text-left">
+                  <Label htmlFor="emailInput" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">📧 Электронная почта (Email) *</Label>
                   <div className="relative">
                     <Input
                       id="emailInput"
@@ -1928,25 +1928,25 @@ const Cabinet = () => {
                       value={emailInput}
                       placeholder="your-email@example.com"
                       disabled={true} // Всегда заблокировано, так как берется из регистрации
-                      className="bg-muted/40 border-border/50 text-muted-foreground font-medium h-10 cursor-not-allowed pr-32"
+                      className="bg-slate-100/50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 text-muted-foreground font-medium h-10 cursor-not-allowed pr-32 rounded-xl"
                     />
-                    <span className="absolute right-3 top-3 text-[10px] text-muted-foreground flex items-center gap-1 font-semibold select-none bg-background/60 px-2 py-0.5 rounded border border-border/40">
+                    <span className="absolute right-3 top-2.5 text-[9px] text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 font-semibold select-none">
                       🔒 Регистрация
                     </span>
                   </div>
                 </div>
 
                 {/* 4. Выбор Типа Недвижимости (Квартира/Офис vs Частный дом) */}
-                <div className="space-y-2">
-                  <Label className="text-sm font-semibold flex items-center gap-1">🏠 Тип недвижимости *</Label>
-                  <div className="flex rounded-lg border p-1 bg-muted/40 w-full">
+                <div className="space-y-2 text-left">
+                  <Label className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">🏠 Тип недвижимости *</Label>
+                  <div className="flex rounded-xl border border-slate-200 dark:border-slate-700 p-1 bg-white/20 dark:bg-slate-900/20 w-full">
                     <button
                       type="button"
                       disabled={isLocked}
                       onClick={() => setPremiseType("apartment")}
-                      className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-md transition-all flex items-center justify-center gap-1.5 disabled:opacity-70 ${
+                      className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 disabled:opacity-70 ${
                         premiseType === "apartment"
-                          ? "bg-background text-foreground shadow-sm"
+                          ? "bg-white dark:bg-slate-800 text-foreground shadow-sm font-bold"
                           : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
@@ -1960,9 +1960,9 @@ const Cabinet = () => {
                         setApartment(""); // Очищаем квартиру для частного сектора
                         setFloor(""); // Очищаем этаж
                       }}
-                      className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-md transition-all flex items-center justify-center gap-1.5 disabled:opacity-70 ${
+                      className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 disabled:opacity-70 ${
                         premiseType === "private"
-                          ? "bg-background text-foreground shadow-sm"
+                          ? "bg-white dark:bg-slate-800 text-foreground shadow-sm font-bold"
                           : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
@@ -1974,8 +1974,8 @@ const Cabinet = () => {
                 {/* 5. Раздельные поля Улицы и Дома с DaData-автокомплитом */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Поле «Улица» */}
-                  <div className="space-y-2 relative">
-                    <Label htmlFor="street" className="text-sm font-semibold flex items-center gap-1">🛣️ Улица *</Label>
+                  <div className="space-y-2 relative text-left">
+                    <Label htmlFor="street" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">🛣️ Улица *</Label>
                     <div className="relative">
                       <Input
                         id="street"
@@ -1985,7 +1985,7 @@ const Cabinet = () => {
                         onBlur={() => setTimeout(() => setShowStreetSuggestions(false), 250)}
                         placeholder="Начните вводить название улицы"
                         disabled={isLocked}
-                        className="bg-background/50 border-border/80 focus:border-primary/50 font-medium h-10 transition-all"
+                        className="bg-white/40 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 font-medium h-10 transition-all rounded-xl placeholder-slate-400"
                       />
                       {loadingAddressCache && (
                         <Loader2 className="absolute right-3 top-3 h-4 w-4 animate-spin text-primary" />
@@ -1994,18 +1994,18 @@ const Cabinet = () => {
                     
                     {/* Подсказки улиц */}
                     {showStreetSuggestions && (streetSuggestions.length > 0 || dadataStreetSuggestions.length > 0) && (
-                      <div className="absolute z-50 w-full mt-1 bg-background/95 backdrop-blur-md border rounded-lg shadow-xl max-h-60 overflow-y-auto divide-y animate-in fade-in-50 slide-in-from-top-1 duration-200">
+                      <div className="absolute z-50 w-full mt-1.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200/50 dark:border-slate-700/50 rounded-2xl shadow-2xl max-h-60 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 animate-in fade-in-50 slide-in-from-top-1 duration-200">
                         
                         {/* Подключенные улицы */}
                         {streetSuggestions.map((item: any, idx) => (
                           <button
                             key={`local-st-${idx}`}
                             type="button"
-                            className="w-full text-left px-4 py-3 text-xs sm:text-sm hover:bg-primary/10 transition-colors focus:bg-primary/10 focus:outline-none flex items-center justify-between font-semibold text-foreground"
+                            className="w-full text-left px-4 py-3 text-xs sm:text-sm hover:bg-amber-500/5 transition-colors focus:bg-amber-500/5 focus:outline-none flex items-center justify-between font-semibold text-foreground"
                             onClick={() => handleSelectStreet(item)}
                           >
                             <span className="flex items-center gap-2"><span className="text-base">🏠</span> {item.streetName}</span>
-                            <span className="text-[10px] bg-green-500/10 text-green-600 dark:text-green-400 px-1.5 py-0.5 rounded border border-green-200/50">Подключен</span>
+                            <span className="text-[9px] bg-green-500/10 text-green-600 dark:text-green-400 px-2 py-0.5 rounded border border-green-200/50 font-bold">Подключен</span>
                           </button>
                         ))}
 
@@ -2014,11 +2014,11 @@ const Cabinet = () => {
                           <button
                             key={`dadata-st-${idx}`}
                             type="button"
-                            className="w-full text-left px-4 py-3 text-xs sm:text-sm hover:bg-primary/10 transition-colors focus:bg-primary/10 focus:outline-none flex items-center justify-between font-medium text-muted-foreground hover:text-foreground"
+                            className="w-full text-left px-4 py-3 text-xs sm:text-sm hover:bg-primary/5 transition-colors focus:bg-primary/5 focus:outline-none flex items-center justify-between font-medium text-muted-foreground hover:text-foreground"
                             onClick={() => handleSelectStreet(item)}
                           >
                             <span className="flex items-center gap-2"><span className="text-base">🛣️</span> {item.streetName}</span>
-                            <span className="text-[10px] text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded border">{item.city}</span>
+                            <span className="text-[9px] text-muted-foreground bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200/40">{item.city}</span>
                           </button>
                         ))}
                       </div>
@@ -2026,8 +2026,8 @@ const Cabinet = () => {
                   </div>
 
                   {/* Поле «Номер дома» */}
-                  <div className="space-y-2 relative">
-                    <Label htmlFor="house" className="text-sm font-semibold flex items-center gap-1">🏢 Номер дома *</Label>
+                  <div className="space-y-2 relative text-left">
+                    <Label htmlFor="house" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">🏢 Номер дома *</Label>
                     <div className="relative">
                       <Input
                         id="house"
@@ -2037,27 +2037,27 @@ const Cabinet = () => {
                         onBlur={() => setTimeout(() => setShowHouseSuggestions(false), 250)}
                         placeholder={displayStreet?.trim() ? "Введите номер дома" : "Сначала введите улицу"}
                         disabled={isLocked || !displayStreet?.trim()}
-                        className="bg-background/50 border-border/80 focus:border-primary/50 font-medium h-10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="bg-white/40 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 font-medium h-10 transition-all rounded-xl placeholder-slate-400 disabled:opacity-50 disabled:cursor-not-allowed"
                       />
                     </div>
                     
                     {/* Подсказки домов */}
                     {showHouseSuggestions && houseSuggestions.length > 0 && (
-                      <div className="absolute z-50 w-full mt-1 bg-background/95 backdrop-blur-md border rounded-lg shadow-xl max-h-60 overflow-y-auto divide-y animate-in fade-in-50 slide-in-from-top-1 duration-200">
+                      <div className="absolute z-50 w-full mt-1.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200/50 dark:border-slate-700/50 rounded-2xl shadow-2xl max-h-60 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 animate-in fade-in-50 slide-in-from-top-1 duration-200">
                         {houseSuggestions.map((item: any, idx) => (
                           <button
                             key={`house-${idx}`}
                             type="button"
-                            className="w-full text-left px-4 py-3 text-xs sm:text-sm hover:bg-primary/10 transition-colors focus:bg-primary/10 focus:outline-none flex items-center justify-between font-semibold text-foreground"
+                            className="w-full text-left px-4 py-3 text-xs sm:text-sm hover:bg-amber-500/5 transition-colors focus:bg-amber-500/5 focus:outline-none flex items-center justify-between font-semibold text-foreground"
                             onClick={() => handleSelectHouse(item)}
                           >
                             <span className="flex items-center gap-2">
                               <span>{item.isLocal ? "🛡️" : "🏢"}</span> {item.houseNumber}
                             </span>
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded border ${
+                            <span className={`text-[9px] px-2 py-0.5 rounded border font-bold ${
                               item.isLocal 
                                 ? "bg-green-500/10 text-green-600 dark:text-green-400 border-green-200/50" 
-                                : "bg-muted/50 text-muted-foreground border-border"
+                                : "bg-slate-100 dark:bg-slate-800 text-muted-foreground border-slate-200/40"
                             }`}>
                               {item.isLocal ? "Обслуживается" : "Доступен"}
                             </span>
@@ -2070,8 +2070,8 @@ const Cabinet = () => {
 
                 {/* 6. Помещение (Квартира/Офис) */}
                 {premiseType === "apartment" && (
-                  <div className="space-y-2 relative animate-in fade-in slide-in-from-top-1 duration-300">
-                    <Label htmlFor="apartment" className="text-sm font-semibold flex items-center gap-1">🏢 Квартира / Офис / Помещение *</Label>
+                  <div className="space-y-2 relative text-left animate-in fade-in slide-in-from-top-1 duration-300">
+                    <Label htmlFor="apartment" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">🏢 Квартира / Офис / Помещение *</Label>
                     <Input
                       id="apartment"
                       value={apartment}
@@ -2083,15 +2083,15 @@ const Cabinet = () => {
                         }
                       }}
                       onBlur={() => setTimeout(() => setShowApartmentSuggestions(false), 200)}
-                      placeholder={displayHouse?.trim() ? "Номер квартиры, офиса или бокса (например: 12)" : "Сначала введите номер дома"}
+                      placeholder={displayHouse?.trim() ? "Номер квартиры, офиса или бокса" : "Сначала введите номер дома"}
                       disabled={isLocked || !displayStreet?.trim() || !displayHouse?.trim()}
-                      className="bg-background/50 border-border/80 focus:border-primary/50 font-medium h-10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="bg-white/40 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 font-medium h-10 transition-all rounded-xl placeholder-slate-400 disabled:opacity-50 disabled:cursor-not-allowed"
                     />
 
                     {/* Всплывающая сетка доступных квартир */}
                     {showApartmentSuggestions && apartmentSuggestions.length > 0 && (
-                      <div className="absolute z-50 w-full mt-1 bg-background/95 backdrop-blur-md border rounded-lg shadow-xl max-h-48 overflow-y-auto p-3 animate-in fade-in-50 slide-in-from-top-1 duration-200">
-                        <div className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1">
+                      <div className="absolute z-50 w-full mt-1.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200/50 dark:border-slate-700/50 rounded-2xl shadow-2xl max-h-48 overflow-y-auto p-3 animate-in fade-in-50 slide-in-from-top-1 duration-200">
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                           <DoorOpen className="h-3.5 w-3.5 text-primary" />
                           <span>Подключенные абоненты в этом доме:</span>
                         </div>
@@ -2100,7 +2100,7 @@ const Cabinet = () => {
                             <button
                               key={index}
                               type="button"
-                              className="px-1.5 py-1.5 text-xs text-center rounded border border-border/80 hover:bg-primary/10 hover:border-primary/30 transition-all focus:bg-primary/10 focus:outline-none font-semibold text-foreground hover:scale-105 active:scale-95"
+                              className="px-1.5 py-1.5 text-xs text-center rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-amber-500/10 hover:border-amber-500/30 transition-all focus:bg-amber-500/10 focus:outline-none font-semibold text-foreground hover:scale-105 active:scale-95"
                               onClick={() => {
                                 setApartment(apt);
                                 setShowApartmentSuggestions(false);
@@ -2117,15 +2117,15 @@ const Cabinet = () => {
 
                 {/* 7. Этаж */}
                 {premiseType === "apartment" && (
-                  <div className="space-y-2 animate-in fade-in slide-in-from-top-1 duration-300">
-                    <Label htmlFor="floor" className="text-sm font-semibold flex items-center gap-1">🏢 Этаж *</Label>
+                  <div className="space-y-2 text-left animate-in fade-in slide-in-from-top-1 duration-300">
+                    <Label htmlFor="floor" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">🏢 Этаж *</Label>
                     <Input
                       id="floor"
                       value={floor}
                       onChange={(e) => setFloor(e.target.value)}
-                      placeholder={apartment?.trim() ? "Номер этажа (например: 3)" : "Сначала введите номер квартиры"}
+                      placeholder={apartment?.trim() ? "Номер этажа" : "Сначала введите номер квартиры"}
                       disabled={isLocked || !displayStreet?.trim() || !displayHouse?.trim() || !apartment?.trim()}
-                      className="bg-background/50 border-border/80 focus:border-primary/50 font-medium h-10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="bg-white/40 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 font-medium h-10 transition-all rounded-xl placeholder-slate-400 disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                   </div>
                 )}
@@ -2138,9 +2138,9 @@ const Cabinet = () => {
                       type="checkbox"
                       checked={agreedToTerms}
                       onChange={(e) => setAgreedToTerms(e.target.checked)}
-                      className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary shrink-0 cursor-pointer"
+                      className="mt-1 h-4 w-4 rounded border-slate-300 text-amber-500 focus:ring-amber-500/20 shrink-0 cursor-pointer"
                     />
-                    <Label htmlFor="agreedToTerms" className="text-xs text-muted-foreground leading-normal cursor-pointer select-none font-semibold hover:text-foreground transition-colors">
+                    <Label htmlFor="agreedToTerms" className="text-[11px] text-muted-foreground leading-normal cursor-pointer select-none font-semibold hover:text-foreground transition-colors">
                       Я соглашаюсь на <span className="text-primary hover:underline font-bold">обработку персональных данных</span> в соответствии с ФЗ-152 РФ и принимаю условия <span className="text-primary hover:underline font-bold">публичной оферты</span> при использовании сервиса «Домофондар».
                     </Label>
                   </div>
@@ -2159,18 +2159,18 @@ const Cabinet = () => {
                   );
 
                   return (
-                    <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                    <div className="flex flex-col sm:flex-row gap-3 pt-2">
                       <Button 
                         onClick={handleSaveAndVerify} 
                         disabled={saving} 
-                        className={`flex-1 whitespace-normal h-auto py-2.5 transition-all duration-300 ${
+                        className={`flex-1 whitespace-normal h-11 transition-all duration-300 rounded-xl ${
                           isFormValid 
-                            ? "bg-primary hover:bg-primary/90 text-primary-foreground shadow-md hover:shadow-lg scale-100" 
-                            : "bg-muted/70 hover:bg-muted text-muted-foreground border border-dashed border-muted-foreground/30 opacity-70 cursor-pointer"
+                            ? "btn-premium-gold hover:shadow-gold-glow scale-100 font-bold" 
+                            : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600 border border-dashed border-slate-200 dark:border-slate-700 opacity-60 cursor-not-allowed"
                         }`}
                       >
                         {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin shrink-0" />}
-                        <span className="text-center font-bold">
+                        <span className="text-center">
                           {profile?.is_verified ? "Сохранить и переотправить" : "Сохранить и отправить на верификацию"}
                         </span>
                       </Button>
@@ -2185,7 +2185,7 @@ const Cabinet = () => {
                           setSelectedStreet(null);
                           setApartment(profile?.apartment || "");
                           setFloor(profile?.floor || "");
-                        }} className="font-semibold">
+                        }} className="font-semibold rounded-xl h-11 hover:bg-slate-50 dark:hover:bg-slate-900">
                           Отмена
                         </Button>
                       )}
@@ -2197,21 +2197,21 @@ const Cabinet = () => {
                 {(profile?.is_verified || profile?.full_name) && (
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button variant="ghost" size="sm" className="w-full text-destructive hover:text-destructive hover:bg-destructive/10 whitespace-normal h-auto py-2 flex items-center justify-center gap-1 font-semibold">
+                      <Button variant="ghost" size="sm" className="w-full text-red-500 hover:text-red-600 hover:bg-red-500/10 whitespace-normal h-auto py-2 flex items-center justify-center gap-1 font-semibold rounded-xl">
                         <Trash2 className="h-4 w-4 shrink-0" />
                         <span className="text-center">Удалить данные верификации</span>
                       </Button>
                     </AlertDialogTrigger>
-                    <AlertDialogContent className="bg-background/95 backdrop-blur-md border rounded-xl shadow-2xl">
+                    <AlertDialogContent className="glass-premium border-none rounded-3xl shadow-2xl p-6">
                       <AlertDialogHeader>
-                        <AlertDialogTitle className="text-lg font-bold text-foreground">Удалить данные профиля?</AlertDialogTitle>
-                        <AlertDialogDescription className="text-sm text-muted-foreground">
+                        <AlertDialogTitle className="text-lg font-bold text-foreground font-display">Удалить данные профиля?</AlertDialogTitle>
+                        <AlertDialogDescription className="text-xs text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
                           Все заполненные вами данные профиля (ФИО, адрес, телефон, помещение) будут безвозвратно удалены из базы, а статус верификации аннулирован.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel className="font-semibold">Отмена</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleClearData} className="bg-destructive text-destructive-foreground hover:bg-destructive/90 font-semibold">
+                      <AlertDialogFooter className="mt-4 gap-2">
+                        <AlertDialogCancel className="font-semibold rounded-xl h-10 border border-slate-200 hover:bg-slate-50 dark:hover:bg-slate-900">Отмена</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleClearData} className="bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl h-10">
                           Удалить данные
                         </AlertDialogAction>
                       </AlertDialogFooter>
@@ -2223,162 +2223,174 @@ const Cabinet = () => {
 
 
             {/* --- РАЗДЕЛ: ИСТОРИЯ ЗАЯВОК И ОПЛАТ (в самом низу страницы) --- */}
-            {userRequests && userRequests.length > 0 && (
-              <Card className="border-primary/20 shadow-lg bg-card/65 backdrop-blur-md animate-in fade-in-50 duration-300">
-                <CardHeader className="pb-3 border-b">
-                  <CardTitle className="text-lg font-bold flex items-center gap-2">
-                    <ClipboardList className="h-5 w-5 text-primary" />
-                    История ваших обращений и оплат
-                  </CardTitle>
-                  <CardDescription>
-                    Список всех ваших заявок, их статус выполнения в службе FSM и статус оплаты
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="pt-4 px-3 sm:px-6">
-                  <div className="space-y-4 max-h-[480px] overflow-y-auto pr-1">
-                    {userRequests.map((req: any) => {
-                      const isPaid = req.payment_status === "paid";
-                      const isOnSite = req.payment_status === "on_site";
-                      const isPending = req.payment_status === "pending";
-                      const isOrder = Number(req.payment_amount) > 0;
-                      
-                      // Форматируем статус заявки
-                      const getStatusBadge = (status: string) => {
-                        switch (status) {
-                          case "pending":
-                            return <Badge className="bg-orange-500/10 text-orange-600 dark:text-orange-400 hover:bg-orange-500/10 border-orange-200/50">Новая</Badge>;
-                          case "in_progress":
-                            return <Badge className="bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 border-blue-200/50">В работе</Badge>;
-                          case "completed":
-                            return <Badge className="bg-green-500/10 text-green-600 dark:text-green-400 hover:bg-green-500/10 border-green-200/50">Выполнена</Badge>;
-                          case "cancelled":
-                            return <Badge className="bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/10 border-red-200/50">Отклонена</Badge>;
-                          default:
-                            return <Badge variant="outline">{status}</Badge>;
-                        }
-                      };
+            {userRequests && userRequests.length > 0 && (() => {
+              // RULE 2: Логируем отрисовку блока истории обращений в Личном Кабинете
+              console.log("[ЛК Кабинет] Отрисовка карточки истории обращений и оплат абонента, найдено записей:", userRequests.length);
+              
+              return (
+                <Card className="glass-premium border-none rounded-[24px] shadow-2xl animate-in fade-in-50 duration-300">
+                  <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
+                    <CardTitle className="text-lg font-bold flex items-center gap-2 text-foreground font-display">
+                      <ClipboardList className="h-5 w-5 text-amber-500" />
+                      История ваших обращений и оплат
+                    </CardTitle>
+                    <CardDescription className="text-xs text-slate-500 dark:text-slate-400">
+                      Список всех ваших заявок, их статус выполнения в службе FSM и статус оплаты
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="pt-4 px-3 sm:px-6">
+                    <div className="space-y-4 max-h-[480px] overflow-y-auto pr-1">
+                      {userRequests.map((req: any) => {
+                        const isPaid = req.payment_status === "paid";
+                        const isOnSite = req.payment_status === "on_site";
+                        const isPending = req.payment_status === "pending";
+                        const isOrder = Number(req.payment_amount) > 0;
+                        
+                        // Форматируем статус заявки
+                        const getStatusBadge = (status: string) => {
+                          switch (status) {
+                            case "pending":
+                              return <Badge className="bg-orange-500/10 text-orange-600 dark:text-orange-400 hover:bg-orange-500/10 border-orange-200/50 rounded-lg">Новая</Badge>;
+                            case "in_progress":
+                              return <Badge className="bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 border-blue-200/50 rounded-lg">В работе</Badge>;
+                            case "completed":
+                              return <Badge className="bg-green-500/10 text-green-600 dark:text-green-400 hover:bg-green-500/10 border-green-200/50 rounded-lg">Выполнена</Badge>;
+                            case "cancelled":
+                              return <Badge className="bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/10 border-red-200/50 rounded-lg">Отклонена</Badge>;
+                            default:
+                              return <Badge variant="outline" className="rounded-lg">{status}</Badge>;
+                          }
+                        };
 
-                      // Форматируем статус оплаты
-                      const getPaymentBadge = () => {
-                        if (!isOrder) return null;
-                        if (isPaid) {
-                          return <Badge className="bg-green-600 text-white dark:bg-green-700 hover:bg-green-600 border-none">✓ Оплачено онлайн</Badge>;
-                        }
-                        if (isOnSite) {
-                          return <Badge className="bg-blue-600 text-white dark:bg-blue-700 hover:bg-blue-600 border-none">💵 Оплата на месте</Badge>;
-                        }
-                        if (isPending) {
-                          return <Badge className="bg-orange-500 text-white dark:bg-orange-600 hover:bg-orange-500 border-none">⏳ Ожидает оплаты</Badge>;
-                        }
-                        return null;
-                      };
+                        // Форматируем статус оплаты
+                        const getPaymentBadge = () => {
+                          if (!isOrder) return null;
+                          if (isPaid) {
+                            return <Badge className="bg-green-600 text-white dark:bg-green-700 hover:bg-green-600 border-none rounded-lg font-bold">✓ Оплачено онлайн</Badge>;
+                          }
+                          if (isOnSite) {
+                            return <Badge className="bg-blue-600 text-white dark:bg-blue-700 hover:bg-blue-600 border-none rounded-lg font-bold">💵 Оплата на месте</Badge>;
+                          }
+                          if (isPending) {
+                            return <Badge className="bg-orange-500 text-white dark:bg-orange-600 hover:bg-orange-500 border-none rounded-lg font-bold">⏳ Ожидает оплаты</Badge>;
+                          }
+                          return null;
+                        };
 
-                      return (
-                        <div key={req.id} className="p-4 rounded-xl border bg-muted/20 hover:bg-muted/40 transition-colors flex flex-col md:flex-row justify-between gap-4">
-                          <div className="space-y-2 flex-1 text-left">
-                            <div className="flex items-center justify-between sm:justify-start gap-3 flex-wrap">
-                              <span className="text-xs font-mono text-muted-foreground">
-                                {format(new Date(req.created_at), "dd MMMM yyyy, HH:mm", { locale: ru })}
-                              </span>
-                              <div className="flex gap-1.5 items-center">
-                                {getStatusBadge(req.status)}
-                                {getPaymentBadge()}
+                        return (
+                          <div key={req.id} className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800/80 bg-white/40 dark:bg-slate-900/40 hover:bg-white/60 dark:hover:bg-slate-900/60 transition-all shadow-sm hover:shadow-md flex flex-col md:flex-row justify-between gap-4">
+                            <div className="space-y-2 flex-1 text-left">
+                              <div className="flex items-center justify-between sm:justify-start gap-3 flex-wrap">
+                                <span className="text-xs font-mono text-slate-500 dark:text-slate-400 font-semibold">
+                                  {format(new Date(req.created_at), "dd MMMM yyyy, HH:mm", { locale: ru })}
+                                </span>
+                                <div className="flex gap-1.5 items-center">
+                                  {getStatusBadge(req.status)}
+                                  {getPaymentBadge()}
+                                </div>
                               </div>
+                              
+                              <p className="text-sm font-semibold text-foreground border-b border-slate-100 dark:border-slate-800 pb-1">
+                                {req.address}
+                              </p>
+                              
+                              <p className="text-xs text-slate-600 dark:text-slate-300 whitespace-pre-line leading-relaxed">
+                                {req.message}
+                              </p>
                             </div>
-                            
-                            <p className="text-sm font-semibold text-foreground border-b pb-1">
-                              {req.address}
-                            </p>
-                            
-                            <p className="text-xs text-muted-foreground whitespace-pre-line leading-relaxed">
-                              {req.message}
-                            </p>
+
+                            {/* Кнопка "Оплатить сейчас" для неоплаченных онлайн-заявок */}
+                            {isOrder && isPending && (
+                              <div className="flex items-center justify-end shrink-0 pt-2 md:pt-0 md:pl-4 border-t md:border-t-0 md:border-l border-slate-100 dark:border-slate-800/80">
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    // RULE 2: Логируем инициацию оплаты заявки из истории обращений
+                                    console.log("[ЛК Кабинет] Абонент инициировал оплату заявки ID:", req.id, "сумма:", req.payment_amount);
+                                    
+                                    // Парсим суммы из сообщения или берем payment_amount
+                                    const totalAmount = Number(req.payment_amount) || 0;
+                                    
+                                    // Парсим адрес на улицу, дом, корпус, подъезд и квартиру
+                                    const street = address ? address.split(",")[1]?.replace(/(?:ул\.?|улица)\s*/gi, "").trim() || address : "";
+                                    const house = address ? address.split(",")[2]?.replace(/(?:д\.?|дом)\s*/gi, "").trim() || "" : "";
+                                    const entranceMatch = address ? address.match(/(?:подъезд|п\.?)\s*(\d+)/i) : null;
+                                    const entrance = entranceMatch ? entranceMatch[1] : "1";
+
+                                    // Передаем всю сумму в SUMMA_OPL2 (услуги)
+                                    const payUrl = `https://pay.kk.ru/services/117425?` +
+                                      `&ACCOUNTNUMBER=${encodeURIComponent(userAccount?.account_number || "000000")}` +
+                                      `&FIO=${encodeURIComponent(fullName || profile?.full_name || "")}` +
+                                      `&ADDRESS=${encodeURIComponent(street)}` +
+                                      `&HOUSE=${encodeURIComponent(house)}` +
+                                      `&FLAT=${encodeURIComponent(apartment || profile?.apartment || "")}` +
+                                      `&ENTRANCE=${encodeURIComponent(entrance)}` +
+                                      `&FLOOR=${encodeURIComponent(floor || profile?.floor || "")}` +
+                                      `&EMAIL=${encodeURIComponent(email || profile?.email || "")}` +
+                                      `&PHONE=${encodeURIComponent(phone || profile?.phone || "")}` +
+                                      `&SUMMA_OPL1=0.00` +
+                                      `&SUMMA_OPL2=${totalAmount.toFixed(2)}` +
+                                      `&SUMMA_OPL3=0.00` +
+                                      `&DENGI_F=${totalAmount.toFixed(2)}` +
+                                      `&INFO=${encodeURIComponent(`Оплата услуг по заявке #${req.id}`)}` +
+                                      `&SuccessURL=${encodeURIComponent(`https://domofon.mozhnovpn.tech/cabinet?payment_success=true&request_id=${req.id}`)}`;
+
+                                    window.open(payUrl, "_blank");
+                                  }}
+                                  className="w-full md:w-auto flex items-center justify-center gap-1.5 btn-premium-gold px-4 py-2 hover:shadow-gold-glow text-xs shrink-0 font-bold"
+                                >
+                                  <CreditCard className="h-3.5 w-3.5" />
+                                  Оплатить сейчас
+                                </Button>
+                              </div>
+                            )}
                           </div>
-
-                          {/* Кнопка "Оплатить сейчас" для неоплаченных онлайн-заявок */}
-                          {isOrder && isPending && (
-                            <div className="flex items-center justify-end shrink-0 pt-2 md:pt-0 md:pl-4 border-t md:border-t-0 md:border-l border-muted/50">
-                              <Button
-                                size="sm"
-                                onClick={() => {
-                                  // Парсим суммы из сообщения или берем payment_amount
-                                  const totalAmount = Number(req.payment_amount) || 0;
-                                  
-                                  // Парсим адрес на улицу, дом, корпус, подъезд и квартиру
-                                  const street = address ? address.split(",")[1]?.replace(/(?:ул\.?|улица)\s*/gi, "").trim() || address : "";
-                                  const house = address ? address.split(",")[2]?.replace(/(?:д\.?|дом)\s*/gi, "").trim() || "" : "";
-                                  const entranceMatch = address ? address.match(/(?:подъезд|п\.?)\s*(\d+)/i) : null;
-                                  const entrance = entranceMatch ? entranceMatch[1] : "1";
-
-                                  // Передаем всю сумму в SUMMA_OPL2 (услуги)
-                                  const payUrl = `https://pay.kk.ru/services/117425?` +
-                                    `&ACCOUNTNUMBER=${encodeURIComponent(userAccount?.account_number || "000000")}` +
-                                    `&FIO=${encodeURIComponent(fullName || profile?.full_name || "")}` +
-                                    `&ADDRESS=${encodeURIComponent(street)}` +
-                                    `&HOUSE=${encodeURIComponent(house)}` +
-                                    `&FLAT=${encodeURIComponent(apartment || profile?.apartment || "")}` +
-                                    `&ENTRANCE=${encodeURIComponent(entrance)}` +
-                                    `&FLOOR=${encodeURIComponent(floor || profile?.floor || "")}` +
-                                    `&EMAIL=${encodeURIComponent(email || profile?.email || "")}` +
-                                    `&PHONE=${encodeURIComponent(phone || profile?.phone || "")}` +
-                                    `&SUMMA_OPL1=0.00` +
-                                    `&SUMMA_OPL2=${totalAmount.toFixed(2)}` +
-                                    `&SUMMA_OPL3=0.00` +
-                                    `&DENGI_F=${totalAmount.toFixed(2)}` +
-                                    `&INFO=${encodeURIComponent(`Оплата услуг по заявке #${req.id}`)}` +
-                                    `&SuccessURL=${encodeURIComponent(`https://domofon.mozhnovpn.tech/cabinet?payment_success=true&request_id=${req.id}`)}`;
-
-                                  window.open(payUrl, "_blank");
-                                }}
-                                className="w-full md:w-auto flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs py-1.5"
-                              >
-                                <CreditCard className="h-3.5 w-3.5" />
-                                Оплатить сейчас
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })()}
 
             {/* --- ДИАЛОГ ПОДАЧИ ЗАЯВКИ / ЗАКАЗА УСЛУГ --- */}
-            <Dialog open={isOrderDialogOpen} onOpenChange={setIsOrderDialogOpen}>
-              <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto p-4 sm:p-6 bg-background/95 backdrop-blur-md rounded-xl shadow-2xl border">
-                <DialogHeader className="pb-3 border-b">
-                  <DialogTitle className="text-xl font-bold flex items-center gap-2 text-foreground">
-                    <Wrench className="h-5 w-5 text-primary" />
+            <Dialog open={isOrderDialogOpen} onOpenChange={(openState) => {
+              // RULE 2: Логируем состояние диалога создания заявки
+              console.log("[ЛК Кабинет] Изменение состояния диалога заявки, открыт:", openState);
+              setIsOrderDialogOpen(openState);
+            }}>
+              <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto p-4 sm:p-6 glass-premium border-none rounded-[24px] shadow-2xl animate-in fade-in duration-200">
+                <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
+                  <DialogTitle className="text-xl font-bold flex items-center gap-2 text-foreground font-display">
+                    <Wrench className="h-5 w-5 text-amber-500" />
                     Создание новой заявки
                   </DialogTitle>
-                  <DialogDescription className="text-xs text-muted-foreground mt-1">
+                  <DialogDescription className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                     Абонент: <span className="font-semibold text-foreground">{fullName || profile?.full_name}</span> | Адрес: <span className="font-semibold text-foreground">{address}{apartment ? `, кв. ${apartment}` : ""}</span>
                   </DialogDescription>
                 </DialogHeader>
 
                 {/* --- БЛОК КОНТАКТОВ И АДРЕСА ВЫЗОВА ДЛЯ ЗАЯВКИ --- */}
-                <div className="p-4 bg-muted/30 border rounded-lg space-y-4 my-2 text-left animate-in fade-in duration-300">
-                  <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 border-b pb-1.5">
-                    <Smartphone className="h-4 w-4 text-primary" />
+                <div className="p-4 bg-white/40 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800/80 rounded-2xl space-y-4 my-2 text-left animate-in fade-in duration-300">
+                  <div className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-800/80 pb-1.5 font-display">
+                    <Smartphone className="h-4 w-4 text-amber-500" />
                     <span>Контакты и адрес вызова для этой заявки</span>
                   </div>
 
                   {/* Имя и Телефон */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-1.5">
-                      <Label htmlFor="orderName" className="text-xs font-semibold text-muted-foreground">ФИО клиента</Label>
+                      <Label htmlFor="orderName" className="text-xs font-semibold text-slate-500 dark:text-slate-400">ФИО клиента</Label>
                       <Input
                         id="orderName"
                         value={orderName}
                         onChange={(e) => setOrderName(e.target.value)}
                         placeholder="Иванов Иван Иванович"
-                        className="bg-background/50 border-border/80 h-9 text-sm font-medium transition-all"
+                        className="bg-white/50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 h-9 text-sm font-medium transition-all rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="orderPhone" className="text-xs font-semibold text-muted-foreground flex items-center gap-0.5">
+                      <Label htmlFor="orderPhone" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-0.5">
                         Телефон для связи <span className="text-destructive">*</span>
                       </Label>
                       <Input
@@ -2386,24 +2398,24 @@ const Cabinet = () => {
                         value={orderPhone}
                         onChange={(e) => setOrderPhone(e.target.value)}
                         placeholder="+7 (999) 999-99-99"
-                        className="bg-background/50 border-border/80 h-9 text-sm font-medium transition-all"
+                        className="bg-white/50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 h-9 text-sm font-medium transition-all rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
                       />
                     </div>
                   </div>
 
                   {/* Переключатель типа помещения для заявки */}
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-muted-foreground">Тип недвижимости</Label>
-                    <div className="flex rounded-md border p-0.5 bg-background/50 max-w-xs">
+                    <Label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Тип недвижимости</Label>
+                    <div className="flex rounded-xl border border-slate-200 dark:border-slate-800 p-0.5 bg-white/20 dark:bg-slate-900/20 max-w-xs">
                       <button
                         type="button"
                         onClick={() => {
                           setOrderPremiseType("apartment");
                           console.log("[Заявка] Выбран тип помещения: Квартира/Офис");
                         }}
-                        className={`flex-1 py-1 text-xs font-semibold rounded-sm transition-all ${
+                        className={`flex-1 py-1 text-xs font-semibold rounded-lg transition-all ${
                           orderPremiseType === "apartment"
-                            ? "bg-primary text-primary-foreground shadow-sm font-bold"
+                            ? "bg-white dark:bg-slate-800 text-foreground shadow-sm font-bold"
                             : "text-muted-foreground hover:text-foreground"
                         }`}
                       >
@@ -2415,9 +2427,9 @@ const Cabinet = () => {
                           setOrderPremiseType("private");
                           console.log("[Заявка] Выбран тип помещения: Частный дом");
                         }}
-                        className={`flex-1 py-1 text-xs font-semibold rounded-sm transition-all ${
+                        className={`flex-1 py-1 text-xs font-semibold rounded-lg transition-all ${
                           orderPremiseType === "private"
-                            ? "bg-primary text-primary-foreground shadow-sm font-bold"
+                            ? "bg-white dark:bg-slate-800 text-foreground shadow-sm font-bold"
                             : "text-muted-foreground hover:text-foreground"
                         }`}
                       >
@@ -2429,7 +2441,7 @@ const Cabinet = () => {
                   {/* Адрес: Улица, Дом, Квартира */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="space-y-1.5 sm:col-span-1">
-                      <Label htmlFor="orderStreet" className="text-xs font-semibold text-muted-foreground flex items-center gap-0.5">
+                      <Label htmlFor="orderStreet" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-0.5">
                         Улица <span className="text-destructive">*</span>
                       </Label>
                       <Input
@@ -2437,11 +2449,11 @@ const Cabinet = () => {
                         value={orderStreet}
                         onChange={(e) => setOrderStreet(e.target.value)}
                         placeholder="Название улицы"
-                        className="bg-background/50 border-border/80 h-9 text-sm font-medium transition-all"
+                        className="bg-white/50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 h-9 text-sm font-medium transition-all rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="orderHouse" className="text-xs font-semibold text-muted-foreground flex items-center gap-0.5">
+                      <Label htmlFor="orderHouse" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-0.5">
                         Дом <span className="text-destructive">*</span>
                       </Label>
                       <Input
@@ -2449,12 +2461,12 @@ const Cabinet = () => {
                         value={orderHouse}
                         onChange={(e) => setOrderHouse(e.target.value)}
                         placeholder="Например: 58а"
-                        className="bg-background/50 border-border/80 h-9 text-sm font-medium transition-all"
+                        className="bg-white/50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 h-9 text-sm font-medium transition-all rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
                       />
                     </div>
                     {orderPremiseType === "apartment" && (
                       <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
-                        <Label htmlFor="orderApartment" className="text-xs font-semibold text-muted-foreground flex items-center gap-0.5">
+                        <Label htmlFor="orderApartment" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-0.5">
                           Кв. / Офис <span className="text-destructive">*</span>
                         </Label>
                         <Input
@@ -2462,7 +2474,7 @@ const Cabinet = () => {
                           value={orderApartment}
                           onChange={(e) => setOrderApartment(e.target.value)}
                           placeholder="Например: 12"
-                          className="bg-background/50 border-border/80 h-9 text-sm font-medium transition-all"
+                          className="bg-white/50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 h-9 text-sm font-medium transition-all rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
                         />
                       </div>
                     )}
@@ -2470,13 +2482,17 @@ const Cabinet = () => {
                 </div>
 
                 {/* Переключатель вкладок типа обращения */}
-                <div className="flex rounded-lg border p-1 bg-muted/40 w-full my-4">
+                <div className="flex rounded-xl border border-slate-200 dark:border-slate-850 p-1 bg-white/20 dark:bg-slate-900/20 w-full my-4">
                   <button
                     type="button"
-                    onClick={() => setOrderType("repair")}
-                    className={`flex-1 py-2 text-sm font-semibold rounded-md transition-all flex items-center justify-center gap-1.5 ${
+                    onClick={() => {
+                      // RULE 2: Логируем переключение на ремонт
+                      console.log("[Заявка] Абонент переключил таб на: Неисправность");
+                      setOrderType("repair");
+                    }}
+                    className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
                       orderType === "repair"
-                        ? "bg-background text-foreground shadow-sm"
+                        ? "bg-white dark:bg-slate-800 text-foreground shadow-sm font-bold"
                         : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
@@ -2485,16 +2501,17 @@ const Cabinet = () => {
                   <button
                     type="button"
                     onClick={() => {
+                      // RULE 2: Логируем переключение на заказ
+                      console.log("[Заявка] Абонент переключил таб на: Заказ услуг и оборудования");
                       setOrderType("order");
-                      // Выберем первую доступную услугу по умолчанию, если ничего не выбрано
                       const service = products.find(p => p.category === "service");
                       if (service && !selectedServiceId) {
                         setSelectedServiceId(service.id);
                       }
                     }}
-                    className={`flex-1 py-2 text-sm font-semibold rounded-md transition-all flex items-center justify-center gap-1.5 ${
+                    className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
                       orderType === "order"
-                        ? "bg-background text-foreground shadow-sm"
+                        ? "bg-white dark:bg-slate-800 text-foreground shadow-sm font-bold"
                         : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
@@ -2513,10 +2530,10 @@ const Cabinet = () => {
                         value={repairProblem}
                         onChange={(e) => setRepairProblem(e.target.value)}
                         rows={4}
-                        className="bg-background/50 border-border/80 focus:border-primary/50 focus:ring-1 focus:ring-primary/20 text-sm font-medium"
+                        className="bg-white/50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 text-sm font-medium rounded-xl transition-all placeholder-slate-400"
                       />
                     </div>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-slate-400 dark:text-slate-500">
                       * Заявки по неисправностям и техническому обслуживанию в рамках абонентской платы выполняются **бесплатно**.
                     </p>
                   </div>
@@ -2536,30 +2553,36 @@ const Cabinet = () => {
                             <button
                               key={service.id}
                               type="button"
-                              onClick={() => setSelectedServiceId(service.id)}
-                              className={`p-3 text-left rounded-lg border text-sm font-medium transition-all ${
+                              onClick={() => {
+                                console.log("[Заявка] Выбрана услуга ID:", service.id, "цена:", service.price);
+                                setSelectedServiceId(service.id);
+                              }}
+                              className={`p-3.5 text-left rounded-xl border text-sm transition-all hover:scale-[1.01] ${
                                 selectedServiceId === service.id
-                                  ? "border-primary bg-primary/5 text-foreground shadow-sm"
-                                  : "border-border/80 bg-background/50 text-muted-foreground hover:text-foreground"
+                                  ? "border-amber-500 bg-amber-500/5 text-foreground shadow-sm font-semibold"
+                                  : "border-slate-200 dark:border-slate-800 bg-white/20 dark:bg-slate-900/20 text-muted-foreground hover:text-foreground"
                               }`}
                             >
                               <div className="font-semibold text-foreground">{service.name}</div>
-                              <div className="text-xs text-primary font-bold mt-1">
+                              <div className="text-xs text-amber-500 font-bold mt-1">
                                 {Number(service.price) === 0 ? "Бесплатно" : `${Number(service.price).toFixed(0)} ₽`}
                               </div>
                             </button>
                           ))}
                         <button
                           type="button"
-                          onClick={() => setSelectedServiceId(null)}
-                          className={`p-3 text-left rounded-lg border text-sm font-medium transition-all ${
+                          onClick={() => {
+                            console.log("[Заявка] Сброс выбора услуги");
+                            setSelectedServiceId(null);
+                          }}
+                          className={`p-3.5 text-left rounded-xl border text-sm transition-all hover:scale-[1.01] ${
                             selectedServiceId === null
-                              ? "border-primary bg-primary/5 text-foreground shadow-sm"
-                              : "border-border/80 bg-background/50 text-muted-foreground hover:text-foreground"
+                              ? "border-amber-500 bg-amber-500/5 text-foreground shadow-sm font-semibold"
+                              : "border-slate-200 dark:border-slate-800 bg-white/20 dark:bg-slate-900/20 text-muted-foreground hover:text-foreground"
                           }`}
                         >
                           <div className="font-semibold text-foreground">Без услуги</div>
-                          <div className="text-xs text-muted-foreground mt-1">Только покупка трубки/ключей</div>
+                          <div className="text-xs text-slate-400 dark:text-slate-500 mt-1">Только покупка трубки/ключей</div>
                         </button>
                       </div>
                     </div>
@@ -2575,12 +2598,12 @@ const Cabinet = () => {
                             return (
                               <div
                                 key={equip.id}
-                                className="flex items-center justify-between p-3 rounded-lg border border-border/80 bg-background/50"
+                                className="flex items-center justify-between p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/20 dark:bg-slate-900/20"
                               >
-                                <div>
+                                <div className="text-left">
                                   <div className="font-semibold text-sm text-foreground">{equip.name.toUpperCase()}</div>
-                                  <div className="text-xs text-muted-foreground mt-0.5">{equip.description || "Абонентская трубка домофона"}</div>
-                                  <div className="text-xs text-primary font-bold mt-1">{Number(equip.price).toFixed(0)} ₽</div>
+                                  <div className="text-xs text-slate-500 dark:text-slate-450 mt-0.5">{equip.description || "Абонентская трубка домофона"}</div>
+                                  <div className="text-xs text-amber-500 font-bold mt-1">{Number(equip.price).toFixed(0)} ₽</div>
                                 </div>
                                 
                                 {/* Счетчик количества */}
@@ -2589,10 +2612,11 @@ const Cabinet = () => {
                                     type="button"
                                     onClick={() => {
                                       if (qty > 0) {
+                                        console.log("[Заявка] Уменьшено кол-во трубок", equip.name, "до:", qty - 1);
                                         setSelectedEquipments(prev => ({ ...prev, [equip.id]: qty - 1 }));
                                       }
                                     }}
-                                    className="p-1 rounded-md border hover:bg-muted text-muted-foreground active:scale-90 transition-all shrink-0"
+                                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900 text-slate-400 dark:text-slate-550 active:scale-90 transition-all shrink-0 bg-white/40 dark:bg-slate-950/40"
                                   >
                                     <Minus className="h-3.5 w-3.5" />
                                   </button>
@@ -2600,9 +2624,10 @@ const Cabinet = () => {
                                   <button
                                     type="button"
                                     onClick={() => {
+                                      console.log("[Заявка] Увеличено кол-во трубок", equip.name, "до:", qty + 1);
                                       setSelectedEquipments(prev => ({ ...prev, [equip.id]: qty + 1 }));
                                     }}
-                                    className="p-1 rounded-md border hover:bg-muted text-muted-foreground active:scale-90 transition-all shrink-0"
+                                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900 text-slate-400 dark:text-slate-550 active:scale-90 transition-all shrink-0 bg-white/40 dark:bg-slate-950/40"
                                   >
                                     <Plus className="h-3.5 w-3.5" />
                                   </button>
@@ -2619,14 +2644,14 @@ const Cabinet = () => {
                       .map((keyProduct) => (
                         <div
                           key={keyProduct.id}
-                          className="flex items-center justify-between p-3 rounded-lg border border-primary/20 bg-primary/5"
+                          className="flex items-center justify-between p-3.5 rounded-xl border border-amber-500/20 bg-amber-500/5 shadow-sm shadow-amber-500/5"
                         >
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 text-left">
                             <span className="text-xl">🔑</span>
                             <div>
                               <div className="font-semibold text-sm text-foreground">{keyProduct.name.toUpperCase()}</div>
-                              <div className="text-xs text-muted-foreground mt-0.5">Ключ с повышенной защитой от копирования</div>
-                              <div className="text-xs text-primary font-bold mt-1">{Number(keyProduct.price).toFixed(0)} ₽ за шт.</div>
+                              <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Ключ с повышенной защитой от копирования</div>
+                              <div className="text-xs text-amber-500 font-bold mt-1">{Number(keyProduct.price).toFixed(0)} ₽ за шт.</div>
                             </div>
                           </div>
 
@@ -2635,17 +2660,23 @@ const Cabinet = () => {
                             <button
                               type="button"
                               onClick={() => {
-                                if (keysQuantity > 0) setKeysQuantity(prev => prev - 1);
+                                if (keysQuantity > 0) {
+                                  console.log("[Заявка] Уменьшено кол-во ключей до:", keysQuantity - 1);
+                                  setKeysQuantity(prev => prev - 1);
+                                }
                               }}
-                              className="p-1 rounded-md border bg-background hover:bg-muted text-muted-foreground active:scale-90 transition-all shrink-0"
+                              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900 text-slate-400 dark:text-slate-550 active:scale-90 transition-all shrink-0 bg-white/40 dark:bg-slate-950/40"
                             >
                               <Minus className="h-3.5 w-3.5" />
                             </button>
                             <span className="w-6 text-center font-bold text-sm text-foreground">{keysQuantity}</span>
                             <button
                               type="button"
-                              onClick={() => setKeysQuantity(prev => prev + 1)}
-                              className="p-1 rounded-md border bg-background hover:bg-muted text-muted-foreground active:scale-90 transition-all shrink-0"
+                              onClick={() => {
+                                console.log("[Заявка] Увеличено кол-во ключей до:", keysQuantity + 1);
+                                setKeysQuantity(prev => prev + 1);
+                              }}
+                              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900 text-slate-400 dark:text-slate-550 active:scale-90 transition-all shrink-0 bg-white/40 dark:bg-slate-950/40"
                             >
                               <Plus className="h-3.5 w-3.5" />
                             </button>
@@ -2659,21 +2690,24 @@ const Cabinet = () => {
                       .map((cabinetProduct) => (
                         <div
                           key={cabinetProduct.id}
-                          className="flex items-start gap-3 p-3 rounded-lg border border-border/80 bg-background/50"
+                          className="flex items-start gap-3 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/20 dark:bg-slate-900/20"
                         >
                           <input
                             id="cabinetSetup"
                             type="checkbox"
                             checked={isCabinetSetupChecked}
-                            onChange={(e) => setIsCabinetSetupChecked(e.target.checked)}
-                            className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary shrink-0 cursor-pointer"
+                            onChange={(e) => {
+                              console.log("[Заявка] Подключение ЛК:", e.target.checked);
+                              setIsCabinetSetupChecked(e.target.checked);
+                            }}
+                            className="mt-1 h-4 w-4 rounded border-slate-300 text-amber-500 focus:ring-amber-500/20 shrink-0 cursor-pointer"
                           />
                           <div className="text-left cursor-pointer" onClick={() => setIsCabinetSetupChecked(!isCabinetSetupChecked)}>
                             <Label htmlFor="cabinetSetup" className="font-semibold text-sm text-foreground cursor-pointer flex items-center gap-1.5">
                               📱 {cabinetProduct.name}
                             </Label>
-                            <p className="text-xs text-muted-foreground mt-0.5">{cabinetProduct.description || "Единоразовое подключение и настройка личного кабинета"}</p>
-                            <p className="text-xs text-primary font-bold mt-1">+{Number(cabinetProduct.price).toFixed(0)} ₽ единоразово</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-450 mt-0.5">{cabinetProduct.description || "Единоразовое подключение и настройка личного кабинета"}</p>
+                            <p className="text-xs text-amber-500 font-bold mt-1">+{Number(cabinetProduct.price).toFixed(0)} ₽ единоразово</p>
                           </div>
                         </div>
                       ))}
@@ -2687,19 +2721,19 @@ const Cabinet = () => {
                         value={orderComment}
                         onChange={(e) => setOrderComment(e.target.value)}
                         rows={2}
-                        className="bg-background/50 border-border/80 focus:border-primary/50 text-xs font-medium"
+                        className="bg-white/50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 text-xs font-medium rounded-xl placeholder-slate-450"
                       />
                     </div>
 
                     {/* Смета заказа (Чек) */}
-                    <div className="p-4 rounded-lg bg-muted/40 border border-dashed border-border/80 space-y-2 text-sm">
-                      <div className="font-semibold text-xs text-muted-foreground uppercase tracking-wider pb-1.5 border-b border-border/40">Детализация расчета:</div>
+                    <div className="p-4 rounded-2xl bg-white/40 dark:bg-slate-900/40 border border-dashed border-slate-200 dark:border-slate-800 space-y-2 text-sm">
+                      <div className="font-semibold text-xs text-slate-450 dark:text-slate-400 uppercase tracking-wider pb-1.5 border-b border-slate-100 dark:border-slate-800/80">Детализация расчета:</div>
                       
                       {/* Услуга */}
                       {selectedServiceId && (() => {
                         const s = products.find(p => p.id === selectedServiceId);
                         return s ? (
-                          <div className="flex justify-between text-muted-foreground">
+                          <div className="flex justify-between text-slate-500 dark:text-slate-400">
                             <span>{s.name}</span>
                             <span className="font-semibold text-foreground">{Number(s.price) === 0 ? "Бесплатно" : `${Number(s.price).toFixed(0)} ₽`}</span>
                           </div>
@@ -2710,7 +2744,7 @@ const Cabinet = () => {
                       {Object.entries(selectedEquipments).map(([id, qty]) => {
                         const prod = products.find(p => p.id === id);
                         return prod && qty > 0 ? (
-                          <div key={id} className="flex justify-between text-muted-foreground">
+                          <div key={id} className="flex justify-between text-slate-500 dark:text-slate-400">
                             <span>{prod.name.toUpperCase()} (x{qty})</span>
                             <span className="font-semibold text-foreground">{(Number(prod.price) * qty).toFixed(0)} ₽</span>
                           </div>
@@ -2721,7 +2755,7 @@ const Cabinet = () => {
                       {keysQuantity > 0 && (() => {
                         const kp = products.find(p => p.name.toLowerCase().includes("ключ"));
                         return kp ? (
-                          <div className="flex justify-between text-muted-foreground">
+                          <div className="flex justify-between text-slate-500 dark:text-slate-400">
                             <span>🔑 Ключи Mifare (x{keysQuantity})</span>
                             <span className="font-semibold text-foreground">{(Number(kp.price) * keysQuantity).toFixed(0)} ₽</span>
                           </div>
@@ -2732,7 +2766,7 @@ const Cabinet = () => {
                       {isCabinetSetupChecked && (() => {
                         const cp = products.find(p => p.name.toLowerCase().includes("кабинет"));
                         return cp ? (
-                          <div className="flex justify-between text-muted-foreground">
+                          <div className="flex justify-between text-slate-500 dark:text-slate-400">
                             <span>📱 Подключение личного кабинета</span>
                             <span className="font-semibold text-foreground">{Number(cp.price).toFixed(0)} ₽</span>
                           </div>
@@ -2740,9 +2774,9 @@ const Cabinet = () => {
                       })()}
 
                       {/* Итого */}
-                      <div className="flex justify-between font-bold text-base text-foreground pt-2 border-t">
+                      <div className="flex justify-between font-bold text-base text-foreground pt-2 border-t border-slate-100 dark:border-slate-800">
                         <span>Итого к оплате:</span>
-                        <span className="text-primary">{calculateTotals().total.toFixed(0)} ₽</span>
+                        <span className="text-amber-500">{calculateTotals().total.toFixed(0)} ₽</span>
                       </div>
                     </div>
 
@@ -2750,14 +2784,20 @@ const Cabinet = () => {
                 )}
 
                 {/* Кнопки диалога */}
-                <DialogFooter className="pt-3 border-t flex flex-col sm:flex-row gap-2">
-                  <Button variant="outline" onClick={() => setIsOrderDialogOpen(false)} className="w-full sm:w-auto">
+                <DialogFooter className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row gap-2">
+                  <Button variant="outline" onClick={() => {
+                    console.log("[Заявка] Абонент закрыл диалог заявки");
+                    setIsOrderDialogOpen(false);
+                  }} className="w-full sm:w-auto font-semibold rounded-xl h-11 border border-slate-250 hover:bg-slate-5 hover:text-foreground">
                     Отмена
                   </Button>
                   <Button
-                    onClick={handleCreateOrderRequest}
+                    onClick={() => {
+                      console.log("[Заявка] Абонент нажал отправить/оплатить заявку, итого:", calculateTotals().total);
+                      handleCreateOrderRequest();
+                    }}
                     disabled={saving}
-                    className="w-full sm:w-auto flex-1 flex items-center justify-center gap-1.5"
+                    className="w-full sm:w-auto flex-1 flex items-center justify-center gap-1.5 btn-premium-gold hover:shadow-gold-glow rounded-xl h-11 font-bold"
                   >
                     {saving ? (
                       <Loader2 className="h-4 w-4 animate-spin shrink-0" />
@@ -2778,16 +2818,16 @@ const Cabinet = () => {
 
             {/* --- ДИАЛОГ ОШИБОК ВАЛИДАЦИИ ФОРМЫ (ФЗ-152, ОБЯЗАТЕЛЬНЫЕ ПОЛЯ) --- */}
             <AlertDialog open={showValidationDialog} onOpenChange={setShowValidationDialog}>
-              <AlertDialogContent className="bg-background/95 backdrop-blur-md rounded-xl shadow-2xl border border-destructive/20 max-w-md p-6 text-left">
+              <AlertDialogContent className="glass-premium border-none rounded-[24px] shadow-2xl max-w-md p-6 text-left">
                 <AlertDialogHeader>
-                  <AlertDialogTitle className="text-xl font-bold flex items-center gap-2 text-destructive">
+                  <AlertDialogTitle className="text-xl font-bold flex items-center gap-2 text-destructive font-display">
                     <AlertTriangle className="h-6 w-6 text-destructive animate-bounce" />
                     Внимание! Заполните все поля
                   </AlertDialogTitle>
-                  <AlertDialogDescription className="text-sm text-foreground/80 pt-2 space-y-3">
+                  <AlertDialogDescription className="text-sm text-slate-600 dark:text-slate-350 pt-2 space-y-3 leading-relaxed">
                     <p>Для отправки профиля на верификацию необходимо заполнить все обязательные графы.</p>
-                    <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-left">
-                      <p className="font-semibold text-destructive mb-1.5 text-xs uppercase tracking-wider">Не заполнены следующие поля:</p>
+                    <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-left">
+                      <p className="font-semibold text-destructive mb-1.5 text-xs uppercase tracking-wider font-display">Не заполнены следующие поля:</p>
                       <ul className="list-disc list-inside space-y-1 text-sm text-foreground/90 font-medium">
                         {validationErrors.map((err, i) => (
                           <li key={i}>{err}</li>
@@ -2796,8 +2836,8 @@ const Cabinet = () => {
                     </div>
                   </AlertDialogDescription>
                 </AlertDialogHeader>
-                <AlertDialogFooter className="pt-4 border-t mt-4">
-                  <AlertDialogAction onClick={() => setShowValidationDialog(false)} className="bg-destructive hover:bg-destructive/90 text-white font-semibold w-full sm:w-auto">
+                <AlertDialogFooter className="pt-4 border-t border-slate-100 dark:border-slate-800/80 mt-4">
+                  <AlertDialogAction onClick={() => setShowValidationDialog(false)} className="btn-premium-gold hover:shadow-gold-glow text-white font-semibold w-full sm:w-auto h-11 rounded-xl">
                     Хорошо, заполню
                   </AlertDialogAction>
                 </AlertDialogFooter>
@@ -2806,49 +2846,49 @@ const Cabinet = () => {
 
             {/* --- ДИАЛОГ ПОДТВЕРЖДЕНИЯ УСПЕШНОГО ОФОРМЛЕНИЯ И ОПЛАТЫ БАНКА --- */}
             <Dialog open={isSuccessPaymentOpen} onOpenChange={setIsSuccessPaymentOpen}>
-              <DialogContent className="max-w-md p-6 bg-background rounded-xl shadow-2xl border text-center animate-in fade-in-50 zoom-in-95 duration-200">
+              <DialogContent className="max-w-md p-6 glass-premium border-none rounded-[24px] shadow-2xl text-center animate-in fade-in-50 zoom-in-95 duration-200">
                 <div className="flex flex-col items-center justify-center space-y-4">
                   <div className="p-3 rounded-full bg-green-500/10 text-green-600 animate-bounce">
                     <CheckCircle2 className="h-12 w-12" />
                   </div>
-                  <DialogTitle className="text-xl font-bold text-foreground">Заказ успешно оформлен!</DialogTitle>
-                  <DialogDescription className="text-sm text-muted-foreground">
+                  <DialogTitle className="text-xl font-bold text-foreground font-display">Заказ успешно оформлен!</DialogTitle>
+                  <DialogDescription className="text-sm text-slate-500 dark:text-slate-400">
                     Заявка на подключение и доставку оборудования успешно зарегистрирована в нашей системе. 
                     Для завершения заказа перейдите к безопасной оплате на платежный шлюз банка **«Кубань Кредит»**.
                   </DialogDescription>
 
                   {/* Детализация для проверки */}
                   {lastOrderTotals && (
-                    <div className="w-full p-4 rounded-lg bg-muted/40 border text-left text-xs space-y-2 font-medium">
-                      <div className="text-muted-foreground border-b pb-1 flex justify-between">
+                    <div className="w-full p-4 rounded-xl bg-white/40 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800/80 text-left text-xs space-y-2 font-medium">
+                      <div className="text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800 pb-1 flex justify-between">
                         <span>Лицевой счет:</span>
                         <span className="font-semibold text-foreground">{userAccount?.account_number || "000000"}</span>
                       </div>
                       
                       {lastOrderTotals.sum1 > 0 && (
-                        <div className="flex justify-between text-muted-foreground">
+                        <div className="flex justify-between text-slate-500 dark:text-slate-400">
                           <span>Кодировка доп.ключа (сумма):</span>
                           <span className="font-semibold text-foreground">{lastOrderTotals.sum1.toFixed(2)} ₽</span>
                         </div>
                       )}
                       
                       {lastOrderTotals.sum2 > 0 && (
-                        <div className="flex justify-between text-muted-foreground">
+                        <div className="flex justify-between text-slate-500 dark:text-slate-400">
                           <span>Установка трубки (сумма):</span>
                           <span className="font-semibold text-foreground">{lastOrderTotals.sum2.toFixed(2)} ₽</span>
                         </div>
                       )}
                       
                       {lastOrderTotals.sum3 > 0 && (
-                        <div className="flex justify-between text-muted-foreground">
+                        <div className="flex justify-between text-slate-500 dark:text-slate-400">
                           <span>Настройка ЛК (сумма):</span>
                           <span className="font-semibold text-foreground">{lastOrderTotals.sum3.toFixed(2)} ₽</span>
                         </div>
                       )}
 
-                      <div className="flex justify-between font-bold text-sm text-foreground pt-1.5 border-t">
+                      <div className="flex justify-between font-bold text-sm text-foreground pt-1.5 border-t border-slate-100 dark:border-slate-800">
                         <span>Итого к оплате (DENGI_F):</span>
-                        <span className="text-primary text-base">{lastOrderTotals.total.toFixed(2)} ₽</span>
+                        <span className="text-amber-500 text-base">{lastOrderTotals.total.toFixed(2)} ₽</span>
                       </div>
                     </div>
                   )}
@@ -2857,6 +2897,8 @@ const Cabinet = () => {
                     <Button
                       onClick={() => {
                         if (!lastOrderTotals) return;
+                        
+                        console.log("[Заявка] Абонент переходит к шлюзу банка Кубань Кредит, сумма:", lastOrderTotals.total);
                         
                         // Парсим адрес на улицу, дом, корпус, подъезд и квартиру
                         const street = address ? address.split(",")[1]?.replace(/(?:ул\.?|улица)\s*/gi, "").trim() || address : "";
@@ -2886,7 +2928,7 @@ const Cabinet = () => {
                         window.open(payUrl, "_blank");
                         setIsSuccessPaymentOpen(false);
                       }}
-                      className="w-full py-2.5 flex items-center justify-center gap-2 hover:scale-105 transition-transform"
+                      className="w-full py-2.5 flex items-center justify-center gap-2 hover:scale-105 transition-transform btn-premium-gold hover:shadow-gold-glow rounded-xl h-11 font-bold"
                       size="lg"
                     >
                       <CreditCard className="h-5 w-5 shrink-0" />
@@ -2894,9 +2936,12 @@ const Cabinet = () => {
                     </Button>
                     <Button 
                       variant="outline" 
-                      onClick={handlePayLaterOnSite}
+                      onClick={() => {
+                        console.log("[Заявка] Абонент выбрал оплату на месте мастеру");
+                        handlePayLaterOnSite();
+                      }}
                       disabled={saving}
-                      className="w-full flex items-center justify-center gap-1.5"
+                      className="w-full flex items-center justify-center gap-1.5 font-semibold rounded-xl h-11 border border-slate-200 hover:bg-slate-50 dark:hover:bg-slate-900"
                     >
                       {saving && <Loader2 className="h-4 w-4 animate-spin shrink-0" />}
                       Оплатить позже наличными (мастеру)

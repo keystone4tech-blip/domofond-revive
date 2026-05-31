@@ -64,45 +64,50 @@ interface NumberInputProps {
   tooltip?: string;
 }
 
-const NumberInput = ({ id, label, value, onChange, error, min = 0, placeholder, tooltip }: NumberInputProps) => (
-  <div className="space-y-1.5">
-    <div className="flex items-center gap-1.5">
-      <Label htmlFor={id} className="text-sm text-muted-foreground whitespace-nowrap">
-        {label}
-      </Label>
-      {tooltip && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button type="button" className="text-muted-foreground hover:text-primary transition-colors">
-              <HelpCircle className="w-3.5 h-3.5" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent className="max-w-[240px] text-xs">
-            <p>{tooltip}</p>
-          </TooltipContent>
-        </Tooltip>
+const NumberInput = ({ id, label, value, onChange, error, min = 0, placeholder, tooltip }: NumberInputProps) => {
+  // RULE 2: Логируем рендер инпута параметров
+  return (
+    <div className="space-y-2 text-left">
+      <div className="flex items-center gap-1.5 justify-start">
+        <Label htmlFor={id} className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+          {label}
+        </Label>
+        {tooltip && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button type="button" className="text-slate-400 hover:text-amber-500 transition-colors focus:outline-none">
+                <HelpCircle className="w-3.5 h-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-[240px] text-xs bg-slate-900/90 backdrop-blur-md text-white border-slate-700 rounded-lg p-2.5">
+              <p className="leading-normal">{tooltip}</p>
+            </TooltipContent>
+          </Tooltip>
+        )}
+      </div>
+      <Input
+        id={id}
+        type="text"
+        inputMode="numeric"
+        pattern="[0-9]*"
+        autoComplete="off"
+        aria-invalid={!!error}
+        aria-describedby={error ? `${id}-error` : undefined}
+        placeholder={placeholder ?? String(min)}
+        value={value}
+        onChange={onChange}
+        className={`bg-white/40 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 font-medium h-11 transition-all rounded-xl placeholder-slate-400 ${
+          error ? "border-destructive focus-visible:ring-destructive" : ""
+        }`}
+      />
+      {error && (
+        <p id={`${id}-error`} className="text-xs text-destructive font-semibold mt-1">
+          {error}
+        </p>
       )}
     </div>
-    <Input
-      id={id}
-      type="text"
-      inputMode="numeric"
-      pattern="[0-9]*"
-      autoComplete="off"
-      aria-invalid={!!error}
-      aria-describedby={error ? `${id}-error` : undefined}
-      placeholder={placeholder ?? String(min)}
-      value={value}
-      onChange={onChange}
-      className={error ? "border-destructive focus-visible:ring-destructive" : undefined}
-    />
-    {error && (
-      <p id={`${id}-error`} className="text-xs text-destructive">
-        {error}
-      </p>
-    )}
-  </div>
-);
+  );
+};
 
 export default function Calculator() {
   const { toast } = useToast();
@@ -345,19 +350,23 @@ export default function Calculator() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-[#F8FAFC] dark:bg-[#0F172A] transition-colors duration-300">
       <TooltipProvider>
         <Header />
       <main className="flex-1 pt-20">
-        <section className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground py-12 md:py-16">
-          <div className="container mx-auto px-4">
+        {/* Премиальный LuxTech Security баннер */}
+        <section className="bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-b border-amber-500/20 text-white py-12 md:py-16 relative overflow-hidden shadow-lg">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(212,175,55,0.07),transparent)] pointer-events-none"></div>
+          <div className="container mx-auto px-4 relative z-10">
             <div className="max-w-3xl mx-auto text-center space-y-4">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary-foreground/10 backdrop-blur-sm mb-2">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 shadow-gold-glow text-white mb-2 animate-pulse-glow">
                 <CalcIcon className="w-8 h-8" />
               </div>
-              <h1 className="text-2xl md:text-4xl font-bold tracking-tight">Рассчитайте стоимость обслуживания</h1>
-              <p className="text-primary-foreground/80 text-sm md:text-base max-w-xl mx-auto">
-                Заполните параметры дома и оборудование. Калькулятор посчитает точный тариф для одной квартиры.
+              <h1 className="text-2xl md:text-4xl font-bold tracking-tight font-display text-transparent bg-clip-text bg-gradient-to-r from-slate-100 via-amber-400 to-slate-100">
+                Рассчитайте стоимость обслуживания
+              </h1>
+              <p className="text-slate-400 text-xs md:text-sm max-w-xl mx-auto font-medium">
+                Заполните параметры вашего жилого комплекса или дома. Умный калькулятор мгновенно рассчитает точный прозрачный тариф на одну квартиру.
               </p>
             </div>
           </div>
@@ -365,111 +374,132 @@ export default function Calculator() {
 
         <div className="container mx-auto px-4 py-8 md:py-12">
           <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            {/* Левая колонка: параметры и оборудование */}
             <div className="lg:col-span-7 space-y-6">
-              <Card>
+              
+              {/* Карточка 1: Параметры дома */}
+              <Card className="glass-premium border-none rounded-[24px] shadow-xl hover:shadow-2xl transition-all p-2">
                 <CardHeader className="pb-4">
-                  <CardTitle className="text-lg">Параметры дома</CardTitle>
-                  <CardDescription>Укажите основные характеристики вашего многоквартирного дома.</CardDescription>
+                  <CardTitle className="text-lg font-bold font-display text-foreground flex items-center gap-2">
+                    <span className="text-amber-500">🏢</span> Параметры дома
+                  </CardTitle>
+                  <CardDescription className="text-xs text-slate-500 dark:text-slate-400">
+                    Укажите основные конструктивные характеристики вашего многоквартирного дома.
+                  </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-2">
                   <div className="grid grid-cols-2 gap-4">
                       <NumberInput
                         id="entrances"
-                        label="Подъездов"
+                        label="Подъездов в доме *"
                         value={numericValues.entrances}
                         onChange={handleNumericChange("entrances")}
                         min={1}
-                        placeholder="Укажите количество подъездов"
+                        placeholder="Например: 4"
                         error={fieldErrors.entrances}
                       />
                       <NumberInput
                         id="apartments"
-                        label="Квартир всего"
+                        label="Квартир всего *"
                         value={numericValues.totalApartments}
                         onChange={handleNumericChange("totalApartments")}
                         min={1}
-                        placeholder="Укажите общее количество квартир на весь дом"
+                        placeholder="Например: 160"
                         error={fieldErrors.totalApartments}
                       />
                   </div>
                 </CardContent>
               </Card>
 
-              <Card>
+              {/* Карточка 2: Оборудование */}
+              <Card className="glass-premium border-none rounded-[24px] shadow-xl hover:shadow-2xl transition-all p-2">
                 <CardHeader className="pb-4">
-                  <CardTitle className="text-lg text-primary">Оборудование компании «ДомофонДар»</CardTitle>
-                  <CardDescription className="text-sm font-medium text-foreground/80">
-                    Установка или замена оборудования производится за счёт компании <span className="text-primary font-bold">абсолютно БЕСПЛАТНО</span>. 
-                    Укажите необходимое количество для установки или модернизации.
+                  <CardTitle className="text-lg font-bold font-display text-amber-500 flex items-center gap-2">
+                    <span>🛡️</span> Оборудование компании «Домофондар»
+                  </CardTitle>
+                  <CardDescription className="text-xs text-slate-600 dark:text-slate-300 font-medium">
+                    Установка, монтаж и модернизация оборудования производится за счёт нашей компании <span className="text-amber-500 font-bold">абсолютно БЕСПЛАТНО</span>. Укажите потребности дома.
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-2">
                   <div className="grid grid-cols-2 gap-4">
                       <NumberInput
                         id="smartIntercoms"
-                        label="Умных домофонов"
+                        label="Умных домофонов *"
                         value={numericValues.smartIntercoms}
                         onChange={handleNumericChange("smartIntercoms")}
                         min={0}
-                        placeholder="Укажите количество дверей с домофонами"
+                        placeholder="Кол-во входных дверей"
                         error={fieldErrors.smartIntercoms}
-                        tooltip="Вызывная панель на каждую подъездную дверь."
+                        tooltip="Вызывная панель с Face ID и мобильным приложением на каждую подъездную дверь."
                       />
                       <NumberInput
                         id="additionalCameras"
-                        label="Доп. камер"
+                        label="Доп. камер наблюдения"
                         value={numericValues.additionalCameras}
                         onChange={handleNumericChange("additionalCameras")}
-                        placeholder="Сколько вам требуется дополнительных камер?"
-                        tooltip="Камеры, устанавливаемые дополнительно к домофонам или отдельно на придомовую территорию, фасады и подъезды."
+                        placeholder="Например: 8"
+                        tooltip="Камеры, устанавливаемые на придомовую территорию, парковку, детские площадки или фасады."
                       />
                       <NumberInput
                         id="elevatorCameras"
-                        label="Камер в лифте"
+                        label="Камер в лифтах"
                         value={numericValues.elevatorCameras}
                         onChange={handleNumericChange("elevatorCameras")}
-                        placeholder="Укажите количество лифтов, в которых требуются камеры"
-                        tooltip="Устанавливаются в кабины лифтов (пассажирских и грузовых), по 1 камере на каждый лифт."
+                        placeholder="Количество лифтов"
+                        tooltip="Устанавливаются антивандальные HD-камеры в кабинах лифтов, по 1 камере на каждый лифт дома."
                       />
                       <NumberInput
                         id="gates"
-                        label="Калиток"
+                        label="Калиток во двор"
                         value={numericValues.gates}
                         onChange={handleNumericChange("gates")}
-                        placeholder="Укажите количество калиток, на которые нужно установить домофон"
-                        tooltip="Входы на придомовую территорию, оснащаемые вызывными панелями (как на подъездах). Если калиток нет, оставьте пустым."
+                        placeholder="Кол-во калиток"
+                        tooltip="Входы на огороженную придомовую территорию ЖК, оснащаемые вызывными панелями компании."
                       />
                   </div>
                 </CardContent>
               </Card>
             </div>
 
+            {/* Правая колонка: Ваш расчет */}
             <div className="lg:col-span-5">
-              <Card className="sticky top-24 border-primary/20 shadow-lg overflow-hidden">
-                <CardHeader className="bg-primary/5 border-b border-primary/10">
-                  <CardTitle className="text-lg">Ваш расчёт</CardTitle>
+              <Card className="sticky top-24 glass-premium border-none rounded-[24px] shadow-2xl overflow-hidden animate-in fade-in duration-300">
+                <CardHeader className="bg-slate-900/10 dark:bg-slate-950/20 border-b border-slate-200/50 dark:border-slate-800/80">
+                  <CardTitle className="text-lg font-bold font-display text-foreground flex items-center gap-2">
+                    <span className="text-amber-500">📊</span> Ваш расчет
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="p-6">
                   {!showResult ? (
                     <div className="text-center space-y-4 py-6">
-                      <div className="mx-auto w-14 h-14 bg-muted rounded-full flex items-center justify-center">
-                        <ShieldCheck className="w-7 h-7 text-muted-foreground" />
+                      <div className="mx-auto w-14 h-14 bg-amber-500/10 border border-amber-500/20 rounded-full flex items-center justify-center animate-pulse">
+                        <ShieldCheck className="w-7 h-7 text-amber-500" />
                       </div>
-                      <h3 className="font-medium">Готово к расчёту</h3>
-                      <p className="text-sm text-muted-foreground">Нажмите кнопку, чтобы узнать точную стоимость.</p>
+                      <h3 className="font-bold font-display text-foreground text-base">Готово к расчету</h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 max-w-[240px] mx-auto leading-relaxed">
+                        Введите контакты и отправьте параметры на сервер для мгновенной калькуляции.
+                      </p>
 
                       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                         <DialogTrigger asChild>
-                          <Button size="lg" className="w-full font-semibold">Узнать стоимость</Button>
+                          <Button size="lg" className="w-full btn-premium-gold hover:shadow-gold-glow font-bold h-11 text-sm">
+                            Узнать стоимость
+                          </Button>
                         </DialogTrigger>
-                        <DialogContent className="sm:max-w-md">
-                          <DialogHeader>
-                            <DialogTitle>Показать результат</DialogTitle>
-                            <DialogDescription>Представьтесь, чтобы мы сохранили ваш расчёт в админ-панель.</DialogDescription>
+                        <DialogContent className="sm:max-w-md glass-premium border-none rounded-[24px] shadow-2xl p-6 text-left animate-in fade-in duration-200">
+                          <DialogHeader className="border-b border-slate-100 dark:border-slate-800 pb-3">
+                            <DialogTitle className="text-lg font-bold text-foreground font-display flex items-center gap-2">
+                              <span>📝</span> Получение расчета
+                            </DialogTitle>
+                            <DialogDescription className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                              Представьтесь, чтобы зафиксировать ваш персональный тариф и сохранить расчет в админ-панели.
+                            </DialogDescription>
                           </DialogHeader>
                           <div className="space-y-4 py-4">
                             <div className="space-y-2">
-                              <Label htmlFor="name">Ваше имя</Label>
+                              <Label htmlFor="name" className="text-xs font-semibold text-slate-500 dark:text-slate-400">Ваше имя *</Label>
                               <Input
                                 id="name"
                                 placeholder="Иван"
@@ -478,12 +508,14 @@ export default function Calculator() {
                                   setName(event.target.value);
                                   clearFieldError("name");
                                 }}
-                                className={fieldErrors.name ? "border-destructive focus-visible:ring-destructive" : undefined}
+                                className={`bg-white/40 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 font-medium h-11 transition-all rounded-xl placeholder-slate-400 ${
+                                  fieldErrors.name ? "border-destructive focus-visible:ring-destructive" : ""
+                                }`}
                               />
-                              {fieldErrors.name && <p className="text-xs text-destructive">{fieldErrors.name}</p>}
+                              {fieldErrors.name && <p className="text-xs text-destructive font-semibold">{fieldErrors.name}</p>}
                             </div>
                             <div className="space-y-2">
-                              <Label htmlFor="phone">Телефон</Label>
+                              <Label htmlFor="phone" className="text-xs font-semibold text-slate-500 dark:text-slate-400">Телефон для связи *</Label>
                               <Input
                                 id="phone"
                                 placeholder="+7 (999) 000-00-00"
@@ -493,14 +525,27 @@ export default function Calculator() {
                                   setPhone(event.target.value);
                                   clearFieldError("phone");
                                 }}
-                                className={fieldErrors.phone ? "border-destructive focus-visible:ring-destructive" : undefined}
+                                className={`bg-white/40 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 font-medium h-11 transition-all rounded-xl placeholder-slate-400 ${
+                                  fieldErrors.phone ? "border-destructive focus-visible:ring-destructive" : ""
+                                }`}
                               />
-                              {fieldErrors.phone && <p className="text-xs text-destructive">{fieldErrors.phone}</p>}
+                              {fieldErrors.phone && <p className="text-xs text-destructive font-semibold">{fieldErrors.phone}</p>}
                             </div>
                           </div>
-                          <DialogFooter>
-                            <Button disabled={isSubmitting} onClick={handleCalculate} className="w-full">
-                              {isSubmitting ? "Отправка..." : "Показать расчёт"}
+                          <DialogFooter className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row gap-2">
+                            <Button disabled={isSubmitting} onClick={() => {
+                              // RULE 2: Логируем попытку калькуляции
+                              console.log("[Калькулятор] Пользователь нажал 'Показать расчет', имя:", name, "телефон:", phone);
+                              handleCalculate();
+                            }} className="w-full btn-premium-gold hover:shadow-gold-glow font-bold h-11 rounded-xl">
+                              {isSubmitting ? (
+                                <>
+                                  <Spinner className="mr-2 h-4 w-4 animate-spin shrink-0" />
+                                  Отправка данных...
+                                </>
+                              ) : (
+                                "Показать расчет"
+                              )}
                             </Button>
                           </DialogFooter>
                         </DialogContent>
@@ -508,47 +553,54 @@ export default function Calculator() {
                     </div>
                   ) : (
                     <div className="space-y-5 animate-in fade-in zoom-in duration-300">
+                      
+                      {/* RULE 2: Логируем итоговые тарифные показатели при рендере результатов */}
+                      {(() => {
+                        console.log("[Калькулятор] Отрисовка результатов расчета. Квартир в подъезде:", aptsPerEntrance, "тариф:", tariffPerApt);
+                        return null;
+                      })()}
+
                       {!generalRates.valid ? (
-                        <Alert variant="destructive">
-                          <InfoIcon className="h-4 w-4" />
-                          <AlertTitle>Внимание</AlertTitle>
-                          <AlertDescription>
-                            Для домов с малым количеством квартир на 1 аппарат тариф рассчитывается индивидуально.
+                        <Alert className="bg-red-500/10 border-red-500/20 text-destructive rounded-2xl text-left">
+                          <InfoIcon className="h-4 w-4 text-destructive" />
+                          <AlertTitle className="font-bold font-display text-sm">Внимание</AlertTitle>
+                          <AlertDescription className="text-xs leading-relaxed mt-1 font-medium">
+                            Для домов с малым количеством квартир на один аппарат (менее 15) тариф рассчитывается в индивидуальном коммерческом порядке.
                           </AlertDescription>
                         </Alert>
                       ) : (
                         <>
-                          <div className="text-center p-5 bg-primary/5 rounded-xl border border-primary/20">
-                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Абонентская плата</p>
-                            <p className="text-4xl font-extrabold text-primary">{tariffPerApt} ₽</p>
-                            <p className="text-xs text-muted-foreground mt-1">с 1 квартиры в месяц</p>
+                          <div className="text-center p-5 bg-amber-500/5 rounded-2xl border border-amber-500/20 shadow-sm shadow-amber-500/5">
+                            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Рекомендуемый тариф</p>
+                            <p className="text-4xl font-black text-amber-500 font-display">{tariffPerApt} ₽</p>
+                            <p className="text-[10px] text-slate-400 mt-1 font-semibold">с одной квартиры в месяц</p>
                           </div>
 
-                          <div className="space-y-2">
-                            <p className="text-sm font-semibold">Детализация:</p>
-                            <ul className="text-sm space-y-1.5">
+                          <div className="space-y-2 text-left">
+                            <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider pb-1 border-b border-slate-100 dark:border-slate-800">Детализация расчета:</p>
+                            <ul className="text-xs space-y-2.5 pt-1.5 font-medium text-slate-700 dark:text-slate-350">
                               {smartIntercoms > 0 && (
-                                <li className="flex justify-between py-1 border-b border-border">
-                                  <span className="text-muted-foreground">Умный домофон</span>
-                                  <span className="font-semibold">{intercomRates.smart} ₽</span>
+                                <li className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
+                                  <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1">🚪 Умный IP-домофон</span>
+                                  <span className="font-semibold text-foreground">{intercomRates.smart} ₽</span>
                                 </li>
                               )}
                               {additionalCameras > 0 && (
-                                <li className="flex justify-between py-1 border-b border-border">
-                                  <span className="text-muted-foreground">Доп. камеры</span>
-                                  <span className="font-semibold">{Math.ceil(additionalCameras / entrances) * generalRates.addCam} ₽</span>
+                                <li className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
+                                  <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1">🎥 Камеры на территории</span>
+                                  <span className="font-semibold text-foreground">{Math.ceil(additionalCameras / entrances) * generalRates.addCam} ₽</span>
                                 </li>
                               )}
                               {elevatorCameras > 0 && (
-                                <li className="flex justify-between py-1 border-b border-border">
-                                  <span className="text-muted-foreground">Камеры в лифте</span>
-                                  <span className="font-semibold">{Math.ceil(elevatorCameras / entrances) * generalRates.elev} ₽</span>
+                                <li className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
+                                  <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1">🛗 Камеры в лифтах</span>
+                                  <span className="font-semibold text-foreground">{Math.ceil(elevatorCameras / entrances) * generalRates.elev} ₽</span>
                                 </li>
                               )}
                               {gates > 0 && (
-                                <li className="flex justify-between py-1 border-b border-border">
-                                  <span className="text-muted-foreground">Калитки</span>
-                                  <span className="font-semibold">
+                                <li className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
+                                  <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1">🚧 Умные калитки (двор)</span>
+                                  <span className="font-semibold text-foreground">
                                     {gatePrice} ₽
                                   </span>
                                 </li>
@@ -561,74 +613,84 @@ export default function Calculator() {
                   )}
                 </CardContent>
                 {showResult && (
-                  <CardFooter className="flex flex-col gap-4 bg-muted/50 border-t pt-4">
+                  <CardFooter className="flex flex-col gap-4 bg-slate-900/5 dark:bg-slate-950/20 border-t border-slate-200/50 dark:border-slate-800/80 pt-4 p-6">
                     <Dialog open={isCPDialogOpen} onOpenChange={setIsCPDialogOpen}>
                       <DialogTrigger asChild>
-                        <Button className="w-full gap-2 bg-green-600 hover:bg-green-700 transition-colors">
+                        <Button className="w-full gap-2 btn-premium-gold hover:shadow-gold-glow font-bold h-11 text-sm rounded-xl">
                           <FileText className="w-4 h-4" />
-                          Оформить КП (DOCX)
+                          Оформить коммерческое предложение (DOCX)
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="sm:max-w-[425px]">
-                        <DialogHeader>
-                          <DialogTitle>Данные для КП</DialogTitle>
-                          <DialogDescription>
-                            Укажите адрес объекта для автоматического заполнения документа.
+                      <DialogContent className="sm:max-w-[425px] glass-premium border-none rounded-[24px] shadow-2xl p-6 text-left animate-in fade-in duration-200">
+                        <DialogHeader className="border-b border-slate-100 dark:border-slate-800 pb-3">
+                          <DialogTitle className="text-lg font-bold text-foreground font-display flex items-center gap-2">
+                            <span>📄</span> Сведения об объекте
+                          </DialogTitle>
+                          <DialogDescription className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                            Укажите адрес жилого дома для автоматического брендированного заполнения КП.
                           </DialogDescription>
                         </DialogHeader>
-                        <div className="grid gap-4 py-4">
-                          <div className="grid gap-2">
-                            <Label htmlFor="city">Город</Label>
+                        <div className="grid gap-4 py-4 text-left">
+                          <div className="grid gap-1.5">
+                            <Label htmlFor="city" className="text-xs font-semibold text-slate-500 dark:text-slate-400">Город / Населенный пункт</Label>
                             <Input
                               id="city"
                               value={address.city}
                               onChange={(e) => setAddress({ ...address, city: e.target.value })}
+                              className="bg-white/50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 h-10 text-sm font-medium rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
                             />
                           </div>
-                          <div className="grid gap-2">
-                            <Label htmlFor="street">Улица</Label>
+                          <div className="grid gap-1.5">
+                            <Label htmlFor="street" className="text-xs font-semibold text-slate-500 dark:text-slate-400">Улица / Проспект / Переулок</Label>
                             <Input
                               id="street"
-                              placeholder="Прокофьева"
+                              placeholder="Например: Прокофьева"
                               value={address.street}
                               onChange={(e) => setAddress({ ...address, street: e.target.value })}
+                              className="bg-white/50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 h-10 text-sm font-medium rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
                             />
                           </div>
                           <div className="grid grid-cols-2 gap-4">
-                            <div className="grid gap-2">
-                              <Label htmlFor="house">Дом</Label>
+                            <div className="grid gap-1.5">
+                              <Label htmlFor="house" className="text-xs font-semibold text-slate-500 dark:text-slate-400">Номер дома</Label>
                               <Input
                                 id="house"
-                                placeholder="10"
+                                placeholder="Например: 10"
                                 value={address.house}
                                 onChange={(e) => setAddress({ ...address, house: e.target.value })}
+                                className="bg-white/50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 h-10 text-sm font-medium rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
                               />
                             </div>
-                            <div className="grid gap-2">
-                              <Label htmlFor="block">Корпус/Литер</Label>
+                            <div className="grid gap-1.5">
+                              <Label htmlFor="block" className="text-xs font-semibold text-slate-500 dark:text-slate-400">Корпус / Литер</Label>
                               <Input
                                 id="block"
-                                placeholder="1"
+                                placeholder="Например: 1"
                                 value={address.block}
                                 onChange={(e) => setAddress({ ...address, block: e.target.value })}
+                                className="bg-white/50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 h-10 text-sm font-medium rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
                               />
                             </div>
                           </div>
                         </div>
-                        <DialogFooter>
+                        <DialogFooter className="pt-3 border-t border-slate-100 dark:border-slate-800">
                           <Button 
-                            className="w-full gap-2" 
-                            onClick={handleGenerateCP}
+                            className="w-full gap-2 btn-premium-gold hover:shadow-gold-glow font-bold h-11 text-sm rounded-xl" 
+                            onClick={() => {
+                              // RULE 2: Логируем запуск генерации КП
+                              console.log("[Калькулятор] Запуск генерации КП для адреса:", address);
+                              handleGenerateCP();
+                            }}
                             disabled={isGeneratingCP}
                           >
                             {isGeneratingCP ? (
                               <>
-                                <Spinner className="w-4 h-4 animate-spin" />
-                                Создаем документ...
+                                <Spinner className="w-4 h-4 animate-spin mr-1.5" />
+                                Форматируем документ...
                               </>
                             ) : (
                               <>
-                                <CheckCircle2 className="w-4 h-4" />
+                                <CheckCircle2 className="w-4 h-4 mr-1.5" />
                                 Сгенерировать и скачать
                               </>
                             )}
@@ -637,8 +699,8 @@ export default function Calculator() {
                       </DialogContent>
                     </Dialog>
                     
-                    <p className="text-[10px] text-center text-muted-foreground w-full leading-relaxed">
-                      Расчёт для ознакомления. Итоговая стоимость и перечень работ фиксируются в договоре.
+                    <p className="text-[10px] text-center text-slate-500 dark:text-slate-400 w-full leading-relaxed font-semibold">
+                      * Данный расчет является ознакомительным. Точная стоимость обслуживания, перечень оборудования и регламент регламентных работ фиксируются непосредственно в договоре.
                     </p>
                   </CardFooter>
                 )}

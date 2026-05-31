@@ -379,7 +379,7 @@ export default function ChatWidget() {
       {!open && (
         <button
           onClick={() => setOpen(true)}
-          className="fixed bottom-20 right-4 lg:bottom-6 lg:right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl hover:scale-105 transition-transform animate-bounce"
+          className="fixed bottom-20 right-4 lg:bottom-6 lg:right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r from-primary to-secondary text-primary-foreground shadow-2xl hover:scale-110 active:scale-95 transition-all animate-pulse-glow hover:shadow-gold-glow"
           aria-label="Открыть чат"
         >
           <MessageCircle className="h-6 w-6" />
@@ -387,23 +387,23 @@ export default function ChatWidget() {
       )}
 
       {open && (
-        <div className="fixed bottom-20 right-2 left-2 sm:left-auto sm:right-4 sm:bottom-20 lg:bottom-6 lg:right-6 z-50 w-auto sm:w-[380px] max-h-[70vh] flex flex-col rounded-2xl border border-border bg-background shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 fade-in duration-300">
-          <div className="flex items-center justify-between gap-2 bg-primary px-4 py-3 text-primary-foreground">
+        <div className="fixed bottom-20 right-2 left-2 sm:left-auto sm:right-4 sm:bottom-20 lg:bottom-6 lg:right-6 z-50 w-auto sm:w-[380px] max-h-[70vh] flex flex-col rounded-[24px] overflow-hidden glass-premium animate-in slide-in-from-bottom-4 fade-in duration-300">
+          <div className="flex items-center justify-between gap-2 bg-gradient-to-r from-slate-900/95 to-slate-800/95 dark:from-slate-950/95 dark:to-slate-900/95 px-4 py-3 text-white border-b border-amber-500/20">
             <div className="flex items-center gap-2">
-              <Bot className="h-5 w-5" />
-              <span className="font-semibold text-sm">Помощник Домофондар</span>
+              <Bot className="h-5 w-5 text-amber-400" />
+              <span className="font-semibold text-sm tracking-tight font-display text-slate-100">Помощник Домофондар</span>
             </div>
-            <button onClick={() => setOpen(false)} className="rounded-full p-1 hover:bg-primary-foreground/20 transition-colors">
+            <button onClick={() => setOpen(false)} className="rounded-full p-1 hover:bg-white/10 text-slate-300 hover:text-white transition-colors">
               <X className="h-4 w-4" />
             </button>
           </div>
 
-          <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-3 min-h-[200px] max-h-[50vh]">
+          <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 min-h-[200px] max-h-[50vh] bg-slate-50/20 dark:bg-slate-900/20">
             <div className="flex gap-2">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                <Bot className="h-4 w-4 text-primary" />
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-500/10 border border-amber-500/20">
+                <Bot className="h-4 w-4 text-amber-500" />
               </div>
-              <div className="rounded-2xl rounded-tl-sm bg-muted px-3 py-2 text-sm max-w-[85%]">
+              <div className="rounded-[18px] rounded-tl-sm bg-white/70 dark:bg-slate-800/80 border border-slate-200/50 dark:border-slate-700/50 shadow-sm text-slate-800 dark:text-slate-200 px-4 py-2.5 text-sm max-w-[85%]">
                 {welcomeMessage}
               </div>
             </div>
@@ -411,15 +411,15 @@ export default function ChatWidget() {
             {messages.filter(m => m.role !== "tool").map((msg, i) => (
               <div key={i} className={`flex gap-2 ${msg.role === "user" ? "justify-end" : ""}`}>
                 {msg.role === "assistant" && (
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                    <Bot className="h-4 w-4 text-primary" />
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-500/10 border border-amber-500/20">
+                    <Bot className="h-4 w-4 text-amber-500" />
                   </div>
                 )}
                 <div
-                  className={`rounded-2xl px-3 py-2 text-sm max-w-[85%] ${
+                  className={`rounded-[18px] px-4 py-2.5 text-sm max-w-[85%] ${
                     msg.role === "user"
-                      ? "bg-primary text-primary-foreground rounded-tr-sm"
-                      : "bg-muted rounded-tl-sm"
+                      ? "bg-gradient-to-r from-primary to-primary-dark text-white rounded-tr-sm shadow-md shadow-primary/10"
+                      : "bg-white/70 dark:bg-slate-800/80 border border-slate-200/50 dark:border-slate-700/50 shadow-sm text-slate-800 dark:text-slate-200 rounded-tl-sm"
                   }`}
                 >
                   {msg.role === "assistant" ? (
@@ -431,7 +431,7 @@ export default function ChatWidget() {
                               href={href}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-primary underline hover:text-primary/80"
+                              className="text-primary underline hover:text-primary/80 font-medium"
                             >
                               {children}
                             </a>
@@ -448,17 +448,17 @@ export default function ChatWidget() {
 
             {isLoading && messages[messages.length - 1]?.role !== "assistant" && (
               <div className="flex gap-2">
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                  <Bot className="h-4 w-4 text-primary" />
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-500/10 border border-amber-500/20">
+                  <Bot className="h-4 w-4 text-amber-500" />
                 </div>
-                <div className="rounded-2xl rounded-tl-sm bg-muted px-3 py-2">
-                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                <div className="rounded-[18px] rounded-tl-sm bg-white/70 dark:bg-slate-800/80 border border-slate-200/50 dark:border-slate-700/50 px-4 py-2.5">
+                  <Loader2 className="h-4 w-4 animate-spin text-amber-500" />
                 </div>
               </div>
             )}
           </div>
 
-          <div className="border-t p-2">
+          <div className="border-t border-slate-200/50 dark:border-slate-700/50 p-3 bg-white/30 dark:bg-slate-900/30 backdrop-blur-md">
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -470,10 +470,10 @@ export default function ChatWidget() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Напишите сообщение..."
-                className="flex-1 rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+                className="flex-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800/60 px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all text-slate-800 dark:text-slate-200 placeholder-slate-400"
                 disabled={isLoading}
               />
-              <Button type="submit" size="icon" disabled={isLoading || !input.trim()} className="rounded-xl shrink-0">
+              <Button type="submit" size="icon" disabled={isLoading || !input.trim()} className="rounded-xl shrink-0 btn-premium-gold h-9 w-9 flex items-center justify-center p-0">
                 <Send className="h-4 w-4" />
               </Button>
             </form>
