@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, LogOut, CheckCircle, AlertCircle, ClipboardList, Calendar, Shield, CreditCard, Wallet, Pencil, Trash2, UserCheck, Plus, Clock, Wrench, CheckCircle2, XCircle, Send, Smartphone, KeyRound, PhoneCall, DoorOpen } from "lucide-react";
+import { Loader2, LogOut, CheckCircle, AlertCircle, ClipboardList, Calendar, Shield, CreditCard, Wallet, Pencil, Trash2, UserCheck, Plus, Minus, Clock, Wrench, CheckCircle2, XCircle, Send, Smartphone, KeyRound, PhoneCall, DoorOpen } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -501,6 +501,40 @@ const Cabinet = () => {
   });
   const navigate = useNavigate();
 
+  // --- СТЕЙТЫ ДЛЯ ФОРМЫ ЗАКАЗА УСЛУГ И ОБОРУДОВАНИЯ ---
+  const [products, setProducts] = useState<any[]>([]); // Все товары и услуги из БД
+  const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false); // Открытие диалога заказа
+  const [orderType, setOrderType] = useState<"repair" | "order">("repair"); // Тип обращения: неисправность или заказ
+  const [repairProblem, setRepairProblem] = useState(""); // Текст проблемы для бесплатной заявки
+  const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null); // Выбранная услуга
+  const [selectedEquipments, setSelectedEquipments] = useState<{ [id: string]: number }>({}); // Выбранное оборудование и количество
+  const [keysQuantity, setKeysQuantity] = useState(0); // Количество дополнительных ключей
+  const [isCabinetSetupChecked, setIsCabinetSetupChecked] = useState(false); // Выбран ли чекбокс настройки ЛК
+  const [orderComment, setOrderComment] = useState(""); // Комментарий к платному заказу
+  const [isSuccessPaymentOpen, setIsSuccessPaymentOpen] = useState(false); // Открытие окна с подтверждением перехода к оплате
+  const [lastCreatedRequestId, setLastCreatedRequestId] = useState<string | null>(null); // ID созданной заявки для оплаты
+  const [lastOrderTotals, setLastOrderTotals] = useState<any>(null); // Рассчитанные суммы платежа для передачи в шлюз
+
+  // Загрузка активных товаров и услуг из БД
+  const loadProducts = async () => {
+    console.log("[Заказ] Загрузка списка товаров и услуг из products...");
+    try {
+      const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .eq("is_active", true);
+
+      if (error) throw error;
+
+      if (data) {
+        setProducts(data);
+        console.log(`[Заказ] Успешно загружено товаров и услуг: ${data.length}`);
+      }
+    } catch (err) {
+      console.error("[Заказ] Ошибка загрузки списка продуктов:", err);
+    }
+  };
+
   // Функция для очистки полного адреса (убираем город "Краснодар, " или "пос. Южный, ") для отображения
   const getDisplayAddress = (fullAddr: string) => {
     if (!fullAddr) return "";
@@ -721,6 +755,232 @@ const Cabinet = () => {
     }
   };
 
+  // --- ЛОГИКА РАСЧЕТА СТОИМОСТИ ЗАКАЗА ДЛЯ ШЛЮЗА БАНКА ---
+  const calculateTotals = () => {
+    let sum1 = 0; // Ключи (SUMMA_OPL1)
+    let sum2 = 0; // Установка и трубки (SUMMA_OPL2)
+    let sum3 = 0; // Личный кабинет (SUMMA_OPL3)
+
+    // Находим ключ
+    const keyProduct = products.find(p => p.name.toLowerCase().includes("ключ"));
+    if (keyProduct && keysQuantity > 0) {
+      sum1 = Number(keyProduct.price) * keysQuantity;
+    }
+
+    // Выбранная услуга (установка или замена трубки)
+    const selectedService = products.find(p => p.id === selectedServiceId);
+    if (selectedService) {
+      sum2 += Number(selectedService.price);
+    }
+
+    // Выбранные трубки (оборудование)
+    Object.entries(selectedEquipments).forEach(([id, qty]) => {
+      const prod = products.find(p => p.id === id);
+      if (prod && qty > 0) {
+        sum2 += Number(prod.price) * qty;
+      }
+    });
+
+    // Настройка личного кабинета (300 руб)
+    if (isCabinetSetupChecked) {
+      const cabinetProduct = products.find(p => p.name.toLowerCase().includes("кабинет"));
+      if (cabinetProduct) {
+        sum3 = Number(cabinetProduct.price);
+      } else {
+        sum3 = 300; // Резервное значение, если товара нет в БД
+      }
+    }
+
+    const total = sum1 + sum2 + sum3;
+
+    return { sum1, sum2, sum3, total };
+  };
+
+  // --- ОТПРАВКА ЗАЯВКИ ИЛИ ЗАКАЗА В БД ---
+  const handleCreateOrderRequest = async () => {
+    if (orderType === "repair" && !repairProblem.trim()) {
+      toast({ title: "Опишите проблему", variant: "destructive" });
+      return;
+    }
+
+    const totals = calculateTotals();
+    
+    if (orderType === "order" && totals.total === 0) {
+      toast({ title: "Выберите хотя бы одну платную услугу или оборудование", variant: "destructive" });
+      return;
+    }
+
+    setSaving(true);
+    console.log(`[Заказ] Создание обращения типа: "${orderType}"`);
+
+    try {
+      // 1. Формируем структурированное текстовое сообщение для FSM и Telegram-бота
+      let messageText = "";
+      if (orderType === "repair") {
+        messageText = `🔧 НЕИСПРАВНОСТЬ (БЕСПЛАТНО)\n— Описание проблемы: ${repairProblem.trim()}`;
+      } else {
+        messageText = `🛍️ ЗАКАЗ УСЛУГ И ОБОРУДОВАНИЯ\n`;
+        
+        const selectedService = products.find(p => p.id === selectedServiceId);
+        if (selectedService) {
+          messageText += `— Услуга: ${selectedService.name} (${Number(selectedService.price).toFixed(2)} ₽)\n`;
+        }
+        
+        let hasEquip = false;
+        Object.entries(selectedEquipments).forEach(([id, qty]) => {
+          const prod = products.find(p => p.id === id);
+          if (prod && qty > 0) {
+            messageText += `— Оборудование: ${prod.name} (${qty} шт. x ${Number(prod.price).toFixed(2)} ₽)\n`;
+            hasEquip = true;
+          }
+        });
+        
+        const keyProduct = products.find(p => p.name.toLowerCase().includes("ключ"));
+        if (keyProduct && keysQuantity > 0) {
+          messageText += `— Ключи: ${keyProduct.name} (${keysQuantity} шт. x ${Number(keyProduct.price).toFixed(2)} ₽ = ${totals.sum1.toFixed(2)} ₽)\n`;
+        }
+        
+        if (isCabinetSetupChecked) {
+          messageText += `— Сервис: Настройка личного кабинета (300.00 ₽)\n`;
+        }
+        
+        messageText += `💵 Итоговая сумма заказа: ${totals.total.toFixed(2)} ₽\n`;
+        if (orderComment.trim()) {
+          messageText += `\n💬 Комментарий клиента: ${orderComment.trim()}`;
+        }
+      }
+
+      const fullAddress = `${address}${apartment ? `, кв. ${apartment}` : ""}`;
+
+      // 2. Вставляем запись в таблицу requests
+      const { data: requestData, error: requestError } = await supabase
+        .from("requests")
+        .insert({
+          name: fullName || profile?.full_name || "Абонент ЛК",
+          phone: phone || profile?.phone || "не указан",
+          address: fullAddress,
+          message: messageText,
+          status: "pending",
+          priority: orderType === "repair" ? "medium" : "low",
+        })
+        .select("id")
+        .single();
+
+      if (requestError) throw requestError;
+
+      console.log(`[Заказ] Успешно создано обращение с ID: ${requestData.id}`);
+
+      // 3. Если это платный заказ, вставляем позиции в request_items для детального учета товаров
+      if (orderType === "order" && requestData?.id) {
+        const itemsToInsert: any[] = [];
+        
+        // Вставка выбранной услуги
+        if (selectedServiceId) {
+          const prod = products.find(p => p.id === selectedServiceId);
+          if (prod) {
+            itemsToInsert.push({
+              request_id: requestData.id,
+              product_id: selectedServiceId,
+              quantity: 1,
+              price: Number(prod.price),
+            });
+          }
+        }
+        
+        // Вставка выбранного оборудования (трубок)
+        Object.entries(selectedEquipments).forEach(([id, qty]) => {
+          const prod = products.find(p => p.id === id);
+          if (prod && qty > 0) {
+            itemsToInsert.push({
+              request_id: requestData.id,
+              product_id: id,
+              quantity: qty,
+              price: Number(prod.price),
+            });
+          }
+        });
+        
+        // Вставка выбранных ключей
+        if (keysQuantity > 0) {
+          const keyProduct = products.find(p => p.name.toLowerCase().includes("ключ"));
+          if (keyProduct) {
+            itemsToInsert.push({
+              request_id: requestData.id,
+              product_id: keyProduct.id,
+              quantity: keysQuantity,
+              price: Number(keyProduct.price),
+            });
+          }
+        }
+        
+        // Вставка настройки личного кабинета
+        if (isCabinetSetupChecked) {
+          const cabinetProduct = products.find(p => p.name.toLowerCase().includes("кабинет"));
+          if (cabinetProduct) {
+            itemsToInsert.push({
+              request_id: requestData.id,
+              product_id: cabinetProduct.id,
+              quantity: 1,
+              price: Number(cabinetProduct.price),
+            });
+          }
+        }
+        
+        if (itemsToInsert.length > 0) {
+          console.log(`[Заказ] Запись позиций заказа (всего: ${itemsToInsert.length} шт.) в request_items...`);
+          const { error: itemsError } = await supabase
+            .from("request_items")
+            .insert(itemsToInsert);
+          
+          if (itemsError) throw itemsError;
+        }
+      }
+
+      // 4. Отправляем уведомление в Telegram-бота
+      try {
+        await supabase.functions.invoke("notify", {
+          body: {
+            event: "request_created",
+            data: { name: fullName, phone, address: fullAddress, message: messageText },
+          },
+        });
+      } catch (e) {
+        console.error("[Заказ] Ошибка отправки уведомления в Telegram:", e);
+      }
+
+      // 5. Обрабатываем успешное завершение
+      if (orderType === "repair") {
+        toast({
+          title: "Заявка отправлена",
+          description: "Наши мастера свяжутся с вами в ближайшее время.",
+        });
+        setIsOrderDialogOpen(false);
+        setRepairProblem("");
+      } else {
+        // Для платного заказа закрываем форму оформления и открываем окно оплаты банка
+        setIsOrderDialogOpen(false);
+        setLastCreatedRequestId(requestData.id);
+        setLastOrderTotals(totals);
+        setIsSuccessPaymentOpen(true);
+        
+        // Сбрасываем выбранные стейты заказа
+        setSelectedServiceId(null);
+        setSelectedEquipments({});
+        setKeysQuantity(0);
+        setIsCabinetSetupChecked(false);
+        setOrderComment("");
+      }
+    } catch (err: any) {
+      console.error("[Заказ] Ошибка создания заказа:", err);
+      toast({
+        title: "Не удалось создать заявку",
+        description: err.message,
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const { toast } = useToast();
   const hasAdminConsoleAccess = userRoles.some((role) => ["admin", "director"].includes(role));
@@ -739,6 +999,7 @@ const Cabinet = () => {
   useEffect(() => {
     checkUser();
     loadAddressCache();
+    loadProducts(); // Подгружаем товары и услуги при входе в ЛК
   }, []);
 
   // Realtime subscription for profile updates
@@ -1081,6 +1342,18 @@ const Cabinet = () => {
                 <CardContent className="space-y-4">
                   <DebtCard address={address} apartment={apartment} fullName={fullName} phone={phone} embedded />
                   <RemoteAccessCard address={address} apartment={apartment} />
+                  
+                  {/* Кнопка создания заявки / заказа платных услуг */}
+                  <div className="p-4 rounded-lg border border-primary/20 bg-muted/20 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="text-left w-full">
+                      <p className="font-semibold text-sm flex items-center gap-1.5"><Wrench className="h-4 w-4 text-primary shrink-0" /> Заявки и заказ услуг</p>
+                      <p className="text-xs text-muted-foreground mt-1">Нужен ремонт трубки, новые ключи или установка оборудования? Оформить заявку прямо сейчас.</p>
+                    </div>
+                    <Button onClick={() => { setOrderType("repair"); setIsOrderDialogOpen(true); }} className="w-full sm:w-auto shrink-0 flex items-center gap-1.5 hover:scale-105 transition-transform">
+                      <Plus className="h-4 w-4" />
+                      Создать заявку
+                    </Button>
+                  </div>
                 </CardContent>
               )}
             </Card>
@@ -1271,6 +1544,419 @@ const Cabinet = () => {
             {(phone || fullName) && (
               <MyRequestsCard phone={phone} fullName={fullName} />
             )}
+
+            {/* --- ДИАЛОГ ПОДАЧИ ЗАЯВКИ / ЗАКАЗА УСЛУГ --- */}
+            <Dialog open={isOrderDialogOpen} onOpenChange={setIsOrderDialogOpen}>
+              <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto p-4 sm:p-6 bg-background/95 backdrop-blur-md rounded-xl shadow-2xl border">
+                <DialogHeader className="pb-3 border-b">
+                  <DialogTitle className="text-xl font-bold flex items-center gap-2 text-foreground">
+                    <Wrench className="h-5 w-5 text-primary" />
+                    Создание новой заявки
+                  </DialogTitle>
+                  <DialogDescription className="text-xs text-muted-foreground mt-1">
+                    Абонент: <span className="font-semibold text-foreground">{fullName || profile?.full_name}</span> | Адрес: <span className="font-semibold text-foreground">{address}{apartment ? `, кв. ${apartment}` : ""}</span>
+                  </DialogDescription>
+                </DialogHeader>
+
+                {/* Переключатель вкладок типа обращения */}
+                <div className="flex rounded-lg border p-1 bg-muted/40 w-full my-4">
+                  <button
+                    type="button"
+                    onClick={() => setOrderType("repair")}
+                    className={`flex-1 py-2 text-sm font-semibold rounded-md transition-all flex items-center justify-center gap-1.5 ${
+                      orderType === "repair"
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    🔧 Неисправность
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOrderType("order");
+                      // Выберем первую доступную услугу по умолчанию, если ничего не выбрано
+                      const service = products.find(p => p.category === "service");
+                      if (service && !selectedServiceId) {
+                        setSelectedServiceId(service.id);
+                      }
+                    }}
+                    className={`flex-1 py-2 text-sm font-semibold rounded-md transition-all flex items-center justify-center gap-1.5 ${
+                      orderType === "order"
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    🛍️ Заказ услуг и ТКП
+                  </button>
+                </div>
+
+                {/* СОДЕРЖИМОЕ ТАБА: НЕИСПРАВНОСТЬ */}
+                {orderType === "repair" && (
+                  <div className="space-y-4 py-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="problemText" className="text-sm font-semibold text-foreground">Что случилось?</Label>
+                      <Textarea
+                        id="problemText"
+                        placeholder="Подробно опишите неисправность (например: не работает звук на трубке, сломался доводчик на двери, не реагирует на ключи...)"
+                        value={repairProblem}
+                        onChange={(e) => setRepairProblem(e.target.value)}
+                        rows={4}
+                        className="bg-background/50 border-border/80 focus:border-primary/50 focus:ring-1 focus:ring-primary/20 text-sm font-medium"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      * Заявки по неисправностям и техническому обслуживанию в рамках абонентской платы выполняются **бесплатно**.
+                    </p>
+                  </div>
+                )}
+
+                {/* СОДЕРЖИМОЕ ТАБА: ЗАКАЗ УСЛУГ И ОБОРУДОВАНИЯ */}
+                {orderType === "order" && (
+                  <div className="space-y-5 py-1">
+                    
+                    {/* Выбор услуги (установка / замена) */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold text-foreground flex items-center gap-1">🛠️ Выберите услугу</Label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {products
+                          .filter(p => p.category === "service" && !p.name.toLowerCase().includes("кабинет"))
+                          .map((service) => (
+                            <button
+                              key={service.id}
+                              type="button"
+                              onClick={() => setSelectedServiceId(service.id)}
+                              className={`p-3 text-left rounded-lg border text-sm font-medium transition-all ${
+                                selectedServiceId === service.id
+                                  ? "border-primary bg-primary/5 text-foreground shadow-sm"
+                                  : "border-border/80 bg-background/50 text-muted-foreground hover:text-foreground"
+                              }`}
+                            >
+                              <div className="font-semibold text-foreground">{service.name}</div>
+                              <div className="text-xs text-primary font-bold mt-1">
+                                {Number(service.price) === 0 ? "Бесплатно" : `${Number(service.price).toFixed(0)} ₽`}
+                              </div>
+                            </button>
+                          ))}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedServiceId(null)}
+                          className={`p-3 text-left rounded-lg border text-sm font-medium transition-all ${
+                            selectedServiceId === null
+                              ? "border-primary bg-primary/5 text-foreground shadow-sm"
+                              : "border-border/80 bg-background/50 text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          <div className="font-semibold text-foreground">Без услуги</div>
+                          <div className="text-xs text-muted-foreground mt-1">Только покупка трубки/ключей</div>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Выбор модели трубки */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold text-foreground flex items-center gap-1">🏢 Выберите трубку (ТКП)</Label>
+                      <div className="space-y-2">
+                        {products
+                          .filter(p => p.category === "equipment" && !p.name.toLowerCase().includes("ключ"))
+                          .map((equip) => {
+                            const qty = selectedEquipments[equip.id] || 0;
+                            return (
+                              <div
+                                key={equip.id}
+                                className="flex items-center justify-between p-3 rounded-lg border border-border/80 bg-background/50"
+                              >
+                                <div>
+                                  <div className="font-semibold text-sm text-foreground">{equip.name.toUpperCase()}</div>
+                                  <div className="text-xs text-muted-foreground mt-0.5">{equip.description || "Абонентская трубка домофона"}</div>
+                                  <div className="text-xs text-primary font-bold mt-1">{Number(equip.price).toFixed(0)} ₽</div>
+                                </div>
+                                
+                                {/* Счетчик количества */}
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (qty > 0) {
+                                        setSelectedEquipments(prev => ({ ...prev, [equip.id]: qty - 1 }));
+                                      }
+                                    }}
+                                    className="p-1 rounded-md border hover:bg-muted text-muted-foreground active:scale-90 transition-all shrink-0"
+                                  >
+                                    <Minus className="h-3.5 w-3.5" />
+                                  </button>
+                                  <span className="w-6 text-center font-bold text-sm text-foreground">{qty}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedEquipments(prev => ({ ...prev, [equip.id]: qty + 1 }));
+                                    }}
+                                    className="p-1 rounded-md border hover:bg-muted text-muted-foreground active:scale-90 transition-all shrink-0"
+                                  >
+                                    <Plus className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    </div>
+
+                    {/* Заказ дополнительных ключей */}
+                    {products
+                      .filter(p => p.name.toLowerCase().includes("ключ"))
+                      .map((keyProduct) => (
+                        <div
+                          key={keyProduct.id}
+                          className="flex items-center justify-between p-3 rounded-lg border border-primary/20 bg-primary/5"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-xl">🔑</span>
+                            <div>
+                              <div className="font-semibold text-sm text-foreground">{keyProduct.name.toUpperCase()}</div>
+                              <div className="text-xs text-muted-foreground mt-0.5">Ключ с повышенной защитой от копирования</div>
+                              <div className="text-xs text-primary font-bold mt-1">{Number(keyProduct.price).toFixed(0)} ₽ за шт.</div>
+                            </div>
+                          </div>
+
+                          {/* Счетчик количества ключей */}
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (keysQuantity > 0) setKeysQuantity(prev => prev - 1);
+                              }}
+                              className="p-1 rounded-md border bg-background hover:bg-muted text-muted-foreground active:scale-90 transition-all shrink-0"
+                            >
+                              <Minus className="h-3.5 w-3.5" />
+                            </button>
+                            <span className="w-6 text-center font-bold text-sm text-foreground">{keysQuantity}</span>
+                            <button
+                              type="button"
+                              onClick={() => setKeysQuantity(prev => prev + 1)}
+                              className="p-1 rounded-md border bg-background hover:bg-muted text-muted-foreground active:scale-90 transition-all shrink-0"
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+
+                    {/* Подключение личного кабинета */}
+                    {products
+                      .filter(p => p.name.toLowerCase().includes("кабинет"))
+                      .map((cabinetProduct) => (
+                        <div
+                          key={cabinetProduct.id}
+                          className="flex items-start gap-3 p-3 rounded-lg border border-border/80 bg-background/50"
+                        >
+                          <input
+                            id="cabinetSetup"
+                            type="checkbox"
+                            checked={isCabinetSetupChecked}
+                            onChange={(e) => setIsCabinetSetupChecked(e.target.checked)}
+                            className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary shrink-0 cursor-pointer"
+                          />
+                          <div className="text-left cursor-pointer" onClick={() => setIsCabinetSetupChecked(!isCabinetSetupChecked)}>
+                            <Label htmlFor="cabinetSetup" className="font-semibold text-sm text-foreground cursor-pointer flex items-center gap-1.5">
+                              📱 {cabinetProduct.name}
+                            </Label>
+                            <p className="text-xs text-muted-foreground mt-0.5">{cabinetProduct.description || "Единоразовое подключение и настройка личного кабинета"}</p>
+                            <p className="text-xs text-primary font-bold mt-1">+{Number(cabinetProduct.price).toFixed(0)} ₽ единоразово</p>
+                          </div>
+                        </div>
+                      ))}
+
+                    {/* Комментарий к платному заказу */}
+                    <div className="space-y-2">
+                      <Label htmlFor="orderComment" className="text-sm font-semibold text-foreground">Желаемое время и примечания</Label>
+                      <Textarea
+                        id="orderComment"
+                        placeholder="Укажите желаемое время визита мастера или любые дополнительные пожелания..."
+                        value={orderComment}
+                        onChange={(e) => setOrderComment(e.target.value)}
+                        rows={2}
+                        className="bg-background/50 border-border/80 focus:border-primary/50 text-xs font-medium"
+                      />
+                    </div>
+
+                    {/* Смета заказа (Чек) */}
+                    <div className="p-4 rounded-lg bg-muted/40 border border-dashed border-border/80 space-y-2 text-sm">
+                      <div className="font-semibold text-xs text-muted-foreground uppercase tracking-wider pb-1.5 border-b border-border/40">Детализация расчета:</div>
+                      
+                      {/* Услуга */}
+                      {selectedServiceId && (() => {
+                        const s = products.find(p => p.id === selectedServiceId);
+                        return s ? (
+                          <div className="flex justify-between text-muted-foreground">
+                            <span>{s.name}</span>
+                            <span className="font-semibold text-foreground">{Number(s.price) === 0 ? "Бесплатно" : `${Number(s.price).toFixed(0)} ₽`}</span>
+                          </div>
+                        ) : null;
+                      })()}
+
+                      {/* Оборудование (трубки) */}
+                      {Object.entries(selectedEquipments).map(([id, qty]) => {
+                        const prod = products.find(p => p.id === id);
+                        return prod && qty > 0 ? (
+                          <div key={id} className="flex justify-between text-muted-foreground">
+                            <span>{prod.name.toUpperCase()} (x{qty})</span>
+                            <span className="font-semibold text-foreground">{(Number(prod.price) * qty).toFixed(0)} ₽</span>
+                          </div>
+                        ) : null;
+                      })}
+
+                      {/* Ключи */}
+                      {keysQuantity > 0 && (() => {
+                        const kp = products.find(p => p.name.toLowerCase().includes("ключ"));
+                        return kp ? (
+                          <div className="flex justify-between text-muted-foreground">
+                            <span>🔑 Ключи Mifare (x{keysQuantity})</span>
+                            <span className="font-semibold text-foreground">{(Number(kp.price) * keysQuantity).toFixed(0)} ₽</span>
+                          </div>
+                        ) : null;
+                      })()}
+
+                      {/* ЛК */}
+                      {isCabinetSetupChecked && (() => {
+                        const cp = products.find(p => p.name.toLowerCase().includes("кабинет"));
+                        return cp ? (
+                          <div className="flex justify-between text-muted-foreground">
+                            <span>📱 Подключение личного кабинета</span>
+                            <span className="font-semibold text-foreground">{Number(cp.price).toFixed(0)} ₽</span>
+                          </div>
+                        ) : null;
+                      })()}
+
+                      {/* Итого */}
+                      <div className="flex justify-between font-bold text-base text-foreground pt-2 border-t">
+                        <span>Итого к оплате:</span>
+                        <span className="text-primary">{calculateTotals().total.toFixed(0)} ₽</span>
+                      </div>
+                    </div>
+
+                  </div>
+                )}
+
+                {/* Кнопки диалога */}
+                <DialogFooter className="pt-3 border-t flex flex-col sm:flex-row gap-2">
+                  <Button variant="outline" onClick={() => setIsOrderDialogOpen(false)} className="w-full sm:w-auto">
+                    Отмена
+                  </Button>
+                  <Button
+                    onClick={handleCreateOrderRequest}
+                    disabled={saving}
+                    className="w-full sm:w-auto flex-1 flex items-center justify-center gap-1.5"
+                  >
+                    {saving ? (
+                      <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+                    ) : orderType === "repair" || calculateTotals().total === 0 ? (
+                      <Send className="h-4 w-4 shrink-0" />
+                    ) : (
+                      <CreditCard className="h-4 w-4 shrink-0" />
+                    )}
+                    {orderType === "repair"
+                      ? "Отправить заявку"
+                      : calculateTotals().total === 0
+                      ? "Оформить заявку"
+                      : `Оплатить заказ (${calculateTotals().total.toFixed(0)} ₽)`}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* --- ДИАЛОГ ПОДТВЕРЖДЕНИЯ УСПЕШНОГО ОФОРМЛЕНИЯ И ОПЛАТЫ БАНКА --- */}
+            <Dialog open={isSuccessPaymentOpen} onOpenChange={setIsSuccessPaymentOpen}>
+              <DialogContent className="max-w-md p-6 bg-background rounded-xl shadow-2xl border text-center animate-in fade-in-50 zoom-in-95 duration-200">
+                <div className="flex flex-col items-center justify-center space-y-4">
+                  <div className="p-3 rounded-full bg-green-500/10 text-green-600 animate-bounce">
+                    <CheckCircle2 className="h-12 w-12" />
+                  </div>
+                  <DialogTitle className="text-xl font-bold text-foreground">Заказ успешно оформлен!</DialogTitle>
+                  <DialogDescription className="text-sm text-muted-foreground">
+                    Заявка на подключение и доставку оборудования успешно зарегистрирована в нашей системе. 
+                    Для завершения заказа перейдите к безопасной оплате на платежный шлюз банка **«Кубань Кредит»**.
+                  </DialogDescription>
+
+                  {/* Детализация для проверки */}
+                  {lastOrderTotals && (
+                    <div className="w-full p-4 rounded-lg bg-muted/40 border text-left text-xs space-y-2 font-medium">
+                      <div className="text-muted-foreground border-b pb-1 flex justify-between">
+                        <span>Лицевой счет:</span>
+                        <span className="font-semibold text-foreground">{account?.account_number || "000000"}</span>
+                      </div>
+                      
+                      {lastOrderTotals.sum1 > 0 && (
+                        <div className="flex justify-between text-muted-foreground">
+                          <span>Кодировка доп.ключа (сумма):</span>
+                          <span className="font-semibold text-foreground">{lastOrderTotals.sum1.toFixed(2)} ₽</span>
+                        </div>
+                      )}
+                      
+                      {lastOrderTotals.sum2 > 0 && (
+                        <div className="flex justify-between text-muted-foreground">
+                          <span>Установка трубки (сумма):</span>
+                          <span className="font-semibold text-foreground">{lastOrderTotals.sum2.toFixed(2)} ₽</span>
+                        </div>
+                      )}
+                      
+                      {lastOrderTotals.sum3 > 0 && (
+                        <div className="flex justify-between text-muted-foreground">
+                          <span>Настройка ЛК (сумма):</span>
+                          <span className="font-semibold text-foreground">{lastOrderTotals.sum3.toFixed(2)} ₽</span>
+                        </div>
+                      )}
+
+                      <div className="flex justify-between font-bold text-sm text-foreground pt-1.5 border-t">
+                        <span>Итого к оплате (DENGI_F):</span>
+                        <span className="text-primary text-base">{lastOrderTotals.total.toFixed(2)} ₽</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex flex-col gap-2 w-full pt-2">
+                    <Button
+                      onClick={() => {
+                        if (!lastOrderTotals) return;
+                        
+                        // Парсим адрес на улицу, дом, корпус, подъезд и квартиру
+                        const street = address ? address.split(",")[1]?.replace(/(?:ул\.?|улица)\s*/gi, "").trim() || address : "";
+                        const house = address ? address.split(",")[2]?.replace(/(?:д\.?|дом)\s*/gi, "").trim() || "" : "";
+                        
+                        // Пытаемся вытащить подъезд из адреса
+                        const entranceMatch = address ? address.match(/(?:подъезд|п\.?)\s*(\d+)/i) : null;
+                        const entrance = entranceMatch ? entranceMatch[1] : "1";
+
+                        const payUrl = `https://ref.kubankredit.ru/2?h=1A21EE45CCA81735A998DDFAA76BBB37` +
+                          `&ACCOUNTNUMBER=${encodeURIComponent(account?.account_number || "000000")}` +
+                          `&FIO=${encodeURIComponent(fullName || profile?.full_name || "")}` +
+                          `&ADDRESS=${encodeURIComponent(street)}` +
+                          `&HOUSE=${encodeURIComponent(house)}` +
+                          `&FLAT=${encodeURIComponent(apartment || profile?.apartment || "")}` +
+                          `&ENTRANCE=${encodeURIComponent(entrance)}` +
+                          `&PHONE=${encodeURIComponent(phone || profile?.phone || "")}` +
+                          `&SUMMA_OPL1=${lastOrderTotals.sum1.toFixed(2)}` +
+                          `&SUMMA_OPL2=${lastOrderTotals.sum2.toFixed(2)}` +
+                          `&SUMMA_OPL3=${lastOrderTotals.sum3.toFixed(2)}` +
+                          `&DENGI_F=${lastOrderTotals.total.toFixed(2)}` +
+                          `&INFO=${encodeURIComponent(`Оплата услуг по заявке #${lastCreatedRequestId}`)}`;
+
+                        window.open(payUrl, "_blank");
+                        setIsSuccessPaymentOpen(false);
+                      }}
+                      className="w-full py-2.5 flex items-center justify-center gap-2 hover:scale-105 transition-transform"
+                      size="lg"
+                    >
+                      <CreditCard className="h-5 w-5 shrink-0" />
+                      Оплатить банковской картой
+                    </Button>
+                    <Button variant="outline" onClick={() => setIsSuccessPaymentOpen(false)} className="w-full">
+                      Оплатить позже
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
       </main>
