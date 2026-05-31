@@ -42,22 +42,18 @@ const DebtCard = ({ address, apartment, fullName, phone, embedded = false }: { a
   useEffect(() => {
     const loadDebt = async () => {
       setLoading(true);
-      // Build a flexible query: street keywords first
-      const streetWords = (address || "")
-        .replace(/[,.\-]/g, " ")
-        .split(/\s+/)
-        .filter((w) => w.length > 2 && !/^\d+$/.test(w));
-
+      console.log(`[Баланс] Поиск лицевого счета для дома: "${address}", квартира: "${apartment}"`); // Логирование
+      
+      // Ищем лицевые счета по началу адреса дома
       let query = supabase
         .from("accounts")
-        .select("account_number, period, debt_amount, address, apartment");
-      for (const word of streetWords) {
-        query = query.ilike("address", `%${word}%`);
-      }
-      const { data } = await query.order("period", { ascending: false }).limit(20);
+        .select("account_number, period, debt_amount, address, apartment")
+        .ilike("address", `${address}%`); // Ищем точное соответствие дома
+        
+      const { data } = await query.order("period", { ascending: false }).limit(200);
 
-      // Try to filter by apartment in JS — apartment may be "1", "Офис 1" etc.
-      let best = data && data.length > 0 ? data[0] : null;
+      // Фильтруем результаты, находя точное совпадение по номеру квартиры
+      let best = null;
       if (data && data.length > 0 && apartment) {
         const aptDigits = (apartment.match(/\d+/) || [])[0];
         if (aptDigits) {
@@ -66,9 +62,15 @@ const DebtCard = ({ address, apartment, fullName, phone, embedded = false }: { a
             const addr = (a.address || "").toLowerCase();
             return new RegExp(`кв\\.?\\s*${aptDigits}\\b`, "i").test(addr);
           });
-          if (filtered.length > 0) best = filtered[0];
-          else best = null; // Address matches but apartment doesn't — treat as not found
+          if (filtered.length > 0) {
+            best = filtered[0];
+            console.log(`[Баланс] Лицевой счет найден: ${best.account_number}, сумма: ${best.debt_amount} ₽`); // Логирование
+          } else {
+            console.log(`[Баланс] Адрес совпал, но квартира ${apartment} не найдена в базе`); // Логирование
+          }
         }
+      } else if (data && data.length > 0) {
+        best = data[0];
       }
       setAccount(best);
       setLoading(false);
@@ -506,21 +508,32 @@ const Cabinet = () => {
     setSearchingAddress(true);
     console.log(`[Адрес] Запрос подсказок для: "${val}"`); // Логирование запроса
     try {
-      // Ищем подходящие записи в accounts по подстроке
-      const { data, error } = await supabase
-        .from("accounts")
-        .select("address")
-        .ilike("address", `%${val}%`)
-        .limit(100); // Достаточный лимит, чтобы отсеять квартиры на клиенте
+      // Разбиваем введенное пользователем значение на отдельные слова для умного поиска
+      const words = val.split(/\s+/).filter((w) => w.length > 0);
+      
+      let query = supabase.from("accounts").select("address");
+      
+      // Накладываем фильтрацию ilike для каждого введенного слова
+      for (const word of words) {
+        query = query.ilike("address", `%${word}%`);
+      }
+      
+      const { data, error } = await query.limit(150); // Увеличиваем лимит для лучшего охвата
       
       if (error) throw error;
 
       if (data) {
-        // Очищаем адреса от квартирной части (, кв. ...)
+        // Очищаем адреса до уровня уникальных ДОМОВ (город, улица, дом — это первые 3 части)
         const parsed = data.map((item: any) => {
+          const parts = item.address.split(",");
+          if (parts.length >= 3) {
+            // Объединяем город, улицу и дом
+            return parts.slice(0, 3).join(",").trim();
+          }
+          // Резервный сплит по квартире
           return item.address.split(", кв.")[0].trim();
         });
-        // Оставляем только уникальные адреса домов
+        // Оставляем только уникальные адреса домов (без подъездов и квартир)
         const unique = Array.from(new Set(parsed));
         setAddressSuggestions(unique);
         console.log(`[Адрес] Найдено уникальных домов: ${unique.length}`); // Логирование результата
