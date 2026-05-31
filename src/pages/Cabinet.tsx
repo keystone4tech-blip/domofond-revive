@@ -485,6 +485,10 @@ const Cabinet = () => {
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [apartment, setApartment] = useState("");
+  const [floor, setFloor] = useState("");
+  const [email, setEmail] = useState("");
+  const [emailInput, setEmailInput] = useState("");
+  const [emailVerified, setEmailVerified] = useState(false);
   
   // --- СТЕЙТЫ ДЛЯ УМНОГО АВТОКОМПЛИТА АДРЕСОВ (accounts) ---
   const [allHouses, setAllHouses] = useState<string[]>([]); // Кэш всех уникальных домов
@@ -1072,6 +1076,10 @@ const Cabinet = () => {
           setAddress(data.address || "");
           setDisplayAddress(getDisplayAddress(data.address || ""));
           setApartment(data.apartment || "");
+          setFloor(data.floor || "");
+          setEmail(data.email || "");
+          setEmailInput(data.email || "");
+          setEmailVerified(!!data.email_verified);
         }
       } catch (err) {
         console.error("[Кабинет] Ошибка polling профиля:", err); // Логирование
@@ -1165,6 +1173,10 @@ const Cabinet = () => {
       setAddress(data.address || "");
       setDisplayAddress(getDisplayAddress(data.address || ""));
       setApartment(data.apartment || "");
+      setFloor(data.floor || "");
+      setEmail(data.email || "");
+      setEmailInput(data.email || "");
+      setEmailVerified(!!data.email_verified);
     } catch (error: any) {
       console.error("Error loading profile:", error);
     } finally {
@@ -1245,13 +1257,14 @@ const Cabinet = () => {
           phone,
           address,
           apartment,
+          floor,
           is_verified: false,
         })
         .eq("id", session.user.id);
 
       if (error) throw error;
 
-      setProfile((prev: any) => prev ? { ...prev, full_name: fullName, phone, address, apartment, is_verified: false } : prev);
+      setProfile((prev: any) => prev ? { ...prev, full_name: fullName, phone, address, apartment, floor, is_verified: false } : prev);
 
       try {
         await supabase.functions.invoke("notify", {
@@ -1294,15 +1307,127 @@ const Cabinet = () => {
       if (!session) return;
       const { error } = await supabase
         .from("profiles")
-        .update({ full_name: "", phone: "", address: "", apartment: "", is_verified: false })
+        .update({ full_name: "", phone: "", address: "", apartment: "", floor: "", email: "", email_verified: false, is_verified: false })
         .eq("id", session.user.id);
       if (error) throw error;
-      setProfile((prev: any) => prev ? { ...prev, full_name: "", phone: "", address: "", apartment: "", is_verified: false } : prev);
-      setFullName(""); setPhone(""); setAddress(""); setDisplayAddress(""); setSelectedStreet(null); setApartment("");
+      setProfile((prev: any) => prev ? { ...prev, full_name: "", phone: "", address: "", apartment: "", floor: "", email: "", email_verified: false, is_verified: false } : prev);
+      setFullName(""); setPhone(""); setAddress(""); setDisplayAddress(""); setSelectedStreet(null); setApartment(""); setFloor(""); setEmail(""); setEmailVerified(false);
       setEditing(false);
       toast({ title: "Данные удалены", description: "Заполните форму заново для верификации" });
     } catch (e: any) {
       toast({ title: "Ошибка", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const handleLinkEmail = async (newEmail: string) => {
+    if (!newEmail || !newEmail.includes("@")) {
+      toast({
+        title: "Некорректный Email",
+        description: "Пожалуйста, введите корректный адрес электронной почты",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setSaving(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          email: newEmail,
+          email_verified: false
+        })
+        .eq("id", session.user.id);
+
+      if (error) throw error;
+
+      setEmail(newEmail);
+      setEmailVerified(false);
+      setProfile((prev: any) => prev ? { ...prev, email: newEmail, email_verified: false } : prev);
+
+      toast({
+        title: "Почта привязана",
+        description: "Email успешно сохранен. Теперь вы можете подтвердить его."
+      });
+    } catch (err: any) {
+      toast({
+        title: "Ошибка сохранения",
+        description: err.message,
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleVerifyEmail = async () => {
+    setSaving(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          email_verified: true
+        })
+        .eq("id", session.user.id);
+
+      if (error) throw error;
+
+      setEmailVerified(true);
+      setProfile((prev: any) => prev ? { ...prev, email_verified: true } : prev);
+
+      toast({
+        title: "Почта подтверждена",
+        description: "Электронная почта успешно верифицирована!"
+      });
+    } catch (err: any) {
+      toast({
+        title: "Ошибка верификации",
+        description: err.message,
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemoveEmail = async () => {
+    setSaving(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          email: "",
+          email_verified: false
+        })
+        .eq("id", session.user.id);
+
+      if (error) throw error;
+
+      setEmail("");
+      setEmailVerified(false);
+      setProfile((prev: any) => prev ? { ...prev, email: "", email_verified: false } : prev);
+
+      toast({
+        title: "Почта удалена",
+        description: "Контактный Email успешно удален"
+      });
+    } catch (err: any) {
+      toast({
+        title: "Ошибка удаления",
+        description: err.message,
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -1578,6 +1703,8 @@ const Cabinet = () => {
                                     `&HOUSE=${encodeURIComponent(house)}` +
                                     `&FLAT=${encodeURIComponent(apartment || profile?.apartment || "")}` +
                                     `&ENTRANCE=${encodeURIComponent(entrance)}` +
+                                    `&FLOOR=${encodeURIComponent(floor || profile?.floor || "")}` +
+                                    `&EMAIL=${encodeURIComponent(email || profile?.email || "")}` +
                                     `&PHONE=${encodeURIComponent(phone || profile?.phone || "")}` +
                                     `&SUMMA_OPL1=0.00` +
                                     `&SUMMA_OPL2=${totalAmount.toFixed(2)}` +
@@ -1735,6 +1862,17 @@ const Cabinet = () => {
                   )}
                 </div>
 
+                <div className="space-y-2">
+                  <Label htmlFor="floor">Этаж (для платежки банка)</Label>
+                  <Input
+                    id="floor"
+                    value={floor}
+                    onChange={(e) => setFloor(e.target.value)}
+                    placeholder="Номер этажа (например: 3)"
+                    disabled={isLocked}
+                  />
+                </div>
+
                 {!isLocked && (
                   <div className="flex flex-col sm:flex-row gap-2">
                     <Button onClick={handleSaveAndVerify} disabled={saving} className="flex-1 whitespace-normal h-auto py-2.5">
@@ -1750,6 +1888,7 @@ const Cabinet = () => {
                         setDisplayAddress(getDisplayAddress(profile?.address || ""));
                         setSelectedStreet(null);
                         setApartment(profile?.apartment || "");
+                        setFloor(profile?.floor || "");
                       }}>
                         Отмена
                       </Button>
@@ -1781,6 +1920,100 @@ const Cabinet = () => {
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* --- КАРТОЧКА ПРИВЯЗКИ И ВЕРИФИКАЦИИ ПОЧТЫ (EMAIL) --- */}
+            <Card className="border-primary/20 shadow-lg bg-card/65 backdrop-blur-md animate-in fade-in-50 duration-300">
+              <CardHeader className="pb-3 border-b">
+                <div className="flex items-center gap-2">
+                  <span className="text-primary text-xl">📧</span>
+                  <div>
+                    <CardTitle className="text-lg font-bold text-foreground">Электронная почта</CardTitle>
+                    <CardDescription className="text-xs text-muted-foreground mt-0.5">
+                      Привяжите ваш email для восстановления пароля, безопасности и автозаполнения платежных форм
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-4 space-y-4">
+                {!email ? (
+                  /* Почта еще не привязана */
+                  <div className="space-y-3">
+                    <div className="text-sm text-muted-foreground">
+                      Контактный email не привязан. Введите его ниже, чтобы привязать к профилю.
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <Input
+                        type="email"
+                        placeholder="your-email@example.com"
+                        value={emailInput}
+                        onChange={(e) => setEmailInput(e.target.value)}
+                        className="flex-1"
+                        disabled={saving}
+                      />
+                      <Button
+                        onClick={() => handleLinkEmail(emailInput)}
+                        disabled={saving || !emailInput}
+                        className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
+                      >
+                        Привязать почту
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  /* Почта привязана */
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-lg bg-muted/30 border border-muted/50">
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-2 rounded-full bg-background/50 border">
+                          <span className="text-lg">✉️</span>
+                        </div>
+                        <div>
+                          <div className="text-xs text-muted-foreground">Контактный Email</div>
+                          <div className="font-semibold text-foreground text-sm sm:text-base break-all">{email}</div>
+                        </div>
+                      </div>
+                      <div className="shrink-0">
+                        {emailVerified ? (
+                          <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 font-semibold border border-green-200/50 flex items-center gap-1">
+                            <span>🛡️ Подтверждена</span>
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 font-semibold border border-orange-200/50 flex items-center gap-1">
+                            <span>⚠️ Ожидает подтверждения</span>
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+
+                    {!emailVerified && (
+                      <div className="p-3 bg-orange-50/50 dark:bg-orange-950/10 rounded-lg border border-orange-100 dark:border-orange-900/20 text-xs text-orange-800 dark:text-orange-300">
+                        На привязанную почту отправлена (симулируется) ссылка для верификации. Перейдите по ней или нажмите кнопку ниже для мгновенной верификации почты.
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap gap-2 pt-1.5">
+                      {!emailVerified && (
+                        <Button
+                          onClick={handleVerifyEmail}
+                          disabled={saving}
+                          className="flex-1 sm:flex-none bg-green-600 hover:bg-green-700 text-white font-semibold flex items-center gap-1.5"
+                        >
+                          <span>✅ Подтвердить сейчас</span>
+                        </Button>
+                      )}
+                      <Button
+                        variant="outline"
+                        onClick={handleRemoveEmail}
+                        disabled={saving}
+                        className="flex-1 sm:flex-none text-xs text-destructive hover:bg-destructive/10 border-destructive/20"
+                      >
+                        Сбросить / Изменить email
+                      </Button>
+                    </div>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -2179,6 +2412,8 @@ const Cabinet = () => {
                           `&HOUSE=${encodeURIComponent(house)}` +
                           `&FLAT=${encodeURIComponent(apartment || profile?.apartment || "")}` +
                           `&ENTRANCE=${encodeURIComponent(entrance)}` +
+                          `&FLOOR=${encodeURIComponent(floor || profile?.floor || "")}` +
+                          `&EMAIL=${encodeURIComponent(email || profile?.email || "")}` +
                           `&PHONE=${encodeURIComponent(phone || profile?.phone || "")}` +
                           `&SUMMA_OPL1=${lastOrderTotals.sum1.toFixed(2)}` +
                           `&SUMMA_OPL2=${lastOrderTotals.sum2.toFixed(2)}` +

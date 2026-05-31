@@ -61,6 +61,9 @@ interface Request {
   accepted_at: string | null;
   completed_at: string | null;
   notes: string | null;
+  payment_status?: string | null;
+  payment_method?: string | null;
+  payment_amount?: number | null;
   assigned_employee?: { id: string; full_name: string; phone: string | null } | null;
   accepted_employee?: { id: string; full_name: string; phone: string | null } | null;
 }
@@ -913,6 +916,42 @@ const RequestDetails = ({ request: initialRequest, onBack, isManager }: RequestD
                   {calculateTotal(requestItems).toFixed(0)} ₽
                 </span>
               </div>
+
+              {/* Информация о платеже */}
+              {(request.payment_method || request.payment_status) && (
+                <div className="mt-3 pt-3 border-t border-dashed flex flex-col gap-2 text-sm bg-muted/20 p-2.5 rounded-lg">
+                  {request.payment_method && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Способ оплаты:</span>
+                      <span className="font-semibold text-foreground">
+                        {request.payment_method === 'online' ? '💳 Картой онлайн' : '💵 Наличными мастеру'}
+                      </span>
+                    </div>
+                  )}
+                  {request.payment_status && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Статус оплаты:</span>
+                      <Badge className={`font-bold text-[10px] uppercase px-2 py-0.5 ${
+                        request.payment_status === 'paid' 
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border border-green-200/50' 
+                          : request.payment_status === 'on_site' 
+                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200/50' 
+                            : 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 border border-orange-200/50'
+                      }`}>
+                        {request.payment_status === 'paid' ? 'Оплачено' : request.payment_status === 'on_site' ? 'На месте' : 'Ожидает оплаты'}
+                      </Badge>
+                    </div>
+                  )}
+                  {request.payment_amount && Number(request.payment_amount) > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Сумма к оплате:</span>
+                      <span className="font-semibold text-foreground">
+                        {Number(request.payment_amount).toFixed(0)} ₽
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           ) : (
             <p className="text-sm text-muted-foreground text-center py-4">
