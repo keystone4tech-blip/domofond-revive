@@ -494,6 +494,12 @@ const Cabinet = () => {
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false); // Показ подсказок адреса
   const [showApartmentSuggestions, setShowApartmentSuggestions] = useState(false); // Показ подсказок квартиры
   const [loadingAddressCache, setLoadingAddressCache] = useState(false); // Процесс загрузки кэша адресов
+  const [editing, setEditing] = useState(false);
+  const [isVisible, setIsVisible] = useState({
+    header: false,
+    content: false
+  });
+  const navigate = useNavigate();
 
   // Функция для очистки полного адреса (убираем город "Краснодар, " или "пос. Южный, ") для отображения
   const getDisplayAddress = (fullAddr: string) => {
