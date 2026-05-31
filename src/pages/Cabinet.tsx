@@ -483,65 +483,205 @@ const Cabinet = () => {
   const [address, setAddress] = useState("");
   const [apartment, setApartment] = useState("");
   
-  // --- СТЕЙТЫ ДЛЯ АВТОДОПОЛНЕНИЯ АДРЕСОВ (accounts) ---
-  const [addressSuggestions, setAddressSuggestions] = useState<string[]>([]); // Подсказки адресов (домов)
+  // --- СТЕЙТЫ ДЛЯ УМНОГО АВТОКОМПЛИТА АДРЕСОВ (accounts) ---
+  const [allHouses, setAllHouses] = useState<string[]>([]); // Кэш всех уникальных домов
+  const [allStreets, setAllStreets] = useState<string[]>([]); // Кэш уникальных улиц
+  const [displayAddress, setDisplayAddress] = useState(""); // Красивый адрес для пользователя (без города)
+  const [selectedStreet, setSelectedStreet] = useState<string | null>(null); // Выбранная улица
+  const [streetSuggestions, setStreetSuggestions] = useState<string[]>([]); // Подсказки улиц
+  const [houseSuggestions, setHouseSuggestions] = useState<string[]>([]); // Подсказки домов
   const [apartmentSuggestions, setApartmentSuggestions] = useState<string[]>([]); // Подсказки квартир
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false); // Показ подсказок адреса
   const [showApartmentSuggestions, setShowApartmentSuggestions] = useState(false); // Показ подсказок квартиры
-  const [searchingAddress, setSearchingAddress] = useState(false); // Флаг процесса поиска адреса
+  const [loadingAddressCache, setLoadingAddressCache] = useState(false); // Процесс загрузки кэша адресов
 
-  const [isVisible, setIsVisible] = useState({
-    header: false,
-    content: false
-  });
-  const [editing, setEditing] = useState(false);
-  const navigate = useNavigate();
-
-  // --- МЕТОДЫ ДЛЯ СВЯЗИ С БАЗОЙ АДРЕСОВ (accounts) ---
-
-  // Функция для поиска уникальных адресов (домов) по введенной строке с ilike
-  const fetchAddressSuggestions = async (val: string) => {
-    if (val.trim().length < 2) {
-      setAddressSuggestions([]);
-      return;
+  // Функция для очистки полного адреса (убираем город "Краснодар, " или "пос. Южный, ") для отображения
+  const getDisplayAddress = (fullAddr: string) => {
+    if (!fullAddr) return "";
+    const parts = fullAddr.split(",");
+    if (parts.length >= 3) {
+      // Возвращаем все части, кроме первой (город)
+      return parts.slice(1).join(",").trim();
     }
-    setSearchingAddress(true);
-    console.log(`[Адрес] Запрос подсказок для: "${val}"`); // Логирование запроса
-    try {
-      // Разбиваем введенное пользователем значение на отдельные слова для умного поиска
-      const words = val.split(/\s+/).filter((w) => w.length > 0);
-      
-      let query = supabase.from("accounts").select("address");
-      
-      // Накладываем фильтрацию ilike для каждого введенного слова
-      for (const word of words) {
-        query = query.ilike("address", `%${word}%`);
+    return fullAddr;
+  };
+
+  // Расчет схожести строк с поддержкой нечеткого поиска (биграммы)
+  const scoreSimilarity = (input: string, target: string): number => {
+    const cleanInput = input.toLowerCase().replace(/[^а-яa-z0-9]/g, "");
+    const cleanTarget = target.toLowerCase().replace(/[^а-яa-z0-9]/g, "");
+    
+    if (!cleanInput) return 0;
+
+    // Точное вхождение дает максимальный приоритет
+    if (cleanTarget.includes(cleanInput)) {
+      return 100 + (cleanInput.length / cleanTarget.length) * 10;
+    }
+    
+    // Коэффициент Сёренсена-Диса для исправления опечаток
+    const getBigrams = (str: string) => {
+      const bigrams = new Set<string>();
+      for (let i = 0; i < str.length - 1; i++) {
+        bigrams.add(str.substring(i, i + 2));
       }
-      
-      const { data, error } = await query.limit(150); // Увеличиваем лимит для лучшего охвата
-      
+      return bigrams;
+    };
+    
+    const inputBigrams = getBigrams(cleanInput);
+    const targetBigrams = getBigrams(cleanTarget);
+    
+    let intersection = 0;
+    inputBigrams.forEach((bg) => {
+      if (targetBigrams.has(bg)) intersection++;
+    });
+    
+    const total = inputBigrams.size + targetBigrams.size;
+    if (total === 0) return 0;
+    
+    return ((2 * intersection) / total) * 100;
+  };
+
+  // Загрузка кэша уникальных домов из БД
+  const loadAddressCache = async () => {
+    setLoadingAddressCache(true);
+    console.log("[Адрес] Загрузка кэша уникальных домов из unique_houses...");
+    try {
+      const { data, error } = await supabase
+        .from("unique_houses")
+        .select("house_address");
+
       if (error) throw error;
 
       if (data) {
-        // Очищаем адреса до уровня уникальных ДОМОВ (город, улица, дом — это первые 3 части)
-        const parsed = data.map((item: any) => {
-          const parts = item.address.split(",");
-          if (parts.length >= 3) {
-            // Объединяем город, улицу и дом
-            return parts.slice(0, 3).join(",").trim();
-          }
-          // Резервный сплит по квартире
-          return item.address.split(", кв.")[0].trim();
-        });
-        // Оставляем только уникальные адреса домов (без подъездов и квартир)
-        const unique = Array.from(new Set(parsed));
-        setAddressSuggestions(unique);
-        console.log(`[Адрес] Найдено уникальных домов: ${unique.length}`); // Логирование результата
+        const houses = data.map((item: any) => item.house_address).filter(Boolean);
+        setAllHouses(houses);
+        
+        // Извлекаем уникальные улицы (это 2-я часть в адресе)
+        const streets = Array.from(new Set(houses.map((h: string) => {
+          const parts = h.split(",");
+          return parts[1] ? parts[1].trim() : "";
+        }).filter(Boolean))) as string[];
+        
+        setAllStreets(streets);
+        console.log(`[Адрес] Успешно кэшировано домов: ${houses.length}, улиц: ${streets.length}`);
       }
     } catch (err) {
-      console.error("[Адрес] Ошибка загрузки подсказок:", err);
+      console.error("[Адрес] Ошибка загрузки кэша:", err);
     } finally {
-      setSearchingAddress(false);
+      setLoadingAddressCache(false);
+    }
+  };
+
+  // Обработка ручного ввода в строку адреса
+  const handleAddressInputChange = (val: string) => {
+    setDisplayAddress(val);
+    setShowAddressSuggestions(true);
+    
+    if (val.trim().length === 0) {
+      setStreetSuggestions([]);
+      setHouseSuggestions([]);
+      setSelectedStreet(null);
+      return;
+    }
+
+    // Проверяем, вводит ли пользователь номер дома.
+    // Если в строке есть запятая с пробелом или цифры, следующие за известной улицей
+    const houseMatch = val.match(/(?:д\.|дом)?\s*(\d+.*)$/i);
+    
+    if (houseMatch && selectedStreet) {
+      const enteredHouseNum = houseMatch[1].trim().toLowerCase();
+      console.log(`[Автокомплит] Поиск дома "${enteredHouseNum}" на улице "${selectedStreet}"`);
+      
+      // Находим все номера домов для выбранной улицы
+      const matchingHouses = allHouses
+        .filter((h) => {
+          const parts = h.split(",");
+          const streetPart = parts[1] ? parts[1].trim() : "";
+          return streetPart === selectedStreet;
+        })
+        .map((h) => {
+          const parts = h.split(",");
+          return parts[2] ? parts[2].trim() : ""; // Номер дома (например, "д. 50")
+        })
+        .filter(Boolean);
+
+      // Фильтруем по введенному значению номера дома
+      const filtered = matchingHouses.filter((houseNum) => 
+        houseNum.toLowerCase().includes(enteredHouseNum)
+      );
+      
+      setHouseSuggestions(filtered);
+      setStreetSuggestions([]);
+    } else {
+      // Пользователь пишет название улицы, ищем с поддержкой опечаток (Dice Similarity)
+      const scored = allStreets
+        .map((street) => ({
+          street,
+          score: scoreSimilarity(val, street)
+        }))
+        .filter((item) => item.score > 15) // Порог совпадения
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 5) // Выводим топ-5 подсказок
+        .map((item) => item.street);
+
+      setStreetSuggestions(scored);
+      setHouseSuggestions([]);
+      
+      // Если ввод совпал с какой-то улицей, фиксируем её
+      const exactMatch = allStreets.find(s => s.toLowerCase() === val.trim().toLowerCase());
+      if (exactMatch) {
+        setSelectedStreet(exactMatch);
+      }
+    }
+  };
+
+  // Выбор улицы из списка подсказок
+  const handleSelectStreet = (street: string) => {
+    console.log(`[Автокомплит] Выбрана улица: "${street}"`);
+    setSelectedStreet(street);
+    setDisplayAddress(`${street}, д. `);
+    
+    // Сразу выводим все доступные номера домов для этой улицы
+    const matchingHouses = allHouses
+      .filter((h) => {
+        const parts = h.split(",");
+        const streetPart = parts[1] ? parts[1].trim() : "";
+        return streetPart === street;
+      })
+      .map((h) => {
+        const parts = h.split(",");
+        return parts[2] ? parts[2].trim() : "";
+      })
+      .filter(Boolean);
+      
+    setHouseSuggestions(matchingHouses);
+    setStreetSuggestions([]);
+  };
+
+  // Выбор номера дома из списка подсказок
+  const handleSelectHouse = (houseNumber: string) => {
+    if (!selectedStreet) return;
+    console.log(`[Автокомплит] Выбран дом: "${houseNumber}" на улице "${selectedStreet}"`);
+    
+    // Находим полный эталонный адрес в кэше
+    const fullAddr = allHouses.find((h) => {
+      const parts = h.split(",");
+      const streetPart = parts[1] ? parts[1].trim() : "";
+      const housePart = parts[2] ? parts[2].trim() : "";
+      return streetPart === selectedStreet && housePart === houseNumber;
+    });
+
+    if (fullAddr) {
+      setAddress(fullAddr); // Сохраняем полный эталонный адрес (с городом) для БД
+      setDisplayAddress(`${selectedStreet}, ${houseNumber}`);
+      setHouseSuggestions([]);
+      setShowAddressSuggestions(false);
+      
+      // Загружаем квартиры для выбранного дома
+      fetchApartmentSuggestions(fullAddr);
+      
+      // Автоматически выводим интерактивную сетку квартир!
+      setShowApartmentSuggestions(true);
     }
   };
 
@@ -575,28 +715,7 @@ const Cabinet = () => {
     }
   };
 
-  // Выбор адреса из списка подсказок
-  const handleSelectAddress = (selected: string) => {
-    console.log(`[Адрес] Выбран адрес из подсказок: "${selected}"`); // Логирование
-    setAddress(selected);
-    setAddressSuggestions([]);
-    setShowAddressSuggestions(false);
-    // Загружаем квартиры для выбранного дома
-    fetchApartmentSuggestions(selected);
-  };
 
-  // Эффект для дебаунса ввода адреса (300мс)
-  useEffect(() => {
-    // Если профиль уже верифицирован и мы не редактируем его — автокомплит не нужен
-    const isLocked = !!profile?.is_verified && !editing;
-    if (isLocked) return;
-
-    const timer = setTimeout(() => {
-      fetchAddressSuggestions(address);
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [address, editing, profile]);
   const { toast } = useToast();
   const hasAdminConsoleAccess = userRoles.some((role) => ["admin", "director"].includes(role));
   const isLocked = !!profile?.is_verified && !editing;
@@ -613,6 +732,7 @@ const Cabinet = () => {
 
   useEffect(() => {
     checkUser();
+    loadAddressCache();
   }, []);
 
   // Realtime subscription for profile updates
@@ -629,6 +749,7 @@ const Cabinet = () => {
           setFullName(updated.full_name || "");
           setPhone(updated.phone || "");
           setAddress(updated.address || "");
+          setDisplayAddress(getDisplayAddress(updated.address || ""));
           setApartment(updated.apartment || "");
         }
       )
@@ -669,6 +790,7 @@ const Cabinet = () => {
       setFullName(data.full_name || "");
       setPhone(data.phone || "");
       setAddress(data.address || "");
+      setDisplayAddress(getDisplayAddress(data.address || ""));
       setApartment(data.apartment || "");
     } catch (error: any) {
       console.error("Error loading profile:", error);
@@ -785,7 +907,7 @@ const Cabinet = () => {
         .eq("id", session.user.id);
       if (error) throw error;
       setProfile((prev: any) => prev ? { ...prev, full_name: "", phone: "", address: "", apartment: "", is_verified: false } : prev);
-      setFullName(""); setPhone(""); setAddress(""); setApartment("");
+      setFullName(""); setPhone(""); setAddress(""); setDisplayAddress(""); setSelectedStreet(null); setApartment("");
       setEditing(false);
       toast({ title: "Данные удалены", description: "Заполните форму заново для верификации" });
     } catch (e: any) {
@@ -1000,37 +1122,48 @@ const Cabinet = () => {
                 </div>
 
                 <div className="space-y-2 relative">
-                  <Label htmlFor="address">Адрес</Label>
+                  <Label htmlFor="address" className="text-sm font-semibold">Улица и дом</Label>
                   <div className="relative">
                     <Input
                       id="address"
-                      value={address}
-                      onChange={(e) => {
-                        setAddress(e.target.value);
-                        setShowAddressSuggestions(true);
-                      }}
+                      value={displayAddress}
+                      onChange={(e) => handleAddressInputChange(e.target.value)}
                       onFocus={() => setShowAddressSuggestions(true)}
-                      onBlur={() => setTimeout(() => setShowAddressSuggestions(false), 200)}
-                      placeholder="Начните вводить город, улицу или дом (например: Душистая)"
+                      onBlur={() => setTimeout(() => setShowAddressSuggestions(false), 250)}
+                      placeholder="Напишите вашу улицу и дом (например: Душистая 50)"
                       disabled={isLocked}
-                      className="pr-10"
+                      className="pr-10 bg-background/50 border-border/80 focus:border-primary/50 transition-all font-medium"
                     />
-                    {searchingAddress && (
+                    {loadingAddressCache && (
                       <Loader2 className="absolute right-3 top-3 h-4 w-4 animate-spin text-muted-foreground" />
                     )}
                   </div>
                   
-                  {/* Всплывающие подсказки для адреса */}
-                  {showAddressSuggestions && addressSuggestions.length > 0 && (
+                  {/* Всплывающие подсказки для улиц и домов */}
+                  {showAddressSuggestions && (streetSuggestions.length > 0 || houseSuggestions.length > 0) && (
                     <div className="absolute z-50 w-full mt-1 bg-background/95 backdrop-blur-md border rounded-lg shadow-xl max-h-60 overflow-y-auto divide-y animate-in fade-in-50 slide-in-from-top-1 duration-200">
-                      {addressSuggestions.map((suggestion, index) => (
+                      
+                      {/* Подсказки улиц */}
+                      {streetSuggestions.map((street, index) => (
                         <button
-                          key={index}
+                          key={`street-${index}`}
                           type="button"
-                          className="w-full text-left px-4 py-3 text-sm hover:bg-primary/10 transition-colors focus:bg-primary/10 focus:outline-none flex items-center gap-2 font-medium"
-                          onClick={() => handleSelectAddress(suggestion)}
+                          className="w-full text-left px-4 py-3.5 text-sm hover:bg-primary/10 transition-colors focus:bg-primary/10 focus:outline-none flex items-center gap-2.5 font-semibold text-foreground"
+                          onClick={() => handleSelectStreet(street)}
                         >
-                          <span className="text-primary text-base">📍</span> {suggestion}
+                          <span className="text-primary text-base">🛣️</span> {street}
+                        </button>
+                      ))}
+
+                      {/* Подсказки домов */}
+                      {houseSuggestions.map((house, index) => (
+                        <button
+                          key={`house-${index}`}
+                          type="button"
+                          className="w-full text-left px-4 py-3.5 text-sm hover:bg-primary/10 transition-colors focus:bg-primary/10 focus:outline-none flex items-center gap-2.5 font-semibold text-foreground"
+                          onClick={() => handleSelectHouse(house)}
+                        >
+                          <span className="text-primary text-base">🏢</span> {house}
                         </button>
                       ))}
                     </div>
@@ -1090,6 +1223,8 @@ const Cabinet = () => {
                         setFullName(profile?.full_name || "");
                         setPhone(profile?.phone || "");
                         setAddress(profile?.address || "");
+                        setDisplayAddress(getDisplayAddress(profile?.address || ""));
+                        setSelectedStreet(null);
                         setApartment(profile?.apartment || "");
                       }}>
                         Отмена
