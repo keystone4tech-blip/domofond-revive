@@ -1204,6 +1204,13 @@ const Cabinet = () => {
     if (!userId) return;
 
     const pollProfile = async () => {
+      // КРИТИЧЕСКИ ВАЖНО: Если пользователь сейчас редактирует форму (editing === true),
+      // мы полностью пропускаем обновление стейтов ввода, чтобы введенные им новые данные не сбрасывались на старые из БД!
+      if (editing) {
+        console.log("[Кабинет] Polling: пропуск синхронизации с БД во время активного редактирования"); // Логирование
+        return;
+      }
+
       try {
         const { data } = await supabase
           .from("profiles")
@@ -1211,7 +1218,8 @@ const Cabinet = () => {
           .eq("id", userId)
           .single();
 
-        if (data) {
+        // Двойная проверка на случай, если пользователь нажал "Изменить" во время асинхронного REST-запроса
+        if (data && !editing) {
           setProfile(data);
           setFullName(data.full_name || ""); // Инициализируем ФИО абонента
           setPhone(data.phone || ""); // Инициализируем контактный телефон
@@ -1251,7 +1259,7 @@ const Cabinet = () => {
     }, 60000);
 
     return () => { clearInterval(pollInterval); }; // Очистка при размонтировании
-  }, [userId]);
+  }, [userId, editing]); // Добавили editing в зависимости, чтобы эффект перезапускался и видел актуальное состояние редактирования
 
   // Эффект перехвата успешной оплаты из банка (Success URL)
   useEffect(() => {
@@ -1423,14 +1431,16 @@ const Cabinet = () => {
     setSaving(true);
     console.log("[Верификация] Инициация валидации и сохранения профиля..."); // Логирование
 
-    // Автоматически генерируем эталонный адрес для БД, если он не был выбран из подсказок
-    let currentAddress = address;
-    if (!currentAddress || !currentAddress.trim()) {
-      if (displayStreet && displayHouse) {
-        currentAddress = `${selectedCity}, ${displayStreet.trim()}, д. ${displayHouse.trim()}`;
-        setAddress(currentAddress);
-        console.log(`[Верификация] Автоматически собран эталонный адрес: "${currentAddress}"`);
-      }
+    // КРИТИЧЕСКИ ВАЖНО: Всегда собираем актуальный эталонный адрес на основе текущих полей ввода (Улица и Дом),
+    // чтобы при редактировании существующего профиля (когда address в стейте не пустой) изменения гарантированно
+    // применились и записались в БД, а также запустили реактивный поиск лицевого счета в DebtCard!
+    let currentAddress = "";
+    if (displayStreet?.trim() && displayHouse?.trim()) {
+      currentAddress = `${selectedCity || "г. Краснодар"}, ${displayStreet.trim()}, д. ${displayHouse.trim()}`;
+      setAddress(currentAddress); // Синхронизируем стейт адреса для мгновенного поиска лицевого счета в DebtCard
+      console.log(`[Верификация] Актуальный эталонный адрес успешно собран: "${currentAddress}"`); // Логирование
+    } else {
+      currentAddress = address; // Резервный вариант, если поля ввода пусты
     }
 
     // 1. Проверяем обязательные поля и собираем список пустых граф для вывода пользователю
