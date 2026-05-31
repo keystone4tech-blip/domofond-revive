@@ -76,10 +76,10 @@ export const generateProposalDocx = async (data: ProposalData): Promise<Blob> =>
 
   const tariffText = tariffTextArray.join(" ") + ` Итого общий тариф составляет ${calculation.tariffPerApt} рублей по квитанциям ООО «ДомофонДар».`;
 
-  // Подготовка логотипа
+  // Подготовка премиального логотипа компании в формате PNG
   let logoImage: ImageRun | null = null;
   try {
-    const response = await fetch("/logo.jpg");
+    const response = await fetch("/logo.png");
     if (response.ok) {
       const buffer = await response.arrayBuffer();
       logoImage = new ImageRun({
