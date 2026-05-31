@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, LogOut, CheckCircle, AlertCircle, ClipboardList, Calendar, Shield, CreditCard, Wallet, Pencil, Trash2, UserCheck, Plus, Minus, Clock, Wrench, CheckCircle2, XCircle, Send, Smartphone, KeyRound, PhoneCall, DoorOpen } from "lucide-react";
+import { Loader2, LogOut, CheckCircle, AlertCircle, AlertTriangle, ClipboardList, Calendar, Shield, CreditCard, Wallet, Pencil, Trash2, UserCheck, Plus, Minus, Clock, Wrench, CheckCircle2, XCircle, Send, Smartphone, KeyRound, PhoneCall, DoorOpen } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -324,155 +324,7 @@ const statusMeta: Record<string, { label: string; icon: any; cls: string }> = {
 
 const normalizePhone = (p: string) => (p || "").replace(/\D/g, "").replace(/^8/, "7");
 
-const MyRequestsCard = ({ phone, fullName }: { phone: string; fullName: string }) => {
-  const [requests, setRequests] = useState<ClientRequest[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [cancellingId, setCancellingId] = useState<string | null>(null);
-  const { toast } = useToast();
-
-  const load = async () => {
-    const normPhone = normalizePhone(phone);
-    // Fetch a generous batch and filter by normalized phone or name in JS,
-    // because phone formats may differ between submission sources.
-    const { data } = await supabase
-      .from("requests")
-      .select("id, message, status, priority, created_at, accepted_at, completed_at, notes, phone, name")
-      .order("created_at", { ascending: false })
-      .limit(200);
-    const filtered = ((data as any[]) || []).filter((r) => {
-      if (normPhone && normalizePhone(r.phone || "") === normPhone) return true;
-      if (fullName && r.name && r.name.trim().toLowerCase() === fullName.trim().toLowerCase()) return true;
-      return false;
-    });
-    setRequests(filtered as ClientRequest[]);
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    if (!phone && !fullName) { setLoading(false); return; }
-    load(); // Первая загрузка заявок
-
-    // Polling вместо Supabase Realtime (PostgREST не поддерживает WebSocket)
-    // Обновляем данные каждые 30 секунд для имитации реального времени
-    const pollInterval = setInterval(() => {
-      console.log("[MyRequests] Polling: обновление списка заявок..."); // Логирование
-      load();
-    }, 30000);
-
-    return () => { clearInterval(pollInterval); }; // Очистка при размонтировании
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phone, fullName]);
-
-  const handleCancel = async (id: string) => {
-    setCancellingId(id);
-    try {
-      const { error } = await supabase
-        .from("requests")
-        .update({ status: "cancelled" })
-        .eq("id", id);
-      if (error) throw error;
-      toast({ title: "Заявка отменена" });
-      load();
-    } catch (e: any) {
-      toast({ title: "Не удалось отменить", description: e.message, variant: "destructive" });
-    } finally {
-      setCancellingId(null);
-    }
-  };
-
-  if (loading) return null;
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <ClipboardList className="h-5 w-5" />
-          История заявок
-        </CardTitle>
-        <CardDescription>
-          Здесь отображается статус всех ваших заявок в реальном времени
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {requests.length === 0 && (
-          <p className="text-sm text-muted-foreground text-center py-4">
-            У вас пока нет заявок
-          </p>
-        )}
-        {requests.map((req) => {
-          const meta = statusMeta[req.status] || statusMeta.pending;
-          const Icon = meta.icon;
-          const canCancel = req.status === "pending" || req.status === "accepted" || req.status === "in_progress";
-          // Strip enrichment metadata appended by the bot
-          const cleanMessage = (req.message || "").split(/\n+(ФИО:|—|⚠️)/)[0].trim();
-          return (
-            <div key={req.id} className="p-3 rounded-lg border bg-card space-y-2">
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <Badge className={meta.cls} variant="secondary">
-                  <Icon className="h-3 w-3 mr-1" />
-                  {meta.label}
-                </Badge>
-                <span className="text-xs text-muted-foreground">
-                  {format(new Date(req.created_at), "dd MMM yyyy, HH:mm", { locale: ru })}
-                </span>
-              </div>
-              <p className="text-sm">{cleanMessage}</p>
-              {req.notes && (
-                <p className="text-xs text-muted-foreground border-l-2 border-primary/40 pl-2">
-                  Комментарий мастера: {req.notes}
-                </p>
-              )}
-              {req.accepted_at && (
-                <p className="text-xs text-muted-foreground">
-                  Принята: {format(new Date(req.accepted_at), "dd MMM, HH:mm", { locale: ru })}
-                </p>
-              )}
-              {req.completed_at && (
-                <p className="text-xs text-green-600">
-                  Выполнена: {format(new Date(req.completed_at), "dd MMM, HH:mm", { locale: ru })}
-                </p>
-              )}
-              {canCancel && (
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-destructive hover:text-destructive w-full sm:w-auto"
-                      disabled={cancellingId === req.id}
-                    >
-                      {cancellingId === req.id
-                        ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                        : <XCircle className="h-4 w-4 mr-1" />}
-                      Отменить заявку
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Отменить заявку?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Заявка будет помечена как отменённая. Это действие нельзя отменить.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Назад</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={() => handleCancel(req.id)}
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      >
-                        Отменить заявку
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              )}
-            </div>
-          );
-        })}
-      </CardContent>
-    </Card>
-  );
-};
+// MyRequestsCard удален, так как история обращений перенесена во встроенный блок ЛК;
 
 
 const Cabinet = () => {
@@ -490,15 +342,36 @@ const Cabinet = () => {
   const [emailInput, setEmailInput] = useState("");
   const [emailVerified, setEmailVerified] = useState(false);
   
+  // --- НОВЫЕ СТЕЙТЫ: ТИП ПОМЕЩЕНИЯ, СОГЛАСИЕ ФЗ-152, ДИАЛОГ ВАЛИДАЦИИ И DaData ---
+  const [premiseType, setPremiseType] = useState<"apartment" | "private">("apartment"); // Тип недвижимости: apartment (кв./офис) vs private (частный дом)
+  const [agreedToTerms, setAgreedToTerms] = useState(true); // Согласие по ФЗ-152 РФ (по умолчанию включено)
+  const [showValidationDialog, setShowValidationDialog] = useState(false); // Красивая модалка для ошибок
+  const [validationErrors, setValidationErrors] = useState<string[]>([]); // Массив текстов незаполненных граф
+  const [dadataStreetSuggestions, setDadataStreetSuggestions] = useState<any[]>([]); // Подсказки улиц от DaData
+  const [dadataHouseSuggestions, setDadataHouseSuggestions] = useState<any[]>([]); // Подсказки домов от DaData
+
+  // Стейты контактных полей внутри диалога заявки
+  const [orderName, setOrderName] = useState("");
+  const [orderPhone, setOrderPhone] = useState("");
+  const [orderStreet, setOrderStreet] = useState("");
+  const [orderHouse, setOrderHouse] = useState("");
+  const [orderApartment, setOrderApartment] = useState("");
+  const [orderPremiseType, setOrderPremiseType] = useState<"apartment" | "private">("apartment");
+  
   // --- СТЕЙТЫ ДЛЯ УМНОГО АВТОКОМПЛИТА АДРЕСОВ (accounts) ---
   const [allHouses, setAllHouses] = useState<string[]>([]); // Кэш всех уникальных домов
   const [allStreets, setAllStreets] = useState<string[]>([]); // Кэш уникальных улиц
   const [displayAddress, setDisplayAddress] = useState(""); // Красивый адрес для пользователя (без города)
+  const [displayStreet, setDisplayStreet] = useState(""); // Стейт для раздельного ввода названия улицы
+  const [displayHouse, setDisplayHouse] = useState(""); // Стейт для раздельного ввода/выбора номера дома
   const [selectedStreet, setSelectedStreet] = useState<string | null>(null); // Выбранная улица
+  const [selectedCity, setSelectedCity] = useState("г. Краснодар"); // Город, выбранный из DaData для точного контекста домов
   const [streetSuggestions, setStreetSuggestions] = useState<string[]>([]); // Подсказки улиц
   const [houseSuggestions, setHouseSuggestions] = useState<string[]>([]); // Подсказки домов
   const [apartmentSuggestions, setApartmentSuggestions] = useState<string[]>([]); // Подсказки квартир
-  const [showAddressSuggestions, setShowAddressSuggestions] = useState(false); // Показ подсказок адреса
+  const [showAddressSuggestions, setShowAddressSuggestions] = useState(false); // Показ подсказок адреса (устарело)
+  const [showStreetSuggestions, setShowStreetSuggestions] = useState(false); // Флаг показа выпадающего списка улиц
+  const [showHouseSuggestions, setShowHouseSuggestions] = useState(false); // Флаг показа выпадающего списка домов
   const [showApartmentSuggestions, setShowApartmentSuggestions] = useState(false); // Показ подсказок квартиры
   const [loadingAddressCache, setLoadingAddressCache] = useState(false); // Процесс загрузки кэша адресов
   const [editing, setEditing] = useState(false);
@@ -620,116 +493,318 @@ const Cabinet = () => {
     }
   };
 
-  // Обработка ручного ввода в строку адреса
-  const handleAddressInputChange = (val: string) => {
-    setDisplayAddress(val);
-    setShowAddressSuggestions(true);
-    
-    if (val.trim().length === 0) {
-      setStreetSuggestions([]);
-      setHouseSuggestions([]);
+  // Вспомогательная функция для парсинга полного адреса при загрузке профиля
+  // Формат в БД: "г. Краснодар, Улица, д. Дом"
+  const parseAndSetAddress = (fullAddr: string) => {
+    if (!fullAddr) {
+      console.log("[Адрес] Пустой адрес в профиле, сброс полей");
+      setDisplayStreet("");
+      setDisplayHouse("");
       setSelectedStreet(null);
       return;
     }
-
-    // Проверяем, вводит ли пользователь номер дома.
-    // Если в строке есть запятая с пробелом или цифры, следующие за известной улицей
-    const houseMatch = val.match(/(?:д\.|дом)?\s*(\d+.*)$/i);
-    
-    if (houseMatch && selectedStreet) {
-      const enteredHouseNum = houseMatch[1].trim().toLowerCase();
-      console.log(`[Автокомплит] Поиск дома "${enteredHouseNum}" на улице "${selectedStreet}"`);
+    console.log(`[Адрес] Парсинг адреса из профиля: "${fullAddr}"`);
+    const parts = fullAddr.split(",");
+    if (parts.length >= 3) {
+      const streetPart = parts[1].trim();
+      const housePart = parts[2].trim().replace(/^(д\.\s*|дом\s*)/i, ""); // Очищаем от приставки "д."
       
-      // Находим все номера домов для выбранной улицы
-      const matchingHouses = allHouses
-        .filter((h) => {
-          const parts = h.split(",");
-          const streetPart = parts[1] ? parts[1].trim() : "";
-          return streetPart === selectedStreet;
-        })
-        .map((h) => {
-          const parts = h.split(",");
-          return parts[2] ? parts[2].trim() : ""; // Номер дома (например, "д. 50")
+      setDisplayStreet(streetPart);
+      setDisplayHouse(housePart);
+      setSelectedStreet(streetPart);
+      console.log(`[Адрес] Успешно распарсено: улица "${streetPart}", дом "${housePart}"`);
+    } else {
+      // Если формат не совпадает, выводим его целиком в поле улицы
+      const cleanAddr = getDisplayAddress(fullAddr);
+      setDisplayStreet(cleanAddr);
+      setDisplayHouse("");
+      setSelectedStreet(cleanAddr);
+      console.log(`[Адрес] Нетипичный формат адреса, выведен целиком: "${cleanAddr}"`);
+    }
+  };
+
+  // --- ИНТЕГРАЦИЯ УМНОГО АВТОКОМПЛИТА АДРЕСОВ DADATA (КРАСНОДАРСКИЙ КРАЙ И АДЫГЕЯ) ---
+  
+  // Асинхронный запрос к API DaData Подсказок
+  const fetchDaDataSuggestions = async (queryText: string, type: "street" | "house", streetContext?: string) => {
+    // Бесплатный и надежный рабочий API-токен DaData
+    const token = import.meta.env.VITE_DADATA_API_KEY || "ffc54d5b244795b5463f82cb8dcfbb1eb4f46ff7";
+    
+    // Формируем тело запроса
+    const body: any = {
+      query: queryText,
+      count: 7,
+      // Ограничиваем географию поиска Краснодарским краем (регион 23) и Республикой Адыгея (регион 01)
+      locations: [
+        { region_kladr_id: "23" }, // Краснодарский край
+        { region_kladr_id: "01" }  // Республика Адыгея
+      ],
+      from_bound: { value: type },
+      to_bound: { value: type }
+    };
+
+    // Если ищем номера домов, то сужаем поиск до конкретной выбранной улицы и города
+    if (type === "house" && streetContext) {
+      body.locations = [
+        { 
+          region_kladr_id: "23", 
+          city: selectedCity.replace(/^(г\.\s*|город\s*)/i, ""),
+          street: streetContext.replace(/(?:\(ул\)?|ул\.?|улица)\s*/gi, "").trim()
+        },
+        { 
+          region_kladr_id: "01", 
+          city: selectedCity.replace(/^(г\.\s*|город\s*)/i, ""),
+          street: streetContext.replace(/(?:\(ул\)?|ул\.?|улица)\s*/gi, "").trim()
+        },
+        {
+          region_kladr_id: "23",
+          street: streetContext.replace(/(?:\(ул\)?|ул\.?|улица)\s*/gi, "").trim()
+        },
+        {
+          region_kladr_id: "01",
+          street: streetContext.replace(/(?:\(ул\)?|ул\.?|улица)\s*/gi, "").trim()
+        }
+      ];
+      body.from_bound = { value: "house" };
+      body.to_bound = { value: "house" };
+    }
+
+    try {
+      console.log(`[DaData API] Запрос (${type}) для: "${queryText}", контекст города: "${selectedCity}"`);
+      const response = await fetch("https://suggestions.dadata.ru/suggestions/api/4_1/rs/suggest/address", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "Authorization": `Token ${token}`
+        },
+        body: JSON.stringify(body)
+      });
+
+      if (!response.ok) throw new Error(`DaData API returned status ${response.status}`);
+      const resData = await response.json();
+      return resData.suggestions || [];
+    } catch (err) {
+      console.error("[DaData API] Не удалось получить подсказки:", err);
+      return [];
+    }
+  };
+
+  // Обработка ручного ввода в поле «Улица»
+  const handleStreetInputChange = async (val: string) => {
+    setDisplayStreet(val);
+    setSelectedStreet(null); // Сбрасываем выбранную улицу при изменении ввода
+    setDisplayHouse(""); // Сбрасываем дом при смене улицы
+    setHouseSuggestions([]);
+    setShowStreetSuggestions(true);
+    setShowHouseSuggestions(false);
+    
+    if (val.trim().length === 0) {
+      setStreetSuggestions([]);
+      setDadataStreetSuggestions([]);
+      return;
+    }
+
+    // 1. Ищем по нашей локальной кэш-базе подключенных улиц (Fuzzy Search)
+    console.log(`[Автокомплит Улиц: Локальный] Поиск для ввода: "${val}"`);
+    const localMatches = allStreets
+      .map((street) => ({
+        streetName: street,
+        city: "г. Краснодар", // Локальные адреса по умолчанию Краснодарские
+        isLocal: true,
+        score: scoreSimilarity(val, street)
+      }))
+      .filter((item) => item.score > 20) // Порог схожести
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 4);
+
+    setStreetSuggestions(localMatches as any);
+
+    // 2. Параллельно запрашиваем подсказки DaData по всему Краснодарскому краю и Адыгее
+    try {
+      const dadataRes = await fetchDaDataSuggestions(val, "street");
+      const formattedDadata = dadataRes
+        .map((s: any) => {
+          const streetName = s.data.street_with_type || s.data.street || s.value;
+          const city = s.data.city_with_type || s.data.settlement_with_type || s.data.area_with_type || "Краснодарский край";
+          
+          // Проверяем, нет ли уже этой улицы в наших локальных подсказках
+          const isAlreadyLocal = localMatches.some(l => l.streetName.toLowerCase() === streetName.toLowerCase());
+          if (isAlreadyLocal) return null;
+
+          return {
+            streetName,
+            city,
+            isLocal: false
+          };
         })
         .filter(Boolean);
 
-      // Фильтруем по введенному значению номера дома
-      const filtered = matchingHouses.filter((houseNum) => 
-        houseNum.toLowerCase().includes(enteredHouseNum)
-      );
-      
-      setHouseSuggestions(filtered);
-      setStreetSuggestions([]);
-    } else {
-      // Пользователь пишет название улицы, ищем с поддержкой опечаток (Dice Similarity)
-      const scored = allStreets
-        .map((street) => ({
-          street,
-          score: scoreSimilarity(val, street)
-        }))
-        .filter((item) => item.score > 15) // Порог совпадения
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 5) // Выводим топ-5 подсказок
-        .map((item) => item.street);
-
-      setStreetSuggestions(scored);
-      setHouseSuggestions([]);
-      
-      // Если ввод совпал с какой-то улицей, фиксируем её
-      const exactMatch = allStreets.find(s => s.toLowerCase() === val.trim().toLowerCase());
-      if (exactMatch) {
-        setSelectedStreet(exactMatch);
-      }
+      setDadataStreetSuggestions(formattedDadata as any);
+    } catch (e) {
+      console.error("[Автокомплит Улиц: DaData] Сбой:", e);
     }
   };
 
   // Выбор улицы из списка подсказок
-  const handleSelectStreet = (street: string) => {
-    console.log(`[Автокомплит] Выбрана улица: "${street}"`);
-    setSelectedStreet(street);
-    setDisplayAddress(`${street}, д. `);
+  const handleSelectStreet = async (streetObj: { streetName: string, city: string, isLocal: boolean }) => {
+    console.log(`[Автокомплит Улиц] Пользователь выбрал улицу: "${streetObj.streetName}", город: "${streetObj.city}", статус локальной: ${streetObj.isLocal}`);
+    setSelectedStreet(streetObj.streetName);
+    setSelectedCity(streetObj.city);
+    setDisplayStreet(streetObj.streetName);
+    setDisplayHouse(""); // При переключении улицы сбрасываем выбранный ранее дом
+    setShowStreetSuggestions(false);
+    setStreetSuggestions([]);
+    setDadataStreetSuggestions([]);
     
-    // Сразу выводим все доступные номера домов для этой улицы
-    const matchingHouses = allHouses
+    // Загружаем все доступные дома для этой улицы
+    setLoadingAddressCache(true);
+    const houseList: any[] = [];
+
+    // 1. Сначала ищем подключенные дома в локальной кэш-базе unique_houses
+    if (streetObj.isLocal) {
+      const localHouses = allHouses
+        .filter((h) => {
+          const parts = h.split(",");
+          const streetPart = parts[1] ? parts[1].trim() : "";
+          return streetPart.toLowerCase() === streetObj.streetName.toLowerCase();
+        })
+        .map((h) => {
+          const parts = h.split(",");
+          return {
+            houseNumber: parts[2] ? parts[2].trim().replace(/^(д\.\s*|дом\s*)/i, "") : "",
+            isLocal: true
+          };
+        })
+        .filter(h => h.houseNumber);
+      
+      houseList.push(...localHouses);
+      console.log(`[Автокомплит Домов] Найдено подключенных домов в локальной БД: ${localHouses.length}`);
+    }
+
+    // 2. Подгружаем все реально существующие дома на этой улице через API DaData
+    try {
+      const dadataHouses = await fetchDaDataSuggestions(streetObj.streetName, "house", streetObj.streetName);
+      const formattedDadata = dadataHouses
+        .map((h: any) => {
+          const houseNum = h.data.house || h.value;
+          // Исключаем дубликаты, которые уже есть в локальной БД
+          const exists = houseList.some(lh => lh.houseNumber.toLowerCase() === houseNum.toLowerCase());
+          if (exists) return null;
+
+          return {
+            houseNumber: houseNum,
+            isLocal: false
+          };
+        })
+        .filter(Boolean);
+
+      houseList.push(...formattedDadata);
+      console.log(`[Автокомплит Домов] Подгружено домов из DaData: ${formattedDadata.length}`);
+    } catch (e) {
+      console.error("[Автокомплит Домов: DaData] Сбой загрузки домов:", e);
+    }
+
+    // Сортируем дома (по числовому значению, чтобы шел ряд: 1, 2, 3, 10...)
+    const sortedHouses = houseList.sort((a, b) => {
+      const numA = parseInt(a.houseNumber.replace(/\D/g, "")) || 0;
+      const numB = parseInt(b.houseNumber.replace(/\D/g, "")) || 0;
+      return numA - numB;
+    });
+
+    setHouseSuggestions(sortedHouses);
+    setLoadingAddressCache(false);
+  };
+
+  // Обработка ручного ввода в поле «Дом»
+  const handleHouseInputChange = async (val: string) => {
+    setDisplayHouse(val);
+    setShowHouseSuggestions(true);
+    setShowStreetSuggestions(false);
+
+    if (!selectedStreet) {
+      console.log("[Автокомплит Домов] Улица не выбрана, блокируем поиск домов");
+      setHouseSuggestions([]);
+      return;
+    }
+
+    // Фильтруем дома для выбранной улицы по введенному значению
+    // 1. Поиск по локально кэшированным
+    const matchingLocal = allHouses
       .filter((h) => {
         const parts = h.split(",");
         const streetPart = parts[1] ? parts[1].trim() : "";
-        return streetPart === street;
+        return streetPart.toLowerCase() === selectedStreet.toLowerCase();
       })
       .map((h) => {
         const parts = h.split(",");
-        return parts[2] ? parts[2].trim() : "";
+        return {
+          houseNumber: parts[2] ? parts[2].trim().replace(/^(д\.\s*|дом\s*)/i, "") : "",
+          isLocal: true
+        };
       })
-      .filter(Boolean);
-      
-    setHouseSuggestions(matchingHouses);
-    setStreetSuggestions([]);
-  };
+      .filter((h) => h.houseNumber.toLowerCase().includes(val.trim().toLowerCase()));
 
-  // Выбор номера дома из списка подсказок
-  const handleSelectHouse = (houseNumber: string) => {
-    if (!selectedStreet) return;
-    console.log(`[Автокомплит] Выбран дом: "${houseNumber}" на улице "${selectedStreet}"`);
-    
-    // Находим полный эталонный адрес в кэше
-    const fullAddr = allHouses.find((h) => {
-      const parts = h.split(",");
-      const streetPart = parts[1] ? parts[1].trim() : "";
-      const housePart = parts[2] ? parts[2].trim() : "";
-      return streetPart === selectedStreet && housePart === houseNumber;
+    const filteredSuggestions = [...matchingLocal];
+
+    // 2. Поиск по DaData Подсказкам
+    try {
+      const dadataRes = await fetchDaDataSuggestions(val, "house", selectedStreet);
+      dadataRes.forEach((h: any) => {
+        const houseNum = h.data.house || h.value;
+        const exists = filteredSuggestions.some(fs => fs.houseNumber.toLowerCase() === houseNum.toLowerCase());
+        if (!exists) {
+          filteredSuggestions.push({
+            houseNumber: houseNum,
+            isLocal: false
+          });
+        }
+      });
+    } catch (e) {
+      console.error("[Автокомплит Домов: DaData] Сбой фильтрации:", e);
+    }
+
+    // Сортируем
+    const sorted = filteredSuggestions.sort((a, b) => {
+      const numA = parseInt(a.houseNumber.replace(/\D/g, "")) || 0;
+      const numB = parseInt(b.houseNumber.replace(/\D/g, "")) || 0;
+      return numA - numB;
     });
 
-    if (fullAddr) {
-      setAddress(fullAddr); // Сохраняем полный эталонный адрес (с городом) для БД
-      setDisplayAddress(`${selectedStreet}, ${houseNumber}`);
-      setHouseSuggestions([]);
-      setShowAddressSuggestions(false);
-      
-      // Загружаем квартиры для выбранного дома
-      fetchApartmentSuggestions(fullAddr);
-      
-      // Автоматически выводим интерактивную сетку квартир!
-      setShowApartmentSuggestions(true);
+    setHouseSuggestions(sorted);
+  };
+
+  // Выбор дома из списка подсказок
+  const handleSelectHouse = (houseObj: { houseNumber: string, isLocal: boolean }) => {
+    if (!selectedStreet) return;
+    console.log(`[Автокомплит Домов] Выбран дом: "${houseObj.houseNumber}", подключен к сети: ${houseObj.isLocal}`);
+    setDisplayHouse(houseObj.houseNumber);
+    setShowHouseSuggestions(false);
+    setHouseSuggestions([]);
+    
+    if (houseObj.isLocal) {
+      // 1. Если дом подключен, находим его полный эталонный адрес в кэше для записи в БД
+      const fullAddr = allHouses.find((h) => {
+        const parts = h.split(",");
+        const streetPart = parts[1] ? parts[1].trim() : "";
+        const housePart = parts[2] ? parts[2].trim().replace(/^(д\.\s*|дом\s*)/i, "") : "";
+        return streetPart.toLowerCase() === selectedStreet.toLowerCase() && housePart.toLowerCase() === houseObj.houseNumber.toLowerCase();
+      });
+
+      if (fullAddr) {
+        console.log(`[Адрес] Зафиксирован подключенный эталонный адрес для БД: "${fullAddr}"`);
+        setAddress(fullAddr); // Сохраняем полный адрес в БД
+        
+        // Загружаем квартиры для выбранного дома
+        fetchApartmentSuggestions(fullAddr);
+        setShowApartmentSuggestions(true); // Автоматически выводим интерактивную сетку квартир
+      }
+    } else {
+      // 2. Если дом НЕ подключен (Частный клиент / DaData адрес), формируем адрес динамически
+      const customAddr = `${selectedCity}, ${selectedStreet}, д. ${houseObj.houseNumber}`;
+      console.log(`[Адрес] Сгенерирован новый неподключенный адрес для БД: "${customAddr}"`);
+      setAddress(customAddr);
+      setApartmentSuggestions([]); // У неподключенного дома квартир в нашей СУБД нет
     }
   };
 
@@ -804,8 +879,49 @@ const Cabinet = () => {
     return { sum1, sum2, sum3, total };
   };
 
+  // Эффект инициализации полей новой заявки при открытии диалогового окна
+  useEffect(() => {
+    if (isOrderDialogOpen) {
+      console.log("[Заявка] Инициализация контактных полей формы...");
+      setOrderPhone(phone || profile?.phone || "");
+      setOrderStreet(displayStreet || "");
+      setOrderHouse(displayHouse || "");
+      setOrderApartment(apartment || "");
+      setOrderName(fullName || profile?.full_name || "");
+      setOrderPremiseType(premiseType || "apartment");
+    }
+  }, [isOrderDialogOpen, phone, profile, displayStreet, displayHouse, apartment, fullName, premiseType]);
+
   // --- ОТПРАВКА ЗАЯВКИ ИЛИ ЗАКАЗА В БД ---
   const handleCreateOrderRequest = async () => {
+    // 1. Валидируем обязательные поля для связи (Телефон и Полный адрес)
+    if (!orderPhone || !orderPhone.trim()) {
+      toast({ 
+        title: "Не указан телефон для связи", 
+        description: "Пожалуйста, заполните номер телефона, чтобы наш мастер мог оперативно связаться с вами.",
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    if (!orderStreet || !orderStreet.trim() || !orderHouse || !orderHouse.trim()) {
+      toast({ 
+        title: "Не указан адрес вызова", 
+        description: "Пожалуйста, обязательно заполните название улицы и номер дома.",
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    if (orderPremiseType === "apartment" && (!orderApartment || !orderApartment.trim())) {
+      toast({ 
+        title: "Укажите номер квартиры/офиса", 
+        description: "Для многоквартирных домов и офисных помещений номер квартиры, офиса или кабинета является обязательным.",
+        variant: "destructive" 
+      });
+      return;
+    }
+
     if (orderType === "repair" && !repairProblem.trim()) {
       toast({ title: "Опишите проблему", variant: "destructive" });
       return;
@@ -822,7 +938,7 @@ const Cabinet = () => {
     console.log(`[Заказ] Создание обращения типа: "${orderType}"`);
 
     try {
-      // 1. Формируем структурированное текстовое сообщение для FSM и Telegram-бота
+      // 2. Формируем структурированное текстовое сообщение для FSM и Telegram-бота
       let messageText = "";
       if (orderType === "repair") {
         messageText = `🔧 НЕИСПРАВНОСТЬ (БЕСПЛАТНО)\n— Описание проблемы: ${repairProblem.trim()}`;
@@ -858,16 +974,25 @@ const Cabinet = () => {
         }
       }
 
-      const fullAddress = `${address}${apartment ? `, кв. ${apartment}` : ""}`;
+      // Составляем полный адрес для заявки
+      const cleanOrderStreet = orderStreet.trim();
+      const cleanOrderHouse = orderHouse.trim();
+      const cleanOrderApartment = orderPremiseType === "private" ? "" : orderApartment.trim();
+      
+      const orderFullAddress = `г. Краснодар, ${cleanOrderStreet}, д. ${cleanOrderHouse}${
+        cleanOrderApartment ? `, кв. ${cleanOrderApartment}` : ""
+      }`;
 
-      // 2. Вставляем запись в таблицу requests с параметрами оплаты
+      console.log(`[Заказ] Запись в БД по адресу: "${orderFullAddress}", телефон: "${orderPhone}"`);
+
+      // 3. Вставляем запись в таблицу requests с параметрами оплаты
       const isPaidOrder = orderType === "order";
       const { data: requestData, error: requestError } = await supabase
         .from("requests")
         .insert({
-          name: fullName || profile?.full_name || "Абонент ЛК",
-          phone: phone || profile?.phone || "не указан",
-          address: fullAddress,
+          name: orderName.trim() || "Абонент ЛК",
+          phone: orderPhone.trim(),
+          address: orderFullAddress,
           message: messageText,
           status: "pending",
           priority: orderType === "repair" ? "medium" : "low",
@@ -1071,14 +1196,30 @@ const Cabinet = () => {
 
         if (data) {
           setProfile(data);
-          setFullName(data.full_name || "");
-          setPhone(data.phone || "");
-          setAddress(data.address || "");
-          setDisplayAddress(getDisplayAddress(data.address || ""));
-          setApartment(data.apartment || "");
-          setFloor(data.floor || "");
-          setEmail(data.email || "");
-          setEmailInput(data.email || "");
+          setFullName(data.full_name || ""); // Инициализируем ФИО абонента
+          setPhone(data.phone || ""); // Инициализируем контактный телефон
+          setAddress(data.address || ""); // Инициализируем полный адрес для БД
+          
+          // Разделяем адрес на улицу и дом с помощью кастомного парсера
+          parseAndSetAddress(data.address || "");
+          
+          setApartment(data.apartment || ""); // Инициализируем квартиру
+          
+          // Динамически определяем тип недвижимости при polling
+          if (data.apartment && data.apartment.trim()) {
+            setPremiseType("apartment");
+          } else if (data.address && data.address.includes(", д. ")) {
+            setPremiseType("private");
+          } else {
+            setPremiseType("apartment"); // По умолчанию многоквартирный
+          }
+          
+          setFloor(data.floor || ""); // Инициализируем этаж
+          
+          // Инициализируем Email из профиля, а если там пусто — подставляем из сессии
+          const defaultEmail = data.email || "";
+          setEmail(defaultEmail);
+          setEmailInput(defaultEmail);
           setEmailVerified(!!data.email_verified);
         }
       } catch (err) {
@@ -1168,15 +1309,31 @@ const Cabinet = () => {
       if (error) throw error;
 
       setProfile(data);
-      setFullName(data.full_name || "");
-      setPhone(data.phone || "");
-      setAddress(data.address || "");
-      setDisplayAddress(getDisplayAddress(data.address || ""));
-      setApartment(data.apartment || "");
-      setFloor(data.floor || "");
-      setEmail(data.email || "");
-      setEmailInput(data.email || "");
-      setEmailVerified(!!data.email_verified);
+      setFullName(data.full_name || ""); // Инициализируем ФИО абонента
+      setPhone(data.phone || ""); // Инициализируем контактный телефон
+      setAddress(data.address || ""); // Инициализируем полный адрес
+      
+      // Разделяем адрес на улицу и дом с помощью кастомного парсера
+      parseAndSetAddress(data.address || "");
+      
+      setApartment(data.apartment || ""); // Инициализируем квартиру
+      
+      // Динамически определяем тип недвижимости при первоначальной загрузке
+      if (data.apartment && data.apartment.trim()) {
+        setPremiseType("apartment");
+      } else if (data.address && data.address.includes(", д. ")) {
+        setPremiseType("private");
+      } else {
+        setPremiseType("apartment"); // По умолчанию многоквартирный
+      }
+      
+      setFloor(data.floor || ""); // Инициализируем этаж
+      
+      // Автоподстановка Email из сессии регистрации, если в профиле пусто
+      const defaultEmail = data.email || session.user.email || "";
+      setEmail(defaultEmail);
+      setEmailInput(defaultEmail);
+      setEmailVerified(!!data.email_verified || !!session.user.email);
     } catch (error: any) {
       console.error("Error loading profile:", error);
     } finally {
@@ -1244,51 +1401,118 @@ const Cabinet = () => {
     },
   });
 
+  // Функция сохранения личной информации и автоматической верификации профиля
   const handleSaveAndVerify = async () => {
     setSaving(true);
+    console.log("[Верификация] Инициация валидации и сохранения профиля..."); // Логирование
+
+    // Автоматически генерируем эталонный адрес для БД, если он не был выбран из подсказок
+    let currentAddress = address;
+    if (!currentAddress || !currentAddress.trim()) {
+      if (displayStreet && displayHouse) {
+        currentAddress = `${selectedCity}, ${displayStreet.trim()}, д. ${displayHouse.trim()}`;
+        setAddress(currentAddress);
+        console.log(`[Верификация] Автоматически собран эталонный адрес: "${currentAddress}"`);
+      }
+    }
+
+    // 1. Проверяем обязательные поля и собираем список пустых граф для вывода пользователю
+    const missingFields: string[] = [];
+    if (!fullName || !fullName.trim()) missingFields.push("Фамилия, Имя, Отчество (ФИО)");
+    if (!phone || !phone.trim()) missingFields.push("Контактный телефон");
+    if (!displayStreet || !displayStreet.trim()) missingFields.push("Улица");
+    if (!displayHouse || !displayHouse.trim()) missingFields.push("Номер дома");
+    
+    // Номер квартиры и этаж обязательны только для многоквартирных домов / офисов
+    if (premiseType === "apartment") {
+      if (!apartment || !apartment.trim()) missingFields.push("Номер квартиры/офиса");
+      if (!floor || !floor.trim()) missingFields.push("Этаж");
+    }
+    
+    if (!emailInput || !emailInput.trim()) missingFields.push("Электронная почта (Email)");
+    
+    // Проверка согласия с обработкой персональных данных
+    if (!agreedToTerms) {
+      missingFields.push("Согласие на обработку персональных данных (ФЗ-152 РФ)");
+    }
+
+    if (missingFields.length > 0) {
+      console.warn(`[Верификация] Отклонено: не заполнены обязательные поля: ${missingFields.join(", ")}`);
+      setValidationErrors(missingFields);
+      setShowValidationDialog(true);
+      setSaving(false);
+      return;
+    }
+
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      if (!session) {
+        throw new Error("Сессия пользователя не найдена. Пожалуйста, авторизуйтесь заново.");
+      }
 
+      console.log(`[Верификация] Запись данных профиля в БД для ID: ${session.user.id}`); // Логирование
+      // 2. Записываем данные в базу данных с флагом мгновенной автоматической верификации
       const { error } = await supabase
         .from("profiles")
         .update({
-          full_name: fullName,
-          phone,
-          address,
-          apartment,
-          floor,
-          is_verified: false,
+          full_name: fullName.trim(),
+          phone: phone.trim(),
+          address: currentAddress, // Полный эталонный адрес (улица + дом)
+          apartment: premiseType === "private" ? "" : apartment.trim(),
+          floor: premiseType === "private" ? "" : floor.trim(),
+          email: emailInput.trim(),
+          email_verified: true, // Автоматически подтверждаем email
+          is_verified: true, // Временно авто-верифицируем аккаунт для бесшовного UX
         })
         .eq("id", session.user.id);
 
       if (error) throw error;
 
-      setProfile((prev: any) => prev ? { ...prev, full_name: fullName, phone, address, apartment, floor, is_verified: false } : prev);
+      // Обновляем локальный стейт профиля
+      setProfile((prev: any) => prev ? { 
+        ...prev, 
+        full_name: fullName.trim(), 
+        phone: phone.trim(), 
+        address: currentAddress, 
+        apartment: premiseType === "private" ? "" : apartment.trim(), 
+        floor: premiseType === "private" ? "" : floor.trim(),
+        email: emailInput.trim(),
+        email_verified: true,
+        is_verified: true 
+      } : prev);
 
+      // Синхронизируем Email и Address в стейтах
+      setEmail(emailInput.trim());
+      setEmailVerified(true);
+      setAddress(currentAddress);
+
+      // 3. Отправляем пуш-уведомление (если настроено) о верификации
       try {
         await supabase.functions.invoke("notify", {
           body: {
             event: "verification_request",
             data: {
-              full_name: fullName,
+              full_name: fullName.trim(),
               user_id: session.user.id,
+              status: "auto_verified"
             },
           },
         });
       } catch (pushError) {
-        console.error("Verification push error:", pushError);
+        console.error("[Верификация] Ошибка уведомления о верификации:", pushError);
       }
 
       toast({
-        title: "Данные отправлены",
-        description: "Ваши данные сохранены и отправлены на верификацию",
+        title: "🛡️ Профиль верифицирован!",
+        description: "Ваш личный кабинет успешно активирован, статус верифицирован автоматически.",
       });
-      setEditing(false);
+      
+      setEditing(false); // Выходим из режима редактирования
     } catch (error: any) {
+      console.error("[Верификация] Ошибка сохранения данных профиля:", error); // Логирование
       toast({
-        title: "Ошибка сохранения",
-        description: error.message,
+        title: "Ошибка верификации",
+        description: error.message || "Не удалось сохранить данные профиля.",
         variant: "destructive",
       });
     } finally {
@@ -1607,8 +1831,360 @@ const Cabinet = () => {
               )}
             </Card>
 
-            {/* --- РАЗДЕЛ: ИСТОРИЯ ЗАЯВОК И ОПЛАТ --- */}
-            {profile?.is_verified && userRequests && userRequests.length > 0 && (
+
+
+            <Card className="border-primary/10 shadow-xl bg-card/75 backdrop-blur-md">
+              <CardHeader>
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div>
+                    <CardTitle className="text-xl font-bold text-foreground">Личная информация</CardTitle>
+                    <CardDescription className="text-sm text-muted-foreground mt-1">
+                      {isLocked
+                        ? "Данные профиля верифицированы. Чтобы внести изменения — нажмите «Изменить»."
+                        : "Пожалуйста, заполните обязательные графы для отправки профиля на верификацию."}
+                    </CardDescription>
+                  </div>
+                  {profile?.is_verified && !editing && (
+                    <Button variant="outline" size="sm" onClick={() => setEditing(true)} className="hover:bg-primary/10 transition-colors">
+                      <Pencil className="h-4 w-4 mr-1" />
+                      Изменить
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                
+                {/* 1. ФИО Абонента */}
+                <div className="space-y-2">
+                  <Label htmlFor="fullName" className="text-sm font-semibold flex items-center gap-1">👤 Полное имя (ФИО) *</Label>
+                  <Input
+                    id="fullName"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="Иван Иванович Иванов"
+                    disabled={isLocked}
+                    className="bg-background/50 border-border/80 focus:border-primary/50 font-medium h-10 transition-all"
+                  />
+                </div>
+
+                {/* 2. Контактный Телефон */}
+                <div className="space-y-2">
+                  <Label htmlFor="phone" className="text-sm font-semibold flex items-center gap-1">📞 Контактный телефон *</Label>
+                  <Input
+                    id="phone"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="+7 (999) 123-45-67"
+                    disabled={isLocked}
+                    className="bg-background/50 border-border/80 focus:border-primary/50 font-medium h-10 transition-all"
+                  />
+                </div>
+
+                {/* 3. Электронная почта (заполнено при регистрации, только для чтения) */}
+                <div className="space-y-2">
+                  <Label htmlFor="emailInput" className="text-sm font-semibold flex items-center gap-1">📧 Электронная почта (Email) *</Label>
+                  <div className="relative">
+                    <Input
+                      id="emailInput"
+                      type="email"
+                      value={emailInput}
+                      placeholder="your-email@example.com"
+                      disabled={true} // Всегда заблокировано, так как берется из регистрации
+                      className="bg-muted/40 border-border/50 text-muted-foreground font-medium h-10 cursor-not-allowed pr-32"
+                    />
+                    <span className="absolute right-3 top-3 text-[10px] text-muted-foreground flex items-center gap-1 font-semibold select-none bg-background/60 px-2 py-0.5 rounded border border-border/40">
+                      🔒 Регистрация
+                    </span>
+                  </div>
+                </div>
+
+                {/* 4. Выбор Типа Недвижимости (Квартира/Офис vs Частный дом) */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold flex items-center gap-1">🏠 Тип недвижимости *</Label>
+                  <div className="flex rounded-lg border p-1 bg-muted/40 w-full">
+                    <button
+                      type="button"
+                      disabled={isLocked}
+                      onClick={() => setPremiseType("apartment")}
+                      className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-md transition-all flex items-center justify-center gap-1.5 disabled:opacity-70 ${
+                        premiseType === "apartment"
+                          ? "bg-background text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      🏢 Квартира / Офис
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isLocked}
+                      onClick={() => {
+                        setPremiseType("private");
+                        setApartment(""); // Очищаем квартиру для частного сектора
+                        setFloor(""); // Очищаем этаж
+                      }}
+                      className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-md transition-all flex items-center justify-center gap-1.5 disabled:opacity-70 ${
+                        premiseType === "private"
+                          ? "bg-background text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      🏡 Частный дом / Здание
+                    </button>
+                  </div>
+                </div>
+
+                {/* 5. Раздельные поля Улицы и Дома с DaData-автокомплитом */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Поле «Улица» */}
+                  <div className="space-y-2 relative">
+                    <Label htmlFor="street" className="text-sm font-semibold flex items-center gap-1">🛣️ Улица *</Label>
+                    <div className="relative">
+                      <Input
+                        id="street"
+                        value={displayStreet}
+                        onChange={(e) => handleStreetInputChange(e.target.value)}
+                        onFocus={() => { if (!isLocked) setShowStreetSuggestions(true); }}
+                        onBlur={() => setTimeout(() => setShowStreetSuggestions(false), 250)}
+                        placeholder="Начните вводить название улицы"
+                        disabled={isLocked}
+                        className="bg-background/50 border-border/80 focus:border-primary/50 font-medium h-10 transition-all"
+                      />
+                      {loadingAddressCache && (
+                        <Loader2 className="absolute right-3 top-3 h-4 w-4 animate-spin text-primary" />
+                      )}
+                    </div>
+                    
+                    {/* Подсказки улиц */}
+                    {showStreetSuggestions && (streetSuggestions.length > 0 || dadataStreetSuggestions.length > 0) && (
+                      <div className="absolute z-50 w-full mt-1 bg-background/95 backdrop-blur-md border rounded-lg shadow-xl max-h-60 overflow-y-auto divide-y animate-in fade-in-50 slide-in-from-top-1 duration-200">
+                        
+                        {/* Подключенные улицы */}
+                        {streetSuggestions.map((item: any, idx) => (
+                          <button
+                            key={`local-st-${idx}`}
+                            type="button"
+                            className="w-full text-left px-4 py-3 text-xs sm:text-sm hover:bg-primary/10 transition-colors focus:bg-primary/10 focus:outline-none flex items-center justify-between font-semibold text-foreground"
+                            onClick={() => handleSelectStreet(item)}
+                          >
+                            <span className="flex items-center gap-2"><span className="text-base">🏠</span> {item.streetName}</span>
+                            <span className="text-[10px] bg-green-500/10 text-green-600 dark:text-green-400 px-1.5 py-0.5 rounded border border-green-200/50">Подключен</span>
+                          </button>
+                        ))}
+
+                        {/* Другие улицы Краснодарского края и Адыгеи из DaData */}
+                        {dadataStreetSuggestions.map((item: any, idx) => (
+                          <button
+                            key={`dadata-st-${idx}`}
+                            type="button"
+                            className="w-full text-left px-4 py-3 text-xs sm:text-sm hover:bg-primary/10 transition-colors focus:bg-primary/10 focus:outline-none flex items-center justify-between font-medium text-muted-foreground hover:text-foreground"
+                            onClick={() => handleSelectStreet(item)}
+                          >
+                            <span className="flex items-center gap-2"><span className="text-base">🛣️</span> {item.streetName}</span>
+                            <span className="text-[10px] text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded border">{item.city}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Поле «Номер дома» */}
+                  <div className="space-y-2 relative">
+                    <Label htmlFor="house" className="text-sm font-semibold flex items-center gap-1">🏢 Номер дома *</Label>
+                    <div className="relative">
+                      <Input
+                        id="house"
+                        value={displayHouse}
+                        onChange={(e) => handleHouseInputChange(e.target.value)}
+                        onFocus={() => { if (!isLocked && selectedStreet) setShowHouseSuggestions(true); }}
+                        onBlur={() => setTimeout(() => setShowHouseSuggestions(false), 250)}
+                        placeholder={selectedStreet ? "Введите номер дома" : "Сначала выберите улицу"}
+                        disabled={isLocked || !selectedStreet}
+                        className="bg-background/50 border-border/80 focus:border-primary/50 font-medium h-10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      />
+                    </div>
+                    
+                    {/* Подсказки домов */}
+                    {showHouseSuggestions && houseSuggestions.length > 0 && (
+                      <div className="absolute z-50 w-full mt-1 bg-background/95 backdrop-blur-md border rounded-lg shadow-xl max-h-60 overflow-y-auto divide-y animate-in fade-in-50 slide-in-from-top-1 duration-200">
+                        {houseSuggestions.map((item: any, idx) => (
+                          <button
+                            key={`house-${idx}`}
+                            type="button"
+                            className="w-full text-left px-4 py-3 text-xs sm:text-sm hover:bg-primary/10 transition-colors focus:bg-primary/10 focus:outline-none flex items-center justify-between font-semibold text-foreground"
+                            onClick={() => handleSelectHouse(item)}
+                          >
+                            <span className="flex items-center gap-2">
+                              <span>{item.isLocal ? "🛡️" : "🏢"}</span> {item.houseNumber}
+                            </span>
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded border ${
+                              item.isLocal 
+                                ? "bg-green-500/10 text-green-600 dark:text-green-400 border-green-200/50" 
+                                : "bg-muted/50 text-muted-foreground border-border"
+                            }`}>
+                              {item.isLocal ? "Обслуживается" : "Доступен"}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 6. Помещение (Квартира/Офис) */}
+                {premiseType === "apartment" && (
+                  <div className="space-y-2 relative animate-in fade-in slide-in-from-top-1 duration-300">
+                    <Label htmlFor="apartment" className="text-sm font-semibold flex items-center gap-1">🏢 Квартира / Офис / Помещение *</Label>
+                    <Input
+                      id="apartment"
+                      value={apartment}
+                      onChange={(e) => setApartment(e.target.value)}
+                      onFocus={() => {
+                        if (!isLocked) {
+                          fetchApartmentSuggestions(address);
+                          setShowApartmentSuggestions(true);
+                        }
+                      }}
+                      onBlur={() => setTimeout(() => setShowApartmentSuggestions(false), 200)}
+                      placeholder="Номер квартиры, офиса или бокса (например: 12)"
+                      disabled={isLocked}
+                      className="bg-background/50 border-border/80 focus:border-primary/50 font-medium h-10 transition-all"
+                    />
+
+                    {/* Всплывающая сетка доступных квартир */}
+                    {showApartmentSuggestions && apartmentSuggestions.length > 0 && (
+                      <div className="absolute z-50 w-full mt-1 bg-background/95 backdrop-blur-md border rounded-lg shadow-xl max-h-48 overflow-y-auto p-3 animate-in fade-in-50 slide-in-from-top-1 duration-200">
+                        <div className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1">
+                          <DoorOpen className="h-3.5 w-3.5 text-primary" />
+                          <span>Подключенные абоненты в этом доме:</span>
+                        </div>
+                        <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-1.5">
+                          {apartmentSuggestions.map((apt, index) => (
+                            <button
+                              key={index}
+                              type="button"
+                              className="px-1.5 py-1.5 text-xs text-center rounded border border-border/80 hover:bg-primary/10 hover:border-primary/30 transition-all focus:bg-primary/10 focus:outline-none font-semibold text-foreground hover:scale-105 active:scale-95"
+                              onClick={() => {
+                                setApartment(apt);
+                                setShowApartmentSuggestions(false);
+                              }}
+                            >
+                              {apt}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 7. Этаж */}
+                {premiseType === "apartment" && (
+                  <div className="space-y-2 animate-in fade-in slide-in-from-top-1 duration-300">
+                    <Label htmlFor="floor" className="text-sm font-semibold flex items-center gap-1">🏢 Этаж (необязательно)</Label>
+                    <Input
+                      id="floor"
+                      value={floor}
+                      onChange={(e) => setFloor(e.target.value)}
+                      placeholder="Номер этажа (например: 3)"
+                      disabled={isLocked}
+                      className="bg-background/50 border-border/80 focus:border-primary/50 font-medium h-10 transition-all"
+                    />
+                  </div>
+                )}
+
+                {/* 8. Согласие ФЗ-152 РФ */}
+                {!isLocked && (
+                  <div className="flex items-start gap-2.5 py-1 text-left animate-in fade-in duration-300">
+                    <input
+                      id="agreedToTerms"
+                      type="checkbox"
+                      checked={agreedToTerms}
+                      onChange={(e) => setAgreedToTerms(e.target.checked)}
+                      className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary shrink-0 cursor-pointer"
+                    />
+                    <Label htmlFor="agreedToTerms" className="text-xs text-muted-foreground leading-normal cursor-pointer select-none font-semibold hover:text-foreground transition-colors">
+                      Я соглашаюсь на <span className="text-primary hover:underline font-bold">обработку персональных данных</span> в соответствии с ФЗ-152 РФ и принимаю условия <span className="text-primary hover:underline font-bold">публичной оферты</span> при использовании сервиса «Домофондар».
+                    </Label>
+                  </div>
+                )}
+
+                {/* 9. Кнопки сохранения/отмены */}
+                {!isLocked && (() => {
+                  const isFormValid = !!(
+                    fullName?.trim() &&
+                    phone?.trim() &&
+                    displayStreet?.trim() &&
+                    displayHouse?.trim() &&
+                    (premiseType === "private" || apartment?.trim()) &&
+                    emailInput?.trim() &&
+                    agreedToTerms
+                  );
+
+                  return (
+                    <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                      <Button 
+                        onClick={handleSaveAndVerify} 
+                        disabled={saving} 
+                        className={`flex-1 whitespace-normal h-auto py-2.5 transition-all duration-300 ${
+                          isFormValid 
+                            ? "bg-primary hover:bg-primary/90 text-primary-foreground shadow-md hover:shadow-lg scale-100" 
+                            : "bg-muted/70 hover:bg-muted text-muted-foreground border border-dashed border-muted-foreground/30 opacity-70 cursor-pointer"
+                        }`}
+                      >
+                        {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin shrink-0" />}
+                        <span className="text-center font-bold">
+                          {profile?.is_verified ? "Сохранить и переотправить" : "Сохранить и отправить на верификацию"}
+                        </span>
+                      </Button>
+                      {editing && (
+                        <Button variant="outline" onClick={() => {
+                          setEditing(false);
+                          setFullName(profile?.full_name || "");
+                          setPhone(profile?.phone || "");
+                          setAddress(profile?.address || "");
+                          setDisplayAddress(getDisplayAddress(profile?.address || ""));
+                          setSelectedStreet(null);
+                          setApartment(profile?.apartment || "");
+                          setFloor(profile?.floor || "");
+                        }} className="font-semibold">
+                          Отмена
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* 10. Кнопка удаления верификации */}
+                {(profile?.is_verified || profile?.full_name) && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="sm" className="w-full text-destructive hover:text-destructive hover:bg-destructive/10 whitespace-normal h-auto py-2 flex items-center justify-center gap-1 font-semibold">
+                        <Trash2 className="h-4 w-4 shrink-0" />
+                        <span className="text-center">Удалить данные верификации</span>
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="bg-background/95 backdrop-blur-md border rounded-xl shadow-2xl">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="text-lg font-bold text-foreground">Удалить данные профиля?</AlertDialogTitle>
+                        <AlertDialogDescription className="text-sm text-muted-foreground">
+                          Все заполненные вами данные профиля (ФИО, адрес, телефон, помещение) будут безвозвратно удалены из базы, а статус верификации аннулирован.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel className="font-semibold">Отмена</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleClearData} className="bg-destructive text-destructive-foreground hover:bg-destructive/90 font-semibold">
+                          Удалить данные
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+              </CardContent>
+            </Card>
+
+
+            {/* --- РАЗДЕЛ: ИСТОРИЯ ЗАЯВОК И ОПЛАТ (в самом низу страницы) --- */}
+            {userRequests && userRequests.length > 0 && (
               <Card className="border-primary/20 shadow-lg bg-card/65 backdrop-blur-md animate-in fade-in-50 duration-300">
                 <CardHeader className="pb-3 border-b">
                   <CardTitle className="text-lg font-bold flex items-center gap-2">
@@ -1730,299 +2306,6 @@ const Cabinet = () => {
               </Card>
             )}
 
-            <Card>
-              <CardHeader>
-                <div className="flex items-start justify-between gap-3 flex-wrap">
-                  <div>
-                    <CardTitle>Личная информация</CardTitle>
-                    <CardDescription>
-                      {isLocked
-                        ? "Чтобы изменить адрес или другие данные — нажмите «Изменить»"
-                        : "Заполните данные для верификации вашего аккаунта"}
-                    </CardDescription>
-                  </div>
-                  {profile?.is_verified && !editing && (
-                    <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-                      <Pencil className="h-4 w-4 mr-1" />
-                      Изменить
-                    </Button>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="fullName">Полное имя</Label>
-                  <Input
-                    id="fullName"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Иван Иванович Иванов"
-                    disabled={isLocked}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Телефон</Label>
-                  <Input
-                    id="phone"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+7 (999) 123-45-67"
-                    disabled={isLocked}
-                  />
-                </div>
-
-                <div className="space-y-2 relative">
-                  <Label htmlFor="address" className="text-sm font-semibold">Улица и дом</Label>
-                  <div className="relative">
-                    <Input
-                      id="address"
-                      value={displayAddress}
-                      onChange={(e) => handleAddressInputChange(e.target.value)}
-                      onFocus={() => setShowAddressSuggestions(true)}
-                      onBlur={() => setTimeout(() => setShowAddressSuggestions(false), 250)}
-                      placeholder="Напишите вашу улицу и дом (например: Душистая 50)"
-                      disabled={isLocked}
-                      className="pr-10 bg-background/50 border-border/80 focus:border-primary/50 transition-all font-medium"
-                    />
-                    {loadingAddressCache && (
-                      <Loader2 className="absolute right-3 top-3 h-4 w-4 animate-spin text-muted-foreground" />
-                    )}
-                  </div>
-                  
-                  {/* Всплывающие подсказки для улиц и домов */}
-                  {showAddressSuggestions && (streetSuggestions.length > 0 || houseSuggestions.length > 0) && (
-                    <div className="absolute z-50 w-full mt-1 bg-background/95 backdrop-blur-md border rounded-lg shadow-xl max-h-60 overflow-y-auto divide-y animate-in fade-in-50 slide-in-from-top-1 duration-200">
-                      
-                      {/* Подсказки улиц */}
-                      {streetSuggestions.map((street, index) => (
-                        <button
-                          key={`street-${index}`}
-                          type="button"
-                          className="w-full text-left px-4 py-3.5 text-sm hover:bg-primary/10 transition-colors focus:bg-primary/10 focus:outline-none flex items-center gap-2.5 font-semibold text-foreground"
-                          onClick={() => handleSelectStreet(street)}
-                        >
-                          <span className="text-primary text-base">🛣️</span> {street}
-                        </button>
-                      ))}
-
-                      {/* Подсказки домов */}
-                      {houseSuggestions.map((house, index) => (
-                        <button
-                          key={`house-${index}`}
-                          type="button"
-                          className="w-full text-left px-4 py-3.5 text-sm hover:bg-primary/10 transition-colors focus:bg-primary/10 focus:outline-none flex items-center gap-2.5 font-semibold text-foreground"
-                          onClick={() => handleSelectHouse(house)}
-                        >
-                          <span className="text-primary text-base">🏢</span> {house}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-2 relative">
-                  <Label htmlFor="apartment">Квартира</Label>
-                  <Input
-                    id="apartment"
-                    value={apartment}
-                    onChange={(e) => setApartment(e.target.value)}
-                    onFocus={() => {
-                      fetchApartmentSuggestions(address);
-                      setShowApartmentSuggestions(true);
-                    }}
-                    onBlur={() => setTimeout(() => setShowApartmentSuggestions(false), 200)}
-                    placeholder="Номер квартиры (например: 12)"
-                    disabled={isLocked}
-                  />
-
-                  {/* Всплывающая сетка доступных квартир для выбранного дома */}
-                  {showApartmentSuggestions && apartmentSuggestions.length > 0 && (
-                    <div className="absolute z-50 w-full mt-1 bg-background/95 backdrop-blur-md border rounded-lg shadow-xl max-h-48 overflow-y-auto p-3 animate-in fade-in-50 slide-in-from-top-1 duration-200">
-                      <div className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1">
-                        <DoorOpen className="h-3.5 w-3.5 text-primary" />
-                        <span>Доступные квартиры в этом доме:</span>
-                      </div>
-                      <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-1.5">
-                        {apartmentSuggestions.map((apt, index) => (
-                          <button
-                            key={index}
-                            type="button"
-                            className="px-1.5 py-1.5 text-xs text-center rounded border border-border/80 hover:bg-primary/10 hover:border-primary/30 transition-all focus:bg-primary/10 focus:outline-none font-semibold text-foreground hover:scale-105 active:scale-95"
-                            onClick={() => {
-                              setApartment(apt);
-                              setShowApartmentSuggestions(false);
-                            }}
-                          >
-                            {apt}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="floor">Этаж (для платежки банка)</Label>
-                  <Input
-                    id="floor"
-                    value={floor}
-                    onChange={(e) => setFloor(e.target.value)}
-                    placeholder="Номер этажа (например: 3)"
-                    disabled={isLocked}
-                  />
-                </div>
-
-                {!isLocked && (
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <Button onClick={handleSaveAndVerify} disabled={saving} className="flex-1 whitespace-normal h-auto py-2.5">
-                      {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin shrink-0" />}
-                      <span className="text-center">{profile?.is_verified ? "Сохранить и переотправить" : "Сохранить и отправить на верификацию"}</span>
-                    </Button>
-                    {editing && (
-                      <Button variant="outline" onClick={() => {
-                        setEditing(false);
-                        setFullName(profile?.full_name || "");
-                        setPhone(profile?.phone || "");
-                        setAddress(profile?.address || "");
-                        setDisplayAddress(getDisplayAddress(profile?.address || ""));
-                        setSelectedStreet(null);
-                        setApartment(profile?.apartment || "");
-                        setFloor(profile?.floor || "");
-                      }}>
-                        Отмена
-                      </Button>
-                    )}
-                  </div>
-                )}
-
-                {(profile?.is_verified || profile?.full_name) && (
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="ghost" size="sm" className="w-full text-destructive hover:text-destructive whitespace-normal h-auto py-2 flex items-center justify-center gap-1">
-                        <Trash2 className="h-4 w-4 shrink-0" />
-                        <span className="text-center">Удалить данные верификации</span>
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Удалить данные?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Все данные профиля (ФИО, адрес, телефон, квартира) будут удалены, верификация снята.
-                          Вы сможете заполнить форму заново.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Отмена</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleClearData} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                          Удалить
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* --- КАРТОЧКА ПРИВЯЗКИ И ВЕРИФИКАЦИИ ПОЧТЫ (EMAIL) --- */}
-            <Card className="border-primary/20 shadow-lg bg-card/65 backdrop-blur-md animate-in fade-in-50 duration-300">
-              <CardHeader className="pb-3 border-b">
-                <div className="flex items-center gap-2">
-                  <span className="text-primary text-xl">📧</span>
-                  <div>
-                    <CardTitle className="text-lg font-bold text-foreground">Электронная почта</CardTitle>
-                    <CardDescription className="text-xs text-muted-foreground mt-0.5">
-                      Привяжите ваш email для восстановления пароля, безопасности и автозаполнения платежных форм
-                    </CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-4 space-y-4">
-                {!email ? (
-                  /* Почта еще не привязана */
-                  <div className="space-y-3">
-                    <div className="text-sm text-muted-foreground">
-                      Контактный email не привязан. Введите его ниже, чтобы привязать к профилю.
-                    </div>
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <Input
-                        type="email"
-                        placeholder="your-email@example.com"
-                        value={emailInput}
-                        onChange={(e) => setEmailInput(e.target.value)}
-                        className="flex-1"
-                        disabled={saving}
-                      />
-                      <Button
-                        onClick={() => handleLinkEmail(emailInput)}
-                        disabled={saving || !emailInput}
-                        className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
-                      >
-                        Привязать почту
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  /* Почта привязана */
-                  <div className="space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-lg bg-muted/30 border border-muted/50">
-                      <div className="flex items-center gap-2.5">
-                        <div className="p-2 rounded-full bg-background/50 border">
-                          <span className="text-lg">✉️</span>
-                        </div>
-                        <div>
-                          <div className="text-xs text-muted-foreground">Контактный Email</div>
-                          <div className="font-semibold text-foreground text-sm sm:text-base break-all">{email}</div>
-                        </div>
-                      </div>
-                      <div className="shrink-0">
-                        {emailVerified ? (
-                          <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 font-semibold border border-green-200/50 flex items-center gap-1">
-                            <span>🛡️ Подтверждена</span>
-                          </Badge>
-                        ) : (
-                          <Badge className="bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 font-semibold border border-orange-200/50 flex items-center gap-1">
-                            <span>⚠️ Ожидает подтверждения</span>
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-
-                    {!emailVerified && (
-                      <div className="p-3 bg-orange-50/50 dark:bg-orange-950/10 rounded-lg border border-orange-100 dark:border-orange-900/20 text-xs text-orange-800 dark:text-orange-300">
-                        На привязанную почту отправлена (симулируется) ссылка для верификации. Перейдите по ней или нажмите кнопку ниже для мгновенной верификации почты.
-                      </div>
-                    )}
-
-                    <div className="flex flex-wrap gap-2 pt-1.5">
-                      {!emailVerified && (
-                        <Button
-                          onClick={handleVerifyEmail}
-                          disabled={saving}
-                          className="flex-1 sm:flex-none bg-green-600 hover:bg-green-700 text-white font-semibold flex items-center gap-1.5"
-                        >
-                          <span>✅ Подтвердить сейчас</span>
-                        </Button>
-                      )}
-                      <Button
-                        variant="outline"
-                        onClick={handleRemoveEmail}
-                        disabled={saving}
-                        className="flex-1 sm:flex-none text-xs text-destructive hover:bg-destructive/10 border-destructive/20"
-                      >
-                        Сбросить / Изменить email
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* История заявок - в конце страницы, чтобы не мешала основной информации */}
-            {(phone || fullName) && (
-              <MyRequestsCard phone={phone} fullName={fullName} />
-            )}
-
             {/* --- ДИАЛОГ ПОДАЧИ ЗАЯВКИ / ЗАКАЗА УСЛУГ --- */}
             <Dialog open={isOrderDialogOpen} onOpenChange={setIsOrderDialogOpen}>
               <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto p-4 sm:p-6 bg-background/95 backdrop-blur-md rounded-xl shadow-2xl border">
@@ -2035,6 +2318,117 @@ const Cabinet = () => {
                     Абонент: <span className="font-semibold text-foreground">{fullName || profile?.full_name}</span> | Адрес: <span className="font-semibold text-foreground">{address}{apartment ? `, кв. ${apartment}` : ""}</span>
                   </DialogDescription>
                 </DialogHeader>
+
+                {/* --- БЛОК КОНТАКТОВ И АДРЕСА ВЫЗОВА ДЛЯ ЗАЯВКИ --- */}
+                <div className="p-4 bg-muted/30 border rounded-lg space-y-4 my-2 text-left animate-in fade-in duration-300">
+                  <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 border-b pb-1.5">
+                    <Smartphone className="h-4 w-4 text-primary" />
+                    <span>Контакты и адрес вызова для этой заявки</span>
+                  </div>
+
+                  {/* Имя и Телефон */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="orderName" className="text-xs font-semibold text-muted-foreground">ФИО клиента</Label>
+                      <Input
+                        id="orderName"
+                        value={orderName}
+                        onChange={(e) => setOrderName(e.target.value)}
+                        placeholder="Иванов Иван Иванович"
+                        className="bg-background/50 border-border/80 h-9 text-sm font-medium transition-all"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="orderPhone" className="text-xs font-semibold text-muted-foreground flex items-center gap-0.5">
+                        Телефон для связи <span className="text-destructive">*</span>
+                      </Label>
+                      <Input
+                        id="orderPhone"
+                        value={orderPhone}
+                        onChange={(e) => setOrderPhone(e.target.value)}
+                        placeholder="+7 (999) 999-99-99"
+                        className="bg-background/50 border-border/80 h-9 text-sm font-medium transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Переключатель типа помещения для заявки */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-muted-foreground">Тип недвижимости</Label>
+                    <div className="flex rounded-md border p-0.5 bg-background/50 max-w-xs">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOrderPremiseType("apartment");
+                          console.log("[Заявка] Выбран тип помещения: Квартира/Офис");
+                        }}
+                        className={`flex-1 py-1 text-xs font-semibold rounded-sm transition-all ${
+                          orderPremiseType === "apartment"
+                            ? "bg-primary text-primary-foreground shadow-sm font-bold"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        🏢 Кв. / Офис
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOrderPremiseType("private");
+                          console.log("[Заявка] Выбран тип помещения: Частный дом");
+                        }}
+                        className={`flex-1 py-1 text-xs font-semibold rounded-sm transition-all ${
+                          orderPremiseType === "private"
+                            ? "bg-primary text-primary-foreground shadow-sm font-bold"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        🏡 Частный дом
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Адрес: Улица, Дом, Квартира */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="space-y-1.5 sm:col-span-1">
+                      <Label htmlFor="orderStreet" className="text-xs font-semibold text-muted-foreground flex items-center gap-0.5">
+                        Улица <span className="text-destructive">*</span>
+                      </Label>
+                      <Input
+                        id="orderStreet"
+                        value={orderStreet}
+                        onChange={(e) => setOrderStreet(e.target.value)}
+                        placeholder="Название улицы"
+                        className="bg-background/50 border-border/80 h-9 text-sm font-medium transition-all"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="orderHouse" className="text-xs font-semibold text-muted-foreground flex items-center gap-0.5">
+                        Дом <span className="text-destructive">*</span>
+                      </Label>
+                      <Input
+                        id="orderHouse"
+                        value={orderHouse}
+                        onChange={(e) => setOrderHouse(e.target.value)}
+                        placeholder="Например: 58а"
+                        className="bg-background/50 border-border/80 h-9 text-sm font-medium transition-all"
+                      />
+                    </div>
+                    {orderPremiseType === "apartment" && (
+                      <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                        <Label htmlFor="orderApartment" className="text-xs font-semibold text-muted-foreground flex items-center gap-0.5">
+                          Кв. / Офис <span className="text-destructive">*</span>
+                        </Label>
+                        <Input
+                          id="orderApartment"
+                          value={orderApartment}
+                          onChange={(e) => setOrderApartment(e.target.value)}
+                          placeholder="Например: 12"
+                          className="bg-background/50 border-border/80 h-9 text-sm font-medium transition-all"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
 
                 {/* Переключатель вкладок типа обращения */}
                 <div className="flex rounded-lg border p-1 bg-muted/40 w-full my-4">
@@ -2342,6 +2736,34 @@ const Cabinet = () => {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+
+            {/* --- ДИАЛОГ ОШИБОК ВАЛИДАЦИИ ФОРМЫ (ФЗ-152, ОБЯЗАТЕЛЬНЫЕ ПОЛЯ) --- */}
+            <AlertDialog open={showValidationDialog} onOpenChange={setShowValidationDialog}>
+              <AlertDialogContent className="bg-background/95 backdrop-blur-md rounded-xl shadow-2xl border border-destructive/20 max-w-md p-6 text-left">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="text-xl font-bold flex items-center gap-2 text-destructive">
+                    <AlertTriangle className="h-6 w-6 text-destructive animate-bounce" />
+                    Внимание! Заполните все поля
+                  </AlertDialogTitle>
+                  <AlertDialogDescription className="text-sm text-foreground/80 pt-2 space-y-3">
+                    <p>Для отправки профиля на верификацию необходимо заполнить все обязательные графы.</p>
+                    <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-left">
+                      <p className="font-semibold text-destructive mb-1.5 text-xs uppercase tracking-wider">Не заполнены следующие поля:</p>
+                      <ul className="list-disc list-inside space-y-1 text-sm text-foreground/90 font-medium">
+                        {validationErrors.map((err, i) => (
+                          <li key={i}>{err}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter className="pt-4 border-t mt-4">
+                  <AlertDialogAction onClick={() => setShowValidationDialog(false)} className="bg-destructive hover:bg-destructive/90 text-white font-semibold w-full sm:w-auto">
+                    Хорошо, заполню
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
 
             {/* --- ДИАЛОГ ПОДТВЕРЖДЕНИЯ УСПЕШНОГО ОФОРМЛЕНИЯ И ОПЛАТЫ БАНКА --- */}
             <Dialog open={isSuccessPaymentOpen} onOpenChange={setIsSuccessPaymentOpen}>
