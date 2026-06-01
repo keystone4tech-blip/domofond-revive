@@ -2333,7 +2333,7 @@ const Cabinet = () => {
                                       `&SUMMA_OPL3=0.00` +
                                       `&DENGI_F=${totalAmount.toFixed(2)}` +
                                       `&INFO=${encodeURIComponent(`Оплата услуг по заявке #${req.id}`)}` +
-                                      `&SuccessURL=${encodeURIComponent(`https://domofon.mozhnovpn.tech/cabinet?payment_success=true&request_id=${req.id}`)}`;
+                                      `&SuccessURL=${encodeURIComponent(`https://domofondar.ru/cabinet?payment_success=true&request_id=${req.id}`)}`;
 
                                     window.open(payUrl, "_blank");
                                   }}
@@ -2923,7 +2923,7 @@ const Cabinet = () => {
                           `&SUMMA_OPL3=${lastOrderTotals.sum3.toFixed(2)}` +
                           `&DENGI_F=${lastOrderTotals.total.toFixed(2)}` +
                           `&INFO=${encodeURIComponent(`Оплата услуг по заявке #${lastCreatedRequestId}`)}` +
-                          `&SuccessURL=${encodeURIComponent(`https://domofon.mozhnovpn.tech/cabinet?payment_success=true&request_id=${lastCreatedRequestId}`)}`;
+                          `&SuccessURL=${encodeURIComponent(`https://domofondar.ru/cabinet?payment_success=true&request_id=${lastCreatedRequestId}`)}`;
 
                         window.open(payUrl, "_blank");
                         setIsSuccessPaymentOpen(false);

@@ -7,9 +7,9 @@
 ---
 
 ## 🌐 1. Основные ссылки и доступы (Production)
-*   **Публичный сайт (Frontend):** [https://domofon.mozhnovpn.tech/](https://domofon.mozhnovpn.tech/)
-*   **Админ-панель:** [https://domofon.mozhnovpn.tech/admin](https://domofon.mozhnovpn.tech/admin)
-*   **Кабинет / FSM (Сотрудники):** [https://domofon.mozhnovpn.tech/cabinet](https://domofon.mozhnovpn.tech/cabinet)
+*   **Публичный сайт (Frontend):** [https://domofondar.ru/](https://domofondar.ru/)
+*   **Админ-панель:** [https://domofondar.ru/admin](https://domofondar.ru/admin)
+*   **Кабинет / FSM (Сотрудники):** [https://domofondar.ru/cabinet](https://domofondar.ru/cabinet)
 
 ---
 
