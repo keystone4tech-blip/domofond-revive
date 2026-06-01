@@ -40,6 +40,7 @@ const normalizeStreet = (s: string) =>
 const normalizeHouse = (h: string) => 
   (h || "").toLowerCase()
     .replace(/^(д\.\s*|дом\s*)/i, "") // убираем "д." или "дом"
+    .replace(/(?:корп\.?|корпус)\s*/gi, "к") // унифицируем корпуса
     .replace(/[^а-яa-z0-9]/g, "") // оставляем только буквы и цифры
     .trim();
 
@@ -50,13 +51,21 @@ const normalizeApartment = (a: string) =>
     .trim();
 
 const parseAddressParts = (fullAddr: string) => {
-  const parts = (fullAddr || "").split(",");
+  if (!fullAddr) return { street: "", house: "" };
+  
+  // Очищаем адрес от подъезда и квартиры
+  const cleanAddr = fullAddr
+    .replace(/,\s*(?:п(?:одъезд)?\.?\s*\d+).*$/i, "")
+    .replace(/,\s*(?:кв\.?\s*\d+).*$/i, "");
+    
+  const parts = cleanAddr.split(",");
   let parsedStreet = "";
   let parsedHouse = "";
   
   if (parts.length >= 3) {
     parsedStreet = parts[1].trim();
-    parsedHouse = parts[2].trim().replace(/^(д\.\s*|дом\s*)/i, "").trim();
+    // Соединяем все последующие части (дом, корпус) через запятую и очищаем от "д."
+    parsedHouse = parts.slice(2).join(", ").trim().replace(/^(д\.\s*|дом\s*)/i, "").trim();
   } else if (parts.length === 2) {
     parsedStreet = parts[0].trim();
     parsedHouse = parts[1].trim().replace(/^(д\.\s*|дом\s*)/i, "").trim();
@@ -109,7 +118,10 @@ const DebtCard = ({ address, apartment, fullName, phone, embedded = false, setPa
           if (dbParts.length < 3) return false;
 
           const dbStreetNorm = normalizeStreet(dbParts[1]);
-          const dbHouseNorm = normalizeHouse(dbParts[2]);
+          const dbHouseFull = dbParts.slice(2).join(", ")
+            .replace(/,\s*(?:п(?:одъезд)?\.?\s*\d+).*$/i, "")
+            .replace(/,\s*(?:кв\.?\s*\d+).*$/i, "");
+          const dbHouseNorm = normalizeHouse(dbHouseFull);
           const dbAptNorm = normalizeApartment(a.apartment || "");
 
           return dbStreetNorm === userStreetNorm && dbHouseNorm === userHouseNorm && dbAptNorm === userAptNorm;
@@ -890,7 +902,7 @@ const Cabinet = () => {
         .select("address, apartment")
         .ilike("address", `%${cleanStreetQuery}%`);
         
-      if (error) throw error;
+      if (error) error;
 
       if (data) {
         const userStreetNorm = normalizeStreet(street);
@@ -902,7 +914,10 @@ const Cabinet = () => {
           if (dbParts.length < 3) return false;
 
           const dbStreetNorm = normalizeStreet(dbParts[1]);
-          const dbHouseNorm = normalizeHouse(dbParts[2]);
+          const dbHouseFull = dbParts.slice(2).join(", ")
+            .replace(/,\s*(?:п(?:одъезд)?\.?\s*\d+).*$/i, "")
+            .replace(/,\s*(?:кв\.?\s*\d+).*$/i, "");
+          const dbHouseNorm = normalizeHouse(dbHouseFull);
 
           return dbStreetNorm === userStreetNorm && dbHouseNorm === userHouseNorm;
         });
@@ -924,333 +939,7 @@ const Cabinet = () => {
     }
   };
 
-  // --- ЛОГИКА РАСЧЕТА СТОИМОСТИ ЗАКАЗА ДЛЯ ШЛЮЗА БАНКА ---
-  const calculateTotals = () => {
-    let sum1 = 0; // Ключи (SUMMA_OPL1)
-    let sum2 = 0; // Установка и трубки (SUMMA_OPL2)
-    let sum3 = 0; // Личный кабинет (SUMMA_OPL3)
-
-    // Находим ключ
-    const keyProduct = products.find(p => p.name.toLowerCase().includes("ключ"));
-    if (keyProduct && keysQuantity > 0) {
-      sum1 = Number(keyProduct.price) * keysQuantity;
-    }
-
-    // Выбранная услуга (установка или замена трубки)
-    const selectedService = products.find(p => p.id === selectedServiceId);
-    if (selectedService) {
-      sum2 += Number(selectedService.price);
-    }
-
-    // Выбранные трубки (оборудование)
-    Object.entries(selectedEquipments).forEach(([id, qty]) => {
-      const prod = products.find(p => p.id === id);
-      if (prod && qty > 0) {
-        sum2 += Number(prod.price) * qty;
-      }
-    });
-
-    // Настройка личного кабинета (300 руб)
-    if (isCabinetSetupChecked) {
-      const cabinetProduct = products.find(p => p.name.toLowerCase().includes("кабинет"));
-      if (cabinetProduct) {
-        sum3 = Number(cabinetProduct.price);
-      } else {
-        sum3 = 300; // Резервное значение, если товара нет в БД
-      }
-    }
-
-    const total = sum1 + sum2 + sum3;
-
-    return { sum1, sum2, sum3, total };
-  };
-
-  // Эффект инициализации полей новой заявки при открытии диалогового окна
-  useEffect(() => {
-    if (isOrderDialogOpen) {
-      console.log("[Заявка] Инициализация контактных полей формы...");
-      setOrderPhone(phone || profile?.phone || "");
-      setOrderStreet(displayStreet || "");
-      setOrderHouse(displayHouse || "");
-      setOrderApartment(apartment || "");
-      setOrderName(fullName || profile?.full_name || "");
-      setOrderPremiseType(premiseType || "apartment");
-    }
-  }, [isOrderDialogOpen, phone, profile, displayStreet, displayHouse, apartment, fullName, premiseType]);
-
-  // --- ОТПРАВКА ЗАЯВКИ ИЛИ ЗАКАЗА В БД ---
-  const handleCreateOrderRequest = async () => {
-    // 1. Валидируем обязательные поля для связи (Телефон и Полный адрес)
-    if (!orderPhone || !orderPhone.trim()) {
-      toast({ 
-        title: "Не указан телефон для связи", 
-        description: "Пожалуйста, заполните номер телефона, чтобы наш мастер мог оперативно связаться с вами.",
-        variant: "destructive" 
-      });
-      return;
-    }
-
-    if (!orderStreet || !orderStreet.trim() || !orderHouse || !orderHouse.trim()) {
-      toast({ 
-        title: "Не указан адрес вызова", 
-        description: "Пожалуйста, обязательно заполните название улицы и номер дома.",
-        variant: "destructive" 
-      });
-      return;
-    }
-
-    if (orderPremiseType === "apartment" && (!orderApartment || !orderApartment.trim())) {
-      toast({ 
-        title: "Укажите номер квартиры/офиса", 
-        description: "Для многоквартирных домов и офисных помещений номер квартиры, офиса или кабинета является обязательным.",
-        variant: "destructive" 
-      });
-      return;
-    }
-
-    if (orderType === "repair" && !repairProblem.trim()) {
-      toast({ title: "Опишите проблему", variant: "destructive" });
-      return;
-    }
-
-    const totals = calculateTotals();
-    
-    if (orderType === "order" && totals.total === 0) {
-      toast({ title: "Выберите хотя бы одну платную услугу или оборудование", variant: "destructive" });
-      return;
-    }
-
-    setSaving(true);
-    console.log(`[Заказ] Создание обращения типа: "${orderType}"`);
-
-    try {
-      // 2. Формируем структурированное текстовое сообщение для FSM и Telegram-бота
-      let messageText = "";
-      if (orderType === "repair") {
-        messageText = `🔧 НЕИСПРАВНОСТЬ (БЕСПЛАТНО)\n— Описание проблемы: ${repairProblem.trim()}`;
-      } else {
-        messageText = `🛍️ ЗАКАЗ УСЛУГ И ОБОРУДОВАНИЯ\n`;
-        
-        const selectedService = products.find(p => p.id === selectedServiceId);
-        if (selectedService) {
-          messageText += `— Услуга: ${selectedService.name} (${Number(selectedService.price).toFixed(2)} ₽)\n`;
-        }
-        
-        let hasEquip = false;
-        Object.entries(selectedEquipments).forEach(([id, qty]) => {
-          const prod = products.find(p => p.id === id);
-          if (prod && qty > 0) {
-            messageText += `— Оборудование: ${prod.name} (${qty} шт. x ${Number(prod.price).toFixed(2)} ₽)\n`;
-            hasEquip = true;
-          }
-        });
-        
-        const keyProduct = products.find(p => p.name.toLowerCase().includes("ключ"));
-        if (keyProduct && keysQuantity > 0) {
-          messageText += `— Ключи: ${keyProduct.name} (${keysQuantity} шт. x ${Number(keyProduct.price).toFixed(2)} ₽ = ${totals.sum1.toFixed(2)} ₽)\n`;
-        }
-        
-        if (isCabinetSetupChecked) {
-          messageText += `— Сервис: Настройка личного кабинета (300.00 ₽)\n`;
-        }
-        
-        messageText += `💵 Итоговая сумма заказа: ${totals.total.toFixed(2)} ₽\n`;
-        if (orderComment.trim()) {
-          messageText += `\n💬 Комментарий клиента: ${orderComment.trim()}`;
-        }
-      }
-
-      // Составляем полный адрес для заявки
-      const cleanOrderStreet = orderStreet.trim();
-      const cleanOrderHouse = orderHouse.trim();
-      const cleanOrderApartment = orderPremiseType === "private" ? "" : orderApartment.trim();
-      
-      const orderFullAddress = `г. Краснодар, ${cleanOrderStreet}, д. ${cleanOrderHouse}${
-        cleanOrderApartment ? `, кв. ${cleanOrderApartment}` : ""
-      }`;
-
-      console.log(`[Заказ] Запись в БД по адресу: "${orderFullAddress}", телефон: "${orderPhone}"`);
-
-      // 3. Вставляем запись в таблицу requests с параметрами оплаты
-      const isPaidOrder = orderType === "order";
-      const { data: requestData, error: requestError } = await supabase
-        .from("requests")
-        .insert({
-          name: orderName.trim() || "Абонент ЛК",
-          phone: orderPhone.trim(),
-          address: orderFullAddress,
-          message: messageText,
-          status: "pending",
-          priority: orderType === "repair" ? "medium" : "low",
-          payment_status: isPaidOrder ? "pending" : null,
-          payment_amount: isPaidOrder ? totals.total : 0,
-          payment_method: isPaidOrder ? "online" : null,
-        })
-        .select("id")
-        .single();
-
-      if (requestError) throw requestError;
-
-      console.log(`[Заказ] Успешно создано обращение с ID: ${requestData.id}`);
-
-      // 3. Если это платный заказ, вставляем позиции в request_items для детального учета товаров
-      if (orderType === "order" && requestData?.id) {
-        const itemsToInsert: any[] = [];
-        
-        // Вставка выбранной услуги
-        if (selectedServiceId) {
-          const prod = products.find(p => p.id === selectedServiceId);
-          if (prod) {
-            itemsToInsert.push({
-              request_id: requestData.id,
-              product_id: selectedServiceId,
-              quantity: 1,
-              price: Number(prod.price),
-            });
-          }
-        }
-        
-        // Вставка выбранного оборудования (трубок)
-        Object.entries(selectedEquipments).forEach(([id, qty]) => {
-          const prod = products.find(p => p.id === id);
-          if (prod && qty > 0) {
-            itemsToInsert.push({
-              request_id: requestData.id,
-              product_id: id,
-              quantity: qty,
-              price: Number(prod.price),
-            });
-          }
-        });
-        
-        // Вставка выбранных ключей
-        if (keysQuantity > 0) {
-          const keyProduct = products.find(p => p.name.toLowerCase().includes("ключ"));
-          if (keyProduct) {
-            itemsToInsert.push({
-              request_id: requestData.id,
-              product_id: keyProduct.id,
-              quantity: keysQuantity,
-              price: Number(keyProduct.price),
-            });
-          }
-        }
-        
-        // Вставка настройки личного кабинета
-        if (isCabinetSetupChecked) {
-          const cabinetProduct = products.find(p => p.name.toLowerCase().includes("кабинет"));
-          if (cabinetProduct) {
-            itemsToInsert.push({
-              request_id: requestData.id,
-              product_id: cabinetProduct.id,
-              quantity: 1,
-              price: Number(cabinetProduct.price),
-            });
-          }
-        }
-        
-        if (itemsToInsert.length > 0) {
-          console.log(`[Заказ] Запись позиций заказа (всего: ${itemsToInsert.length} шт.) в request_items...`);
-          const { error: itemsError } = await supabase
-            .from("request_items")
-            .insert(itemsToInsert);
-          
-          if (itemsError) throw itemsError;
-        }
-      }
-
-      // 4. Отправляем уведомление в Telegram-бота
-      try {
-        await supabase.functions.invoke("notify", {
-          body: {
-            event: "request_created",
-            data: { name: fullName, phone, address: fullAddress, message: messageText },
-          },
-        });
-      } catch (e) {
-        console.error("[Заказ] Ошибка отправки уведомления в Telegram:", e);
-      }
-
-      // 5. Обрабатываем успешное завершение
-      if (refetchUserRequests) {
-        refetchUserRequests();
-      }
-      
-      if (orderType === "repair") {
-        toast({
-          title: "Заявка отправлена",
-          description: "Наши мастера свяжутся с вами в ближайшее время.",
-        });
-        setIsOrderDialogOpen(false);
-        setRepairProblem("");
-      } else {
-        // Для платного заказа закрываем форму оформления и открываем окно оплаты банка
-        setIsOrderDialogOpen(false);
-        setLastCreatedRequestId(requestData.id);
-        setLastOrderTotals(totals);
-        setIsSuccessPaymentOpen(true);
-        
-        // Сбрасываем выбранные стейты заказа
-        setSelectedServiceId(null);
-        setSelectedEquipments({});
-        setKeysQuantity(0);
-        setIsCabinetSetupChecked(false);
-        setOrderComment("");
-      }
-    } catch (err: any) {
-      console.error("[Заказ] Ошибка создания заказа:", err);
-      toast({
-        title: "Не удалось создать заявку",
-        description: err.message,
-        variant: "destructive",
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handlePayLaterOnSite = async () => {
-    if (!lastCreatedRequestId) return;
-    
-    setSaving(true);
-    console.log(`[Оплата] Перевод заявки ${lastCreatedRequestId} на оплату на месте`);
-    try {
-      const { error } = await supabase
-        .from("requests")
-        .update({
-          payment_method: "cash",
-          payment_status: "on_site"
-        })
-        .eq("id", lastCreatedRequestId);
-        
-      if (error) throw error;
-      
-      toast({
-        title: "Заказ оформлен!",
-        description: "Выбран способ оплаты на месте. Наряд передан в службу FSM.",
-        variant: "default"
-      });
-      
-      if (refetchUserRequests) {
-        refetchUserRequests();
-      }
-      setIsSuccessPaymentOpen(false);
-    } catch (err: any) {
-      console.error("[Оплата] Ошибка перевода на оплату на месте:", err);
-      toast({
-        title: "Ошибка",
-        description: "Не удалось изменить способ оплаты.",
-        variant: "destructive"
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const { toast } = useToast();
-  const hasAdminConsoleAccess = userRoles.some((role) => ["admin", "director"].includes(role));
-  const isLocked = !!profile?.is_verified && !editing;
-
+  // Эффект плавного появления элементов
   useEffect(() => {
     if (!loading) {
       // Анимация заголовка (0.5 сек)
