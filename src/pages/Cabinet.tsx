@@ -30,6 +30,42 @@ interface Task {
   clients: { name: string; address: string } | null;
 }
 
+const normalizeStreet = (s: string) => 
+  (s || "").toLowerCase()
+    .replace(/^(г\.|город|пос\.|поселок)\s*[^,]+,\s*/i, "") // убираем город в начале если есть
+    .replace(/(?:\(ул\)?|ул\.?|улица)\s*/gi, "") // убираем обозначения улицы
+    .replace(/[^а-яa-z0-9]/g, "") // оставляем только буквы и цифры
+    .trim();
+
+const normalizeHouse = (h: string) => 
+  (h || "").toLowerCase()
+    .replace(/^(д\.\s*|дом\s*)/i, "") // убираем "д." или "дом"
+    .replace(/[^а-яa-z0-9]/g, "") // оставляем только буквы и цифры
+    .trim();
+
+const normalizeApartment = (a: string) => 
+  (a || "").toLowerCase()
+    .replace(/^(кв\.\s*|квартира\s*)/i, "")
+    .replace(/[^а-яa-z0-9]/g, "")
+    .trim();
+
+const parseAddressParts = (fullAddr: string) => {
+  const parts = (fullAddr || "").split(",");
+  let parsedStreet = "";
+  let parsedHouse = "";
+  
+  if (parts.length >= 3) {
+    parsedStreet = parts[1].trim();
+    parsedHouse = parts[2].trim().replace(/^(д\.\s*|дом\s*)/i, "").trim();
+  } else if (parts.length === 2) {
+    parsedStreet = parts[0].trim();
+    parsedHouse = parts[1].trim().replace(/^(д\.\s*|дом\s*)/i, "").trim();
+  } else {
+    parsedStreet = fullAddr || "";
+  }
+  return { street: parsedStreet, house: parsedHouse };
+};
+
 const DebtCard = ({ address, apartment, fullName, phone, embedded = false, setParentAccount }: { address: string; apartment: string; fullName: string; phone: string; embedded?: boolean; setParentAccount?: (acc: any) => void }) => {
   const [account, setAccount] = useState<{ account_number: string; period: string; debt_amount: number; address: string } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -42,35 +78,49 @@ const DebtCard = ({ address, apartment, fullName, phone, embedded = false, setPa
   useEffect(() => {
     const loadDebt = async () => {
       setLoading(true);
-      console.log(`[Баланс] Поиск лицевого счета для дома: "${address}", квартира: "${apartment}"`); // Логирование
+      const { street, house } = parseAddressParts(address);
+      const cleanStreetQuery = street.replace(/(?:\(ул\)?|ул\.?|улица)\s*/gi, "").trim();
       
-      // Ищем лицевые счета по началу адреса дома
+      console.log(`[Баланс] Поиск счета. Улица: "${street}" (${cleanStreetQuery}), Дом: "${house}", Кв: "${apartment}"`); // Логирование
+      
+      // Ищем лицевые счета по названию улицы
       let query = supabase
         .from("accounts")
         .select("account_number, period, debt_amount, address, apartment")
-        .ilike("address", `${address}%`); // Ищем точное соответствие дома
+        .ilike("address", `%${cleanStreetQuery}%`);
         
-      const { data } = await query.order("period", { ascending: false }).limit(200);
+      const { data, error } = await query.order("period", { ascending: false }).limit(300);
 
-      // Фильтруем результаты, находя точное совпадение по номеру квартиры
+      if (error) {
+        console.error("[Баланс] Ошибка запроса лицевых счетов из БД:", error);
+      }
+
+      // Фильтруем результаты на фронтенде со 100% точностью по нормализованным частям адреса
       let best = null;
-      if (data && data.length > 0 && apartment) {
-        const aptDigits = (apartment.match(/\d+/) || [])[0];
-        if (aptDigits) {
-          const filtered = data.filter((a: any) => {
-            if (a.apartment && String(a.apartment) === aptDigits) return true;
-            const addr = (a.address || "").toLowerCase();
-            return new RegExp(`кв\\.?\\s*${aptDigits}\\b`, "i").test(addr);
-          });
-          if (filtered.length > 0) {
-            best = filtered[0];
-            console.log(`[Баланс] Лицевой счет найден: ${best.account_number}, сумма: ${best.debt_amount} ₽`); // Логирование
-          } else {
-            console.log(`[Баланс] Адрес совпал, но квартира ${apartment} не найдена в базе`); // Логирование
-          }
+      if (data && data.length > 0) {
+        const userStreetNorm = normalizeStreet(street);
+        const userHouseNorm = normalizeHouse(house);
+        const userAptNorm = normalizeApartment(apartment);
+
+        console.log(`[Баланс] Из БД получено записей: ${data.length} для улицы "${cleanStreetQuery}". Точный подбор...`);
+        
+        const filtered = data.filter((a: any) => {
+          const dbParts = (a.address || "").split(",");
+          if (dbParts.length < 3) return false;
+
+          const dbStreetNorm = normalizeStreet(dbParts[1]);
+          const dbHouseNorm = normalizeHouse(dbParts[2]);
+          const dbAptNorm = normalizeApartment(a.apartment || "");
+
+          return dbStreetNorm === userStreetNorm && dbHouseNorm === userHouseNorm && dbAptNorm === userAptNorm;
+        });
+
+        if (filtered.length > 0) {
+          best = filtered[0];
+          console.log(`[Баланс] Лицевой счет найден: ${best.account_number}, сумма: ${best.debt_amount} ₽`); // Логирование
+        } else {
+          console.log(`[Баланс] Адрес совпал по улице и дому, но квартира ${apartment} не найдена в обслуживаемых лицевых счетах`); // Логирование
         }
-      } else if (data && data.length > 0) {
-        best = data[0];
       }
       setAccount(best);
       if (setParentAccount) {
@@ -826,21 +876,39 @@ const Cabinet = () => {
     }
   };
 
-  // Функция для загрузки доступных квартир по выбранному адресу дома
+    // Функция для загрузки доступных квартир по выбранному адресу дома
   const fetchApartmentSuggestions = async (selectedAddr: string) => {
     if (!selectedAddr) return;
-    console.log(`[Квартира] Загрузка списка квартир для дома: "${selectedAddr}"`); // Логирование
+    const { street, house } = parseAddressParts(selectedAddr);
+    const cleanStreetQuery = street.replace(/(?:\(ул\)?|ул\.?|улица)\s*/gi, "").trim();
+    
+    console.log(`[Квартира] Загрузка квартир. Улица: "${street}" (${cleanStreetQuery}), Дом: "${house}"`); // Логирование
     try {
+      // Ищем все лицевые счета по корню названия улицы
       const { data, error } = await supabase
         .from("accounts")
-        .select("apartment")
-        .ilike("address", `${selectedAddr}%`); // Ищем точное совпадение по префиксу адреса
+        .select("address, apartment")
+        .ilike("address", `%${cleanStreetQuery}%`);
         
       if (error) throw error;
 
       if (data) {
+        const userStreetNorm = normalizeStreet(street);
+        const userHouseNorm = normalizeHouse(house);
+
+        // Точно фильтруем только те квартиры, у которых совпадают нормализованные улица и дом
+        const filtered = data.filter((a: any) => {
+          const dbParts = (a.address || "").split(",");
+          if (dbParts.length < 3) return false;
+
+          const dbStreetNorm = normalizeStreet(dbParts[1]);
+          const dbHouseNorm = normalizeHouse(dbParts[2]);
+
+          return dbStreetNorm === userStreetNorm && dbHouseNorm === userHouseNorm;
+        });
+
         // Извлекаем уникальные номера квартир и сортируем их по возрастанию
-        const apts = data
+        const apts = filtered
           .map((item: any) => String(item.apartment || "").trim())
           .filter(Boolean);
         const uniqueApts = Array.from(new Set(apts)).sort((a, b) => {
@@ -849,7 +917,7 @@ const Cabinet = () => {
           return numA - numB;
         });
         setApartmentSuggestions(uniqueApts);
-        console.log(`[Квартира] Загружено уникальных квартир: ${uniqueApts.length}`); // Логирование
+        console.log(`[Квартира] Загружено уникальных квартир для дома: ${uniqueApts.length}`); // Логирование
       }
     } catch (err) {
       console.error("[Квартира] Ошибка загрузки квартир:", err);
@@ -1557,13 +1625,49 @@ const Cabinet = () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
+      
+      // Сохраняем текущую почту пользователя из сессии входа!
+      const userEmail = session.user.email || "";
+      console.log(`[Сброс данных] Очистка данных профиля, email сохраняется: ${userEmail}`); // Логирование
+      
       const { error } = await supabase
         .from("profiles")
-        .update({ full_name: "", phone: "", address: "", apartment: "", floor: "", email: "", email_verified: false, is_verified: false })
+        .update({ 
+          full_name: "", 
+          phone: "", 
+          address: "", 
+          apartment: "", 
+          floor: "", 
+          email: userEmail, // Записываем email из сессии обратно
+          email_verified: true, // Он остается верифицированным
+          is_verified: false 
+        })
         .eq("id", session.user.id);
+        
       if (error) throw error;
-      setProfile((prev: any) => prev ? { ...prev, full_name: "", phone: "", address: "", apartment: "", floor: "", email: "", email_verified: false, is_verified: false } : prev);
-      setFullName(""); setPhone(""); setAddress(""); setDisplayAddress(""); setSelectedStreet(null); setApartment(""); setFloor(""); setEmail(""); setEmailVerified(false);
+      
+      setProfile((prev: any) => prev ? { 
+        ...prev, 
+        full_name: "", 
+        phone: "", 
+        address: "", 
+        apartment: "", 
+        floor: "", 
+        email: userEmail, 
+        email_verified: true, 
+        is_verified: false 
+      } : prev);
+      
+      setFullName(""); 
+      setPhone(""); 
+      setAddress(""); 
+      setDisplayAddress(""); 
+      setSelectedStreet(null); 
+      setApartment(""); 
+      setFloor(""); 
+      setEmail(userEmail); 
+      setEmailInput(userEmail); // Сохраняем в стейте ввода почты
+      setEmailVerified(true);
       setEditing(false);
       toast({ title: "Данные удалены", description: "Заполните форму заново для верификации" });
     } catch (e: any) {
