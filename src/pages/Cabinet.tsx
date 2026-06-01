@@ -403,6 +403,8 @@ const Cabinet = () => {
   const [email, setEmail] = useState("");
   const [emailInput, setEmailInput] = useState("");
   const [emailVerified, setEmailVerified] = useState(false);
+  const [runtimeError, setRuntimeError] = useState<string | null>(null);
+
   
   const { toast } = useToast();
   const hasAdminConsoleAccess = userRoles.some((role) => ["admin", "director"].includes(role));
@@ -1064,7 +1066,22 @@ const Cabinet = () => {
       };
       confirmPayment();
     }
-  }, []); // Проверяем URL-параметры оплаты только при первом рендере кабинета
+  }, []);
+
+  useEffect(() => {
+    const handleError = (event: ErrorEvent) => {
+      setRuntimeError(event.message + " in " + event.filename + ":" + event.lineno);
+    };
+    const handleRejection = (event: PromiseRejectionEvent) => {
+      setRuntimeError("Promise Rejection: " + String(event.reason));
+    };
+    window.addEventListener("error", handleError);
+    window.addEventListener("unhandledrejection", handleRejection);
+    return () => {
+      window.removeEventListener("error", handleError);
+      window.removeEventListener("unhandledrejection", handleRejection);
+    };
+  }, []);
 
   const checkUser = async () => {
     try {
@@ -1829,6 +1846,21 @@ const Cabinet = () => {
     };
     return <Badge className={styles[priority]} variant="secondary">{labels[priority]}</Badge>;
   };
+
+  if (runtimeError) {
+    return (
+      <div className="min-h-screen bg-slate-900 text-white p-8 flex flex-col items-center justify-center text-center">
+        <h1 className="text-2xl font-bold text-red-500 mb-4 font-display">⚠️ Обнаружена рантайм-ошибка ЛК</h1>
+        <p className="text-sm text-slate-400 max-w-md mb-6">Пожалуйста, скопируйте текст ошибки ниже и передайте его разработчику для мгновенного исправления.</p>
+        <pre className="bg-slate-950 p-4 rounded-xl text-xs max-w-xl overflow-auto border border-red-900/50 text-red-400 font-mono text-left">
+          {runtimeError}
+        </pre>
+        <Button onClick={() => window.location.reload()} className="mt-6 btn-premium-gold hover:shadow-gold-glow">
+          Перезагрузить кабинет
+        </Button>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
