@@ -405,11 +405,6 @@ const Cabinet = () => {
   const [emailVerified, setEmailVerified] = useState(false);
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
 
-  
-  const { toast } = useToast();
-  const hasAdminConsoleAccess = userRoles.some((role) => ["admin", "director"].includes(role));
-  const isLocked = !!profile?.is_verified && !editing;
-
   // --- НОВЫЕ СТЕЙТЫ: ТИП ПОМЕЩЕНИЯ, СОГЛАСИЕ ФЗ-152, ДИАЛОГ ВАЛИДАЦИИ И DaData ---
   const [premiseType, setPremiseType] = useState<"apartment" | "private">("apartment"); // Тип недвижимости: apartment (кв./офис) vs private (частный дом)
   const [agreedToTerms, setAgreedToTerms] = useState(true); // Согласие по ФЗ-152 РФ (по умолчанию включено)
@@ -448,6 +443,11 @@ const Cabinet = () => {
     content: false
   });
   const navigate = useNavigate();
+
+  // Глобальные переменные и утилиты, вынесенные ниже объявлений всех стейтов для предотвращения ReferenceError (temporal dead zone)
+  const { toast } = useToast();
+  const hasAdminConsoleAccess = userRoles.some((role) => ["admin", "director"].includes(role));
+  const isLocked = !!profile?.is_verified && !editing;
 
   // --- СТЕЙТЫ ДЛЯ ФОРМЫ ЗАКАЗА УСЛУГ И ОБОРУДОВАНИЯ ---
   const [products, setProducts] = useState<any[]>([]); // Все товары и услуги из БД
