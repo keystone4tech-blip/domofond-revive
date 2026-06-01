@@ -1085,33 +1085,56 @@ const Cabinet = () => {
 
   const checkUser = async () => {
     try {
+      // Получаем текущую сессию пользователя из Supabase
       const { data: { session } } = await supabase.auth.getSession();
 
+      // Если сессия отсутствует (токен недействителен, истек или отсутствует в БД)
       if (!session) {
+        console.warn("[Cabinet Auth] Сессия отсутствует или недействительна! Очищаем локальные токены и перенаправляем на /auth для прерывания бесконечного цикла...");
+        
+        // Принудительно очищаем localStorage, чтобы страница /auth не пыталась сразу же редиректить обратно
+        localStorage.removeItem("auth_token");
+        localStorage.removeItem("user");
+        
+        // Перенаправляем пользователя на страницу авторизации
         navigate("/auth");
         return;
       }
 
+      console.log(`[Cabinet Auth] Сессия успешно подтверждена для пользователя: ${session.user.id}`);
       setUserId(session.user.id);
 
-      // Получаем роли пользователя
-      const { data: rolesData } = await supabase
+      // Получаем роли пользователя из таблицы user_roles
+      console.log("[Cabinet Auth] Запрос ролей пользователя...");
+      const { data: rolesData, error: rolesError } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", session.user.id);
 
-      if (rolesData) {
-        setUserRoles(rolesData.map(r => r.role));
+      if (rolesError) {
+        console.error("[Cabinet Auth] Ошибка при получении ролей пользователя:", rolesError);
       }
 
+      if (rolesData) {
+        const roles = rolesData.map(r => r.role);
+        console.log(`[Cabinet Auth] Роли пользователя успешно загружены: ${JSON.stringify(roles)}`);
+        setUserRoles(roles);
+      }
+
+      // Загружаем профиль пользователя из таблицы profiles
+      console.log("[Cabinet Auth] Загрузка профиля пользователя...");
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", session.user.id)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error("[Cabinet Auth] Не удалось загрузить профиль пользователя из БД:", error);
+        throw error;
+      }
 
+      console.log("[Cabinet Auth] Профиль пользователя успешно загружен, инициализируем стейты...");
       setProfile(data);
       setFullName(data.full_name || ""); // Инициализируем ФИО абонента
       setPhone(data.phone || ""); // Инициализируем контактный телефон
@@ -1125,10 +1148,13 @@ const Cabinet = () => {
       // Динамически определяем тип недвижимости при первоначальной загрузке
       if (data.apartment && data.apartment.trim()) {
         setPremiseType("apartment");
+        console.log("[Cabinet Auth] Тип помещения определен как: Квартира");
       } else if (data.address && data.address.includes(", д. ")) {
         setPremiseType("private");
+        console.log("[Cabinet Auth] Тип помещения определен как: Частный дом");
       } else {
         setPremiseType("apartment"); // По умолчанию многоквартирный
+        console.log("[Cabinet Auth] Тип помещения определен по умолчанию: Квартира");
       }
       
       setFloor(data.floor || ""); // Инициализируем этаж
@@ -1138,8 +1164,13 @@ const Cabinet = () => {
       setEmail(defaultEmail);
       setEmailInput(defaultEmail);
       setEmailVerified(!!data.email_verified || !!session.user.email);
+      console.log(`[Cabinet Auth] Почта инициализирована: "${defaultEmail}" (верифицирована: ${!!data.email_verified || !!session.user.email})`);
     } catch (error: any) {
-      console.error("Error loading profile:", error);
+      console.error("[Cabinet Auth] Критическая ошибка при инициализации пользователя в кабинете:", error);
+    } finally {
+      // Гарантируем отключение экрана загрузки (Loader2) и отображение интерфейса ЛК
+      console.log("[Cabinet Auth] Инициализация завершена, выключаем экран загрузки...");
+      setLoading(false);
     }
   };
 
