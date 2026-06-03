@@ -47,6 +47,7 @@ services:
   postgrest:
     image: postgrest/postgrest:latest
     container_name: domofond_postgrest
+    restart: always
     ports:
       - "3000:3000"
     environment:
