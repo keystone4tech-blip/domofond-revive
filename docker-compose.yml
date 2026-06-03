@@ -41,6 +41,7 @@ services:
       - VITE_API_URL=http://localhost:5000
     depends_on:
       - backend
+      - postgrest
     # Убраны volumes, Nginx раздает собранную статику
 
   postgrest:
