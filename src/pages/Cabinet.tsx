@@ -32,6 +32,7 @@ interface Task {
 
 const normalizeStreet = (s: string) => 
   (s || "").toLowerCase()
+    .trim()
     .replace(/^(г\.|город|пос\.|поселок)\s*[^,]+,\s*/i, "") // убираем город в начале если есть
     .replace(/(?:\(ул\)?|ул\.?|улица)\s*/gi, "") // убираем обозначения улицы
     .replace(/[^а-яa-z0-9]/g, "") // оставляем только буквы и цифры
@@ -39,6 +40,7 @@ const normalizeStreet = (s: string) =>
 
 const normalizeHouse = (h: string) => 
   (h || "").toLowerCase()
+    .trim()
     .replace(/^(д\.\s*|дом\s*)/i, "") // убираем "д." или "дом"
     .replace(/(?:корп\.?|корпус)\s*/gi, "к") // унифицируем корпуса
     .replace(/[^а-яa-z0-9]/g, "") // оставляем только буквы и цифры
@@ -46,6 +48,7 @@ const normalizeHouse = (h: string) =>
 
 const normalizeApartment = (a: string) => 
   (a || "").toLowerCase()
+    .trim()
     .replace(/^(кв\.\s*|квартира\s*)/i, "")
     .replace(/[^а-яa-z0-9]/g, "")
     .trim();
