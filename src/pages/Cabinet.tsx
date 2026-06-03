@@ -767,26 +767,26 @@ const Cabinet = () => {
     const houseList: any[] = [];
 
     // 1. Сначала ищем подключенные дома в локальной кэш-базе unique_houses
-    if (streetObj.isLocal) {
-      const localHouses = allHouses
-        .filter((h) => {
-          const parts = h.split(",");
-          const streetPart = parts[1] ? parts[1].trim() : "";
-          return streetPart.toLowerCase() === streetObj.streetName.toLowerCase();
-        })
-        .map((h) => {
-          // Извлекаем полную часть дома (включая корпуса, буквы, дроби)
-          // Пример: "Краснодар, Корнилова (ул), д. 9, корп. 2" → "9, корп. 2"
-          return {
-            houseNumber: extractHousePartFromCacheAddr(h),
-            isLocal: true
-          };
-        })
-        .filter(h => h.houseNumber);
-      
-      houseList.push(...localHouses);
-      console.log(`[Автокомплит Домов] Найдено подключенных домов в локальной БД: ${localHouses.length}`);
-    }
+    // Ищем их всегда для любой выбранной улицы (даже если из DaData пришел статус isLocal = false),
+    // используя сравнение нормализованных названий улиц через normalizeStreet
+    const localHouses = allHouses
+      .filter((h) => {
+        const parts = h.split(",");
+        const streetPart = parts[1] ? parts[1].trim() : "";
+        return normalizeStreet(streetPart) === normalizeStreet(streetObj.streetName);
+      })
+      .map((h) => {
+        // Извлекаем полную часть дома (включая корпуса, буквы, дроби)
+        // Пример: "Краснодар, Корнилова (ул), д. 9, korp. 2" → "9, корп. 2"
+        return {
+          houseNumber: extractHousePartFromCacheAddr(h),
+          isLocal: true
+        };
+      })
+      .filter(h => h.houseNumber);
+    
+    houseList.push(...localHouses);
+    console.log(`[Автокомплит Домов] Найдено подключенных домов в локальной БД: ${localHouses.length}`);
 
     // 2. Подгружаем все реально существующие дома на этой улице через API DaData
     try {
@@ -811,11 +811,14 @@ const Cabinet = () => {
       console.error("[Автокомплит Домов: DaData] Сбой загрузки домов:", e);
     }
 
-    // Сортируем дома (по числовому значению, чтобы шел ряд: 1, 2, 3, 10...)
+    // Сортируем дома: сначала на обслуживании (isLocal), затем по возрастанию номеров и корпусов
     const sortedHouses = houseList.sort((a, b) => {
+      if (a.isLocal && !b.isLocal) return -1;
+      if (!a.isLocal && b.isLocal) return 1;
       const numA = parseInt(a.houseNumber.replace(/\D/g, "")) || 0;
       const numB = parseInt(b.houseNumber.replace(/\D/g, "")) || 0;
-      return numA - numB;
+      if (numA !== numB) return numA - numB;
+      return a.houseNumber.localeCompare(b.houseNumber, undefined, { numeric: true, sensitivity: 'base' });
     });
 
     setHouseSuggestions(sortedHouses);
@@ -835,12 +838,12 @@ const Cabinet = () => {
     }
 
     // Фильтруем дома для выбранной улицы по введенному значению
-    // 1. Поиск по локально кэшированным
+    // 1. Поиск по локально кэшированным (сопоставляем по нормализованному значению улицы)
     const matchingLocal = allHouses
       .filter((h) => {
         const parts = h.split(",");
         const streetPart = parts[1] ? parts[1].trim() : "";
-        return streetPart.toLowerCase() === selectedStreet.toLowerCase();
+        return normalizeStreet(streetPart) === normalizeStreet(selectedStreet);
       })
       .map((h) => {
         // Извлекаем полную часть дома (включая корпуса, буквы, дроби)
@@ -870,11 +873,14 @@ const Cabinet = () => {
       console.error("[Автокомплит Домов: DaData] Сбой фильтрации:", e);
     }
 
-    // Сортируем
+    // Сортируем дома: сначала на обслуживании (isLocal), затем по возрастанию номеров и корпусов
     const sorted = filteredSuggestions.sort((a, b) => {
+      if (a.isLocal && !b.isLocal) return -1;
+      if (!a.isLocal && b.isLocal) return 1;
       const numA = parseInt(a.houseNumber.replace(/\D/g, "")) || 0;
       const numB = parseInt(b.houseNumber.replace(/\D/g, "")) || 0;
-      return numA - numB;
+      if (numA !== numB) return numA - numB;
+      return a.houseNumber.localeCompare(b.houseNumber, undefined, { numeric: true, sensitivity: 'base' });
     });
 
     setHouseSuggestions(sorted);
