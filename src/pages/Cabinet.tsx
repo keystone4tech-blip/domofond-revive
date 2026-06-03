@@ -50,6 +50,20 @@ const normalizeApartment = (a: string) =>
     .replace(/[^а-яa-z0-9]/g, "")
     .trim();
 
+// Утилита для извлечения полной части дома (номер + корпус) из адреса вьюхи unique_houses
+// Формат: "Город, Улица, д. 9, корп. 2" → "9, корп. 2"
+// Формат: "Город, Улица, д. 6а" → "6а"
+// Формат: "Город, Улица, д. 19 к2" → "19 к2"
+const extractHousePartFromCacheAddr = (cacheAddr: string): string => {
+  const parts = cacheAddr.split(",");
+  if (parts.length < 3) return "";
+  // Берём ВСЕ части начиная с 3-й (индекс 2) и объединяем обратно через запятую
+  // Это захватывает: "д. 31/1", "корп. 1" → "д. 31/1, корп. 1" → после очистки "31/1, корп. 1"
+  const fullHousePart = parts.slice(2).join(",").trim();
+  // Убираем приставку "д." или "дом" только из начала
+  return fullHousePart.replace(/^(д\.\s*|дом\s*)/i, "").trim();
+};
+
 const parseAddressParts = (fullAddr: string) => {
   if (!fullAddr) return { street: "", house: "" };
   
@@ -578,7 +592,7 @@ const Cabinet = () => {
   };
 
   // Вспомогательная функция для парсинга полного адреса при загрузке профиля
-  // Формат в БД: "г. Краснодар, Улица, д. Дом"
+  // Формат в БД: "г. Краснодар, Улица, д. Дом" или "Город, Улица, д. 9, корп. 2"
   const parseAndSetAddress = (fullAddr: string) => {
     if (!fullAddr) {
       console.log("[Адрес] Пустой адрес в профиле, сброс полей");
@@ -591,7 +605,9 @@ const Cabinet = () => {
     const parts = fullAddr.split(",");
     if (parts.length >= 3) {
       const streetPart = parts[1].trim();
-      const housePart = parts[2].trim().replace(/^(д\.\s*|дом\s*)/i, ""); // Очищаем от приставки "д."
+      // Используем extractHousePartFromCacheAddr для корректного извлечения полной части дома
+      // включая корпуса, буквы и дроби (д. 9, корп. 2 → "9, корп. 2")
+      const housePart = extractHousePartFromCacheAddr(fullAddr);
       
       setDisplayStreet(streetPart);
       setDisplayHouse(housePart);
@@ -756,9 +772,10 @@ const Cabinet = () => {
           return streetPart.toLowerCase() === streetObj.streetName.toLowerCase();
         })
         .map((h) => {
-          const parts = h.split(",");
+          // Извлекаем полную часть дома (включая корпуса, буквы, дроби)
+          // Пример: "Краснодар, Корнилова (ул), д. 9, корп. 2" → "9, корп. 2"
           return {
-            houseNumber: parts[2] ? parts[2].trim().replace(/^(д\.\s*|дом\s*)/i, "") : "",
+            houseNumber: extractHousePartFromCacheAddr(h),
             isLocal: true
           };
         })
@@ -823,9 +840,9 @@ const Cabinet = () => {
         return streetPart.toLowerCase() === selectedStreet.toLowerCase();
       })
       .map((h) => {
-        const parts = h.split(",");
+        // Извлекаем полную часть дома (включая корпуса, буквы, дроби)
         return {
-          houseNumber: parts[2] ? parts[2].trim().replace(/^(д\.\s*|дом\s*)/i, "") : "",
+          houseNumber: extractHousePartFromCacheAddr(h),
           isLocal: true
         };
       })
@@ -873,8 +890,10 @@ const Cabinet = () => {
       const fullAddr = allHouses.find((h) => {
         const parts = h.split(",");
         const streetPart = parts[1] ? parts[1].trim() : "";
-        const housePart = parts[2] ? parts[2].trim().replace(/^(д\.\s*|дом\s*)/i, "") : "";
-        return streetPart.toLowerCase() === selectedStreet.toLowerCase() && housePart.toLowerCase() === houseObj.houseNumber.toLowerCase();
+        // Извлекаем полную часть дома для точного сопоставления (включая корпуса)
+        const housePart = extractHousePartFromCacheAddr(h);
+        // Сравниваем с использованием normalizeHouse для нечувствительности к формату
+        return streetPart.toLowerCase() === selectedStreet.toLowerCase() && normalizeHouse(housePart) === normalizeHouse(houseObj.houseNumber);
       });
 
       if (fullAddr) {
