@@ -172,11 +172,21 @@ export default function Calculator() {
   };
 
   const handleNumericChange = (field: NumericFieldKey) => (event: ChangeEvent<HTMLInputElement>) => {
-    setNumericValues((current) => ({
-      ...current,
-      [field]: sanitizeNumericInput(event.target.value),
-    }));
+    const val = sanitizeNumericInput(event.target.value);
+    setNumericValues((current) => {
+      const updated = {
+        ...current,
+        [field]: val,
+      };
+      if (field === "entrances") {
+        updated.smartIntercoms = val;
+      }
+      return updated;
+    });
     clearFieldError(field);
+    if (field === "entrances") {
+      clearFieldError("smartIntercoms");
+    }
   };
 
   const validateForm = () => {
@@ -482,12 +492,27 @@ export default function Calculator() {
                         Введите контакты и отправьте параметры на сервер для мгновенной калькуляции.
                       </p>
 
+                      <Button 
+                        size="lg" 
+                        className="w-full btn-premium-gold hover:shadow-gold-glow font-bold h-11 text-sm"
+                        onClick={() => {
+                          const hasEntrances = !!numericValues.entrances.trim();
+                          const hasApartments = !!numericValues.totalApartments.trim();
+                          if (!hasEntrances || !hasApartments) {
+                            toast({
+                              title: "Параметры дома не заполнены",
+                              description: "Пожалуйста, обязательно укажите количество подъездов и квартир в доме перед расчетом.",
+                              variant: "destructive"
+                            });
+                            return;
+                          }
+                          setIsDialogOpen(true);
+                        }}
+                      >
+                        Узнать стоимость
+                      </Button>
+
                       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                        <DialogTrigger asChild>
-                          <Button size="lg" className="w-full btn-premium-gold hover:shadow-gold-glow font-bold h-11 text-sm">
-                            Узнать стоимость
-                          </Button>
-                        </DialogTrigger>
                         <DialogContent className="sm:max-w-md glass-premium border-none rounded-[24px] shadow-2xl p-6 text-left animate-in fade-in duration-200">
                           <DialogHeader className="border-b border-slate-100 dark:border-slate-800 pb-3">
                             <DialogTitle className="text-lg font-bold text-foreground font-display flex items-center gap-2">
