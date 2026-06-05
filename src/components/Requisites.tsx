@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ShinyButton } from "@/components/ui/shiny-button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -82,13 +83,13 @@ const Requisites = () => {
             <CardTitle className="text-lg font-semibold text-foreground">Карточка Клиента (Реквизиты)</CardTitle>
             <CardDescription className="text-xs">Актуально на {new Date().getFullYear()} год</CardDescription>
           </div>
-          <Button 
+          <ShinyButton 
             onClick={handleDownloadDoc}
-            className="btn-premium-gold bg-amber-500 hover:bg-amber-600 text-white flex items-center gap-2 h-9 text-xs font-semibold px-4 rounded-xl shadow-md transition-all duration-300"
+            className="h-9 text-xs font-semibold px-4 rounded-xl shadow-md"
           >
             <Download className="h-4 w-4" />
             Скачать DOC
-          </Button>
+          </ShinyButton>
         </CardHeader>
         <CardContent className="p-0 divide-y divide-slate-100 dark:divide-slate-800/80">
           <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-100 dark:divide-slate-800/80">

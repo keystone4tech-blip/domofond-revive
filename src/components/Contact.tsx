@@ -1,3 +1,4 @@
+import { ShinyButton } from "@/components/ui/shiny-button";
 import { useState } from "react";
 import { Phone, Mail, MapPin, Clock, MessageCircle, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -125,18 +126,14 @@ const Contact = () => {
                 </a>
                 <p className="text-sm text-muted-foreground mt-1">Круглосуточная линия</p>
                 <div className="flex gap-2 mt-2">
-                  <Button asChild size="sm" variant="outline">
-                    <a href="tel:+79034118393">
-                      <Phone className="h-4 w-4 mr-1" />
-                      Позвонить
-                    </a>
-                  </Button>
-                  <Button asChild size="sm" variant="outline">
-                    <a href="https://wa.me/79034118393" target="_blank" rel="noopener noreferrer">
-                      <MessageCircle className="h-4 w-4 mr-1" />
-                      WhatsApp
-                    </a>
-                  </Button>
+                  <ShinyButton href="tel:+79034118393" className="w-full sm:w-auto py-1.5 px-3 text-xs rounded-xl">
+                    <Phone className="h-3.5 w-3.5" />
+                    Позвонить
+                  </ShinyButton>
+                  <ShinyButton href="https://wa.me/79034118393" target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto py-1.5 px-3 text-xs rounded-xl">
+                    <MessageCircle className="h-3.5 w-3.5" />
+                    WhatsApp
+                  </ShinyButton>
                 </div>
               </div>
             </div>
@@ -154,17 +151,13 @@ const Contact = () => {
                   Telegram бот
                 </a>
                 <div className="flex gap-2 mt-2">
-                  <Button asChild size="sm" variant="outline">
-                    <a href="https://t.me/domofondar123" target="_blank" rel="noopener noreferrer">
-                      <Send className="h-4 w-4 mr-1" />
-                      Открыть чат
-                    </a>
-                  </Button>
-                  <Button asChild size="sm" variant="outline">
-                    <a href="https://t.me/Domofondar_bot" target="_blank" rel="noopener noreferrer">
-                      Telegram бот
-                    </a>
-                  </Button>
+                  <ShinyButton href="https://t.me/domofondar123" target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto py-1.5 px-3 text-xs rounded-xl">
+                    <Send className="h-3.5 w-3.5" />
+                    Открыть чат
+                  </ShinyButton>
+                  <ShinyButton href="https://t.me/Domofondar_bot" target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto py-1.5 px-3 text-xs rounded-xl">
+                    Telegram бот
+                  </ShinyButton>
                 </div>
               </div>
             </div>
@@ -180,12 +173,10 @@ const Contact = () => {
                 </a>
                 <p className="text-sm text-muted-foreground mt-1">Ответим в течение часа</p>
                 <div className="mt-2">
-                  <Button asChild size="sm" variant="outline">
-                    <a href="mailto:domofondar@mail.ru">
-                      <Mail className="h-4 w-4 mr-1" />
-                      Написать
-                    </a>
-                  </Button>
+                  <ShinyButton href="mailto:domofondar@mail.ru" className="w-full sm:w-auto py-1.5 px-3 text-xs rounded-xl">
+                    <Mail className="h-3.5 w-3.5" />
+                    Написать
+                  </ShinyButton>
                 </div>
               </div>
             </div>
@@ -199,18 +190,14 @@ const Contact = () => {
                 <p className="text-muted-foreground">г. Краснодар, проезд Репина 1</p>
                 <p className="text-sm text-muted-foreground mt-1">2 этаж, офис 134</p>
                 <div className="flex gap-2 mt-2">
-                  <Button asChild size="sm" variant="outline">
-                    <a href="https://yandex.ru/maps/-/CLhNYJYt" target="_blank" rel="noopener noreferrer">
-                      <MapPin className="h-4 w-4 mr-1" />
-                      Яндекс Карты
-                    </a>
-                  </Button>
-                  <Button asChild size="sm" variant="outline">
-                    <a href="https://go.2gis.com/Morvu" target="_blank" rel="noopener noreferrer">
-                      <MapPin className="h-4 w-4 mr-1" />
-                      2GIS
-                    </a>
-                  </Button>
+                  <ShinyButton href="https://yandex.ru/maps/-/CLhNYJYt" target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto py-1.5 px-3 text-xs rounded-xl">
+                    <MapPin className="h-3.5 w-3.5" />
+                    Яндекс Карты
+                  </ShinyButton>
+                  <ShinyButton href="https://go.2gis.com/Morvu" target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto py-1.5 px-3 text-xs rounded-xl">
+                    <MapPin className="h-3.5 w-3.5" />
+                    2GIS
+                  </ShinyButton>
                 </div>
               </div>
             </div>
@@ -284,9 +271,9 @@ const Contact = () => {
                 )}
               </div>
 
-              <Button type="submit" size="lg" className="w-full gradient-primary text-primary-foreground">
+              <ShinyButton type="submit" className="w-full py-3.5 rounded-xl text-base font-semibold">
                 Отправить заявку
-              </Button>
+              </ShinyButton>
 
               <p className="text-xs text-muted-foreground text-center">
                 Нажимая кнопку, вы соглашаетесь с политикой конфиденциальности

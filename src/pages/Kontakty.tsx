@@ -34,7 +34,7 @@ const Kontakty = () => {
             <TabsList className="glass-premium border border-slate-200/50 dark:border-slate-800/50 p-1.5 rounded-2xl grid grid-cols-3 gap-2 w-full max-w-2xl shadow-lg h-auto">
               <TabsTrigger 
                 value="contact-form" 
-                className="flex items-center justify-center gap-2 py-3 px-2 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all data-[state=active]:bg-amber-500 data-[state=active]:text-white data-[state=active]:shadow-md text-slate-500 dark:text-slate-400"
+                className="flex items-center justify-center gap-2 py-3 px-2 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md text-slate-500 dark:text-slate-400"
               >
                 <MessageSquare className="h-4 w-4" />
                 <span className="hidden xs:inline">Обратная связь</span>
@@ -42,14 +42,14 @@ const Kontakty = () => {
               </TabsTrigger>
               <TabsTrigger 
                 value="requisites" 
-                className="flex items-center justify-center gap-2 py-3 px-2 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all data-[state=active]:bg-amber-500 data-[state=active]:text-white data-[state=active]:shadow-md text-slate-500 dark:text-slate-400"
+                className="flex items-center justify-center gap-2 py-3 px-2 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md text-slate-500 dark:text-slate-400"
               >
                 <ShieldCheck className="h-4 w-4" />
                 <span>Реквизиты</span>
               </TabsTrigger>
               <TabsTrigger 
                 value="documents" 
-                className="flex items-center justify-center gap-2 py-3 px-2 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all data-[state=active]:bg-amber-500 data-[state=active]:text-white data-[state=active]:shadow-md text-slate-500 dark:text-slate-400"
+                className="flex items-center justify-center gap-2 py-3 px-2 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md text-slate-500 dark:text-slate-400"
               >
                 <FolderOpen className="h-4 w-4" />
                 <span>Документы</span>

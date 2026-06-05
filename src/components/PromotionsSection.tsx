@@ -1,3 +1,4 @@
+import { ShinyButton } from "@/components/ui/shiny-button";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
@@ -91,17 +92,15 @@ export const PromotionsSection = () => {
               <CardFooter className="flex items-center gap-2 border-t pt-4">
                 <LikesSection contentType="promotion" contentId={promotion.id} />
                 <CommentsSection contentType="promotion" contentId={promotion.id} />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="ml-auto"
+                <ShinyButton
+                  className="ml-auto text-xs py-1.5 px-3 rounded-xl"
                   onClick={(e) => {
                     e.stopPropagation();
                     openModal(promotion);
                   }}
                 >
                   Подробнее
-                </Button>
+                </ShinyButton>
               </CardFooter>
             </Card>
           ))}
@@ -131,9 +130,9 @@ export const PromotionsSection = () => {
                   <LikesSection contentType="promotion" contentId={selectedPromotion.id} />
                   <CommentsSection contentType="promotion" contentId={selectedPromotion.id} />
                 </div>
-                <Button onClick={closeModal}>
+                <ShinyButton onClick={closeModal} className="py-2 px-4 rounded-xl text-sm">
                   Закрыть
-                </Button>
+                </ShinyButton>
               </div>
             </div>
           )}
