@@ -54,7 +54,14 @@ const Requisites = () => {
   const handleDownloadDoc = () => {
     console.log("[Реквизиты] Запрос на скачивание оригинального DOC-файла реквизитов");
     const docPath = "/media/documents/contracts/requisites_domofondar.doc";
-    window.open(docPath, "_blank");
+    
+    // Создаем временную ссылку для прямого скачивания без открытия новой вкладки
+    const link = document.createElement("a");
+    link.href = docPath;
+    link.setAttribute("download", "requisites_domofondar.doc");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (

@@ -82,7 +82,15 @@ const DocumentsList = () => {
         }
       }
 
-      window.open(downloadPath, '_blank');
+      // Создаем временную ссылку для прямого скачивания без открытия новой вкладки
+      const link = document.createElement("a");
+      link.href = downloadPath;
+      // Задаем имя скачиваемого файла на основе пути
+      const filename = downloadPath.split('/').pop() || 'document';
+      link.setAttribute("download", filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     }
   };
 
