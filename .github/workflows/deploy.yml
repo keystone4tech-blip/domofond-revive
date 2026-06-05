@@ -30,8 +30,8 @@ jobs:
           script: |
             # Переходим в папку проекта на сервере
             cd /opt/domofond_project
-            
-            # Установка Docker и Docker Compose (если их нет на новом сервере)
+
+            # Установка Docker (если нет)
             if ! [ -x "$(command -v docker)" ]; then
               echo "Установка Docker..."
               curl -fsSL https://get.docker.com -o get-docker.sh
@@ -39,8 +39,8 @@ jobs:
               sudo systemctl enable docker
               sudo systemctl start docker
             fi
-            
-            # Если плагин docker-compose не установлен, качаем старый бинарник (на всякий случай)
+
+            # Установка Docker Compose (если нет)
             if ! docker compose version > /dev/null 2>&1; then
                if ! [ -x "$(command -v docker-compose)" ]; then
                   echo "Установка Docker Compose..."
@@ -48,8 +48,12 @@ jobs:
                   sudo chmod +x /usr/local/bin/docker-compose
                fi
             fi
-            
-            # Останавливаем старые контейнеры, собираем новые и запускаем в фоне
-            echo "🚀 Сборка и запуск контейнеров..."
-            docker compose down || true
-            docker compose up -d --build
+
+            # Пересобираем ТОЛЬКО фронтенд, не трогая БД и PostgREST
+            # --no-deps: не пересобирать зависимости (db, postgrest, backend)
+            # --remove-orphans: убрать устаревшие контейнеры
+            # Данные в PostgreSQL полностью сохраняются!
+            echo "Пересборка и перезапуск только frontend..."
+            docker compose up -d --build --no-deps --remove-orphans frontend
+            echo "Frontend успешно обновлён!"
+            docker compose ps
