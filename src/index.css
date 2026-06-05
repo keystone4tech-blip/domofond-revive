@@ -161,10 +161,12 @@
 
   /* Премиальный Glassmorphism в стиле UI/UX Pro Max */
   .glass-premium {
-    background: rgba(255, 255, 255, 0.7);
+    /* Премиальный нежно-синий фон для контраста на светлой теме в цвет стиля сайта */
+    background: rgba(239, 246, 255, 0.85);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(226, 232, 240, 0.8);
+    /* Светло-синяя граница для четкого выделения карточек на платиновом фоне */
+    border: 1px solid rgba(191, 219, 254, 0.9);
     box-shadow: 0 10px 40px -10px rgba(15, 23, 42, 0.05), 0 1px 3px rgba(15, 23, 42, 0.02);
     transition: var(--transition-base);
   }
