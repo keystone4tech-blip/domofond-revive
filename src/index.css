@@ -159,37 +159,83 @@
     transition: var(--transition-fast);
   }
 
-  /* Премиальный Glassmorphism в стиле UI/UX Pro Max */
+  /* Премиальный Glassmorphism в стиле UI/UX Pro Max (уровень проектов $10,000) */
   .glass-premium, .bg-card {
-    /* Реалистичное матовое стекло нежно-синего оттенка */
-    background: rgba(239, 246, 255, 0.75) !important;
-    backdrop-filter: blur(20px) saturate(180%) !important;
-    -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-    /* Светло-синяя граница для четкого выделения карточек на светлом фоне */
-    border: 1px solid rgba(191, 219, 254, 0.8) !important;
-    /* Реалистичная мягкая тень с двойным контуром рассеивания */
-    box-shadow: 0 20px 40px -15px rgba(15, 23, 42, 0.12), 0 0 0 1px rgba(37, 99, 235, 0.05) !important;
+    /* Полупрозрачный фон нежно-синего/голубого оттенка для пропускания фоновых сфер */
+    background: rgba(240, 246, 255, 0.45) !important;
+    
+    /* Сильное размытие заднего плана и насыщение цветов для создания текстуры матового стекла */
+    backdrop-filter: blur(25px) saturate(190%) !important;
+    -webkit-backdrop-filter: blur(25px) saturate(190%) !important;
+    
+    /* Тонкая белая полупрозрачная граница, имитирующая ребро отполированного хрусталя */
+    border: 1px solid rgba(255, 255, 255, 0.6) !important;
+    
+    /* Многослойная тень:
+       1) Глубокая мягкая тень от карточки (0 20px 50px)
+       2) Дополнительная размытая синяя тень для контраста (0 4px 12px)
+       3) Внутренний белый блик сверху (inset 0 1px 0) - создает эффект фаски стекла, на которое падает свет
+    */
+    box-shadow: 
+      0 20px 50px -12px rgba(15, 23, 42, 0.08), 
+      0 4px 12px -2px rgba(37, 99, 235, 0.03),
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.75) !important;
+      
+    /* Плавный переход для ховер-эффектов */
     transition: var(--transition-base);
   }
 
+  /* Премиальное темное матовое стекло */
   .dark .glass-premium, .dark .bg-card {
-    background: rgba(15, 23, 42, 0.8) !important;
+    /* Глубокий благородный обсидианово-синий фон */
+    background: rgba(15, 23, 42, 0.5) !important;
+    
+    /* Высокое размытие для устранения визуального шума в темноте */
+    backdrop-filter: blur(25px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(25px) saturate(180%) !important;
+    
+    /* Очень тонкая, деликатная темная рамка */
     border: 1px solid rgba(255, 255, 255, 0.08) !important;
-    box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.3) !important;
-    backdrop-filter: blur(16px) !important;
-    -webkit-backdrop-filter: blur(16px) !important;
+    
+    /* Многослойная тень для темной темы:
+       1) Глубокая черная тень (0 25px 60px)
+       2) Внутренний деликатный серебристый блик по верхнему краю (inset 0 1px 0)
+       3) Мягкий синий неоновый ореол вокруг карточки (0 0 40px)
+    */
+    box-shadow: 
+      0 25px 60px -15px rgba(0, 0, 0, 0.5), 
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.15),
+      0 0 40px -10px rgba(59, 130, 246, 0.08) !important;
   }
 
-  /* Эффект при наведении для карточек */
+  /* Премиальный эффект при наведении (hover) на карточки (светлая тема) */
   .glass-premium-hover:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 20px 40px -10px rgba(37, 99, 235, 0.12), 0 4px 12px rgba(37, 99, 235, 0.04);
-    border-color: rgba(37, 99, 235, 0.2);
+    /* Легкое приподнимание карточки для ощущения интерактивности */
+    transform: translateY(-3px);
+    
+    /* Увеличение глубины теней и яркости верхнего блика при наведении */
+    box-shadow: 
+      0 25px 50px -10px rgba(37, 99, 235, 0.14), 
+      0 8px 20px rgba(37, 99, 235, 0.04), 
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.9) !important;
+      
+    /* Окрашивание границы в технологичный синий цвет с прозрачностью */
+    border-color: rgba(37, 99, 235, 0.25) !important;
   }
 
+  /* Премиальный эффект при наведении (hover) на карточки (темная тема) */
   .dark .glass-premium-hover:hover {
-    box-shadow: 0 20px 40px -10px rgba(37, 99, 235, 0.2), 0 4px 12px rgba(37, 99, 235, 0.08);
-    border-color: rgba(37, 99, 235, 0.3);
+    /* Легкое приподнимание карточки */
+    transform: translateY(-3px);
+    
+    /* Усиление свечения и глубины в темноте */
+    box-shadow: 
+      0 30px 60px -10px rgba(0, 0, 0, 0.6), 
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.25), 
+      0 0 50px -5px rgba(59, 130, 246, 0.15) !important;
+      
+    /* Мягкая синяя подсветка контура */
+    border-color: rgba(59, 130, 246, 0.25) !important;
   }
 
   /* Премиальная золотая кнопка */
