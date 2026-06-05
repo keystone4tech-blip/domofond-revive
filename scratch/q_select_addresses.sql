@@ -1,0 +1,1 @@
+SELECT DISTINCT address FROM accounts LIMIT 50;

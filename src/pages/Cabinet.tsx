@@ -487,6 +487,12 @@ const Cabinet = () => {
   const [showApartmentSuggestions, setShowApartmentSuggestions] = useState(false); // Показ подсказок квартиры
   const [loadingAddressCache, setLoadingAddressCache] = useState(false); // Процесс загрузки кэша адресов
   const [editing, setEditing] = useState(false);
+
+  // --- СТЕЙТЫ ДЛЯ ПОИСКА ПО ЛИЦЕВОМУ СЧЁТУ ---
+  const [accountSearchInput, setAccountSearchInput] = useState(""); // Введённый пользователем лицевой счёт
+  const [accountSearchLoading, setAccountSearchLoading] = useState(false); // Индикатор загрузки при поиске по л/с
+  const [accountSearchError, setAccountSearchError] = useState<string | null>(null); // Текст ошибки если л/с не найден
+  const [accountSearchFound, setAccountSearchFound] = useState(false); // Флаг: счёт успешно найден и адрес подставлен
   const [isVisible, setIsVisible] = useState({
     header: false,
     content: false
@@ -593,6 +599,104 @@ const Cabinet = () => {
     }
 
     return diceScore;
+  };
+
+  // =================================================================
+  // ПОИСК ПО ЛИЦЕВОМУ СЧЁТУ
+  // Нормализует ввод (например, "654" → "0000000654") и ищет
+  // соответствующий адрес в таблице accounts. После нахождения
+  // автоматически заполняет поля улицы, дома и квартиры.
+  // =================================================================
+  const searchByAccountNumber = async () => {
+    const rawInput = accountSearchInput.trim();
+    if (!rawInput) {
+      console.log("[Л/С Поиск] Поле лицевого счёта пустое");
+      return;
+    }
+
+    setAccountSearchLoading(true);
+    setAccountSearchError(null);
+    setAccountSearchFound(false);
+
+    // Нормализуем лицевой счёт: убираем лишние символы, дополняем нулями до 10 знаков слева
+    // Пример: "654" → "0000000654", "0000000654" → "0000000654"
+    const digitsOnly = rawInput.replace(/\D/g, ""); // Оставляем только цифры
+    const paddedAccount = digitsOnly.padStart(10, "0"); // Дополняем нулями до 10 цифр
+
+    console.log(`[Л/С Поиск] Ввод: "${rawInput}" → нормализован до: "${paddedAccount}"`);
+
+    try {
+      // Ищем в базе сначала точное совпадение (с нулями)
+      let { data, error } = await supabase
+        .from("accounts")
+        .select("account_number, address, apartment, debt_amount, period")
+        .eq("account_number", paddedAccount)
+        .order("period", { ascending: false })
+        .limit(1);
+
+      // Если не нашли с нулями — ищем без нулей (на случай нестандартного формата в БД)
+      if ((!data || data.length === 0) && !error) {
+        console.log(`[Л/С Поиск] Не найден с нулями, пробуем без: "${rawInput}"`);
+        const result = await supabase
+          .from("accounts")
+          .select("account_number, address, apartment, debt_amount, period")
+          .eq("account_number", rawInput)
+          .order("period", { ascending: false })
+          .limit(1);
+        data = result.data;
+        error = result.error;
+      }
+
+      // Дополнительный поиск: ilike для частичного совпадения (если нужно)
+      if ((!data || data.length === 0) && !error) {
+        console.log(`[Л/С Поиск] Точный поиск не дал результатов, пробуем ilike...`);
+        const result = await supabase
+          .from("accounts")
+          .select("account_number, address, apartment, debt_amount, period")
+          .ilike("account_number", `%${digitsOnly}%`)
+          .order("period", { ascending: false })
+          .limit(1);
+        data = result.data;
+        error = result.error;
+      }
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const found = data[0];
+        console.log(`[Л/С Поиск] ✅ Найден лицевой счёт: ${found.account_number}, адрес: ${found.address}, квартира: ${found.apartment}`);
+
+        // Автоматически подставляем адрес из найденного счёта
+        setAddress(found.address || "");
+        setApartment(found.apartment || "");
+        parseAndSetAddress(found.address || "");
+
+        // Загружаем список квартир для найденного дома
+        if (found.address) {
+          fetchApartmentSuggestions(found.address);
+        }
+
+        setAccountSearchFound(true);
+        setAccountSearchError(null);
+
+        toast({
+          title: "✅ Лицевой счёт найден!",
+          description: `Адрес заполнен автоматически. Счёт: ${found.account_number}`,
+        });
+      } else {
+        // Счёт не найден — показываем понятное сообщение
+        console.log(`[Л/С Поиск] ❌ Лицевой счёт "${paddedAccount}" не найден в базе`);
+        setAccountSearchError(
+          `Лицевой счёт «${paddedAccount}» не найден. Проверьте правильность ввода или заполните адрес вручную.`
+        );
+        setAccountSearchFound(false);
+      }
+    } catch (err: any) {
+      console.error("[Л/С Поиск] Ошибка поиска лицевого счёта:", err);
+      setAccountSearchError("Ошибка при поиске. Попробуйте позже или заполните адрес вручную.");
+    } finally {
+      setAccountSearchLoading(false);
+    }
   };
 
   // Загрузка кэша уникальных домов из БД
@@ -843,14 +947,28 @@ const Cabinet = () => {
       console.error("[Автокомплит Домов: DaData] Сбой загрузки домов:", e);
     }
 
-    // Сортируем дома: сначала на обслуживании (isLocal), затем по возрастанию номеров и корпусов
+    // Сортируем дома: сначала на обслуживании (isLocal), затем по числовому значению,
+    // затем по суффиксу (корпус, буква). Например: 6, 6А, 9, 9 корп. 1, 9 корп. 2, 31/1
+    const parseHouseNum = (h: string) => {
+      // Извлекаем основной номер дома (числовая часть перед любыми буквами/корпусами)
+      const mainNum = parseInt(h.replace(/[^0-9]/g, "").slice(0, 5)) || 0;
+      // Извлекаем суффикс (буква, корпус, дробь) для вторичной сортировки
+      const suffix = h.replace(/^\d+/, "").replace(/[^а-яa-z0-9/]/gi, "").toLowerCase();
+      return { mainNum, suffix };
+    };
+
     const sortedHouses = houseList.sort((a, b) => {
+      // 1. Сначала идут дома "на обслуживании"
       if (a.isLocal && !b.isLocal) return -1;
       if (!a.isLocal && b.isLocal) return 1;
-      const numA = parseInt(a.houseNumber.replace(/\D/g, "")) || 0;
-      const numB = parseInt(b.houseNumber.replace(/\D/g, "")) || 0;
+
+      // 2. Сортируем по основному номеру дома
+      const { mainNum: numA, suffix: sufA } = parseHouseNum(a.houseNumber);
+      const { mainNum: numB, suffix: sufB } = parseHouseNum(b.houseNumber);
       if (numA !== numB) return numA - numB;
-      return a.houseNumber.localeCompare(b.houseNumber, undefined, { numeric: true, sensitivity: 'base' });
+
+      // 3. При одинаковых номерах — сортируем по суффиксу (корпус, буква)
+      return sufA.localeCompare(sufB, "ru", { numeric: true, sensitivity: "base" });
     });
 
     setHouseSuggestions(sortedHouses);
@@ -915,18 +1033,26 @@ const Cabinet = () => {
       console.error("[Автокомплит Домов: DaData] Сбой фильтрации:", e);
     }
 
-    // Сортируем дома: сначала на обслуживании (isLocal), затем по возрастанию номеров и корпусов
+    // Сортируем дома: сначала на обслуживании (isLocal), затем по числовому значению,
+    // затем по суффиксу (корпус, буква). Пример: 6, 6А, 9 корп.1, 9 корп.2, 31/1
+    const parseHouseNumFilter = (h: string) => {
+      const mainNum = parseInt(h.replace(/[^0-9]/g, "").slice(0, 5)) || 0;
+      const suffix = h.replace(/^\d+/, "").replace(/[^а-яa-z0-9/]/gi, "").toLowerCase();
+      return { mainNum, suffix };
+    };
+
     const sorted = filteredSuggestions.sort((a, b) => {
+      // 1. Дома на обслуживании — первые
       if (a.isLocal && !b.isLocal) return -1;
       if (!a.isLocal && b.isLocal) return 1;
-      
-      // Сравниваем числовые основы домов (например, для 31/1 -> 31, для 9к2 -> 9)
-      const numA = parseInt(a.houseNumber.replace(/\D/g, "")) || 0;
-      const numB = parseInt(b.houseNumber.replace(/\D/g, "")) || 0;
+
+      // 2. Сортировка по основному номеру дома
+      const { mainNum: numA, suffix: sufA } = parseHouseNumFilter(a.houseNumber);
+      const { mainNum: numB, suffix: sufB } = parseHouseNumFilter(b.houseNumber);
       if (numA !== numB) return numA - numB;
-      
-      // При равных номерах сортируем по строке (чтобы шли по порядку корпусов: корп. 1, корп. 2, корп. 3)
-      return a.houseNumber.localeCompare(b.houseNumber, undefined, { numeric: true, sensitivity: 'base' });
+
+      // 3. При одинаковых номерах — по корпусу/букве
+      return sufA.localeCompare(sufB, "ru", { numeric: true, sensitivity: "base" });
     });
 
     setHouseSuggestions(sorted);
@@ -2190,6 +2316,112 @@ const Cabinet = () => {
                   </div>
                 </div>
 
+                {/* 3.5. БЛОК БЫСТРОГО ВВОДА ЛИЦЕВОГО СЧЁТА — показываем только в режиме редактирования */}
+                {!isLocked && (
+                  <div className="space-y-3 text-left animate-in fade-in slide-in-from-top-2 duration-300">
+                    {/* Информационный баннер с инструкцией */}
+                    <div className="flex items-start gap-3 p-4 rounded-2xl bg-gradient-to-r from-blue-500/8 to-indigo-500/8 border border-blue-200/40 dark:border-blue-700/30">
+                      {/* Иконка подсказки */}
+                      <div className="p-2 rounded-xl bg-blue-500/15 shrink-0 mt-0.5">
+                        <CreditCard className="h-4 w-4 text-blue-500" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[11px] font-bold text-blue-700 dark:text-blue-300 mb-1">
+                          💡 Знаете свой лицевой счёт?
+                        </p>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                          Введите его ниже — адрес заполнится автоматически. Лицевой счёт можно найти
+                          в <span className="font-semibold text-slate-600 dark:text-slate-300">квитанции об оплате</span> или
+                          узнать, позвонив диспетчеру.{" "}
+                          <span className="text-blue-600 dark:text-blue-400 font-medium">Можно вводить без ведущих нулей</span> — например, «654» вместо «0000000654».
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Поле ввода лицевого счёта */}
+                    <div className="flex gap-2 items-start">
+                      <div className="flex-1 relative">
+                        <Label
+                          htmlFor="accountSearchInput"
+                          className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1 mb-1.5"
+                        >
+                          🔢 Лицевой счёт (необязательно)
+                        </Label>
+                        <Input
+                          id="accountSearchInput"
+                          value={accountSearchInput}
+                          onChange={(e) => {
+                            // Принимаем только цифры и пробелы для удобства ввода
+                            setAccountSearchInput(e.target.value);
+                            // Сбрасываем статус поиска при новом вводе
+                            setAccountSearchFound(false);
+                            setAccountSearchError(null);
+                          }}
+                          onKeyDown={(e) => {
+                            // Поиск по нажатию Enter для удобства
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              searchByAccountNumber();
+                            }
+                          }}
+                          placeholder="Например: 654 или 0000000654"
+                          className={`bg-white/40 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700 focus:ring-2 font-medium h-10 transition-all rounded-xl placeholder-slate-400 ${
+                            accountSearchFound
+                              ? "border-green-400 focus:border-green-500 focus:ring-green-500/20"
+                              : accountSearchError
+                              ? "border-red-400 focus:border-red-500 focus:ring-red-500/20"
+                              : "focus:border-amber-500 focus:ring-amber-500/20"
+                          }`}
+                          disabled={accountSearchLoading}
+                        />
+                        {/* Иконка статуса справа */}
+                        {accountSearchFound && (
+                          <CheckCircle className="absolute right-3 top-[2.1rem] h-4 w-4 text-green-500 pointer-events-none" />
+                        )}
+                        {accountSearchLoading && (
+                          <Loader2 className="absolute right-3 top-[2.1rem] h-4 w-4 animate-spin text-primary pointer-events-none" />
+                        )}
+                      </div>
+                      {/* Кнопка «Найти» */}
+                      <Button
+                        type="button"
+                        onClick={searchByAccountNumber}
+                        disabled={accountSearchLoading || !accountSearchInput.trim()}
+                        className="mt-7 h-10 px-4 btn-premium-gold hover:shadow-gold-glow shrink-0 rounded-xl font-semibold"
+                      >
+                        {accountSearchLoading ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          "Найти"
+                        )}
+                      </Button>
+                    </div>
+
+                    {/* Сообщение об успехе */}
+                    {accountSearchFound && (
+                      <div className="flex items-center gap-2 text-[11px] text-green-700 dark:text-green-300 bg-green-50/80 dark:bg-green-950/30 border border-green-200/60 dark:border-green-800/40 px-3 py-2 rounded-xl animate-in fade-in duration-300">
+                        <CheckCircle className="h-3.5 w-3.5 shrink-0" />
+                        <span>Адрес успешно найден и заполнен автоматически. Проверьте данные ниже.</span>
+                      </div>
+                    )}
+
+                    {/* Сообщение об ошибке */}
+                    {accountSearchError && (
+                      <div className="flex items-start gap-2 text-[11px] text-red-600 dark:text-red-400 bg-red-50/80 dark:bg-red-950/30 border border-red-200/60 dark:border-red-800/40 px-3 py-2 rounded-xl animate-in fade-in duration-300">
+                        <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                        <span>{accountSearchError}</span>
+                      </div>
+                    )}
+
+                    {/* Разделительная линия */}
+                    <div className="flex items-center gap-3 py-1">
+                      <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
+                      <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">или заполните адрес вручную</span>
+                      <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
+                    </div>
+                  </div>
+                )}
+
                 {/* 4. Выбор Типа Недвижимости (Квартира/Офис vs Частный дом) */}
                 <div className="space-y-2 text-left">
                   <Label className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">🏠 Тип недвижимости *</Label>
@@ -2439,6 +2671,10 @@ const Cabinet = () => {
                           setSelectedStreet(null);
                           setApartment(profile?.apartment || "");
                           setFloor(profile?.floor || "");
+                          // Сбрасываем стейты поиска по лицевому счёту
+                          setAccountSearchInput("");
+                          setAccountSearchFound(false);
+                          setAccountSearchError(null);
                         }} className="font-semibold rounded-xl h-11 hover:bg-slate-50 dark:hover:bg-slate-900">
                           Отмена
                         </Button>
