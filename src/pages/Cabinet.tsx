@@ -1147,7 +1147,8 @@ const Cabinet = () => {
     // Если подъезд выбран, фильтруем квартиры по этому подъезду
     if (entrance && entrance.trim()) {
       filtered = houseAccounts.filter((acc: any) => {
-        const match = acc.address ? acc.address.match(/(?:подъезд|п\.?)\s*(\d+)/i) : null;
+        // Безопасная регулярка: исключаем ложные совпадения буквы "п" с окончанием слова "корп."
+        const match = acc.address ? acc.address.match(/(?:^|,|\s)(?:подъезд|п\.?)\s*(\d+)/i) : null;
         const parsedEntrance = match ? match[1] : "";
         return parsedEntrance === entrance.trim();
       });
@@ -1166,6 +1167,28 @@ const Cabinet = () => {
     setApartmentSuggestions(uniqueApts);
     console.log(`[Квартиры] Реактивно отфильтровано квартир для подъезда "${entrance}": ${uniqueApts.length}`);
   }, [entrance, houseAccounts]);
+
+  // Автоматическое заполнение подъезда при вводе или выборе номера квартиры
+  useEffect(() => {
+    if (!apartment || !apartment.trim() || houseAccounts.length === 0) return;
+    
+    // Ищем лицевой счет с совпадающей квартирой в кэше дома
+    const targetAptNorm = normalizeApartment(apartment);
+    const foundAccount = houseAccounts.find((acc: any) => normalizeApartment(acc.apartment) === targetAptNorm);
+    
+    if (foundAccount && foundAccount.address) {
+      // Извлекаем подъезд с помощью безопасной регулярки
+      const match = foundAccount.address.match(/(?:^|,|\s)(?:подъезд|п\.?)\s*(\d+)/i);
+      if (match) {
+        const autoEntrance = match[1];
+        // Заполняем подъезд автоматически, только если он еще не заполнен
+        if (autoEntrance && autoEntrance !== entrance && !entrance) {
+          console.log(`[Автозаполнение Подъезда] Для квартиры "${apartment}" автоматически определён подъезд "${autoEntrance}"`);
+          setEntrance(autoEntrance);
+        }
+      }
+    }
+  }, [apartment, houseAccounts, entrance]);
 
   // Функция для загрузки доступных квартир и подъездов по выбранному адресу дома
   const fetchApartmentSuggestions = async (selectedAddr: string) => {
@@ -1207,7 +1230,8 @@ const Cabinet = () => {
         // Извлекаем уникальные номера подъездов и сортируем их по возрастанию
         const entrances = filtered
           .map((item: any) => {
-            const match = item.address ? item.address.match(/(?:подъезд|п\.?)\s*(\d+)/i) : null;
+            // Безопасная регулярка: исключаем совпадения с окончанием слова "корп."
+            const match = item.address ? item.address.match(/(?:^|,|\s)(?:подъезд|п\.?)\s*(\d+)/i) : null;
             return match ? match[1] : "";
           })
           .filter(Boolean);
@@ -2644,111 +2668,112 @@ const Cabinet = () => {
                   </div>
                 </div>
 
-                {/* 5.5. Помещение (Подъезд) */}
+                {/* 5.5 и 6. Подъезд и Квартира на одной строке */}
                 {premiseType === "apartment" && (
-                  <div className="space-y-2 relative text-left animate-in fade-in slide-in-from-top-1 duration-300">
-                    <Label htmlFor="entrance" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                      🚪 Номер подъезда {entranceSuggestions.length > 0 && "*"}
-                    </Label>
-                    <Input
-                      id="entrance"
-                      value={entrance}
-                      onChange={(e) => setEntrance(e.target.value)}
-                      onFocus={() => {
-                        if (!isLocked) {
-                          fetchApartmentSuggestions(address);
-                          setShowEntranceSuggestions(true);
+                  <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-1 duration-300">
+                    {/* 5.5. Помещение (Подъезд) */}
+                    <div className="space-y-2 relative text-left">
+                      <Label htmlFor="entrance" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                        🚪 Номер подъезда {entranceSuggestions.length > 0 && "*"}
+                      </Label>
+                      <Input
+                        id="entrance"
+                        value={entrance}
+                        onChange={(e) => setEntrance(e.target.value)}
+                        onFocus={() => {
+                          if (!isLocked) {
+                            fetchApartmentSuggestions(address);
+                            setShowEntranceSuggestions(true);
+                          }
+                        }}
+                        onBlur={() => setTimeout(() => setShowEntranceSuggestions(false), 200)}
+                        placeholder={displayHouse?.trim() ? (entranceSuggestions.length > 0 ? "Выберите или введите подъезд" : "Номер подъезда (необязательно)") : "Сначала введите номер дома"}
+                        disabled={isLocked || !displayStreet?.trim() || !displayHouse?.trim()}
+                        className="bg-white/40 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 font-medium h-10 transition-all rounded-xl placeholder-slate-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                      />
+
+                      {/* Всплывающая сетка доступных подъездов */}
+                      {showEntranceSuggestions && entranceSuggestions.length > 0 && (
+                        <div className="absolute z-50 w-full mt-1.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200/50 dark:border-slate-700/50 rounded-2xl shadow-2xl max-h-48 overflow-y-auto p-3 animate-in fade-in-50 slide-in-from-top-1 duration-200">
+                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                            <DoorOpen className="h-3.5 w-3.5 text-primary" />
+                            <span>Выберите подъезд в этом доме:</span>
+                          </div>
+                          <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
+                            {entranceSuggestions.map((ent, index) => (
+                              <button
+                                key={index}
+                                type="button"
+                                className={`px-1.5 py-1.5 text-xs text-center rounded-lg border transition-all focus:outline-none font-semibold ${
+                                  entrance === ent
+                                    ? "bg-amber-500 text-white border-amber-500 scale-102"
+                                    : "border-slate-200 dark:border-slate-700 hover:bg-amber-500/10 hover:border-amber-500/30 text-foreground"
+                                }`}
+                                onClick={() => {
+                                  setEntrance(ent);
+                                  setShowEntranceSuggestions(false);
+                                }}
+                              >
+                                Подъезд ${ent}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 6. Помещение (Квартира/Офис) */}
+                    <div className="space-y-2 relative text-left">
+                      <Label htmlFor="apartment" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">🏢 Квартира / Офис / Помещение *</Label>
+                      <Input
+                        id="apartment"
+                        value={apartment}
+                        onChange={(e) => setApartment(e.target.value)}
+                        onFocus={() => {
+                          if (!isLocked) {
+                            fetchApartmentSuggestions(address);
+                            setShowApartmentSuggestions(true);
+                          }
+                        }}
+                        onBlur={() => setTimeout(() => setShowApartmentSuggestions(false), 200)}
+                        placeholder={
+                          !displayHouse?.trim() 
+                            ? "Сначала введите номер дома" 
+                            : (entranceSuggestions.length > 0 && !entrance)
+                            ? "Рекомендуется выбрать подъезд"
+                            : "Номер квартиры, офиса или бокса"
                         }
-                      }}
-                      onBlur={() => setTimeout(() => setShowEntranceSuggestions(false), 200)}
-                      placeholder={displayHouse?.trim() ? (entranceSuggestions.length > 0 ? "Выберите или введите подъезд" : "Номер подъезда (необязательно)") : "Сначала введите номер дома"}
-                      disabled={isLocked || !displayStreet?.trim() || !displayHouse?.trim()}
-                      className="bg-white/40 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 font-medium h-10 transition-all rounded-xl placeholder-slate-400 disabled:opacity-50 disabled:cursor-not-allowed"
-                    />
+                        disabled={isLocked || !displayStreet?.trim() || !displayHouse?.trim()}
+                        className="bg-white/40 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 font-medium h-10 transition-all rounded-xl placeholder-slate-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                      />
 
-                    {/* Всплывающая сетка доступных подъездов */}
-                    {showEntranceSuggestions && entranceSuggestions.length > 0 && (
-                      <div className="absolute z-50 w-full mt-1.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200/50 dark:border-slate-700/50 rounded-2xl shadow-2xl max-h-48 overflow-y-auto p-3 animate-in fade-in-50 slide-in-from-top-1 duration-200">
-                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                          <DoorOpen className="h-3.5 w-3.5 text-primary" />
-                          <span>Выберите подъезд в этом доме:</span>
+                      {/* Всплывающая сетка доступных квартир */}
+                      {showApartmentSuggestions && apartmentSuggestions.length > 0 && (
+                        <div className="absolute z-50 w-full mt-1.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200/50 dark:border-slate-700/50 rounded-2xl shadow-2xl max-h-48 overflow-y-auto p-3 animate-in fade-in-50 slide-in-from-top-1 duration-200">
+                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                            <DoorOpen className="h-3.5 w-3.5 text-primary" />
+                            <span>
+                              {entrance ? `Квартиры подъезда ${entrance}:` : "Подключенные абоненты в этом доме:"}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-1.5">
+                            {apartmentSuggestions.map((apt, index) => (
+                              <button
+                                key={index}
+                                type="button"
+                                className="px-1.5 py-1.5 text-xs text-center rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-amber-500/10 hover:border-amber-500/30 transition-all focus:bg-amber-500/10 focus:outline-none font-semibold text-foreground hover:scale-105 active:scale-95"
+                                onClick={() => {
+                                  setApartment(apt);
+                                  setShowApartmentSuggestions(false);
+                                }}
+                              >
+                                ${apt}
+                              </button>
+                            ))}
+                          </div>
                         </div>
-                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
-                          {entranceSuggestions.map((ent, index) => (
-                            <button
-                              key={index}
-                              type="button"
-                              className={`px-1.5 py-1.5 text-xs text-center rounded-lg border transition-all focus:outline-none font-semibold ${
-                                entrance === ent
-                                  ? "bg-amber-500 text-white border-amber-500 scale-102"
-                                  : "border-slate-200 dark:border-slate-700 hover:bg-amber-500/10 hover:border-amber-500/30 text-foreground"
-                              }`}
-                              onClick={() => {
-                                setEntrance(ent);
-                                setShowEntranceSuggestions(false);
-                              }}
-                            >
-                              Подъезд {ent}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* 6. Помещение (Квартира/Офис) */}
-                {premiseType === "apartment" && (
-                  <div className="space-y-2 relative text-left animate-in fade-in slide-in-from-top-1 duration-300">
-                    <Label htmlFor="apartment" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">🏢 Квартира / Офис / Помещение *</Label>
-                    <Input
-                      id="apartment"
-                      value={apartment}
-                      onChange={(e) => setApartment(e.target.value)}
-                      onFocus={() => {
-                        if (!isLocked) {
-                          fetchApartmentSuggestions(address);
-                          setShowApartmentSuggestions(true);
-                        }
-                      }}
-                      onBlur={() => setTimeout(() => setShowApartmentSuggestions(false), 200)}
-                      placeholder={
-                        !displayHouse?.trim() 
-                          ? "Сначала введите номер дома" 
-                          : (entranceSuggestions.length > 0 && !entrance)
-                          ? "Рекомендуется выбрать подъезд"
-                          : "Номер квартиры, офиса или бокса"
-                      }
-                      disabled={isLocked || !displayStreet?.trim() || !displayHouse?.trim()}
-                      className="bg-white/40 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 font-medium h-10 transition-all rounded-xl placeholder-slate-400 disabled:opacity-50 disabled:cursor-not-allowed"
-                    />
-
-                    {/* Всплывающая сетка доступных квартир */}
-                    {showApartmentSuggestions && apartmentSuggestions.length > 0 && (
-                      <div className="absolute z-50 w-full mt-1.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200/50 dark:border-slate-700/50 rounded-2xl shadow-2xl max-h-48 overflow-y-auto p-3 animate-in fade-in-50 slide-in-from-top-1 duration-200">
-                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                          <DoorOpen className="h-3.5 w-3.5 text-primary" />
-                          <span>
-                            {entrance ? `Квартиры подъезда ${entrance}:` : "Подключенные абоненты в этом доме:"}
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-1.5">
-                          {apartmentSuggestions.map((apt, index) => (
-                            <button
-                              key={index}
-                              type="button"
-                              className="px-1.5 py-1.5 text-xs text-center rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-amber-500/10 hover:border-amber-500/30 transition-all focus:bg-amber-500/10 focus:outline-none font-semibold text-foreground hover:scale-105 active:scale-95"
-                              onClick={() => {
-                                setApartment(apt);
-                                setShowApartmentSuggestions(false);
-                              }}
-                            >
-                              {apt}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -2960,7 +2985,7 @@ const Cabinet = () => {
                                     // Парсим адрес на улицу, дом, корпус, подъезд и квартиру
                                     const street = address ? address.split(",")[1]?.replace(/(?:ул\.?|улица)\s*/gi, "").trim() || address : "";
                                     const house = address ? address.split(",")[2]?.replace(/(?:д\.?|дом)\s*/gi, "").trim() || "" : "";
-                                    const entranceMatch = address ? address.match(/(?:подъезд|п\.?)\s*(\d+)/i) : null;
+                                    const entranceMatch = address ? address.match(/(?:^|,|\s)(?:подъезд|п\.?)\s*(\d+)/i) : null;
                                     const entrance = entranceMatch ? entranceMatch[1] : "1";
 
                                     // Передаем всю сумму в SUMMA_OPL2 (услуги)
@@ -3551,7 +3576,7 @@ const Cabinet = () => {
                         const house = address ? address.split(",")[2]?.replace(/(?:д\.?|дом)\s*/gi, "").trim() || "" : "";
                         
                         // Пытаемся вытащить подъезд из адреса
-                        const entranceMatch = address ? address.match(/(?:подъезд|п\.?)\s*(\d+)/i) : null;
+                        const entranceMatch = address ? address.match(/(?:^|,|\s)(?:подъезд|п\.?)\s*(\d+)/i) : null;
                         const entrance = entranceMatch ? entranceMatch[1] : "1";
 
                         const payUrl = `https://pay.kk.ru/services/117425?` +
