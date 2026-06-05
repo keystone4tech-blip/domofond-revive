@@ -2714,7 +2714,7 @@ const Cabinet = () => {
                                   setShowEntranceSuggestions(false);
                                 }}
                               >
-                                Подъезд ${ent}
+                                Подъезд {ent}
                               </button>
                             ))}
                           </div>
@@ -2767,7 +2767,7 @@ const Cabinet = () => {
                                   setShowApartmentSuggestions(false);
                                 }}
                               >
-                                ${apt}
+                                {apt}
                               </button>
                             ))}
                           </div>
