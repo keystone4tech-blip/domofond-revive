@@ -53,7 +53,7 @@ const Requisites = () => {
   // Функция скачивания DOC-файла
   const handleDownloadDoc = () => {
     console.log("[Реквизиты] Запрос на скачивание оригинального DOC-файла реквизитов");
-    const docPath = "/media/documents/contracts/РЕКВИЗИТЫ ООО ДомофонДар.doc";
+    const docPath = "/media/documents/contracts/requisites_domofondar.doc";
     window.open(docPath, "_blank");
   };
 
