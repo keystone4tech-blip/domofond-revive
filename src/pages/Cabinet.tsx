@@ -30,13 +30,24 @@ interface Task {
   clients: { name: string; address: string } | null;
 }
 
-const normalizeStreet = (s: string) => 
-  (s || "").toLowerCase()
-    .trim()
-    .replace(/^(г\.|город|пос\.|поселок)\s*[^,]+,\s*/i, "") // убираем город в начале если есть
-    .replace(/(?:\(ул\)?|ул\.?|улица)\s*/gi, "") // убираем обозначения улицы
+const normalizeStreet = (s: string) => {
+  if (!s) return "";
+  let clean = s.toLowerCase().trim();
+  // Если в строке есть запятая, то предполагаем, что первая часть — это город/населенный пункт, удаляем её
+  if (clean.includes(",")) {
+    const parts = clean.split(",");
+    // В адресах БД: [0] = Город, [1] = Улица, [2] = Дом. Берем именно улицу!
+    if (parts.length >= 2) {
+      clean = parts[1].trim();
+    }
+  }
+  return clean
+    .replace(/^(г\.|город|пос\.|поселок|аул|п\.|х\.|хутор|ст\.|станица)\s+[^,]+/gi, "") // убираем населенный пункт, если остался в начале
+    .replace(/(?:\(ул\)?|ул\.?|улица|пер\.?|переулок|проспект|пр-кт|пр\.?|аллея|бульвар|тракт|шоссе)\s*/gi, "") // убираем типы улиц
+    .replace(/(?:^|\s)(?:им\.?|имени|генерала?|академика?|маршала?|улице)(?:\s|$)/gi, "") // убираем звания, инициалы и "имени"
     .replace(/[^а-яa-z0-9]/g, "") // оставляем только буквы и цифры
     .trim();
+};
 
 const normalizeHouse = (h: string) => 
   (h || "").toLowerCase()
@@ -52,6 +63,27 @@ const normalizeApartment = (a: string) =>
     .replace(/^(кв\.\s*|квартира\s*)/i, "")
     .replace(/[^а-яa-z0-9]/g, "")
     .trim();
+
+// Вспомогательная функция для динамического определения города для локальных улиц
+const getCityForLocalStreet = (streetName: string, housesCache: string[]): string => {
+  if (!streetName || !housesCache || housesCache.length === 0) return "г. Краснодар";
+  
+  // Ищем в кэше первый дом на этой улице
+  const matchingHouse = housesCache.find(h => {
+    const parts = h.split(",");
+    const dbStreet = parts[1] ? parts[1].trim() : "";
+    return normalizeStreet(dbStreet) === normalizeStreet(streetName);
+  });
+  
+  if (matchingHouse) {
+    const parts = matchingHouse.split(",");
+    const city = parts[0] ? parts[0].trim() : "г. Краснодар";
+    console.log(`[Улица] Для локальной улицы "${streetName}" определен город из БД: "${city}"`);
+    return city;
+  }
+  
+  return "г. Краснодар";
+};
 
 // Утилита для извлечения полной части дома (номер + корпус) из адреса вьюхи unique_houses
 // Формат: "Город, Улица, д. 9, корп. 2" → "9, корп. 2"
@@ -715,7 +747,7 @@ const Cabinet = () => {
     const localMatches = allStreets
       .map((street) => ({
         streetName: street,
-        city: "г. Краснодар", // Локальные адреса по умолчанию Краснодарские
+        city: getCityForLocalStreet(street, allHouses), // Динамически определяем город из БД (например, Новая Адыгея)
         isLocal: true,
         score: scoreSimilarity(val, street)
       }))
@@ -852,7 +884,12 @@ const Cabinet = () => {
           isLocal: true
         };
       })
-      .filter((h) => h.houseNumber.toLowerCase().includes(val.trim().toLowerCase()));
+      .filter((h) => {
+        // Интеллектуальный поиск: приводим и вводимое значение, и номер дома к нормализованному виду
+        const normHouse = normalizeHouse(h.houseNumber);
+        const normInput = normalizeHouse(val);
+        return normHouse.includes(normInput);
+      });
 
     const filteredSuggestions = [...matchingLocal];
 
@@ -861,7 +898,12 @@ const Cabinet = () => {
       const dadataRes = await fetchDaDataSuggestions(val, "house", selectedStreet);
       dadataRes.forEach((h: any) => {
         const houseNum = h.data.house || h.value;
-        const exists = filteredSuggestions.some(fs => fs.houseNumber.toLowerCase() === houseNum.toLowerCase());
+        if (!houseNum) return;
+
+        // Исключаем дубликаты на основе интеллектуального сопоставления номеров домов через normalizeHouse.
+        // Это предотвратит повторное появление обслуживаемых локальных домов в качестве обычных ("Доступен") подсказок.
+        const exists = filteredSuggestions.some(fs => normalizeHouse(fs.houseNumber) === normalizeHouse(houseNum));
+        
         if (!exists) {
           filteredSuggestions.push({
             houseNumber: houseNum,
@@ -877,9 +919,13 @@ const Cabinet = () => {
     const sorted = filteredSuggestions.sort((a, b) => {
       if (a.isLocal && !b.isLocal) return -1;
       if (!a.isLocal && b.isLocal) return 1;
+      
+      // Сравниваем числовые основы домов (например, для 31/1 -> 31, для 9к2 -> 9)
       const numA = parseInt(a.houseNumber.replace(/\D/g, "")) || 0;
       const numB = parseInt(b.houseNumber.replace(/\D/g, "")) || 0;
       if (numA !== numB) return numA - numB;
+      
+      // При равных номерах сортируем по строке (чтобы шли по порядку корпусов: корп. 1, корп. 2, корп. 3)
       return a.houseNumber.localeCompare(b.houseNumber, undefined, { numeric: true, sensitivity: 'base' });
     });
 
@@ -901,8 +947,8 @@ const Cabinet = () => {
         const streetPart = parts[1] ? parts[1].trim() : "";
         // Извлекаем полную часть дома для точного сопоставления (включая корпуса)
         const housePart = extractHousePartFromCacheAddr(h);
-        // Сравниваем с использованием normalizeHouse для нечувствительности к формату
-        return streetPart.toLowerCase() === selectedStreet.toLowerCase() && normalizeHouse(housePart) === normalizeHouse(houseObj.houseNumber);
+        // Сравниваем с использованием normalizeStreet и normalizeHouse для нечувствительности к формату
+        return normalizeStreet(streetPart) === normalizeStreet(selectedStreet) && normalizeHouse(housePart) === normalizeHouse(houseObj.houseNumber);
       });
 
       if (fullAddr) {

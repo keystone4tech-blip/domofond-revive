@@ -17,12 +17,6 @@ const DocumentsList = () => {
 
   const documents: Document[] = [
     {
-      id: "1",
-      title: "Реквизиты",
-      description: "Банковские реквизиты организации",
-      path: "/media/documents/contracts/requisites.pdf"
-    },
-    {
       id: "2",
       title: "Договор с представителем собственников",
       description: "Проект договора с представителем собственников",
