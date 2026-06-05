@@ -160,21 +160,24 @@
   }
 
   /* Премиальный Glassmorphism в стиле UI/UX Pro Max */
-  .glass-premium {
-    /* Премиальный нежно-синий фон для контраста на светлой теме в цвет стиля сайта */
-    background: rgba(239, 246, 255, 0.85);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    /* Светло-синяя граница для четкого выделения карточек на платиновом фоне */
-    border: 1px solid rgba(191, 219, 254, 0.9);
-    box-shadow: 0 10px 40px -10px rgba(15, 23, 42, 0.05), 0 1px 3px rgba(15, 23, 42, 0.02);
+  .glass-premium, .bg-card {
+    /* Реалистичное матовое стекло нежно-синего оттенка */
+    background: rgba(239, 246, 255, 0.75) !important;
+    backdrop-filter: blur(20px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+    /* Светло-синяя граница для четкого выделения карточек на светлом фоне */
+    border: 1px solid rgba(191, 219, 254, 0.8) !important;
+    /* Реалистичная мягкая тень с двойным контуром рассеивания */
+    box-shadow: 0 20px 40px -15px rgba(15, 23, 42, 0.12), 0 0 0 1px rgba(37, 99, 235, 0.05) !important;
     transition: var(--transition-base);
   }
 
-  .dark .glass-premium {
-    background: rgba(15, 23, 42, 0.8);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.3);
+  .dark .glass-premium, .dark .bg-card {
+    background: rgba(15, 23, 42, 0.8) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.3) !important;
+    backdrop-filter: blur(16px) !important;
+    -webkit-backdrop-filter: blur(16px) !important;
   }
 
   /* Эффект при наведении для карточек */
