@@ -85,18 +85,42 @@ const getCityForLocalStreet = (streetName: string, housesCache: string[]): strin
   return "г. Краснодар";
 };
 
-// Утилита для извлечения полной части дома (номер + корпус) из адреса вьюхи unique_houses
-// Формат: "Город, Улица, д. 9, корп. 2" → "9, корп. 2"
+// Вспомогательная функция для сборки красивого и полного номера дома с корпусом/буквой/строением из DaData
+const getHouseNumberFromDaData = (h: any): string => {
+  if (!h) return "";
+  if (h.data) {
+    let num = h.data.house || "";
+    // Если есть литера (буква) дома, и она не вшита в номер дома, добавляем её
+    if (h.data.house_letter && !num.toLowerCase().includes(h.data.house_letter.toLowerCase())) {
+      num += h.data.house_letter;
+    }
+    // Если есть блок/корпус/строение
+    if (h.data.block) {
+      const blockType = h.data.block_type === "к" ? "корп." : (h.data.block_type || "корп.");
+      num += ` ${blockType} ${h.data.block}`;
+    }
+    if (num) return num.trim();
+  }
+  // Резервный вариант: пробуем вытащить из полного значения
+  return h.value || "";
+};
+
+// Утилита для извлечения полной части дома (номер + корпус) из адреса вьюхи unique_houses или accounts
+// Формат: "Город, Улица, д. 9, корп. 2, п 6, кв. 332" → "9, корп. 2"
 // Формат: "Город, Улица, д. 6а" → "6а"
-// Формат: "Город, Улица, д. 19 к2" → "19 к2"
 const extractHousePartFromCacheAddr = (cacheAddr: string): string => {
   const parts = cacheAddr.split(",");
   if (parts.length < 3) return "";
   // Берём ВСЕ части начиная с 3-й (индекс 2) и объединяем обратно через запятую
-  // Это захватывает: "д. 31/1", "корп. 1" → "д. 31/1, корп. 1" → после очистки "31/1, корп. 1"
-  const fullHousePart = parts.slice(2).join(",").trim();
+  let fullHousePart = parts.slice(2).join(",").trim();
   // Убираем приставку "д." или "дом" только из начала
-  return fullHousePart.replace(/^(д\.\s*|дом\s*)/i, "").trim();
+  fullHousePart = fullHousePart.replace(/^(д\.\s*|дом\s*)/i, "").trim();
+  // Принудительно очищаем от информации о подъездах и квартирах, если они попали сюда из сырого адреса accounts
+  fullHousePart = fullHousePart
+    .replace(/,\s*(?:п(?:одъезд)?\.?\s*\d+).*$/i, "")
+    .replace(/,\s*(?:кв\.?\s*\w+).*$/i, "")
+    .trim();
+  return fullHousePart;
 };
 
 const parseAddressParts = (fullAddr: string) => {
@@ -449,6 +473,10 @@ const Cabinet = () => {
   const [address, setAddress] = useState("");
   const [apartment, setApartment] = useState("");
   const [floor, setFloor] = useState("");
+  const [entrance, setEntrance] = useState(""); // Выбранный или введённый подъезд
+  const [entranceSuggestions, setEntranceSuggestions] = useState<string[]>([]); // Доступные подъезды в доме
+  const [showEntranceSuggestions, setShowEntranceSuggestions] = useState(false); // Показ списка подъездов
+  const [houseAccounts, setHouseAccounts] = useState<any[]>([]); // Кэш лицевых счетов выбранного дома для фильтрации квартир по подъездам
   const [email, setEmail] = useState("");
   const [emailInput, setEmailInput] = useState("");
   const [emailVerified, setEmailVerified] = useState(false);
@@ -738,6 +766,7 @@ const Cabinet = () => {
       setDisplayStreet("");
       setDisplayHouse("");
       setSelectedStreet(null);
+      setEntrance("");
       return;
     }
     console.log(`[Адрес] Парсинг адреса из профиля: "${fullAddr}"`);
@@ -745,19 +774,25 @@ const Cabinet = () => {
     if (parts.length >= 3) {
       const streetPart = parts[1].trim();
       // Используем extractHousePartFromCacheAddr для корректного извлечения полной части дома
-      // включая корпуса, буквы и дроби (д. 9, корп. 2 → "9, корп. 2")
+      // включая корпуса, буквы и дроби (д. 9, корп. 2 → "9, корп. 2", подъезды/квартиры очищаются)
       const housePart = extractHousePartFromCacheAddr(fullAddr);
+      
+      // Парсим подъезд с помощью регулярного выражения из адреса
+      const entranceMatch = fullAddr.match(/,\s*(?:п(?:одъезд)?\.?\s*(\d+))/i);
+      const parsedEntrance = entranceMatch ? entranceMatch[1] : "";
       
       setDisplayStreet(streetPart);
       setDisplayHouse(housePart);
       setSelectedStreet(streetPart);
-      console.log(`[Адрес] Успешно распарсено: улица "${streetPart}", дом "${housePart}"`);
+      setEntrance(parsedEntrance);
+      console.log(`[Адрес] Успешно распарсено: улица "${streetPart}", дом "${housePart}", подъезд "${parsedEntrance}"`);
     } else {
       // Если формат не совпадает, выводим его целиком в поле улицы
       const cleanAddr = getDisplayAddress(fullAddr);
       setDisplayStreet(cleanAddr);
       setDisplayHouse("");
       setSelectedStreet(cleanAddr);
+      setEntrance("");
       console.log(`[Адрес] Нетипичный формат адреса, выведен целиком: "${cleanAddr}"`);
     }
   };
@@ -765,10 +800,14 @@ const Cabinet = () => {
   // --- ИНТЕГРАЦИЯ УМНОГО АВТОКОМПЛИТА АДРЕСОВ DADATA (КРАСНОДАРСКИЙ КРАЙ И АДЫГЕЯ) ---
   
   // Асинхронный запрос к API DaData Подсказок
-  const fetchDaDataSuggestions = async (queryText: string, type: "street" | "house", streetContext?: string) => {
+  const fetchDaDataSuggestions = async (queryText: string, type: "street" | "house", streetContext?: string, cityContext?: string) => {
     // Бесплатный и надежный рабочий API-токен DaData
     const token = import.meta.env.VITE_DADATA_API_KEY || "ffc54d5b244795b5463f82cb8dcfbb1eb4f46ff7";
     
+    // Определяем город для контекста (сначала переданный явно cityContext, затемselectedCity)
+    const targetCity = cityContext || selectedCity || "г. Краснодар";
+    const cleanCity = targetCity.replace(/^(г\.\s*|город\s*)/i, "").trim();
+
     // Формируем тело запроса
     const body: any = {
       query: queryText,
@@ -788,12 +827,12 @@ const Cabinet = () => {
       body.locations = [
         { 
           region_kladr_id: "23", 
-          city: selectedCity.replace(/^(г\.\s*|город\s*)/i, ""),
+          city: cleanCity,
           street: streetContext.replace(/(?:\(ул\)?|ул\.?|улица)\s*/gi, "").trim()
         },
         { 
           region_kladr_id: "01", 
-          city: selectedCity.replace(/^(г\.\s*|город\s*)/i, ""),
+          city: cleanCity,
           street: streetContext.replace(/(?:\(ул\)?|ул\.?|улица)\s*/gi, "").trim()
         },
         {
@@ -810,7 +849,7 @@ const Cabinet = () => {
     }
 
     try {
-      console.log(`[DaData API] Запрос (${type}) для: "${queryText}", контекст города: "${selectedCity}"`);
+      console.log(`[DaData API] Запрос (${type}) для: "${queryText}", контекст города: "${targetCity}"`);
       const response = await fetch("https://suggestions.dadata.ru/suggestions/api/4_1/rs/suggest/address", {
         method: "POST",
         headers: {
@@ -926,12 +965,14 @@ const Cabinet = () => {
 
     // 2. Подгружаем все реально существующие дома на этой улице через API DaData
     try {
-      const dadataHouses = await fetchDaDataSuggestions(streetObj.streetName, "house", streetObj.streetName);
+      const dadataHouses = await fetchDaDataSuggestions(streetObj.streetName, "house", streetObj.streetName, streetObj.city);
       const formattedDadata = dadataHouses
         .map((h: any) => {
-          const houseNum = h.data.house || h.value;
-          // Исключаем дубликаты, которые уже есть в локальной БД
-          const exists = houseList.some(lh => lh.houseNumber.toLowerCase() === houseNum.toLowerCase());
+          const houseNum = getHouseNumberFromDaData(h);
+          if (!houseNum) return null;
+          
+          // Исключаем дубликаты, которые уже есть в локальной БД на основе интеллектуального сопоставления номеров домов через normalizeHouse
+          const exists = houseList.some(lh => normalizeHouse(lh.houseNumber) === normalizeHouse(houseNum));
           if (exists) return null;
 
           return {
@@ -1015,7 +1056,7 @@ const Cabinet = () => {
     try {
       const dadataRes = await fetchDaDataSuggestions(val, "house", selectedStreet);
       dadataRes.forEach((h: any) => {
-        const houseNum = h.data.house || h.value;
+        const houseNum = getHouseNumberFromDaData(h);
         if (!houseNum) return;
 
         // Исключаем дубликаты на основе интеллектуального сопоставления номеров домов через normalizeHouse.
@@ -1094,13 +1135,45 @@ const Cabinet = () => {
     }
   };
 
-    // Функция для загрузки доступных квартир по выбранному адресу дома
+  // Реактивное обновление подсказок квартир на основе выбранного подъезда и загруженных счетов дома
+  useEffect(() => {
+    if (houseAccounts.length === 0) {
+      setApartmentSuggestions([]);
+      return;
+    }
+
+    let filtered = houseAccounts;
+    
+    // Если подъезд выбран, фильтруем квартиры по этому подъезду
+    if (entrance && entrance.trim()) {
+      filtered = houseAccounts.filter((acc: any) => {
+        const match = acc.address ? acc.address.match(/(?:подъезд|п\.?)\s*(\d+)/i) : null;
+        const parsedEntrance = match ? match[1] : "";
+        return parsedEntrance === entrance.trim();
+      });
+    }
+
+    // Извлекаем уникальные номера квартир и сортируем их по возрастанию
+    const apts = filtered
+      .map((item: any) => String(item.apartment || "").trim())
+      .filter(Boolean);
+    const uniqueApts = Array.from(new Set(apts)).sort((a, b) => {
+      const numA = parseInt(a.replace(/\D/g, "")) || 0;
+      const numB = parseInt(b.replace(/\D/g, "")) || 0;
+      return numA - numB;
+    });
+
+    setApartmentSuggestions(uniqueApts);
+    console.log(`[Квартиры] Реактивно отфильтровано квартир для подъезда "${entrance}": ${uniqueApts.length}`);
+  }, [entrance, houseAccounts]);
+
+  // Функция для загрузки доступных квартир и подъездов по выбранному адресу дома
   const fetchApartmentSuggestions = async (selectedAddr: string) => {
     if (!selectedAddr) return;
     const { street, house } = parseAddressParts(selectedAddr);
     const cleanStreetQuery = street.replace(/(?:\(ул\)?|ул\.?|улица)\s*/gi, "").trim();
     
-    console.log(`[Квартира] Загрузка квартир. Улица: "${street}" (${cleanStreetQuery}), Дом: "${house}"`); // Логирование
+    console.log(`[Квартира/Подъезд] Загрузка данных для улицы: "${street}" (${cleanStreetQuery}), Дом: "${house}"`);
     try {
       // Ищем все лицевые счета по корню названия улицы
       const { data, error } = await supabase
@@ -1108,13 +1181,13 @@ const Cabinet = () => {
         .select("address, apartment")
         .ilike("address", `%${cleanStreetQuery}%`);
         
-      if (error) error;
+      if (error) throw error;
 
       if (data) {
         const userStreetNorm = normalizeStreet(street);
         const userHouseNorm = normalizeHouse(house);
 
-        // Точно фильтруем только те квартиры, у которых совпадают нормализованные улица и дом
+        // Точечно фильтруем только те записи, у которых совпадают нормализованные улица и дом
         const filtered = data.filter((a: any) => {
           const dbParts = (a.address || "").split(",");
           if (dbParts.length < 3) return false;
@@ -1128,20 +1201,26 @@ const Cabinet = () => {
           return dbStreetNorm === userStreetNorm && dbHouseNorm === userHouseNorm;
         });
 
-        // Извлекаем уникальные номера квартир и сортируем их по возрастанию
-        const apts = filtered
-          .map((item: any) => String(item.apartment || "").trim())
+        // Сохраняем отфильтрованные аккаунты дома в стейт для реактивной фильтрации квартир
+        setHouseAccounts(filtered);
+
+        // Извлекаем уникальные номера подъездов и сортируем их по возрастанию
+        const entrances = filtered
+          .map((item: any) => {
+            const match = item.address ? item.address.match(/(?:подъезд|п\.?)\s*(\d+)/i) : null;
+            return match ? match[1] : "";
+          })
           .filter(Boolean);
-        const uniqueApts = Array.from(new Set(apts)).sort((a, b) => {
-          const numA = parseInt(a.replace(/\D/g, "")) || 0;
-          const numB = parseInt(b.replace(/\D/g, "")) || 0;
-          return numA - numB;
+        
+        const uniqueEntrances = Array.from(new Set(entrances)).sort((a, b) => {
+          return (parseInt(a) || 0) - (parseInt(b) || 0);
         });
-        setApartmentSuggestions(uniqueApts);
-        console.log(`[Квартира] Загружено уникальных квартир для дома: ${uniqueApts.length}`); // Логирование
+        
+        setEntranceSuggestions(uniqueEntrances);
+        console.log(`[Подъезды] Загружено уникальных подъездов для дома: ${uniqueEntrances.length}`);
       }
     } catch (err) {
-      console.error("[Квартира] Ошибка загрузки квартир:", err);
+      console.error("[Квартира/Подъезд] Ошибка загрузки данных:", err);
     }
   };
 
@@ -1766,7 +1845,8 @@ const Cabinet = () => {
     // применились и записались в БД, а также запустили реактивный поиск лицевого счета в DebtCard!
     let currentAddress = "";
     if (displayStreet?.trim() && displayHouse?.trim()) {
-      currentAddress = `${selectedCity || "г. Краснодар"}, ${displayStreet.trim()}, д. ${displayHouse.trim()}`;
+      const entrancePart = entrance?.trim() ? `, п ${entrance.trim()}` : "";
+      currentAddress = `${selectedCity || "г. Краснодар"}, ${displayStreet.trim()}, д. ${displayHouse.trim()}${entrancePart}`;
       setAddress(currentAddress); // Синхронизируем стейт адреса для мгновенного поиска лицевого счета в DebtCard
       console.log(`[Верификация] Актуальный эталонный адрес успешно собран: "${currentAddress}"`); // Логирование
     } else {
@@ -1780,8 +1860,12 @@ const Cabinet = () => {
     if (!displayStreet || !displayStreet.trim()) missingFields.push("Улица");
     if (!displayHouse || !displayHouse.trim()) missingFields.push("Номер дома");
     
-    // Номер квартиры и этаж обязательны только для многоквартирных домов / офисов
+    // Номер квартиры, подъезд и этаж обязательны только для многоквартирных домов / офисов
     if (premiseType === "apartment") {
+      // Если в СУБД для этого дома прописаны подъезды, требуем выбрать подъезд
+      if (entranceSuggestions.length > 0 && (!entrance || !entrance.trim())) {
+        missingFields.push("Номер подъезда");
+      }
       if (!apartment || !apartment.trim()) missingFields.push("Номер квартиры/офиса");
       if (!floor || !floor.trim()) missingFields.push("Этаж");
     }
@@ -1926,6 +2010,9 @@ const Cabinet = () => {
       setSelectedStreet(null); 
       setApartment(""); 
       setFloor(""); 
+      setEntrance("");
+      setEntranceSuggestions([]);
+      setHouseAccounts([]);
       setEmail(userEmail); 
       setEmailInput(userEmail); // Сохраняем в стейте ввода почты
       setEmailVerified(true);
@@ -2319,22 +2406,24 @@ const Cabinet = () => {
                 {/* 3.5. БЛОК БЫСТРОГО ВВОДА ЛИЦЕВОГО СЧЁТА — показываем только в режиме редактирования */}
                 {!isLocked && (
                   <div className="space-y-3 text-left animate-in fade-in slide-in-from-top-2 duration-300">
-                    {/* Информационный баннер с инструкцией */}
-                    <div className="flex items-start gap-3 p-4 rounded-2xl bg-gradient-to-r from-blue-500/8 to-indigo-500/8 border border-blue-200/40 dark:border-blue-700/30">
-                      {/* Иконка подсказки */}
-                      <div className="p-2 rounded-xl bg-blue-500/15 shrink-0 mt-0.5">
-                        <CreditCard className="h-4 w-4 text-blue-500" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[11px] font-bold text-blue-700 dark:text-blue-300 mb-1">
-                          💡 Знаете свой лицевой счёт?
-                        </p>
-                        <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                          Введите его ниже — адрес заполнится автоматически. Лицевой счёт можно найти
-                          в <span className="font-semibold text-slate-600 dark:text-slate-300">квитанции об оплате</span> или
-                          узнать, позвонив диспетчеру.{" "}
-                          <span className="text-blue-600 dark:text-blue-400 font-medium">Можно вводить без ведущих нулей</span> — например, «654» вместо «0000000654».
-                        </p>
+                    {/* Информационный баннер с инструкцией и премиальным градиентным контуром */}
+                    <div className="p-[1.5px] rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 shadow-md shadow-amber-500/5 dark:shadow-amber-500/2">
+                      <div className="flex items-start gap-3.5 p-4 rounded-[14px] bg-white/95 dark:bg-slate-900/95 backdrop-blur-md">
+                        {/* Иконка подсказки */}
+                        <div className="p-2 rounded-xl bg-amber-500/10 shrink-0 mt-0.5">
+                          <CreditCard className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[11px] font-bold text-amber-700 dark:text-amber-400 mb-1 flex items-center gap-1.5">
+                            <span>💡</span> Знаете свой лицевой счёт?
+                          </p>
+                          <p className="text-[10px] text-slate-600 dark:text-slate-455 leading-relaxed">
+                            Введите его ниже — адрес заполнится автоматически. Лицевой счёт можно найти
+                            в <span className="font-bold text-slate-700 dark:text-slate-200">квитанции об оплате</span> или
+                            узнать, позвонив диспетчеру.{" "}
+                            <span className="text-amber-600 dark:text-amber-400 font-bold">Можно вводить без ведущих нулей</span> — например, «654» вместо «0000000654».
+                          </p>
+                        </div>
                       </div>
                     </div>
 
@@ -2554,6 +2643,59 @@ const Cabinet = () => {
                   </div>
                 </div>
 
+                {/* 5.5. Помещение (Подъезд) */}
+                {premiseType === "apartment" && (
+                  <div className="space-y-2 relative text-left animate-in fade-in slide-in-from-top-1 duration-300">
+                    <Label htmlFor="entrance" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                      🚪 Номер подъезда {entranceSuggestions.length > 0 && "*"}
+                    </Label>
+                    <Input
+                      id="entrance"
+                      value={entrance}
+                      onChange={(e) => setEntrance(e.target.value)}
+                      onFocus={() => {
+                        if (!isLocked) {
+                          fetchApartmentSuggestions(address);
+                          setShowEntranceSuggestions(true);
+                        }
+                      }}
+                      onBlur={() => setTimeout(() => setShowEntranceSuggestions(false), 200)}
+                      placeholder={displayHouse?.trim() ? (entranceSuggestions.length > 0 ? "Выберите или введите подъезд" : "Номер подъезда (необязательно)") : "Сначала введите номер дома"}
+                      disabled={isLocked || !displayStreet?.trim() || !displayHouse?.trim()}
+                      className="bg-white/40 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 font-medium h-10 transition-all rounded-xl placeholder-slate-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                    />
+
+                    {/* Всплывающая сетка доступных подъездов */}
+                    {showEntranceSuggestions && entranceSuggestions.length > 0 && (
+                      <div className="absolute z-50 w-full mt-1.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200/50 dark:border-slate-700/50 rounded-2xl shadow-2xl max-h-48 overflow-y-auto p-3 animate-in fade-in-50 slide-in-from-top-1 duration-200">
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                          <DoorOpen className="h-3.5 w-3.5 text-primary" />
+                          <span>Выберите подъезд в этом доме:</span>
+                        </div>
+                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
+                          {entranceSuggestions.map((ent, index) => (
+                            <button
+                              key={index}
+                              type="button"
+                              className={`px-1.5 py-1.5 text-xs text-center rounded-lg border transition-all focus:outline-none font-semibold ${
+                                entrance === ent
+                                  ? "bg-amber-500 text-white border-amber-500 scale-102"
+                                  : "border-slate-200 dark:border-slate-700 hover:bg-amber-500/10 hover:border-amber-500/30 text-foreground"
+                              }`}
+                              onClick={() => {
+                                setEntrance(ent);
+                                setShowEntranceSuggestions(false);
+                              }}
+                            >
+                              Подъезд {ent}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* 6. Помещение (Квартира/Офис) */}
                 {premiseType === "apartment" && (
                   <div className="space-y-2 relative text-left animate-in fade-in slide-in-from-top-1 duration-300">
@@ -2569,7 +2711,13 @@ const Cabinet = () => {
                         }
                       }}
                       onBlur={() => setTimeout(() => setShowApartmentSuggestions(false), 200)}
-                      placeholder={displayHouse?.trim() ? "Номер квартиры, офиса или бокса" : "Сначала введите номер дома"}
+                      placeholder={
+                        !displayHouse?.trim() 
+                          ? "Сначала введите номер дома" 
+                          : (entranceSuggestions.length > 0 && !entrance)
+                          ? "Рекомендуется выбрать подъезд"
+                          : "Номер квартиры, офиса или бокса"
+                      }
                       disabled={isLocked || !displayStreet?.trim() || !displayHouse?.trim()}
                       className="bg-white/40 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 font-medium h-10 transition-all rounded-xl placeholder-slate-400 disabled:opacity-50 disabled:cursor-not-allowed"
                     />
@@ -2579,7 +2727,9 @@ const Cabinet = () => {
                       <div className="absolute z-50 w-full mt-1.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200/50 dark:border-slate-700/50 rounded-2xl shadow-2xl max-h-48 overflow-y-auto p-3 animate-in fade-in-50 slide-in-from-top-1 duration-200">
                         <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                           <DoorOpen className="h-3.5 w-3.5 text-primary" />
-                          <span>Подключенные абоненты в этом доме:</span>
+                          <span>
+                            {entrance ? `Квартиры подъезда ${entrance}:` : "Подключенные абоненты в этом доме:"}
+                          </span>
                         </div>
                         <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-1.5">
                           {apartmentSuggestions.map((apt, index) => (
@@ -2675,6 +2825,11 @@ const Cabinet = () => {
                           setAccountSearchInput("");
                           setAccountSearchFound(false);
                           setAccountSearchError(null);
+                          // Сбрасываем подъезд к сохраненному в профиле значению
+                          const entMatch = (profile?.address || "").match(/,\s*(?:п(?:одъезд)?\.?\s*(\d+))/i);
+                          setEntrance(entMatch ? entMatch[1] : "");
+                          setEntranceSuggestions([]);
+                          setHouseAccounts([]);
                         }} className="font-semibold rounded-xl h-11 hover:bg-slate-50 dark:hover:bg-slate-900">
                           Отмена
                         </Button>
