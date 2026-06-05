@@ -278,6 +278,50 @@
     background: linear-gradient(135deg, #F59E0B 0%, #D4AF37 100%);
   }
 
+  /* Премиальная стилизация кнопок с контуром (outline) для светлой темы.
+     Вместо белого фона, кнопки получают полупрозрачный светло-синий оттенок,
+     а также выраженную синюю рамку и темно-синий читаемый текст. */
+  button.border-input, 
+  a.border-input, 
+  [role="button"].border-input {
+    border-color: rgba(37, 99, 235, 0.25) !important;
+    background-color: rgba(239, 246, 255, 0.7) !important;
+    color: #1e3a8a !important; /* Глубокий благородный синий */
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.04) !important;
+    transition: var(--transition-base) !important;
+  }
+
+  /* Эффект при наведении на outline кнопки (светлая тема) */
+  button.border-input:hover, 
+  a.border-input:hover, 
+  [role="button"].border-input:hover {
+    background-color: rgba(191, 219, 254, 0.45) !important;
+    border-color: rgba(37, 99, 235, 0.45) !important;
+    color: #1d4ed8 !important; /* Яркий бренд-синий */
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.1) !important;
+    transform: translateY(-1px);
+  }
+
+  /* Для темной темы (dark mode) */
+  .dark button.border-input, 
+  .dark a.border-input, 
+  .dark [role="button"].border-input {
+    border-color: rgba(255, 255, 255, 0.1) !important;
+    background-color: rgba(15, 23, 42, 0.5) !important;
+    color: #cbd5e1 !important; /* Комфортный серый текст */
+    box-shadow: none !important;
+  }
+
+  /* Эффект при наведении (темная тема) */
+  .dark button.border-input:hover, 
+  .dark a.border-input:hover, 
+  .dark [role="button"].border-input:hover {
+    background-color: rgba(255, 255, 255, 0.06) !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+    color: #ffffff !important;
+    transform: translateY(-1px);
+  }
+
   @keyframes glow {
     0%, 100% {
       opacity: 0.5;
