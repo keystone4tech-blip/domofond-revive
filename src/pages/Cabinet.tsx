@@ -2414,14 +2414,15 @@ const Cabinet = () => {
                           <CreditCard className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-[11px] font-bold text-amber-700 dark:text-amber-400 mb-1 flex items-center gap-1.5">
+                          <p className="text-[11px] font-bold text-blue-700 dark:text-amber-400 mb-1 flex items-center gap-1.5">
                             <span>💡</span> Знаете свой лицевой счёт?
                           </p>
-                          <p className="text-[10px] text-slate-600 dark:text-slate-455 leading-relaxed">
+                          {/* Текст баннера: на светлой теме text-slate-900 (черный) с выделением text-blue-600 (синий), на темной теме text-slate-200 (белый) с выделением text-amber-400 (желтый) */}
+                          <p className="text-[10px] text-slate-900 dark:text-slate-200 leading-relaxed">
                             Введите его ниже — адрес заполнится автоматически. Лицевой счёт можно найти
-                            в <span className="font-bold text-slate-700 dark:text-slate-200">квитанции об оплате</span> или
+                            в <span className="font-bold text-blue-600 dark:text-amber-400">квитанции об оплате</span> или
                             узнать, позвонив диспетчеру.{" "}
-                            <span className="text-amber-600 dark:text-amber-400 font-bold">Можно вводить без ведущих нулей</span> — например, «654» вместо «0000000654».
+                            <span className="text-blue-600 dark:text-amber-400 font-bold">Можно вводить без ведущих нулей</span> — например, «654» вместо «0000000654».
                           </p>
                         </div>
                       </div>
