@@ -872,6 +872,9 @@ const Cabinet = () => {
   // Обработка ручного ввода в поле «Улица»
   const handleStreetInputChange = async (val: string) => {
     setDisplayStreet(val);
+    setEntrance("");
+    setApartment("");
+    setFloor("");
     setSelectedStreet(val); // Сохраняем текущий ручной ввод улицы для разблокировки инпута дома и передачи контекста в DaData
     setDisplayHouse(""); // Сбрасываем дом при смене улицы
     setHouseSuggestions([]);
@@ -932,6 +935,9 @@ const Cabinet = () => {
     setSelectedStreet(streetObj.streetName);
     setSelectedCity(streetObj.city);
     setDisplayStreet(streetObj.streetName);
+    setEntrance("");
+    setApartment("");
+    setFloor("");
     setDisplayHouse(""); // При переключении улицы сбрасываем выбранный ранее дом
     setShowStreetSuggestions(false);
     setStreetSuggestions([]);
@@ -1019,6 +1025,9 @@ const Cabinet = () => {
   // Обработка ручного ввода в поле «Дом»
   const handleHouseInputChange = async (val: string) => {
     setDisplayHouse(val);
+    setEntrance("");
+    setApartment("");
+    setFloor("");
     setShowHouseSuggestions(true);
     setShowStreetSuggestions(false);
 
@@ -1104,6 +1113,9 @@ const Cabinet = () => {
     if (!selectedStreet) return;
     console.log(`[Автокомплит Домов] Выбран дом: "${houseObj.houseNumber}", подключен к сети: ${houseObj.isLocal}`);
     setDisplayHouse(houseObj.houseNumber);
+    setEntrance("");
+    setApartment("");
+    setFloor("");
     setShowHouseSuggestions(false);
     setHouseSuggestions([]);
     
@@ -1258,6 +1270,16 @@ const Cabinet = () => {
       setTimeout(() => setIsVisible(prev => ({ ...prev, content: true })), 1000);
     }
   }, [loading]);
+
+  useEffect(() => {
+    const isApartment = !!apartment?.trim();
+    setPremiseType(isApartment ? "apartment" : "private");
+  }, [apartment]);
+
+  useEffect(() => {
+    const isApartment = !!orderApartment?.trim();
+    setOrderPremiseType(isApartment ? "apartment" : "private");
+  }, [orderApartment]);
 
   useEffect(() => {
     checkUser();
@@ -2536,40 +2558,7 @@ const Cabinet = () => {
                   </div>
                 )}
 
-                {/* 4. Выбор Типа Недвижимости (Квартира/Офис vs Частный дом) */}
-                <div className="space-y-2 text-left">
-                  <Label className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">🏠 Тип недвижимости *</Label>
-                  <div className="flex rounded-xl border border-slate-200 dark:border-slate-700 p-1 bg-white/20 dark:bg-slate-900/20 w-full">
-                    <button
-                      type="button"
-                      disabled={isLocked}
-                      onClick={() => setPremiseType("apartment")}
-                      className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 disabled:opacity-70 ${
-                        premiseType === "apartment"
-                          ? "bg-white dark:bg-slate-800 text-foreground shadow-sm font-bold"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      🏢 Квартира / Офис
-                    </button>
-                    <button
-                      type="button"
-                      disabled={isLocked}
-                      onClick={() => {
-                        setPremiseType("private");
-                        setApartment(""); // Очищаем квартиру для частного сектора
-                        setFloor(""); // Очищаем этаж
-                      }}
-                      className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 disabled:opacity-70 ${
-                        premiseType === "private"
-                          ? "bg-white dark:bg-slate-800 text-foreground shadow-sm font-bold"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      🏡 Частный дом / Здание
-                    </button>
-                  </div>
-                </div>
+
 
                 {/* 5. Раздельные поля Улицы и Дома с DaData-автокомплитом */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2668,129 +2657,137 @@ const Cabinet = () => {
                   </div>
                 </div>
 
-                {/* 5.5 и 6. Подъезд и Квартира на одной строке */}
-                {premiseType === "apartment" && (
-                  <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-1 duration-300">
-                    {/* 5.5. Помещение (Подъезд) */}
-                    <div className="space-y-2 relative text-left">
-                      <Label htmlFor="entrance" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                        🚪 Номер подъезда {entranceSuggestions.length > 0 && "*"}
-                      </Label>
-                      <Input
-                        id="entrance"
-                        value={entrance}
-                        onChange={(e) => setEntrance(e.target.value)}
-                        onFocus={() => {
-                          if (!isLocked) {
-                            fetchApartmentSuggestions(address);
-                            setShowEntranceSuggestions(true);
-                          }
-                        }}
-                        onBlur={() => setTimeout(() => setShowEntranceSuggestions(false), 200)}
-                        placeholder={displayHouse?.trim() ? (entranceSuggestions.length > 0 ? "Выберите или введите подъезд" : "Номер подъезда (необязательно)") : "Сначала введите номер дома"}
-                        disabled={isLocked || !displayStreet?.trim() || !displayHouse?.trim()}
-                        className="bg-white/40 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 font-medium h-10 transition-all rounded-xl placeholder-slate-400 disabled:opacity-50 disabled:cursor-not-allowed"
-                      />
-
-                      {/* Всплывающая сетка доступных подъездов */}
-                      {showEntranceSuggestions && entranceSuggestions.length > 0 && (
-                        <div className="absolute z-50 w-full mt-1.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200/50 dark:border-slate-700/50 rounded-2xl shadow-2xl max-h-48 overflow-y-auto p-3 animate-in fade-in-50 slide-in-from-top-1 duration-200">
-                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                            <DoorOpen className="h-3.5 w-3.5 text-primary" />
-                            <span>Выберите подъезд в этом доме:</span>
-                          </div>
-                          <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
-                            {entranceSuggestions.map((ent, index) => (
-                              <button
-                                key={index}
-                                type="button"
-                                className={`px-1.5 py-1.5 text-xs text-center rounded-lg border transition-all focus:outline-none font-semibold ${
-                                  entrance === ent
-                                    ? "bg-amber-500 text-white border-amber-500 scale-102"
-                                    : "border-slate-200 dark:border-slate-700 hover:bg-amber-500/10 hover:border-amber-500/30 text-foreground"
-                                }`}
-                                onClick={() => {
-                                  setEntrance(ent);
-                                  setShowEntranceSuggestions(false);
-                                }}
-                              >
-                                Подъезд {ent}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* 6. Помещение (Квартира/Офис) */}
-                    <div className="space-y-2 relative text-left">
-                      <Label htmlFor="apartment" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">🏢 Квартира / Офис / Помещение *</Label>
-                      <Input
-                        id="apartment"
-                        value={apartment}
-                        onChange={(e) => setApartment(e.target.value)}
-                        onFocus={() => {
-                          if (!isLocked) {
-                            fetchApartmentSuggestions(address);
-                            setShowApartmentSuggestions(true);
-                          }
-                        }}
-                        onBlur={() => setTimeout(() => setShowApartmentSuggestions(false), 200)}
-                        placeholder={
-                          !displayHouse?.trim() 
-                            ? "Сначала введите номер дома" 
-                            : (entranceSuggestions.length > 0 && !entrance)
-                            ? "Рекомендуется выбрать подъезд"
-                            : "Номер квартиры, офиса или бокса"
-                        }
-                        disabled={isLocked || !displayStreet?.trim() || !displayHouse?.trim()}
-                        className="bg-white/40 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 font-medium h-10 transition-all rounded-xl placeholder-slate-400 disabled:opacity-50 disabled:cursor-not-allowed"
-                      />
-
-                      {/* Всплывающая сетка доступных квартир */}
-                      {showApartmentSuggestions && apartmentSuggestions.length > 0 && (
-                        <div className="absolute z-50 w-full mt-1.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200/50 dark:border-slate-700/50 rounded-2xl shadow-2xl max-h-48 overflow-y-auto p-3 animate-in fade-in-50 slide-in-from-top-1 duration-200">
-                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                            <DoorOpen className="h-3.5 w-3.5 text-primary" />
-                            <span>
-                              {entrance ? `Квартиры подъезда ${entrance}:` : "Подключенные абоненты в этом доме:"}
-                            </span>
-                          </div>
-                          <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-1.5">
-                            {apartmentSuggestions.map((apt, index) => (
-                              <button
-                                key={index}
-                                type="button"
-                                className="px-1.5 py-1.5 text-xs text-center rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-amber-500/10 hover:border-amber-500/30 transition-all focus:bg-amber-500/10 focus:outline-none font-semibold text-foreground hover:scale-105 active:scale-95"
-                                onClick={() => {
-                                  setApartment(apt);
-                                  setShowApartmentSuggestions(false);
-                                }}
-                              >
-                                {apt}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                {/* Информационная подсказка о важности полных данных */}
+                {((displayStreet?.trim() && displayHouse?.trim()) || entrance || apartment || floor) && (
+                  <div className="flex items-start gap-2.5 text-[11px] text-blue-700 dark:text-blue-300 bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200/50 dark:border-blue-800/30 px-3.5 py-3 rounded-xl animate-in fade-in duration-300 text-left my-2">
+                    <Info className="h-4 w-4 shrink-0 mt-0.5 text-blue-500" />
+                    <div>
+                      <span className="font-bold">Пожалуйста, укажите полные данные</span> (подъезд, квартира, этаж), если они у вас есть. Это позволит нам значительно быстрее реагировать на ваши заявки по ремонту и доставке ключей.
                     </div>
                   </div>
                 )}
 
-                {/* 7. Этаж */}
-                {premiseType === "apartment" && (
-                  <div className="space-y-2 text-left animate-in fade-in slide-in-from-top-1 duration-300">
-                    <Label htmlFor="floor" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">🏢 Этаж *</Label>
+                {/* Поля Подъезд, Квартира и Этаж в единой сетке */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 animate-in fade-in duration-300">
+                  {/* 5.5. Помещение (Подъезд) */}
+                  <div className="space-y-2 relative text-left">
+                    <Label htmlFor="entrance" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                      🚪 Номер подъезда
+                    </Label>
+                    <Input
+                      id="entrance"
+                      value={entrance}
+                      onChange={(e) => setEntrance(e.target.value)}
+                      onFocus={() => {
+                        if (!isLocked) {
+                          fetchApartmentSuggestions(address);
+                          setShowEntranceSuggestions(true);
+                        }
+                      }}
+                      onBlur={() => setTimeout(() => setShowEntranceSuggestions(false), 200)}
+                      placeholder={displayHouse?.trim() ? (entranceSuggestions.length > 0 ? "Выберите подъезд" : "Номер подъезда") : "Сначала введите дом"}
+                      disabled={isLocked || !displayStreet?.trim() || !displayHouse?.trim()}
+                      className="bg-white/40 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 font-medium h-10 transition-all rounded-xl placeholder-slate-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                    />
+
+                    {/* Всплывающая сетка доступных подъездов */}
+                    {showEntranceSuggestions && entranceSuggestions.length > 0 && (
+                      <div className="absolute z-50 w-full mt-1.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200/50 dark:border-slate-700/50 rounded-2xl shadow-2xl max-h-48 overflow-y-auto p-3 animate-in fade-in-50 slide-in-from-top-1 duration-200">
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                          <DoorOpen className="h-3.5 w-3.5 text-primary" />
+                          <span>Выберите подъезд в этом доме:</span>
+                        </div>
+                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
+                          {entranceSuggestions.map((ent, index) => (
+                            <button
+                              key={index}
+                              type="button"
+                              className={`px-1.5 py-1.5 text-xs text-center rounded-lg border transition-all focus:outline-none font-semibold ${
+                                entrance === ent
+                                  ? "bg-amber-500 text-white border-amber-500 scale-102"
+                                  : "border-slate-200 dark:border-slate-700 hover:bg-amber-500/10 hover:border-amber-500/30 text-foreground"
+                              }`}
+                              onClick={() => {
+                                setEntrance(ent);
+                                setShowEntranceSuggestions(false);
+                              }}
+                            >
+                              Подъезд {ent}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 6. Помещение (Квартира/Офис) */}
+                  <div className="space-y-2 relative text-left">
+                    <Label htmlFor="apartment" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">🏢 Квартира / Офис / Помещение</Label>
+                    <Input
+                      id="apartment"
+                      value={apartment}
+                      onChange={(e) => {
+                        setApartment(e.target.value);
+                        setFloor(""); // Сбрасываем этаж при изменении квартиры вручную
+                      }}
+                      onFocus={() => {
+                        if (!isLocked) {
+                          fetchApartmentSuggestions(address);
+                          setShowApartmentSuggestions(true);
+                        }
+                      }}
+                      onBlur={() => setTimeout(() => setShowApartmentSuggestions(false), 200)}
+                      placeholder={
+                        !displayHouse?.trim() 
+                          ? "Сначала введите дом" 
+                          : "Квартира или офис"
+                      }
+                      disabled={isLocked || !displayStreet?.trim() || !displayHouse?.trim()}
+                      className="bg-white/40 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 font-medium h-10 transition-all rounded-xl placeholder-slate-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                    />
+
+                    {/* Всплывающая сетка доступных квартир */}
+                    {showApartmentSuggestions && apartmentSuggestions.length > 0 && (
+                      <div className="absolute z-50 w-full mt-1.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200/50 dark:border-slate-700/50 rounded-2xl shadow-2xl max-h-48 overflow-y-auto p-3 animate-in fade-in-50 slide-in-from-top-1 duration-200">
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                          <DoorOpen className="h-3.5 w-3.5 text-primary" />
+                          <span>
+                            {entrance ? `Квартиры подъезда ${entrance}:` : "Подключенные абоненты в этом доме:"}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-1.5">
+                          {apartmentSuggestions.map((apt, index) => (
+                            <button
+                              key={index}
+                              type="button"
+                              className="px-1.5 py-1.5 text-xs text-center rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-amber-500/10 hover:border-amber-500/30 transition-all focus:bg-amber-500/10 focus:outline-none font-semibold text-foreground hover:scale-105 active:scale-95"
+                              onClick={() => {
+                                setApartment(apt);
+                                setFloor(""); // Сбрасываем этаж при выборе квартиры из подсказок
+                                setShowApartmentSuggestions(false);
+                              }}
+                            >
+                              {apt}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 7. Этаж */}
+                  <div className="space-y-2 text-left">
+                    <Label htmlFor="floor" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">🏢 Этаж</Label>
                     <Input
                       id="floor"
                       value={floor}
                       onChange={(e) => setFloor(e.target.value)}
-                      placeholder={apartment?.trim() ? "Номер этажа" : "Сначала введите номер квартиры"}
-                      disabled={isLocked || !displayStreet?.trim() || !displayHouse?.trim() || !apartment?.trim()}
+                      placeholder="Номер этажа"
+                      disabled={isLocked || !displayStreet?.trim() || !displayHouse?.trim()}
                       className="bg-white/40 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 font-medium h-10 transition-all rounded-xl placeholder-slate-400 disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                   </div>
-                )}
+                </div>
 
                 {/* 8. Согласие ФЗ-152 РФ */}
                 {!isLocked && (
@@ -2815,7 +2812,6 @@ const Cabinet = () => {
                     phone?.trim() &&
                     displayStreet?.trim() &&
                     displayHouse?.trim() &&
-                    (premiseType === "private" || (apartment?.trim() && floor?.trim())) && // Этаж обязателен для квартир/офисов
                     emailInput?.trim() &&
                     agreedToTerms
                   );
@@ -3074,42 +3070,7 @@ const Cabinet = () => {
                     </div>
                   </div>
 
-                  {/* Переключатель типа помещения для заявки */}
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Тип недвижимости</Label>
-                    <div className="flex rounded-xl border border-slate-200 dark:border-slate-800 p-0.5 bg-white/20 dark:bg-slate-900/20 max-w-xs">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setOrderPremiseType("apartment");
-                          console.log("[Заявка] Выбран тип помещения: Квартира/Офис");
-                        }}
-                        className={`flex-1 py-1 text-xs font-semibold rounded-lg transition-all ${
-                          orderPremiseType === "apartment"
-                            ? "bg-white dark:bg-slate-800 text-foreground shadow-sm font-bold"
-                            : "text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        🏢 Кв. / Офис
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setOrderPremiseType("private");
-                          console.log("[Заявка] Выбран тип помещения: Частный дом");
-                        }}
-                        className={`flex-1 py-1 text-xs font-semibold rounded-lg transition-all ${
-                          orderPremiseType === "private"
-                            ? "bg-white dark:bg-slate-800 text-foreground shadow-sm font-bold"
-                            : "text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        🏡 Частный дом
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Адрес: Улица, Дом, Квартира */}
+                  {/* Адрес: Улица, Дом, Квартира в одной строке без ручного выбора типа недвижимости */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="space-y-1.5 sm:col-span-1">
                       <Label htmlFor="orderStreet" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-0.5">
@@ -3135,20 +3096,18 @@ const Cabinet = () => {
                         className="bg-white/50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 h-9 text-sm font-medium transition-all rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
                       />
                     </div>
-                    {orderPremiseType === "apartment" && (
-                      <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
-                        <Label htmlFor="orderApartment" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-0.5">
-                          Кв. / Офис <span className="text-destructive">*</span>
-                        </Label>
-                        <Input
-                          id="orderApartment"
-                          value={orderApartment}
-                          onChange={(e) => setOrderApartment(e.target.value)}
-                          placeholder="Например: 12"
-                          className="bg-white/50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 h-9 text-sm font-medium transition-all rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
-                        />
-                      </div>
-                    )}
+                    <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                      <Label htmlFor="orderApartment" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-0.5">
+                        Кв. / Офис
+                      </Label>
+                      <Input
+                        id="orderApartment"
+                        value={orderApartment}
+                        onChange={(e) => setOrderApartment(e.target.value)}
+                        placeholder="Например: 12"
+                        className="bg-white/50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 h-9 text-sm font-medium transition-all rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
+                      />
+                    </div>
                   </div>
                 </div>
 
