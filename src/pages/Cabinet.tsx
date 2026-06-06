@@ -64,6 +64,18 @@ const normalizeApartment = (a: string) =>
     .replace(/[^а-яa-z0-9]/g, "")
     .trim();
 
+// Вспомогательная функция для надежного извлечения квартиры из полной строки адреса.
+// Помогает получить квартиру, если в БД accounts поле apartment пустое, но квартира записана в адресе.
+const extractApartmentFromAddress = (addr: string): string => {
+  if (!addr) return "";
+  // Ищем ", кв. 15", ", кв.15", ", квартира 15", ", кв 15", ", кв. 15-а", ", кв. 15б" и т.д.
+  // Поддерживаем русские/английские буквы, цифры, дефисы.
+  const match = addr.match(/,\s*(?:кв\.?|квартира)\s*([а-яa-z0-9-+]+)/i);
+  const result = match ? match[1].trim() : "";
+  console.log(`[Адрес: Квартира] Извлечение из "${addr}" -> "${result}"`); // Логирование
+  return result;
+};
+
 // Вспомогательная функция для динамического определения города для локальных улиц
 const getCityForLocalStreet = (streetName: string, housesCache: string[]): string => {
   if (!streetName || !housesCache || housesCache.length === 0) return "г. Краснодар";
@@ -116,9 +128,10 @@ const extractHousePartFromCacheAddr = (cacheAddr: string): string => {
   // Убираем приставку "д." или "дом" только из начала
   fullHousePart = fullHousePart.replace(/^(д\.\s*|дом\s*)/i, "").trim();
   // Принудительно очищаем от информации о подъездах и квартирах, если они попали сюда из сырого адреса accounts
+  // Заменяем \w+ на [а-яa-z0-9-+]+ для корректной поддержки букв в квартирах при очистке
   fullHousePart = fullHousePart
     .replace(/,\s*(?:п(?:одъезд)?\.?\s*\d+).*$/i, "")
-    .replace(/,\s*(?:кв\.?\s*\w+).*$/i, "")
+    .replace(/,\s*(?:кв\.?\s*[а-яa-z0-9-+]+).*$/i, "")
     .trim();
   return fullHousePart;
 };
@@ -127,9 +140,10 @@ const parseAddressParts = (fullAddr: string) => {
   if (!fullAddr) return { street: "", house: "" };
   
   // Очищаем адрес от подъезда и квартиры
+  // Заменяем \d+ на [а-яa-z0-9-+]+ для корректного вырезания квартир с литерами (например, "15а")
   const cleanAddr = fullAddr
     .replace(/,\s*(?:п(?:одъезд)?\.?\s*\d+).*$/i, "")
-    .replace(/,\s*(?:кв\.?\s*\d+).*$/i, "");
+    .replace(/,\s*(?:кв\.?\s*[а-яa-z0-9-+]+).*$/i, "");
     
   const parts = cleanAddr.split(",");
   let parsedStreet = "";
@@ -191,13 +205,27 @@ const DebtCard = ({ address, apartment, fullName, phone, embedded = false, setPa
           if (dbParts.length < 3) return false;
 
           const dbStreetNorm = normalizeStreet(dbParts[1]);
+          
+          // Вырезаем подъезды и квартиры (с поддержкой буквенных квартир) из номера дома
           const dbHouseFull = dbParts.slice(2).join(", ")
             .replace(/,\s*(?:п(?:одъезд)?\.?\s*\d+).*$/i, "")
-            .replace(/,\s*(?:кв\.?\s*\d+).*$/i, "");
+            .replace(/,\s*(?:кв\.?\s*[а-яa-z0-9-+]+).*$/i, "");
           const dbHouseNorm = normalizeHouse(dbHouseFull);
-          const dbAptNorm = normalizeApartment(a.apartment || "");
+          
+          // Надежно извлекаем номер квартиры (из поля `apartment` или из строки адреса)
+          const dbApt = a.apartment?.trim() || extractApartmentFromAddress(a.address || "");
+          const dbAptNorm = normalizeApartment(dbApt);
 
-          return dbStreetNorm === userStreetNorm && dbHouseNorm === userHouseNorm && dbAptNorm === userAptNorm;
+          const isMatch = dbStreetNorm === userStreetNorm && dbHouseNorm === userHouseNorm && dbAptNorm === userAptNorm;
+          
+          if (isMatch) {
+            console.log(`[Баланс: Сравнение] ✅ Совпадение! БД улица: "${dbStreetNorm}" (ввод: "${userStreetNorm}"), БД дом: "${dbHouseNorm}" (ввод: "${userHouseNorm}"), БД кв: "${dbAptNorm}" (ввод: "${userAptNorm}")`);
+          } else {
+            // Подробный лог несовпадения для упрощения отладки в консоли
+            console.log(`[Баланс: Сравнение] ❌ Не совпало. БД: у (${dbStreetNorm}) д (${dbHouseNorm}) кв (${dbAptNorm}) | Ввод: у (${userStreetNorm}) д (${userHouseNorm}) кв (${userAptNorm})`);
+          }
+
+          return isMatch;
         });
 
         if (filtered.length > 0) {
@@ -696,7 +724,12 @@ const Cabinet = () => {
 
         // Автоматически подставляем адрес из найденного счёта
         setAddress(found.address || "");
-        setApartment(found.apartment || "");
+        
+        // Надежно определяем квартиру: если в специальном поле apartment пусто, 
+        // пробуем распарсить её из строки полного адреса (например, "..., кв. 15")
+        const apt = found.apartment?.trim() || extractApartmentFromAddress(found.address || "");
+        setApartment(apt);
+        
         parseAndSetAddress(found.address || "");
 
         // Загружаем список квартир для найденного дома
@@ -1230,7 +1263,7 @@ const Cabinet = () => {
           const dbStreetNorm = normalizeStreet(dbParts[1]);
           const dbHouseFull = dbParts.slice(2).join(", ")
             .replace(/,\s*(?:п(?:одъезд)?\.?\s*\d+).*$/i, "")
-            .replace(/,\s*(?:кв\.?\s*\d+).*$/i, "");
+            .replace(/,\s*(?:кв\.?\s*[а-яa-z0-9-+]+).*$/i, "");
           const dbHouseNorm = normalizeHouse(dbHouseFull);
 
           return dbStreetNorm === userStreetNorm && dbHouseNorm === userHouseNorm;
@@ -1881,10 +1914,22 @@ const Cabinet = () => {
     },
   });
 
+  // Вычисляем, обязателен ли этаж для ввода.
+  // Обязателен, если:
+  // 1. Успешно найден лицевой счет (accountSearchFound === true)
+  // 2. ИЛИ в базе подключенных домов (houseAccounts) есть лицевой счет с такой же квартирой
+  const isFloorRequired = !!(
+    accountSearchFound || 
+    (houseAccounts.length > 0 && apartment?.trim() && houseAccounts.some((acc: any) => {
+      const dbApt = acc.apartment?.trim() || extractApartmentFromAddress(acc.address || "");
+      return normalizeApartment(dbApt) === normalizeApartment(apartment);
+    }))
+  );
+
   // Функция сохранения личной информации и автоматической верификации профиля
   const handleSaveAndVerify = async () => {
     setSaving(true);
-    console.log("[Верификация] Инициация валидации и сохранения профиля..."); // Логирование
+    console.log(`[Верификация] Инициация сохранения. Обязательность этажа (isFloorRequired): ${isFloorRequired}`); // Логирование
 
     // КРИТИЧЕСКИ ВАЖНО: Всегда собираем актуальный эталонный адрес на основе текущих полей ввода (Улица и Дом),
     // чтобы при редактировании существующего профиля (когда address в стейте не пустой) изменения гарантированно
@@ -1906,14 +1951,12 @@ const Cabinet = () => {
     if (!displayStreet || !displayStreet.trim()) missingFields.push("Улица");
     if (!displayHouse || !displayHouse.trim()) missingFields.push("Номер дома");
     
-    // Номер квартиры, подъезд и этаж обязательны только для многоквартирных домов / офисов
-    if (premiseType === "apartment") {
-      // Если в СУБД для этого дома прописаны подъезды, требуем выбрать подъезд
-      if (entranceSuggestions.length > 0 && (!entrance || !entrance.trim())) {
-        missingFields.push("Номер подъезда");
-      }
-      if (!apartment || !apartment.trim()) missingFields.push("Номер квартиры/офиса");
-      if (!floor || !floor.trim()) missingFields.push("Этаж");
+    // Номер квартиры, подъезд и этаж больше не обязательны безусловно.
+    // Однако, если адрес находится на обслуживании (isFloorRequired === true), 
+    // то ввод этажа является строго обязательным для сохранения.
+    if (isFloorRequired && (!floor || !floor.trim())) {
+      console.log("[Верификация] Отклонено: этаж обязателен для обслуживаемого адреса, но не указан");
+      missingFields.push("Этаж");
     }
     
     if (!emailInput || !emailInput.trim()) missingFields.push("Электронная почта (Email)");
@@ -2807,13 +2850,17 @@ const Cabinet = () => {
 
                 {/* 9. Кнопки сохранения/отмены */}
                 {!isLocked && (() => {
+                  // Валидируем форму перед активацией кнопки отправки.
+                  // Кнопка станет активной, только если заполнены ФИО, телефон, улица, дом, почта, 
+                  // дано согласие ФЗ-152, а также заполнен этаж ЕСЛИ адрес на обслуживании (isFloorRequired === true).
                   const isFormValid = !!(
                     fullName?.trim() &&
                     phone?.trim() &&
                     displayStreet?.trim() &&
                     displayHouse?.trim() &&
                     emailInput?.trim() &&
-                    agreedToTerms
+                    agreedToTerms &&
+                    (!isFloorRequired || floor?.trim())
                   );
 
                   return (
