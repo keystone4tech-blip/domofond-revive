@@ -18,7 +18,7 @@ export function SplineScene({ scene, className }: SplineSceneProps) {
   return (
     <Suspense 
       fallback={
-        <div className="w-full h-full flex items-center justify-center bg-slate-950/10 dark:bg-slate-900/10 backdrop-blur-sm rounded-2xl">
+        <div className="w-full h-full flex items-center justify-center">
           {/* Красивый вращающийся лоадер-спиннер во время загрузки 3D модели */}
           <Loader2 className="h-10 w-10 animate-spin text-primary" />
         </div>

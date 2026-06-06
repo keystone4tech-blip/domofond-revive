@@ -106,16 +106,17 @@ const Hero = () => {
               </Button>
             </div>
           </div>
-          <div className="relative mt-6 md:mt-8 lg:mt-0 hidden md:block w-full h-[400px] lg:h-[480px]">
+          <div className="relative mt-6 md:mt-8 lg:mt-0 hidden md:block w-full h-[480px] lg:h-[560px]">
             {/* Spotlight подсветка с фирменным синим свечением бренда */}
             <Spotlight
               className="-top-20 left-0 md:left-20 md:-top-10"
-              fill="rgba(37, 99, 235, 0.22)"
+              fill="rgba(37, 99, 235, 0.25)"
             />
-            <div className="absolute inset-0 bg-gradient-to-tr from-primary/15 to-secondary/15 rounded-2xl blur-3xl" />
+            {/* Мягкое свечение за роботом */}
+            <div className="absolute inset-0 bg-gradient-to-tr from-primary/20 to-secondary/20 rounded-full blur-3xl opacity-50" />
             
-            {/* Обертка для 3D Сцены в стиле Premium Glassmorphism */}
-            <div className="w-full h-full rounded-2xl overflow-hidden border border-slate-200/50 dark:border-slate-800/50 glass-premium shadow-2xl relative">
+            {/* Интерактивная 3D сцена, бесшовно встроенная прямо на фон секции Hero */}
+            <div className="w-full h-full relative z-20">
               {/* 
                 Интерактивная 3D сцена. По умолчанию отображает робота.
                 Чтобы заменить на видеокамеру (CCTV):
@@ -127,15 +128,6 @@ const Hero = () => {
                 scene="https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode"
                 className="w-full h-full"
               />
-              
-              {/* Fallback-подложка во время загрузки (или как резерв) */}
-              <div className="absolute inset-0 pointer-events-none z-[-1] bg-slate-950/5 flex items-center justify-center">
-                <img
-                  src={heroImage}
-                  alt="Профессиональная установка домофонов"
-                  className="w-full h-full object-cover opacity-10"
-                />
-              </div>
             </div>
           </div>
         </div>
