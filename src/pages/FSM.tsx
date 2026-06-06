@@ -152,7 +152,7 @@ const FSM = () => {
   };
 
   return (
-    <div className="min-h-screen flex bg-background">
+    <div className="min-h-screen flex bg-background overflow-x-hidden w-full">
       {/* Боковой сайдбар для ПК и мобильная шторка */}
       <FSMSidebar 
         activeTab={activeTab} 
@@ -162,8 +162,8 @@ const FSM = () => {
         setIsOpen={setIsMobileSidebarOpen}
       />
 
-      {/* Основной контент-контейнер справа */}
-      <div className="flex-1 flex flex-col min-h-screen lg:pl-64 pb-20 lg:pb-0 transition-all duration-300">
+      {/* Основной контент-контейнер справа: overflow-x-hidden предотвращает горизонтальный скролл */}
+      <div className="flex-1 flex flex-col min-h-screen overflow-x-hidden lg:pl-64 pb-20 lg:pb-0 transition-all duration-300">
         
         {/* Адаптивный верхний Top Bar дашборда */}
         <header className="sticky top-0 z-40 bg-white/70 dark:bg-slate-900/75 backdrop-blur-md border-b border-slate-200/50 dark:border-slate-800/50 px-4 h-16 flex items-center justify-between">
@@ -208,7 +208,7 @@ const FSM = () => {
         </header>
 
         {/* Главная рабочая область контента */}
-        <main className="flex-1 p-4 lg:p-6 max-w-full overflow-x-hidden">
+        <main className="flex-1 p-3 sm:p-4 lg:p-6 w-full overflow-x-hidden min-w-0">
           <Tabs
             value={activeTab}
             onValueChange={(val) => handleTabChange(val)}

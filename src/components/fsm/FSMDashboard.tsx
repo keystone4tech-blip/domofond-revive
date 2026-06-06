@@ -294,10 +294,10 @@ export const FSMDashboard = ({ isManager, onNavigate }: FSMDashboardProps) => {
   if (!analytics) return null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full overflow-x-hidden min-w-0">
       {/* Шапка дашборда и период аналитики */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white/40 dark:bg-slate-900/40 backdrop-blur-md p-4 rounded-2xl border border-slate-200/50 dark:border-slate-800/50">
-        <div>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white/40 dark:bg-slate-900/40 backdrop-blur-md p-3 sm:p-4 rounded-2xl border border-slate-200/50 dark:border-slate-800/50">
+        <div className="min-w-0">
           <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
             <Zap className="h-5 w-5 text-primary animate-pulse" />
             Аналитика FSM (Режим Онлайн)
