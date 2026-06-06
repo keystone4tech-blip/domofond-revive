@@ -38,17 +38,19 @@ const Auth = () => {
     ? envApiUrl 
     : `${window.location.origin}${envApiUrl}`;
 
+  // Стейт "Оставаться в системе" (Запомнить меня)
+  const [rememberMe, setRememberMe] = useState(true);
+
   useEffect(() => {
-    // Проверяем наличие токена локальной сессии при загрузке
-    const token = localStorage.getItem("auth_token");
-    const userStr = localStorage.getItem("user");
+    // Проверяем наличие токена сессии в localStorage или sessionStorage при загрузке
+    const token = localStorage.getItem("auth_token") || sessionStorage.getItem("auth_token");
+    const userStr = localStorage.getItem("user") || sessionStorage.getItem("user");
     if (token && userStr) {
       console.log("[Auth] Обнаружена активная сессия, перенаправление в личный кабинет...");
       navigate("/cabinet");
-    } else {
-      localStorage.removeItem("auth_token");
     }
   }, [navigate]);
+
 
   // Обработчик регистрации нового пользователя
   const handleSignUp = async (e: React.FormEvent) => {
@@ -110,8 +112,17 @@ const Auth = () => {
         description: "Добро пожаловать! Ваш профиль успешно создан.",
       });
 
-      localStorage.setItem("auth_token", data.token);
-      localStorage.setItem("user", JSON.stringify(data.user));
+      // Сохраняем сессию в зависимости от галочки "Оставаться в системе"
+      if (rememberMe) {
+        localStorage.setItem("auth_token", data.token);
+        localStorage.setItem("user", JSON.stringify(data.user));
+        localStorage.setItem("remember_me", "true");
+      } else {
+        sessionStorage.setItem("auth_token", data.token);
+        sessionStorage.setItem("user", JSON.stringify(data.user));
+        localStorage.setItem("remember_me", "false");
+      }
+
 
       // Генерируем событие для мгновенного реактивного обновления сессии в шапке сайта
       console.log("[Auth Page] Регистрация успешна, генерируем событие auth-change..."); // Логирование
@@ -158,8 +169,17 @@ const Auth = () => {
         throw new Error(friendlyMessage);
       }
 
-      localStorage.setItem("auth_token", data.token);
-      localStorage.setItem("user", JSON.stringify(data.user));
+      // Сохраняем сессию в зависимости от галочки "Оставаться в системе"
+      if (rememberMe) {
+        localStorage.setItem("auth_token", data.token);
+        localStorage.setItem("user", JSON.stringify(data.user));
+        localStorage.setItem("remember_me", "true");
+      } else {
+        sessionStorage.setItem("auth_token", data.token);
+        sessionStorage.setItem("user", JSON.stringify(data.user));
+        localStorage.setItem("remember_me", "false");
+      }
+
 
       // Генерируем событие для мгновенного реактивного обновления сессии в шапке сайта
       console.log("[Auth Page] Вход выполнен, генерируем событие auth-change..."); // Логирование
@@ -224,7 +244,23 @@ const Auth = () => {
                       required
                     />
                   </div>
+                  
+                  {/* Галочка "Оставаться в системе" */}
+                  <div className="flex items-center gap-2 py-1 text-left">
+                    <input
+                      id="signin-remember"
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+                    />
+                    <Label htmlFor="signin-remember" className="text-xs text-muted-foreground cursor-pointer select-none font-medium">
+                      Оставаться в системе
+                    </Label>
+                  </div>
+
                   <Button type="submit" className="w-full" disabled={loading}>
+
                     {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Войти
                   </Button>

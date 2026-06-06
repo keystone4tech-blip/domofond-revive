@@ -8,6 +8,23 @@ const SUPABASE_URL = typeof envUrl === 'string' && envUrl.startsWith('http') ? e
 // Dummy key since PostgREST relies on JWT
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'dummy';
 
+// Вспомогательные функции для работы с сессией в localStorage и sessionStorage
+export const getAuthToken = (): string | null => {
+  return localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
+};
+
+export const getAuthUser = (): string | null => {
+  return localStorage.getItem('user') || sessionStorage.getItem('user');
+};
+
+export const clearAuth = () => {
+  console.log('[Supabase Client] Очистка токенов и сессий авторизации...');
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('user');
+  sessionStorage.removeItem('auth_token');
+  sessionStorage.removeItem('user');
+};
+
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     storage: localStorage,
@@ -20,7 +37,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
       if (typeof url === 'string') {
         url = url.replace('/rest/v1/', '/');
       }
-      const token = localStorage.getItem('auth_token');
+      const token = getAuthToken();
       options = options || {};
       options.headers = options.headers || {};
       if (token) {
@@ -39,15 +56,15 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
 // Polyfill for session checking so components don't crash when using supabase.auth.getSession()
 const authPolyfill = {
   getSession: async () => {
-    const token = localStorage.getItem('auth_token');
-    const userStr = localStorage.getItem('user');
+    const token = getAuthToken();
+    const userStr = getAuthUser();
     if (token && userStr) {
       return { data: { session: { access_token: token, user: JSON.parse(userStr) } }, error: null };
     }
     return { data: { session: null }, error: null };
   },
   getUser: async () => {
-    const userStr = localStorage.getItem('user');
+    const userStr = getAuthUser();
     if (userStr) {
       return { data: { user: JSON.parse(userStr) }, error: null };
     }
@@ -56,8 +73,8 @@ const authPolyfill = {
   onAuthStateChange: (callback: any) => {
     // Слушатель кастомного события изменения авторизации
     const handler = () => {
-      const token = localStorage.getItem('auth_token');
-      const userStr = localStorage.getItem('user');
+      const token = getAuthToken();
+      const userStr = getAuthUser();
       let session = null;
       if (token && userStr) {
         session = { access_token: token, user: JSON.parse(userStr) };
@@ -70,8 +87,8 @@ const authPolyfill = {
     window.addEventListener('auth-change', handler);
 
     // Первоначальное уведомление о сессии при монтировании (INITIAL_SESSION)
-    const token = localStorage.getItem('auth_token');
-    const userStr = localStorage.getItem('user');
+    const token = getAuthToken();
+    const userStr = getAuthUser();
     let session = null;
     if (token && userStr) {
       session = { access_token: token, user: JSON.parse(userStr) };
@@ -96,9 +113,8 @@ const authPolyfill = {
     };
   },
   signOut: async () => {
-    console.log('[Supabase Auth] Вызов signOut, очищаем localStorage и генерируем событие auth-change...'); // Логирование
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('user');
+    console.log('[Supabase Auth] Вызов signOut, очищаем localStorage/sessionStorage и генерируем событие auth-change...'); // Логирование
+    clearAuth();
     // Генерируем событие для мгновенного реактивного обновления во всех компонентах
     window.dispatchEvent(new Event("auth-change"));
     return { error: null };

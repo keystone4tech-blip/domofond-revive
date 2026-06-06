@@ -22,6 +22,8 @@ import MobileBottomNav from "./components/MobileBottomNav";
 import ScrollToTop from "./components/ScrollToTop";
 import ChatWidget from "./components/ChatWidget";
 import SEOHead from "./components/SEOHead";
+import SessionTimeoutProvider from "./components/SessionTimeoutProvider";
+
 
 const queryClient = new QueryClient();
 
@@ -58,26 +60,29 @@ const App = () => (
           <div className="relative z-10">
             <ScrollToTop />
             <SEOHead />
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/cabinet" element={<Cabinet />} />
-              <Route path="/admin" element={<Admin />} />
-              <Route path="/fsm" element={<FSM />} />
-              <Route path="/domofony" element={<Domofony />} />
-              <Route path="/videonablyudenie" element={<Videonablyudenie />} />
-              <Route path="/nashi-raboty" element={<NashiRaboty />} />
-              <Route path="/voprosy" element={<Voprosy />} />
-              <Route path="/kontakty" element={<Kontakty />} />
-              <Route path="/smart-intercom" element={<SmartIntercom />} />
-              <Route path="/payment" element={<Payment />} />
-              <Route path="/calculator" element={<Calculator />} />
-              <Route path="/golosovanie" element={<Golosovanie />} />
-              <Route path="/golosovanie/:id" element={<Golosovanie />} />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+            <SessionTimeoutProvider>
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/cabinet" element={<Cabinet />} />
+                <Route path="/admin" element={<Admin />} />
+                <Route path="/fsm" element={<FSM />} />
+                <Route path="/domofony" element={<Domofony />} />
+                <Route path="/videonablyudenie" element={<Videonablyudenie />} />
+                <Route path="/nashi-raboty" element={<NashiRaboty />} />
+                <Route path="/voprosy" element={<Voprosy />} />
+                <Route path="/kontakty" element={<Kontakty />} />
+                <Route path="/smart-intercom" element={<SmartIntercom />} />
+                <Route path="/payment" element={<Payment />} />
+                <Route path="/calculator" element={<Calculator />} />
+                <Route path="/golosovanie" element={<Golosovanie />} />
+                <Route path="/golosovanie/:id" element={<Golosovanie />} />
+                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </SessionTimeoutProvider>
           </div>
+
         </div>
         <MobileBottomNav />
         <ChatWidget />
