@@ -179,11 +179,12 @@ const DebtCard = ({ address, apartment, fullName, phone, embedded = false, setPa
       
       console.log(`[Баланс] Поиск счета. Улица: "${street}" (${cleanStreetQuery}), Дом: "${house}", Кв: "${apartment}"`); // Логирование
       
-      // Ищем лицевые счета по названию улицы
+      // Ищем лицевые счета по названию улицы И номеру дома для исключения обрезки лимитом PostgREST
+      console.log(`[Баланс: БД Запрос] Отправка запроса к accounts с ilike по адресу: "%${cleanStreetQuery}%${house}%"`); // Подробное логирование запроса
       let query = supabase
         .from("accounts")
         .select("account_number, period, debt_amount, address, apartment")
-        .ilike("address", `%${cleanStreetQuery}%`);
+        .ilike("address", `%${cleanStreetQuery}%${house}%`);
         
       const { data, error } = await query.order("period", { ascending: false }).limit(300);
 
@@ -1243,11 +1244,12 @@ const Cabinet = () => {
     
     console.log(`[Квартира/Подъезд] Загрузка данных для улицы: "${street}" (${cleanStreetQuery}), Дом: "${house}"`);
     try {
-      // Ищем все лицевые счета по корню названия улицы
+      // Ищем все лицевые счета по корню названия улицы И номеру дома для исключения обрезки лимитом PostgREST
+      console.log(`[Квартира/Подъезд: БД Запрос] Отправка запроса к accounts с ilike по адресу: "%${cleanStreetQuery}%${house}%"`); // Подробное логирование запроса
       const { data, error } = await supabase
         .from("accounts")
         .select("address, apartment")
-        .ilike("address", `%${cleanStreetQuery}%`);
+        .ilike("address", `%${cleanStreetQuery}%${house}%`);
         
       if (error) throw error;
 
