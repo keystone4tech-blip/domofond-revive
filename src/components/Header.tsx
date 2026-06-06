@@ -1,4 +1,4 @@
-import { Phone, User, LayoutDashboard } from "lucide-react";
+import { Phone, User, LayoutDashboard, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -57,8 +57,9 @@ const Header = () => {
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       {/* Верхняя строка с логотипом, телефоном, графиком и адресом */}
       <div className="container px-4 py-1 hidden md:flex items-center justify-between border-b border-border/50">
-        <div className="flex items-center cursor-pointer" onClick={() => navigate("/")}>
-          <span className="text-2xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-blue-950 to-blue-800 dark:from-white dark:to-neutral-400 font-logo select-none">
+        <div className="flex items-center gap-2 cursor-pointer logo-container" onClick={() => navigate("/")}>
+          <ShieldCheck className="h-7 w-7 text-blue-600 dark:text-blue-400 logo-icon-glow" />
+          <span className="text-2xl font-extrabold tracking-tight text-shimmer font-logo select-none">
             Домофондар
           </span>
         </div>
@@ -85,8 +86,9 @@ const Header = () => {
 
       {/* Нижняя строка с навигацией */}
       <div className="container px-4 flex h-14 items-center justify-between">
-        <div className="flex items-center cursor-pointer md:hidden" onClick={() => navigate("/")}>
-          <span className="text-2xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-blue-950 to-blue-800 dark:from-white dark:to-neutral-400 font-logo select-none">
+        <div className="flex items-center gap-2 cursor-pointer md:hidden logo-container" onClick={() => navigate("/")}>
+          <ShieldCheck className="h-7 w-7 text-blue-600 dark:text-blue-400 logo-icon-glow" />
+          <span className="text-2xl font-extrabold tracking-tight text-shimmer font-logo select-none">
             Домофондар
           </span>
         </div>

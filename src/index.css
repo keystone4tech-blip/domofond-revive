@@ -177,6 +177,71 @@
   .gradient-gold {
     background: var(--gradient-gold);
   }
+
+  /* Анимация 3D-вращения значка по оси Y */
+  @keyframes logo-spin-3d {
+    0% {
+      transform: rotateY(0deg);
+    }
+    100% {
+      transform: rotateY(360deg);
+    }
+  }
+
+  /* Свечение значка логотипа */
+  .logo-icon-glow {
+    filter: drop-shadow(0 0 7px rgba(37, 99, 235, 0.7)) drop-shadow(0 0 2px rgba(37, 99, 235, 0.45));
+    transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    perspective: 1000px;
+  }
+
+  /* 3D-кручение при наведении на контейнер логотипа */
+  .logo-container:hover .logo-icon-glow {
+    animation: logo-spin-3d 1.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  }
+
+  /* Анимация бегущего блика света (Shimmer) */
+  @keyframes text-shimmer-wave {
+    0% {
+      background-position: -200% center;
+    }
+    100% {
+      background-position: 200% center;
+    }
+  }
+
+  /* Градиент с бликом для светлой темы */
+  .text-shimmer {
+    background: linear-gradient(
+      90deg,
+      #1e3a8a 0%,
+      #1e3a8a 35%,
+      #60a5fa 50%,
+      #1e3a8a 65%,
+      #1e3a8a 100%
+    );
+    background-size: 200% auto;
+    color: transparent;
+    -webkit-background-clip: text;
+    background-clip: text;
+    animation: text-shimmer-wave 4s linear infinite;
+  }
+
+  /* Градиент с бликом для темной темы */
+  .dark .text-shimmer {
+    background: linear-gradient(
+      90deg,
+      #ffffff 0%,
+      #ffffff 35%,
+      #94a3b8 50%,
+      #ffffff 65%,
+      #ffffff 100%
+    );
+    background-size: 200% auto;
+    color: transparent;
+    -webkit-background-clip: text;
+    background-clip: text;
+  }
   
   .shadow-glow {
     box-shadow: var(--shadow-glow);
