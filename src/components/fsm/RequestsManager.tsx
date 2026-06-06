@@ -775,7 +775,7 @@ const RequestsManager = ({
     }
 
     return (
-      <div className="overflow-x-auto rounded-xl border border-slate-200/60 dark:border-slate-800/60 bg-white/50 dark:bg-slate-900/40 backdrop-blur-md">
+      <div className="w-full overflow-x-auto rounded-xl border border-slate-200/60 dark:border-slate-800/60 bg-white/50 dark:bg-slate-900/40 backdrop-blur-md">
         <table className="w-full text-sm text-left border-collapse">
           <thead className="text-xs font-bold uppercase bg-slate-50/80 dark:bg-slate-800/60 text-muted-foreground border-b border-slate-200 dark:border-slate-800">
             <tr>

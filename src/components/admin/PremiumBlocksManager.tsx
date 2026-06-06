@@ -279,7 +279,8 @@ export const PremiumBlocksManager = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              {/* Иконка и цвет: адаптивная сетка */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="badge_icon">Иконка бейджа</Label>
                   <Select
@@ -391,7 +392,8 @@ export const PremiumBlocksManager = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              {/* Цена и описание цены: адаптивная сетка */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="price">Цена</Label>
                   <Input

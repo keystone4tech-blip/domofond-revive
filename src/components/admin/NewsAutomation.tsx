@@ -192,7 +192,8 @@ export const NewsAutomation = () => {
               <Label className="text-sm font-semibold">Расписание автопостинга (МСК)</Label>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            {/* Время и кол-во постов: адаптивная сетка */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <Label className="text-xs">Время запуска</Label>
                 <Input

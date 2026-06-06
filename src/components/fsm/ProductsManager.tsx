@@ -336,7 +336,7 @@ const ProductsManager = () => {
             Нет товаров. Добавьте первый товар или услугу.
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="w-full overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>

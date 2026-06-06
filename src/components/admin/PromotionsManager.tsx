@@ -214,7 +214,8 @@ export const PromotionsManager = () => {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            {/* Даты: 1 колонка на мобильном, 2 на планшете+ */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="start_date">Дата начала</Label>
                 <Input

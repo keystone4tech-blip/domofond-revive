@@ -251,7 +251,7 @@ const ClientsManager = () => {
         ) : clients?.length === 0 ? (
           <p className="text-center text-muted-foreground py-8">Нет клиентов</p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="w-full overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>

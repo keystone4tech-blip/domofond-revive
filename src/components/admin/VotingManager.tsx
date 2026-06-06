@@ -268,7 +268,8 @@ export const VotingManager = () => {
                   <Input value={editing.legal_basis || ""} onChange={(e) => setEditing({ ...editing, legal_basis: e.target.value })} className="mt-1" />
                 </div>
               )}
-              <div className="grid grid-cols-3 gap-3">
+              {/* Адаптивная сетка: 1 колонка на мобильном, 3 на планшете/ПК */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <Label className="text-xs">Всего квартир</Label>
                   <Input type="number" value={editing.total_apartments ?? ""} onChange={(e) => setEditing({ ...editing, total_apartments: e.target.value ? parseInt(e.target.value) : null })} className="mt-1" />

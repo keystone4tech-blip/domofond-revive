@@ -307,10 +307,10 @@ export const FSMDashboard = ({ isManager, onNavigate }: FSMDashboardProps) => {
           </p>
         </div>
         
-        {/* Выбор периода */}
-        <div className="flex items-center gap-2 self-start md:self-auto">
-          <Calendar className="h-4 w-4 text-muted-foreground" />
-          <div className="grid grid-cols-5 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl text-xs font-semibold">
+        {/* Выбор периода — flex-wrap для корректного отображения на мобильных */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+          <div className="flex flex-wrap gap-1 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl text-xs font-semibold">
             {[
               { id: "current_month", label: "Месяц" },
               { id: "last_month", label: "Прошлый" },
@@ -321,7 +321,7 @@ export const FSMDashboard = ({ isManager, onNavigate }: FSMDashboardProps) => {
               <button
                 key={item.id}
                 onClick={() => setPeriod(item.id as AnalyticsPeriod)}
-                className={`px-2 py-1.5 rounded-lg transition-all ${
+                className={`px-2 py-1.5 rounded-lg transition-all whitespace-nowrap ${
                   period === item.id 
                     ? "bg-white dark:bg-slate-700 text-foreground shadow-sm scale-105" 
                     : "text-muted-foreground hover:text-foreground"
@@ -336,7 +336,8 @@ export const FSMDashboard = ({ isManager, onNavigate }: FSMDashboardProps) => {
 
       {/* Вкладки аналитики */}
       <Tabs defaultValue="overview" className="w-full space-y-4">
-        <TabsList className="bg-slate-100 dark:bg-slate-800/60 p-1 rounded-xl w-full md:w-auto grid grid-cols-4 gap-1">
+        {/* Вкладки аналитики — w-full для адаптивности на мобильных */}
+        <TabsList className="bg-slate-100 dark:bg-slate-800/60 p-1 rounded-xl w-full grid grid-cols-4 gap-1">
           <TabsTrigger value="overview" className="rounded-lg text-xs font-bold">Обзор</TabsTrigger>
           <TabsTrigger value="masters" className="rounded-lg text-xs font-bold">Мастера</TabsTrigger>
           {isManager && <TabsTrigger value="dispatchers" className="rounded-lg text-xs font-bold">Диспетчеры</TabsTrigger>}
@@ -557,7 +558,7 @@ export const FSMDashboard = ({ isManager, onNavigate }: FSMDashboardProps) => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto rounded-xl border border-slate-100 dark:border-slate-800/80">
+              <div className="w-full overflow-x-auto rounded-xl border border-slate-100 dark:border-slate-800/80">
                 <table className="w-full text-sm text-left">
                   <thead className="text-xs font-bold uppercase bg-slate-50 dark:bg-slate-800/60 text-muted-foreground border-b">
                     <tr>
@@ -623,7 +624,7 @@ export const FSMDashboard = ({ isManager, onNavigate }: FSMDashboardProps) => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto rounded-xl border border-slate-100 dark:border-slate-800/80">
+              <div className="w-full overflow-x-auto rounded-xl border border-slate-100 dark:border-slate-800/80">
                 <table className="w-full text-sm text-left">
                   <thead className="text-xs font-bold uppercase bg-slate-50 dark:bg-slate-800/60 text-muted-foreground border-b">
                     <tr>
@@ -733,7 +734,7 @@ export const FSMDashboard = ({ isManager, onNavigate }: FSMDashboardProps) => {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto rounded-xl border border-slate-100 dark:border-slate-800/80">
+              <div className="w-full overflow-x-auto rounded-xl border border-slate-100 dark:border-slate-800/80">
                 <table className="w-full text-sm text-left">
                   <thead className="text-xs font-bold uppercase bg-slate-50 dark:bg-slate-800/60 text-muted-foreground border-b">
                     <tr>

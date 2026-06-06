@@ -424,6 +424,8 @@ const EmployeesManager = () => {
         ) : employees?.length === 0 ? (
           <p className="text-center text-muted-foreground py-8">Нет сотрудников</p>
         ) : (
+          // Обёртка для горизонтальной прокрутки на мобильных устройствах
+          <div className="w-full overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -482,6 +484,7 @@ const EmployeesManager = () => {
               ))}
             </TableBody>
           </Table>
+          </div>
         )}
       </CardContent>
     </Card>

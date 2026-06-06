@@ -1,5 +1,37 @@
 # PROJECT_LOG.md
 
+## Дата: 2026-06-06 (Полная мобильная адаптация FSM и Admin панелей — раунд 2)
+### Изменения:
+- **`src/components/fsm/EmployeesManager.tsx`** [MODIFY]:
+  * Добавлена обёртка `<div className="w-full overflow-x-auto">` вокруг таблицы сотрудников — предотвращает горизонтальное смещение на мобильных.
+- **`src/components/fsm/FSMDashboard.tsx`** [MODIFY]:
+  * Исправлена кнопочная группа выбора периода аналитики: заменена `grid grid-cols-5` на `flex flex-wrap gap-1` для корректного переноса на узких экранах.
+  * Вкладки аналитики (TabsList) теперь всегда `w-full` на всех размерах экрана.
+- **`src/components/admin/VotingManager.tsx`** [MODIFY]:
+  * Сетка числовых полей (квартиры / кворум / принятие) изменена с `grid-cols-3` на `grid-cols-1 sm:grid-cols-3`.
+- **`src/components/admin/PromotionsManager.tsx`** [MODIFY]:
+  * Сетка дат изменена с `grid-cols-2` на `grid-cols-1 sm:grid-cols-2`.
+- **`src/components/admin/NewsAutomation.tsx`** [MODIFY]:
+  * Сетка расписания изменена с `grid-cols-2` на `grid-cols-1 sm:grid-cols-2`.
+- **`src/components/admin/PremiumBlocksManager.tsx`** [MODIFY]:
+  * Оба блока с двухколоночной сеткой форм изменены на `grid-cols-1 sm:grid-cols-2`.
+### Структура проекта:
+- Изменения структуры файлов отсутствуют.
+### Заметки:
+- Все таблицы обёрнуты в `overflow-x-auto`, формы переведены на адаптивные сетки.
+- Требуется Git push и деплой на сервер с пересборкой контейнера фронтенда.
+
+## Дата: 2026-06-06 (Адаптация таблиц FSM-панели для мобильных устройств)
+### Изменения:
+- **`src/components/fsm/ClientsManager.tsx`**, **`src/components/fsm/FSMDashboard.tsx`**, **`src/components/fsm/ProductsManager.tsx`**, **`src/components/fsm/RequestsManager.tsx`** [MODIFY]:
+  * Добавлен класс `w-full` ко всем внешним контейнерам `div` с горизонтальной прокруткой `overflow-x-auto` для таблиц.
+  * Это предотвращает выход таблиц за правый край экрана на мобильных устройствах, обеспечивая их корректное сжатие под размер экрана и работу горизонтальной прокрутки внутри контейнера.
+### Структура проекта:
+- Изменения структуры файлов отсутствуют.
+### Заметки:
+- Произведена локальная сборка проекта (`npm run build`) для проверки компиляции (успешно).
+- Изменения отправлены в Git, требуется деплой на сервер.
+
 ## Дата: 2026-06-06 (Переработка отображения списка заявок FSM в виде таблицы и диалог подробностей)
 ### Изменения:
 - **`src/components/fsm/RequestsManager.tsx`** [MODIFY]:
