@@ -72,11 +72,10 @@ const Requisites = () => {
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in-50 duration-500">
+    <div className="pt-6 space-y-8 animate-in fade-in-50 duration-500">
       <div className="text-center mb-12">
         {/* Унифицированный градиентный заголовок по центру */}
-        <h2 className="text-2xl sm:text-3xl md:text-4xl mb-4 flex items-center justify-center gap-2 section-title-gradient">
-          <ShieldCheck className="h-8 w-8 text-amber-500 flex-shrink-0" />
+        <h2 className="text-2xl sm:text-3xl md:text-4xl mb-4 section-title-gradient">
           Карта партнера
         </h2>
         <p className="text-base text-muted-foreground max-w-2xl mx-auto">
@@ -113,7 +112,7 @@ const Requisites = () => {
                     size="icon"
                     variant="ghost"
                     onClick={() => handleCopy(item.value, item.id, item.label)}
-                    className="h-8 w-8 hover:bg-amber-500/10 hover:text-amber-500 dark:hover:bg-amber-500/20 text-slate-400 rounded-lg flex-shrink-0 transition-colors"
+                    className="h-8 w-8 hover:bg-blue-600/10 hover:text-blue-600 dark:hover:bg-blue-600/20 text-slate-400 rounded-lg flex-shrink-0 transition-colors"
                     title={`Копировать ${item.label}`}
                   >
                     {copiedField === item.id ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
@@ -134,7 +133,7 @@ const Requisites = () => {
                     size="icon"
                     variant="ghost"
                     onClick={() => handleCopy(item.value, item.id, item.label)}
-                    className="h-8 w-8 hover:bg-amber-500/10 hover:text-amber-500 dark:hover:bg-amber-500/20 text-slate-400 rounded-lg flex-shrink-0 transition-colors"
+                    className="h-8 w-8 hover:bg-blue-600/10 hover:text-blue-600 dark:hover:bg-blue-600/20 text-slate-400 rounded-lg flex-shrink-0 transition-colors"
                     title={`Копировать ${item.label}`}
                   >
                     {copiedField === item.id ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}

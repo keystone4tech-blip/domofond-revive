@@ -7,7 +7,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
-
 const contactSchema = z.object({
   name: z.string().trim().min(2, { message: "Имя должно содержать минимум 2 символа" }).max(100),
   phone: z.string().trim().min(10, { message: "Введите корректный номер телефона" }).max(20),
@@ -15,13 +14,16 @@ const contactSchema = z.object({
   message: z.string().trim().min(10, { message: "Сообщение должно содержать минимум 10 символов" }).max(1000)
 });
 
-const Contact = () => {
+interface ContactProps {
+  isTabPage?: boolean;
+}
+
+const Contact = ({ isTabPage = false }: ContactProps) => {
   const { toast } = useToast();
 
-  // Логирование монтирования компонента Contact
   useEffect(() => {
-    console.log("[Contact] Компонент обратной связи смонтирован. Заголовок 'Свяжитесь с нами' и 'Оставить заявку' переведены на единый градиентный стиль.");
-  }, []);
+    console.log("[Contact] Компонент обратной связи смонтирован. Режим вкладки: ", isTabPage);
+  }, [isTabPage]);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -107,8 +109,10 @@ const Contact = () => {
     }
   };
 
+  const Wrapper = isTabPage ? "div" : "section";
+
   return (
-    <section id="contact" className="py-16 md:py-24">
+    <Wrapper id={isTabPage ? undefined : "contact"} className={isTabPage ? "w-full pt-6" : "py-16 md:py-24"}>
       <div className="container">
         <div className="text-center mb-12">
           {/* Унифицированный градиентный заголовок */}
@@ -290,7 +294,7 @@ const Contact = () => {
           </div>
         </div>
       </div>
-    </section>
+    </Wrapper>
   );
 };
 

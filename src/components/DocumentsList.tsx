@@ -100,7 +100,7 @@ const DocumentsList = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="pt-6 space-y-6">
       <div className="text-center mb-12">
         {/* Унифицированный градиентный заголовок по центру */}
         <h2 className="text-2xl sm:text-3xl md:text-4xl mb-4 section-title-gradient">

@@ -134,13 +134,9 @@ const Kontakty = () => {
                   }}
                   className="w-full focus:outline-none"
                 >
-                  {activeTab === "contact-form" && <Contact />}
+                  {activeTab === "contact-form" && <Contact isTabPage={true} />}
                   {activeTab === "requisites" && <Requisites />}
-                  {activeTab === "documents" && (
-                    <div className="py-4">
-                      <DocumentsList />
-                    </div>
-                  )}
+                  {activeTab === "documents" && <DocumentsList />}
                 </motion.div>
               </AnimatePresence>
             </div>
