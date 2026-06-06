@@ -43,7 +43,7 @@ const normalizeStreet = (s: string) => {
   }
   return clean
     .replace(/^(г\.|город|пос\.|поселок|аул|п\.|х\.|хутор|ст\.|станица)\s+[^,]+/gi, "") // убираем населенный пункт, если остался в начале
-    .replace(/(?:\(ул\)?|ул\.?|улица|пер\.?|переулок|проспект|пр-кт|пр\.?|аллея|бульвар|тракт|шоссе)\s*/gi, "") // убираем типы улиц
+    .replace(/(?:\b(?:ул\.?|улица|пер\.?|переулок|проспект|пр-кт|пр\.?|аллея|бульвар|тракт|шоссе)\b|\(ул\))\s*/gi, "") // убираем типы улиц
     .replace(/(?:^|\s)(?:им\.?|имени|генерала?|академика?|маршала?|улице)(?:\s|$)/gi, "") // убираем звания, инициалы и "имени"
     .replace(/[^а-яa-z0-9]/g, "") // оставляем только буквы и цифры
     .trim();
@@ -175,7 +175,7 @@ const DebtCard = ({ address, apartment, fullName, phone, embedded = false, setPa
     const loadDebt = async () => {
       setLoading(true);
       const { street, house } = parseAddressParts(address);
-      const cleanStreetQuery = street.replace(/(?:\(ул\)?|ул\.?|улица)\s*/gi, "").trim();
+      const cleanStreetQuery = street.replace(/(?:\b(?:ул\.?|улица)\b|\(ул\))\s*/gi, "").trim();
       
       console.log(`[Баланс] Поиск счета. Улица: "${street}" (${cleanStreetQuery}), Дом: "${house}", Кв: "${apartment}"`); // Логирование
       
@@ -861,20 +861,20 @@ const Cabinet = () => {
         { 
           region_kladr_id: "23", 
           city: cleanCity,
-          street: streetContext.replace(/(?:\(ул\)?|ул\.?|улица)\s*/gi, "").trim()
+          street: streetContext.replace(/(?:\b(?:ул\.?|улица)\b|\(ул\))\s*/gi, "").trim()
         },
         { 
           region_kladr_id: "01", 
           city: cleanCity,
-          street: streetContext.replace(/(?:\(ул\)?|ул\.?|улица)\s*/gi, "").trim()
+          street: streetContext.replace(/(?:\b(?:ул\.?|улица)\b|\(ул\))\s*/gi, "").trim()
         },
         {
           region_kladr_id: "23",
-          street: streetContext.replace(/(?:\(ул\)?|ул\.?|улица)\s*/gi, "").trim()
+          street: streetContext.replace(/(?:\b(?:ул\.?|улица)\b|\(ул\))\s*/gi, "").trim()
         },
         {
           region_kladr_id: "01",
-          street: streetContext.replace(/(?:\(ул\)?|ул\.?|улица)\s*/gi, "").trim()
+          street: streetContext.replace(/(?:\b(?:ул\.?|улица)\b|\(ул\))\s*/gi, "").trim()
         }
       ];
       body.from_bound = { value: "house" };
@@ -1239,7 +1239,7 @@ const Cabinet = () => {
   const fetchApartmentSuggestions = async (selectedAddr: string) => {
     if (!selectedAddr) return;
     const { street, house } = parseAddressParts(selectedAddr);
-    const cleanStreetQuery = street.replace(/(?:\(ул\)?|ул\.?|улица)\s*/gi, "").trim();
+    const cleanStreetQuery = street.replace(/(?:\b(?:ул\.?|улица)\b|\(ул\))\s*/gi, "").trim();
     
     console.log(`[Квартира/Подъезд] Загрузка данных для улицы: "${street}" (${cleanStreetQuery}), Дом: "${house}"`);
     try {
@@ -3026,7 +3026,7 @@ const Cabinet = () => {
                                     const totalAmount = Number(req.payment_amount) || 0;
                                     
                                     // Парсим адрес на улицу, дом, корпус, подъезд и квартиру
-                                    const street = address ? address.split(",")[1]?.replace(/(?:ул\.?|улица)\s*/gi, "").trim() || address : "";
+                                    const street = address ? address.split(",")[1]?.replace(/(?:\b(?:ул\.?|улица)\b)\s*/gi, "").trim() || address : "";
                                     const house = address ? address.split(",")[2]?.replace(/(?:д\.?|дом)\s*/gi, "").trim() || "" : "";
                                     const entranceMatch = address ? address.match(/(?:^|,|\s)(?:подъезд|п\.?)\s*(\d+)/i) : null;
                                     const entrance = entranceMatch ? entranceMatch[1] : "1";
@@ -3578,7 +3578,7 @@ const Cabinet = () => {
                         console.log("[Заявка] Абонент переходит к шлюзу банка Кубань Кредит, сумма:", lastOrderTotals.total);
                         
                         // Парсим адрес на улицу, дом, корпус, подъезд и квартиру
-                        const street = address ? address.split(",")[1]?.replace(/(?:ул\.?|улица)\s*/gi, "").trim() || address : "";
+                        const street = address ? address.split(",")[1]?.replace(/(?:\b(?:ул\.?|улица)\b)\s*/gi, "").trim() || address : "";
                         const house = address ? address.split(",")[2]?.replace(/(?:д\.?|дом)\s*/gi, "").trim() || "" : "";
                         
                         // Пытаемся вытащить подъезд из адреса
