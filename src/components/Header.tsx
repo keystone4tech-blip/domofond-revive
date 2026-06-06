@@ -1,6 +1,7 @@
 import { Phone, User, LayoutDashboard, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
+import { ShinyButton } from "@/components/ui/shiny-button";
 import { supabase } from "@/integrations/supabase/client";
 import { User as SupabaseUser } from "@supabase/supabase-js";
 import { useNavigate } from "react-router-dom";
@@ -154,31 +155,29 @@ const Header = () => {
           {user ? (
             <div className="hidden md:flex items-center gap-2">
               {isFSMUser && (
-                <Button
+                <ShinyButton
                   onClick={() => navigate("/fsm")}
-                  variant="outline"
-                  size="sm"
+                  className="py-1.5 px-3.5 text-xs rounded-xl"
                 >
-                  <LayoutDashboard className="h-4 w-4 md:mr-2" />
+                  <LayoutDashboard className="h-3.5 w-3.5 md:mr-1.5" />
                   <span className="hidden lg:inline">FSM</span>
-                </Button>
+                </ShinyButton>
               )}
-              <Button
+              <ShinyButton
                 onClick={() => navigate("/cabinet")}
-                size="sm"
+                className="py-1.5 px-3.5 text-xs rounded-xl"
               >
-                <User className="h-4 w-4 md:mr-2" />
+                <User className="h-3.5 w-3.5 md:mr-1.5" />
                 <span className="hidden lg:inline">Кабинет</span>
-              </Button>
+              </ShinyButton>
             </div>
           ) : (
-            <Button
+            <ShinyButton
               onClick={() => navigate("/auth")}
-              className="hidden md:inline-flex gradient-primary text-primary-foreground hover:opacity-90 transition-opacity"
-              size="sm"
+              className="hidden md:inline-flex py-1.5 px-4 text-xs rounded-xl"
             >
               Войти
-            </Button>
+            </ShinyButton>
           )}
 
         </div>

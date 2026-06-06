@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { ShinyButton } from "@/components/ui/shiny-button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -329,10 +330,10 @@ const DebtCard = ({ address, apartment, fullName, phone, embedded = false, setPa
             </span>
           </div>
 
-          <Button className="w-full" size="lg" onClick={() => navigate("/payment")}>
+          <ShinyButton className="w-full justify-center rounded-xl" onClick={() => navigate("/payment")}>
             <CreditCard className="mr-2 h-4 w-4" />
             Оплатить
-          </Button>
+          </ShinyButton>
         </div>
       </>
     );
@@ -368,12 +369,10 @@ const DebtCard = ({ address, apartment, fullName, phone, embedded = false, setPa
         </div>
       </div>
       <Dialog open={requestOpen} onOpenChange={setRequestOpen}>
-        <DialogTrigger asChild>
-          <Button className="w-full" size="lg">
-            <Plus className="mr-2 h-4 w-4" />
-            Оставить заявку
-          </Button>
-        </DialogTrigger>
+        <ShinyButton className="w-full justify-center rounded-xl" onClick={() => setRequestOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          Оставить заявку
+        </ShinyButton>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Новая заявка</DialogTitle>
@@ -459,10 +458,10 @@ const RemoteAccessCard = ({ address, apartment }: { address: string; apartment: 
         </li>
       </ul>
 
-      <Button className="w-full whitespace-normal h-auto py-3 flex items-center justify-center gap-2" size="lg" onClick={() => navigate("/payment")}>
+      <ShinyButton className="w-full justify-center py-3 rounded-xl gap-2" onClick={() => navigate("/payment")}>
         <CreditCard className="h-5 w-5 shrink-0" />
         <span className="text-center">Оплатить и получить доступ</span>
-      </Button>
+      </ShinyButton>
     </div>
   );
 };
@@ -2298,15 +2297,15 @@ const Cabinet = () => {
               } transition-opacity duration-700 delay-300`}
             >
               {hasAdminConsoleAccess && (
-                <Button variant="outline" size="sm" onClick={() => navigate("/admin")}>
-                  <Shield className="h-4 w-4 mr-1" />
+                <ShinyButton onClick={() => navigate("/admin")} className="py-1 px-3 text-xs rounded-xl h-9">
+                  <Shield className="h-3.5 w-3.5 mr-1" />
                   Панель
-                </Button>
+                </ShinyButton>
               )}
-              <Button variant="outline" size="sm" onClick={handleLogout}>
-                <LogOut className="h-4 w-4 mr-1" />
+              <ShinyButton onClick={handleLogout} className="py-1 px-3 text-xs rounded-xl h-9">
+                <LogOut className="h-3.5 w-3.5 mr-1" />
                 Выйти
-              </Button>
+              </ShinyButton>
             </div>
           </div>
 
@@ -2416,10 +2415,10 @@ const Cabinet = () => {
                           <p className="font-semibold text-sm flex items-center gap-1.5"><Wrench className="h-4 w-4 text-primary shrink-0" /> Заявки и заказ услуг</p>
                           <p className="text-xs text-muted-foreground mt-1">Нужен ремонт трубки, новые ключи или установка оборудования? Оформить заявку прямо сейчас.</p>
                         </div>
-                        <Button onClick={() => { setOrderType("repair"); setIsOrderDialogOpen(true); }} className="w-full sm:w-auto shrink-0 flex items-center gap-1.5 btn-premium-gold px-5 py-2.5 h-10">
+                        <ShinyButton onClick={() => { setOrderType("repair"); setIsOrderDialogOpen(true); }} className="w-full sm:w-auto shrink-0 flex items-center gap-1.5 px-5 py-2.5 rounded-xl h-10">
                           <Plus className="h-4 w-4" />
                           Создать заявку
-                        </Button>
+                        </ShinyButton>
                       </div>
                     </>
                   )}
@@ -2441,10 +2440,10 @@ const Cabinet = () => {
                     </CardDescription>
                   </div>
                   {profile?.is_verified && !editing && (
-                    <Button onClick={() => { setEditing(true); setAgreedToTerms(true); }} className="btn-premium-gold hover:shadow-gold-glow px-4 h-9">
+                    <ShinyButton onClick={() => { setEditing(true); setAgreedToTerms(true); }} className="px-4 h-9 rounded-xl">
                       <Pencil className="h-4 w-4 mr-1.5" />
                       Изменить
-                    </Button>
+                    </ShinyButton>
                   )}
                 </div>
               </CardHeader>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
+import { ShinyButton } from "@/components/ui/shiny-button";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -104,10 +105,10 @@ const SmartIntercom = () => {
               >
                 «Умный домофон — это уже давно не просто «замок» на двери, а комплексное решение для безопасности дома. Что входит в систему?»
               </p>
-              <Button onClick={scrollToContact} size="lg" className="mt-4 gap-2">
+              <ShinyButton onClick={scrollToContact} className="mt-4 gap-2">
                 <Smartphone className="h-5 w-5" />
                 Получить консультацию
-              </Button>
+              </ShinyButton>
             </div>
           </div>
         </section>
@@ -178,27 +179,26 @@ const SmartIntercom = () => {
                     Также вы можете прямо сейчас рассчитать стоимость абонентского обслуживания для вашего дома с помощью нашего онлайн-калькулятора.
                   </p>
                   
-                  {/* Кнопки перенаправления */}
-                  <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                    <Button
-                      variant="outline"
+                  {/* Кнопки перенаправления с центрированием и одинаковой шириной */}
+                  <div className="flex flex-col sm:flex-row gap-4 pt-3 justify-center items-center w-full">
+                    <ShinyButton
                       onClick={() => {
                         console.log("[SmartIntercom] Клик по кнопке 'Оставить заявку'. Переход на контакты.");
                         navigate("/kontakty");
                       }}
-                      className="w-full sm:w-auto hover-scale text-sm font-semibold py-2 px-5"
+                      className="w-full sm:w-56 justify-center text-center text-sm font-semibold py-2.5 rounded-xl"
                     >
                       Оставить заявку
-                    </Button>
-                    <Button
+                    </ShinyButton>
+                    <ShinyButton
                       onClick={() => {
                         console.log("[SmartIntercom] Клик по кнопке 'Рассчитать тариф'. Переход на калькулятор.");
                         navigate("/calculator");
                       }}
-                      className="w-full sm:w-auto gradient-primary text-primary-foreground hover:opacity-90 transition-opacity shadow-lg hover-scale text-sm font-semibold py-2 px-5"
+                      className="w-full sm:w-56 justify-center text-center text-sm font-semibold py-2.5 rounded-xl"
                     >
                       Рассчитать тариф
-                    </Button>
+                    </ShinyButton>
                   </div>
                 </div>
               </div>

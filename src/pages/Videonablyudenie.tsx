@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import { ShinyButton } from "@/components/ui/shiny-button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Camera, Check, Cloud, Shield, Smartphone } from "lucide-react";
@@ -121,16 +122,15 @@ const Videonablyudenie = () => {
                 Современные системы видеонаблюдения для дома и бизнеса.
                 Полный контроль безопасности объекта в режиме реального времени.
               </p>
-              <Button
+              <ShinyButton
                 onClick={scrollToContact}
-                size="lg"
                 className={`gap-2 ${
                   isVisible.header ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
-                } transition-all duration-300 hover:scale-105 active:scale-95`}
+                } transition-all duration-300`}
               >
                 <Camera className="h-5 w-5" />
                 Заказать расчет системы
-              </Button>
+              </ShinyButton>
             </div>
           </div>
         </section>
@@ -253,15 +253,14 @@ const Videonablyudenie = () => {
                 Наш инженер произведет осмотр объекта и составит оптимальное решение
                 с учетом всех ваших требований
               </p>
-              <Button
+              <ShinyButton
                 onClick={scrollToContact}
-                size="lg"
                 className={`${
                   isVisible.cta ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
-                } transition-all duration-300 hover:scale-105 active:scale-95`}
+                } transition-all duration-300`}
               >
                 Вызвать специалиста
-              </Button>
+              </ShinyButton>
             </div>
           </div>
         </section>
