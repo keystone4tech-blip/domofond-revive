@@ -73,13 +73,13 @@ const Requisites = () => {
 
   return (
     <div className="space-y-8 animate-in fade-in-50 duration-500">
-      <div className="text-center md:text-left mb-6">
-        {/* Унифицированный градиентный заголовок */}
-        <h2 className="text-2xl sm:text-3xl md:text-4xl mb-3 flex items-center justify-center md:justify-start gap-2 section-title-gradient">
+      <div className="text-center mb-12">
+        {/* Унифицированный градиентный заголовок по центру */}
+        <h2 className="text-2xl sm:text-3xl md:text-4xl mb-4 flex items-center justify-center gap-2 section-title-gradient">
           <ShieldCheck className="h-8 w-8 text-amber-500 flex-shrink-0" />
           Карта партнера
         </h2>
-        <p className="text-base text-muted-foreground max-w-2xl">
+        <p className="text-base text-muted-foreground max-w-2xl mx-auto">
           Официальные реквизиты компании ООО «ДомофонДар» для заключения договоров и выставления счетов.
         </p>
       </div>

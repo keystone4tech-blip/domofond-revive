@@ -101,8 +101,15 @@ const DocumentsList = () => {
 
   return (
     <div className="space-y-6">
-      {/* Унифицированный градиентный заголовок */}
-      <h2 className="text-2xl section-title-gradient">Документы</h2>
+      <div className="text-center mb-12">
+        {/* Унифицированный градиентный заголовок по центру */}
+        <h2 className="text-2xl sm:text-3xl md:text-4xl mb-4 section-title-gradient">
+          Документы
+        </h2>
+        <p className="text-base text-muted-foreground max-w-2xl mx-auto">
+          Проекты официальных договоров и соглашений ООО «ДомофонДар» для ознакомления и скачивания.
+        </p>
+      </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {documents.map((doc) => (
