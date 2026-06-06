@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState, Component, ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -3643,4 +3643,51 @@ const Cabinet = () => {
   );
 };
 
-export default Cabinet;
+// Классовый предохранитель ошибок (CabinetErrorBoundary) для перехвата любых критических рантайм-сбоев в Личном кабинете
+class CabinetErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: any }> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  // Метод жизненного цикла для обновления стейта при возникновении ошибки
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true, error };
+  }
+
+  // Логирование ошибки в консоль
+  componentDidCatch(error: any, errorInfo: any) {
+    console.error("[Cabinet ErrorBoundary] Перехвачена критическая рантайм-ошибка:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-slate-900 text-white p-8 flex flex-col items-center justify-center text-center">
+          <h1 className="text-2xl font-bold text-red-500 mb-4 font-display">⚠️ Критическая ошибка рендеринга ЛК</h1>
+          <p className="text-sm text-slate-400 max-w-md mb-6">Произошел сбой при отрисовке интерфейса. Пожалуйста, передайте разработчику текст ошибки ниже:</p>
+          <pre className="bg-slate-950 p-4 rounded-xl text-xs max-w-xl overflow-auto border border-red-900/50 text-red-400 font-mono text-left">
+            {this.state.error?.stack || String(this.state.error)}
+          </pre>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="mt-6 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-all"
+          >
+            Перезагрузить страницу
+          </button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+// Обертка компонента Cabinet в предохранитель ошибок для предотвращения "белого экрана" у пользователя
+const CabinetWithErrorBoundary = () => (
+  <CabinetErrorBoundary>
+    <Cabinet />
+  </CabinetErrorBoundary>
+);
+
+export default CabinetWithErrorBoundary;
