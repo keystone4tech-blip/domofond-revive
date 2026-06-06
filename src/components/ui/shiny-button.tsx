@@ -1,4 +1,5 @@
 import type React from "react";
+import { cn } from "@/lib/utils"; // Импортируем утилиту слияния классов Tailwind
 
 // Пропсы для интерактивной кнопки с эффектом перелива
 interface ShinyButtonProps {
@@ -16,7 +17,8 @@ interface ShinyButtonProps {
  * Премиальный компонент ShinyButton
  * Поддерживает анимации вращающегося градиента контура и точечную подложку при наведении.
  * Рендерится как <a> при наличии props.href, иначе как <button>.
- * Стили вынесены в глобальный файл src/index.css для корректного парсинга @property.
+ * Геометрические параметры (отступы, шрифты, скругления) задаются через Tailwind по умолчанию
+ * и могут переопределяться при вызове с помощью cn().
  */
 export function ShinyButton({ 
   children, 
@@ -28,9 +30,14 @@ export function ShinyButton({
   target,
   rel
 }: ShinyButtonProps) {
-  // Базовый класс .shiny-cta отвечает за анимацию границы и цвета бренда.
-  // Класс .rounded-full задает овальную форму (360px) по умолчанию, но может переопределяться.
-  const fullClassName = `shiny-cta ${className}`;
+  // Базовые стили для кнопок ShinyButton:
+  // - shiny-cta: глобальный CSS-класс для анимации шиммера и градиентов
+  // - px-8 py-3.5 text-base font-semibold: крупные размеры по умолчанию
+  // - rounded-full: круглая форма (овал) по умолчанию
+  const fullClassName = cn(
+    "shiny-cta px-8 py-3.5 text-base font-semibold rounded-full",
+    className
+  );
 
   // Рендеринг в виде ссылки <a>
   if (href) {

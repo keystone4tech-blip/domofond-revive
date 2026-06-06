@@ -125,7 +125,7 @@ const Contact = () => {
                   +7 (903) 411-83-93
                 </a>
                 <p className="text-sm text-muted-foreground mt-1">Круглосуточная линия</p>
-                <div className="flex gap-2 mt-2">
+                <div className="flex flex-wrap gap-2 mt-2">
                   <ShinyButton href="tel:+79034118393" className="w-full sm:w-auto py-1.5 px-3 text-xs rounded-xl">
                     <Phone className="h-3.5 w-3.5" />
                     Позвонить
@@ -150,7 +150,7 @@ const Contact = () => {
                 <a href="https://t.me/Domofondar_bot" target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-primary transition-colors mt-1 block">
                   Telegram бот
                 </a>
-                <div className="flex gap-2 mt-2">
+                <div className="flex flex-wrap gap-2 mt-2">
                   <ShinyButton href="https://t.me/domofondar123" target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto py-1.5 px-3 text-xs rounded-xl">
                     <Send className="h-3.5 w-3.5" />
                     Открыть чат
@@ -189,7 +189,7 @@ const Contact = () => {
                 <h3 className="font-semibold mb-1">Адрес офиса</h3>
                 <p className="text-muted-foreground">г. Краснодар, проезд Репина 1</p>
                 <p className="text-sm text-muted-foreground mt-1">2 этаж, офис 134</p>
-                <div className="flex gap-2 mt-2">
+                <div className="flex flex-wrap gap-2 mt-2">
                   <ShinyButton href="https://yandex.ru/maps/-/CLhNYJYt" target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto py-1.5 px-3 text-xs rounded-xl">
                     <MapPin className="h-3.5 w-3.5" />
                     Яндекс Карты

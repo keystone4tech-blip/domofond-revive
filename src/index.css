@@ -394,13 +394,9 @@
   overflow: hidden;
   cursor: pointer;
   outline-offset: 4px;
-  padding: 0.8rem 2rem;
   font-family: "Inter", sans-serif;
-  font-size: 0.95rem;
   line-height: 1.2;
-  font-weight: 600;
   border: 1px solid transparent;
-  border-radius: 360px;
   color: var(--shiny-cta-fg);
   background: linear-gradient(var(--shiny-cta-bg), var(--shiny-cta-bg)) padding-box,
     conic-gradient(
