@@ -51,15 +51,23 @@ interface Task {
 interface TasksManagerProps {
   isManager: boolean;
   initialFilter?: string;
+  initialTaskId?: string;
+  onClearInitialTaskId?: () => void;
 }
 
-const TasksManager = ({ isManager, initialFilter = "all" }: TasksManagerProps) => {
+const TasksManager = ({ 
+  isManager, 
+  initialFilter = "all",
+  initialTaskId,
+  onClearInitialTaskId
+}: TasksManagerProps) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>(initialFilter);
+
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -110,6 +118,18 @@ const TasksManager = ({ isManager, initialFilter = "all" }: TasksManagerProps) =
     },
     enabled: isManager,
   });
+
+  // Авто-открытие задачи по ID
+  useEffect(() => {
+    if (initialTaskId && tasks) {
+      const found = tasks.find(t => t.id === initialTaskId);
+      if (found) {
+        console.log(`[TasksManager] Авто-открытие задачи по ID: ${initialTaskId}`);
+        setSelectedTask(found);
+      }
+    }
+  }, [initialTaskId, tasks]);
+
 
   const { data: clients } = useQuery({
     queryKey: ["clients-list"],
@@ -350,11 +370,15 @@ const TasksManager = ({ isManager, initialFilter = "all" }: TasksManagerProps) =
     return (
       <TaskDetails
         task={selectedTask}
-        onBack={() => setSelectedTask(null)}
+        onBack={() => {
+          setSelectedTask(null);
+          if (onClearInitialTaskId) onClearInitialTaskId();
+        }}
         isManager={isManager}
       />
     );
   }
+
 
   return (
     <Card className="border-border/50">

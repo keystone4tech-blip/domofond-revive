@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useToast } from "@/hooks/use-toast";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import {
   LayoutDashboard,
   Users,
@@ -13,11 +13,11 @@ import {
   FileText,
   Loader2,
   Package,
-  Home,
   ShieldCheck,
-  User
+  Menu,
+  ChevronRight,
+  Shield
 } from "lucide-react";
-import { Link } from "react-router-dom";
 import FSMDashboard from "@/components/fsm/FSMDashboard";
 import EmployeesManager from "@/components/fsm/EmployeesManager";
 import TasksManager from "@/components/fsm/TasksManager";
@@ -28,6 +28,7 @@ import RequestsManager from "@/components/fsm/RequestsManager";
 import ProductsManager from "@/components/fsm/ProductsManager";
 import VerificationManager from "@/components/fsm/VerificationManager";
 import FSMBottomNav from "@/components/fsm/FSMBottomNav";
+import { FSMSidebar } from "@/components/fsm/FSMSidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import PushNotificationToggle from "@/components/fsm/PushNotificationToggle";
 
@@ -36,8 +37,17 @@ const FSM = () => {
     header: false,
     content: false
   });
+  
+  // Текущая активная вкладка
   const [activeTab, setActiveTab] = useState("dashboard");
   const [statusFilter, setStatusFilter] = useState<string>("pending");
+  
+  // Состояния для авто-открытия заявок/задач по ID из дашборда
+  const [selectedRequestId, setSelectedRequestId] = useState<string | undefined>(undefined);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | undefined>(undefined);
+  
+  // Открытие мобильного сайдбара
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -45,19 +55,20 @@ const FSM = () => {
 
   useEffect(() => {
     if (!isLoading && user && isFSMUser) {
-      setTimeout(() => setIsVisible(prev => ({ ...prev, header: true })), 300);
-      setTimeout(() => setIsVisible(prev => ({ ...prev, content: true })), 600);
+      console.log("[FSM] Инициализация страницы...");
+      setTimeout(() => setIsVisible(prev => ({ ...prev, header: true })), 150);
+      setTimeout(() => setIsVisible(prev => ({ ...prev, content: true })), 300);
     }
   }, [isLoading, user, isFSMUser]);
 
   useEffect(() => {
-    console.log("FSM page check - isLoading:", isLoading, "user:", !!user, "isFSMUser:", isFSMUser, "roles:", roles);
+    console.log("FSM page access check - isLoading:", isLoading, "user:", !!user, "isFSMUser:", isFSMUser, "roles:", roles);
     
     if (!isLoading) {
       if (!user) {
         toast({
           title: "Требуется авторизация",
-          description: "Войдите в систему для доступа к панели управления",
+          description: "Войдите в систему для доступа к панели управления FSM",
           variant: "destructive",
         });
         navigate("/auth");
@@ -72,18 +83,34 @@ const FSM = () => {
     }
   }, [user, isFSMUser, isLoading, roles, navigate, toast]);
 
-  // Handle tab change with optional filter
-  const handleTabChange = (tab: string, filter?: string) => {
+  // Обработчик переключения вкладок с поддержкой фильтров и ID переходов
+  const handleTabChange = (tab: string, filter?: string, id?: string) => {
+    console.log(`[FSM] Переключение вкладки на "${tab}". Фильтр: "${filter || 'нет'}", ID: "${id || 'нет'}"`);
     setActiveTab(tab);
+    
     if (filter) {
       setStatusFilter(filter);
     } else {
-      // Default filter when switching tabs
+      // Значения по умолчанию
       if (tab === "requests" || tab === "tasks") {
         setStatusFilter("pending");
       }
     }
+
+    if (id) {
+      if (tab === "requests") {
+        setSelectedRequestId(id);
+        setSelectedTaskId(undefined);
+      } else if (tab === "tasks") {
+        setSelectedTaskId(id);
+        setSelectedRequestId(undefined);
+      }
+    }
   };
+
+  // Очистка переходов после открытия
+  const clearSelectedRequestId = () => setSelectedRequestId(undefined);
+  const clearSelectedTaskId = () => setSelectedTaskId(undefined);
 
   if (isLoading) {
     return (
@@ -107,138 +134,139 @@ const FSM = () => {
     return "Сотрудник";
   };
 
+  const getTabTitle = () => {
+    switch (activeTab) {
+      case "dashboard": return "Панель управления";
+      case "tasks": return "Задачи";
+      case "requests": return "Заявки клиентов";
+      case "products": return "Товары и услуги";
+      case "employees": return "Кадровый состав";
+      case "clients": return "Список клиентов";
+      case "map": return "Карта выездов";
+      case "reports": return "Аналитические отчеты";
+      case "verification": return "Верификация аккаунтов";
+      default: return "FSM Панель";
+    }
+  };
+
   return (
-    <div className="min-h-screen flex flex-col bg-background pb-20 lg:pb-0">
-      {/* Minimal Header for FSM */}
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-lg border-b border-border">
-        <div className="container flex items-center justify-between h-14 px-4">
+    <div className="min-h-screen flex bg-background">
+      {/* Боковой сайдбар для ПК и мобильная шторка */}
+      <FSMSidebar 
+        activeTab={activeTab} 
+        setActiveTab={handleTabChange} 
+        isManager={isManager}
+        isOpen={isMobileSidebarOpen}
+        setIsOpen={setIsMobileSidebarOpen}
+      />
+
+      {/* Основной контент-контейнер справа */}
+      <div className="flex-1 flex flex-col min-h-screen lg:pl-64 pb-20 lg:pb-0 transition-all duration-300">
+        
+        {/* Адаптивный верхний Top Bar дашборда */}
+        <header className="sticky top-0 z-40 bg-white/70 dark:bg-slate-900/75 backdrop-blur-md border-b border-slate-200/50 dark:border-slate-800/50 px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link to="/" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
-              <Home className="h-5 w-5" />
-              <span className="hidden sm:inline text-sm">На сайт</span>
-            </Link>
+            {/* Кнопка открытия мобильного сайдбара */}
+            <button
+              onClick={() => setIsMobileSidebarOpen(true)}
+              className="p-2 -ml-2 rounded-xl lg:hidden text-muted-foreground hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+
+            {/* Хлебные крошки / Текущий раздел */}
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-muted-foreground font-semibold uppercase tracking-wider text-[10px] hidden sm:inline">FSM</span>
+              <ChevronRight className="h-3 w-3 text-muted-foreground/60 hidden sm:inline" />
+              <span className="font-bold text-foreground tracking-tight">{getTabTitle()}</span>
+            </div>
           </div>
-          
-          <div className="flex items-center gap-2">
+
+          {/* Правая часть Top Bar */}
+          <div className="flex items-center gap-3">
             <PushNotificationToggle />
-            <span className="text-sm text-muted-foreground hidden sm:inline">{getRoleLabel()}</span>
-            <Link to="/cabinet" className="p-2 text-muted-foreground hover:text-foreground transition-colors">
-              <User className="h-5 w-5" />
-            </Link>
+            
+            {/* Аватар и роль */}
+            <div className="flex items-center gap-2 bg-slate-100/55 dark:bg-slate-800/40 p-1.5 pl-3 pr-2.5 rounded-xl border border-slate-200/30 dark:border-slate-850">
+              <div className="flex flex-col text-right hidden sm:flex">
+                <span className="text-xs font-bold text-foreground leading-tight">
+                  {user.email?.split("@")[0] || "Сотрудник"}
+                </span>
+                <span className="text-[9px] text-muted-foreground font-semibold uppercase tracking-wider">
+                  {getRoleLabel()}
+                </span>
+              </div>
+              <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold text-xs uppercase shadow-inner">
+                {user.email?.slice(0, 2) || "F"}
+              </div>
+            </div>
+            
             <ThemeToggle />
           </div>
-        </div>
-      </header>
-      
-      <main className="flex-1 container px-4 py-4">
-        <div
-          className={`mb-4 ${
-            isVisible.header ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-10'
-          } transition-all duration-500 ease-out`}
-        >
-          <h1 className="text-xl md:text-2xl font-bold text-foreground flex items-center gap-2">
-            <LayoutDashboard className="h-6 w-6 text-primary" />
-            Домофондар
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Управление заявками и сотрудниками • {getRoleLabel()}
-          </p>
-        </div>
+        </header>
 
-        <Tabs
-          value={activeTab}
-          onValueChange={(val) => handleTabChange(val)}
-          className={`space-y-4 ${
-            isVisible.content ? 'opacity-100' : 'opacity-0'
-          } transition-opacity duration-500`}
-        >
-          {/* Desktop Tabs - hidden on mobile */}
-          <TabsList className="hidden lg:flex flex-wrap h-auto gap-1 bg-muted/50 p-1">
-            <TabsTrigger value="dashboard" className="flex items-center gap-2">
-              <LayoutDashboard className="h-4 w-4" />
-              Панель
-            </TabsTrigger>
-            <TabsTrigger value="tasks" className="flex items-center gap-2">
-              <ClipboardList className="h-4 w-4" />
-              Задачи
-            </TabsTrigger>
-            <TabsTrigger value="requests" className="flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              Заявки
-            </TabsTrigger>
-            <TabsTrigger value="products" className="flex items-center gap-2">
-              <Package className="h-4 w-4" />
-              Товары
-            </TabsTrigger>
+        {/* Главная рабочая область контента */}
+        <main className="flex-1 p-4 lg:p-6 max-w-full overflow-x-hidden">
+          <Tabs
+            value={activeTab}
+            onValueChange={(val) => handleTabChange(val)}
+            className={`space-y-4 ${
+              isVisible.content ? 'opacity-100' : 'opacity-0'
+            } transition-opacity duration-300`}
+          >
+            <TabsContent value="dashboard" className="mt-0 outline-none">
+              <FSMDashboard isManager={isManager} onNavigate={handleTabChange} />
+            </TabsContent>
+
+            <TabsContent value="tasks" className="mt-0 outline-none">
+              <TasksManager 
+                isManager={isManager} 
+                initialFilter={statusFilter}
+                initialTaskId={selectedTaskId}
+                onClearInitialTaskId={clearSelectedTaskId}
+              />
+            </TabsContent>
+
+            <TabsContent value="requests" className="mt-0 outline-none">
+              <RequestsManager 
+                initialFilter={statusFilter} 
+                initialRequestId={selectedRequestId}
+                onClearInitialRequestId={clearSelectedRequestId}
+              />
+            </TabsContent>
+
+            <TabsContent value="products" className="mt-0 outline-none">
+              <ProductsManager />
+            </TabsContent>
+
             {isManager && (
               <>
-                <TabsTrigger value="employees" className="flex items-center gap-2">
-                  <Users className="h-4 w-4" />
-                  Сотрудники
-                </TabsTrigger>
-                <TabsTrigger value="clients" className="flex items-center gap-2">
-                  <Building2 className="h-4 w-4" />
-                  Клиенты
-                </TabsTrigger>
-                <TabsTrigger value="map" className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4" />
-                  Карта
-                </TabsTrigger>
-                <TabsTrigger value="reports" className="flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4" />
-                  Отчеты
-                </TabsTrigger>
-                <TabsTrigger value="verification" className="flex items-center gap-2">
-                  <ShieldCheck className="h-4 w-4" />
-                  Верификация
-                </TabsTrigger>
+                <TabsContent value="employees" className="mt-0 outline-none">
+                  <EmployeesManager />
+                </TabsContent>
+
+                <TabsContent value="clients" className="mt-0 outline-none">
+                  <ClientsManager />
+                </TabsContent>
+
+                <TabsContent value="map" className="mt-0 outline-none">
+                  <LocationMap />
+                </TabsContent>
+
+                <TabsContent value="reports" className="mt-0 outline-none">
+                  <FSMReports />
+                </TabsContent>
+
+                <TabsContent value="verification" className="mt-0 outline-none">
+                  <VerificationManager />
+                </TabsContent>
               </>
             )}
-          </TabsList>
+          </Tabs>
+        </main>
+      </div>
 
-          <TabsContent value="dashboard" className="mt-0">
-            <FSMDashboard isManager={isManager} onNavigate={handleTabChange} />
-          </TabsContent>
-
-          <TabsContent value="tasks" className="mt-0">
-            <TasksManager isManager={isManager} initialFilter={statusFilter} />
-          </TabsContent>
-
-          <TabsContent value="requests" className="mt-0">
-            <RequestsManager initialFilter={statusFilter} />
-          </TabsContent>
-
-          <TabsContent value="products" className="mt-0">
-            <ProductsManager />
-          </TabsContent>
-
-          {isManager && (
-            <>
-              <TabsContent value="employees" className="mt-0">
-                <EmployeesManager />
-              </TabsContent>
-
-              <TabsContent value="clients" className="mt-0">
-                <ClientsManager />
-              </TabsContent>
-
-              <TabsContent value="map" className="mt-0">
-                <LocationMap />
-              </TabsContent>
-
-              <TabsContent value="reports" className="mt-0">
-                <FSMReports />
-              </TabsContent>
-
-              <TabsContent value="verification" className="mt-0">
-                <VerificationManager />
-              </TabsContent>
-            </>
-          )}
-        </Tabs>
-      </main>
-
-      {/* FSM-specific Bottom Navigation for mobile */}
+      {/* Мобильная нижняя навигация */}
       <FSMBottomNav 
         activeTab={activeTab} 
         onTabChange={handleTabChange} 

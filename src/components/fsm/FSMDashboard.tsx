@@ -1,639 +1,799 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useMemo, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
-  ClipboardList, 
-  CheckCircle2, 
-  Clock, 
-  AlertTriangle,
-  Users,
-  Building2,
-  Loader2,
-  FileText,
-  Banknote,
-  HandMetal,
-  XCircle
+  ResponsiveContainer, AreaChart, Area, XAxis, YAxis, 
+  CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, BarChart, Bar 
+} from "recharts";
+import { 
+  ClipboardList, CheckCircle2, Clock, AlertTriangle, Users, 
+  Building2, Loader2, FileText, Banknote, HandMetal, XCircle, 
+  ArrowUpRight, Calendar, Search, Award, ShieldAlert, Zap, History
 } from "lucide-react";
-import { format } from "date-fns";
+import { format, differenceInMinutes, parseISO, subDays } from "date-fns";
+import { ru } from "date-fns/locale";
 
+// Пропсы для дашборда аналитики
 interface FSMDashboardProps {
   isManager: boolean;
-  onNavigate?: (tab: string, filter?: string) => void;
+  onNavigate?: (tab: string, filter?: string, id?: string) => void;
 }
 
-type DetailType = "totalTasks" | "pendingTasks" | "inProgressTasks" | "completedTasks" | 
-                  "totalRequests" | "pendingRequests" | "inProgressRequests" | "completedRequests" | "cancelledRequests" |
-                  "employees" | "clients" | "masters" | "finance" | null;
+// Периоды аналитики
+type AnalyticsPeriod = "current_month" | "last_month" | "30_days" | "90_days" | "all";
 
-const FSMDashboard = ({ isManager, onNavigate }: FSMDashboardProps) => {
-  const [detailType, setDetailType] = useState<DetailType>(null);
+export const FSMDashboard = ({ isManager, onNavigate }: FSMDashboardProps) => {
+  const queryClient = useQueryClient();
+  const [period, setPeriod] = useState<AnalyticsPeriod>("30_days");
+  const [searchTerm, setSearchTerm] = useState("");
 
-  const { data: stats } = useQuery({
-    queryKey: ["fsm-dashboard-stats"],
+  // Запрос сырых данных для аналитики
+  const { data: rawData, isLoading } = useQuery({
+    queryKey: ["fsm-dashboard-raw-data"],
     queryFn: async () => {
-      const [tasksRes, requestsRes, employeesRes, clientsRes] = await Promise.all([
-        supabase.from("tasks").select("status"),
-        supabase.from("requests").select("status"),
-        isManager ? supabase.from("employees").select("id, is_active") : Promise.resolve({ data: [] }),
-        isManager ? supabase.from("clients").select("id") : Promise.resolve({ data: [] }),
+      console.log("[FSMDashboard] Загрузка сырых данных для аналитики...");
+      const [tasksRes, requestsRes, employeesRes, profilesRes] = await Promise.all([
+        supabase.from("tasks").select("*").order("created_at", { ascending: false }),
+        supabase.from("requests").select("*").order("created_at", { ascending: false }),
+        supabase.from("employees").select("*"),
+        supabase.from("profiles").select("id, full_name")
       ]);
 
-      const tasks = tasksRes.data || [];
-      const requests = requestsRes.data || [];
-      const employees = employeesRes.data || [];
-      const clients = clientsRes.data || [];
+      if (tasksRes.error) throw tasksRes.error;
+      if (requestsRes.error) throw requestsRes.error;
+      if (employeesRes.error) throw employeesRes.error;
+      if (profilesRes.error) throw profilesRes.error;
 
       return {
-        // Tasks stats
-        totalTasks: tasks.length,
-        pendingTasks: tasks.filter((t) => t.status === "pending" || t.status === "assigned").length,
-        inProgressTasks: tasks.filter((t) => t.status === "in_progress").length,
-        completedTasks: tasks.filter((t) => t.status === "completed").length,
-        cancelledTasks: tasks.filter((t) => t.status === "cancelled").length,
-        // Requests stats
-        totalRequests: requests.length,
-        pendingRequests: requests.filter((r) => r.status === "pending").length,
-        inProgressRequests: requests.filter((r) => r.status === "in_progress").length,
-        completedRequests: requests.filter((r) => r.status === "completed").length,
-        cancelledRequests: requests.filter((r) => r.status === "cancelled").length,
-        // Other stats
-        activeEmployees: employees.filter((e) => e.is_active).length,
-        totalClients: clients.length,
+        tasks: tasksRes.data || [],
+        requests: requestsRes.data || [],
+        employees: employeesRes.data || [],
+        profiles: profilesRes.data || []
       };
-    },
+    }
   });
 
-  const handleCardClick = (id: DetailType, navigateTo?: { tab: string; filter?: string }) => {
-    if (navigateTo && onNavigate) {
-      onNavigate(navigateTo.tab, navigateTo.filter);
-    } else {
-      setDetailType(id);
+  // Подписка на Supabase Realtime изменения в реальном времени
+  useEffect(() => {
+    console.log("[FSMDashboard] Подключение к realtime-каналам изменений таблиц...");
+    const channel = supabase
+      .channel("fsm-dashboard-realtime-sync")
+      .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, (payload) => {
+        console.log("[Realtime] Обнаружено изменение в таблице задач (tasks):", payload.eventType);
+        queryClient.invalidateQueries({ queryKey: ["fsm-dashboard-raw-data"] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "requests" }, (payload) => {
+        console.log("[Realtime] Обнаружено изменение в таблице заявок (requests):", payload.eventType);
+        queryClient.invalidateQueries({ queryKey: ["fsm-dashboard-raw-data"] });
+      })
+      .subscribe();
+
+    return () => {
+      console.log("[FSMDashboard] Отключение от каналов realtime...");
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
+  // Фильтрация данных по выбранному периоду
+  const filterByPeriod = (dateStr: string | null) => {
+    if (!dateStr) return false;
+    const date = new Date(dateStr);
+    const now = new Date();
+    
+    switch (period) {
+      case "current_month":
+        return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+      case "last_month":
+        const lastMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
+        const lastMonthYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+        return date.getMonth() === lastMonth && date.getFullYear() === lastMonthYear;
+      case "30_days":
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(now.getDate() - 30);
+        return date >= thirtyDaysAgo;
+      case "90_days":
+        const ninetyDaysAgo = new Date();
+        ninetyDaysAgo.setDate(now.getDate() - 90);
+        return date >= ninetyDaysAgo;
+      case "all":
+      default:
+        return true;
     }
   };
 
-  const taskCards = [
-    {
-      id: "totalTasks" as DetailType,
-      title: "Всего задач",
-      value: stats?.totalTasks || 0,
-      icon: ClipboardList,
-      color: "text-primary",
-      bgColor: "bg-primary/10",
-      navigateTo: { tab: "tasks", filter: "pending" },
-    },
-    {
-      id: "pendingTasks" as DetailType,
-      title: "Ожидают",
-      value: stats?.pendingTasks || 0,
-      icon: Clock,
-      color: "text-yellow-600",
-      bgColor: "bg-yellow-100 dark:bg-yellow-900/30",
-      navigateTo: { tab: "tasks", filter: "pending" },
-    },
-    {
-      id: "inProgressTasks" as DetailType,
-      title: "В работе",
-      value: stats?.inProgressTasks || 0,
-      icon: AlertTriangle,
-      color: "text-orange-600",
-      bgColor: "bg-orange-100 dark:bg-orange-900/30",
-      navigateTo: { tab: "tasks", filter: "in_progress" },
-    },
-    {
-      id: "completedTasks" as DetailType,
-      title: "Выполнено",
-      value: stats?.completedTasks || 0,
-      icon: CheckCircle2,
-      color: "text-green-600",
-      bgColor: "bg-green-100 dark:bg-green-900/30",
-      navigateTo: { tab: "tasks", filter: "completed" },
-    },
-  ];
+  // Вычисляемые данные аналитики
+  const analytics = useMemo(() => {
+    if (!rawData) return null;
 
-  const requestCards = [
-    {
-      id: "totalRequests" as DetailType,
-      title: "Всего заявок",
-      value: stats?.totalRequests || 0,
-      icon: FileText,
-      color: "text-blue-600",
-      bgColor: "bg-blue-100 dark:bg-blue-900/30",
-      navigateTo: { tab: "requests", filter: "pending" },
-    },
-    {
-      id: "pendingRequests" as DetailType,
-      title: "Новые",
-      value: stats?.pendingRequests || 0,
-      icon: Clock,
-      color: "text-yellow-600",
-      bgColor: "bg-yellow-100 dark:bg-yellow-900/30",
-      navigateTo: { tab: "requests", filter: "pending" },
-    },
-    {
-      id: "inProgressRequests" as DetailType,
-      title: "В работе",
-      value: stats?.inProgressRequests || 0,
-      icon: AlertTriangle,
-      color: "text-blue-600",
-      bgColor: "bg-blue-100 dark:bg-blue-900/30",
-      navigateTo: { tab: "requests", filter: "in_progress" },
-    },
-    {
-      id: "completedRequests" as DetailType,
-      title: "Выполнено",
-      value: stats?.completedRequests || 0,
-      icon: CheckCircle2,
-      color: "text-green-600",
-      bgColor: "bg-green-100 dark:bg-green-900/30",
-      navigateTo: { tab: "requests", filter: "completed" },
-    },
-    {
-      id: "cancelledRequests" as DetailType,
-      title: "Отменено",
-      value: stats?.cancelledRequests || 0,
-      icon: XCircle,
-      color: "text-muted-foreground",
-      bgColor: "bg-muted",
-      navigateTo: { tab: "requests", filter: "cancelled" },
-    },
-  ];
+    const filteredTasks = rawData.tasks.filter(t => filterByPeriod(t.created_at));
+    const filteredRequests = rawData.requests.filter(r => filterByPeriod(r.created_at));
 
-  const actionCards: typeof taskCards = isManager ? [
-    {
-      id: "masters" as DetailType,
-      title: "По мастерам",
-      value: stats?.activeEmployees || 0,
-      icon: HandMetal,
-      color: "text-purple-600",
-      bgColor: "bg-purple-100 dark:bg-purple-900/30",
-      navigateTo: { tab: "requests", filter: "masters" },
-    },
-    {
-      id: "finance" as DetailType,
-      title: "Финансы",
-      value: 0,
-      icon: Banknote,
-      color: "text-emerald-600",
-      bgColor: "bg-emerald-100 dark:bg-emerald-900/30",
-      navigateTo: { tab: "requests", filter: "reports" },
-    },
-    {
-      id: "employees" as DetailType,
-      title: "Сотрудники",
-      value: stats?.activeEmployees || 0,
-      icon: Users,
-      color: "text-blue-600",
-      bgColor: "bg-blue-100 dark:bg-blue-900/30",
-      navigateTo: { tab: "employees", filter: "" },
-    },
-    {
-      id: "clients" as DetailType,
-      title: "Клиенты",
-      value: stats?.totalClients || 0,
-      icon: Building2,
-      color: "text-purple-600",
-      bgColor: "bg-purple-100 dark:bg-purple-900/30",
-      navigateTo: { tab: "clients", filter: "" },
-    },
-  ] : [];
+    // Суммы платежей
+    let totalRevenue = 0;
+    let cashRevenue = 0;
+    let onlineRevenue = 0;
+    let pendingPayments = 0;
 
-  const getDialogTitle = (type: DetailType) => {
-    switch (type) {
-      case "totalTasks": return "Все задачи";
-      case "pendingTasks": return "Ожидающие задачи";
-      case "inProgressTasks": return "Задачи в работе";
-      case "completedTasks": return "Выполненные задачи";
-      case "totalRequests": return "Все заявки";
-      case "pendingRequests": return "Новые заявки";
-      case "inProgressRequests": return "Заявки в работе";
-      case "completedRequests": return "Выполненные заявки";
-      case "cancelledRequests": return "Отмененные заявки";
-      case "employees": return "Сотрудники";
-      case "clients": return "Клиенты";
-      default: return "";
+    filteredRequests.forEach(r => {
+      const amount = Number(r.payment_amount) || 0;
+      if (r.payment_status === "paid") {
+        totalRevenue += amount;
+        if (r.payment_method === "online") onlineRevenue += amount;
+        else cashRevenue += amount;
+      } else if (r.payment_status === "pending") {
+        pendingPayments += amount;
+      }
+    });
+
+    // Расчет KPI по Мастерам
+    const masterStats = rawData.employees.map(emp => {
+      const empTasks = filteredTasks.filter(t => t.assigned_to === emp.id || t.accepted_by === emp.id);
+      const empRequests = filteredRequests.filter(r => r.assigned_to === emp.id || r.accepted_by === emp.id);
+
+      const completedTasks = empTasks.filter(t => t.status === "completed").length;
+      const completedRequests = empRequests.filter(r => r.status === "completed").length;
+      
+      const totalAssigned = empTasks.length + empRequests.length;
+      const totalCompleted = completedTasks + completedRequests;
+
+      // Сбор денег по закрытым платным заявкам мастера
+      const cashCollected = empRequests
+        .filter(r => r.status === "completed" && r.payment_status === "paid")
+        .reduce((sum, r) => sum + (Number(r.payment_amount) || 0), 0);
+
+      // Время выполнения (в минутах)
+      let totalMinutes = 0;
+      let ratedCount = 0;
+      empTasks.concat(empRequests as any[]).forEach(item => {
+        if (item.status === "completed" && item.completed_at && item.accepted_at) {
+          const diff = differenceInMinutes(new Date(item.completed_at), new Date(item.accepted_at));
+          if (diff > 0) {
+            totalMinutes += diff;
+            ratedCount++;
+          }
+        }
+      });
+
+      const avgTimeMinutes = ratedCount > 0 ? Math.round(totalMinutes / ratedCount) : 0;
+      const successRate = totalAssigned > 0 ? Math.round((totalCompleted / totalAssigned) * 100) : 0;
+
+      return {
+        id: emp.id,
+        name: emp.full_name,
+        position: emp.position || "Мастер",
+        isActive: emp.is_active,
+        assigned: totalAssigned,
+        completed: totalCompleted,
+        successRate,
+        cashCollected,
+        avgTimeMinutes
+      };
+    }).sort((a, b) => b.completed - a.completed);
+
+    // Расчет KPI по Диспетчерам (кто поставил задачи)
+    const dispatcherMap = new Map<string, { name: string; created: number; completed: number }>();
+    filteredTasks.forEach(task => {
+      const creatorId = task.assigned_by;
+      if (creatorId) {
+        const profile = rawData.profiles.find(p => p.id === creatorId);
+        const name = profile?.full_name || `Сотрудник ${creatorId.substring(0, 4)}`;
+        if (!dispatcherMap.has(creatorId)) {
+          dispatcherMap.set(creatorId, { name, created: 0, completed: 0 });
+        }
+        const record = dispatcherMap.get(creatorId)!;
+        record.created += 1;
+        if (task.status === "completed") {
+          record.completed += 1;
+        }
+      }
+    });
+
+    const dispatcherStats = Array.from(dispatcherMap.entries()).map(([id, val]) => ({
+      id,
+      name: val.name,
+      created: val.created,
+      completed: val.completed,
+      successRate: val.created > 0 ? Math.round((val.completed / val.created) * 100) : 0
+    })).sort((a, b) => b.created - a.created);
+
+    // Срочные активные заявки
+    const urgentRequests = filteredRequests.filter(r => r.priority === "urgent" && (r.status === "pending" || r.status === "in_progress"));
+
+    // Статистика приоритетов для диаграммы
+    const priorityData = [
+      { name: "Срочно", value: filteredTasks.filter(t => t.priority === "urgent").length + filteredRequests.filter(r => r.priority === "urgent").length, color: "#ef4444" },
+      { name: "Высокий", value: filteredTasks.filter(t => t.priority === "high").length + filteredRequests.filter(r => r.priority === "high").length, color: "#f97316" },
+      { name: "Средний", value: filteredTasks.filter(t => t.priority === "medium").length + filteredRequests.filter(r => r.priority === "medium").length, color: "#3b82f6" },
+      { name: "Низкий", value: filteredTasks.filter(t => t.priority === "low").length + filteredRequests.filter(r => r.priority === "low").length, color: "#94a3b8" },
+    ].filter(item => item.value > 0);
+
+    // Подготовка данных для графика динамики выполнения (последние 7 периодов)
+    const dynamicsData = Array.from({ length: 7 }).map((_, idx) => {
+      const d = subDays(new Date(), idx);
+      const dateStr = format(d, "yyyy-MM-dd");
+      const label = format(d, "dd MMM", { locale: ru });
+
+      const dayTasks = filteredTasks.filter(t => format(new Date(t.created_at), "yyyy-MM-dd") === dateStr);
+      const dayReqs = filteredRequests.filter(r => format(new Date(r.created_at), "yyyy-MM-dd") === dateStr);
+      
+      const dayCompletedTasks = filteredTasks.filter(t => t.status === "completed" && t.completed_at && format(new Date(t.completed_at), "yyyy-MM-dd") === dateStr);
+      const dayCompletedReqs = filteredRequests.filter(r => r.status === "completed" && r.completed_at && format(new Date(r.completed_at), "yyyy-MM-dd") === dateStr);
+
+      return {
+        name: label,
+        "Поступило заявок": dayReqs.length + dayTasks.length,
+        "Выполнено": dayCompletedReqs.length + dayCompletedTasks.length
+      };
+    }).reverse();
+
+    // Подготовка графика выручки по дням
+    const financeGraphData = Array.from({ length: 7 }).map((_, idx) => {
+      const d = subDays(new Date(), idx);
+      const dateStr = format(d, "yyyy-MM-dd");
+      const label = format(d, "dd MMM", { locale: ru });
+
+      const dayRevenue = filteredRequests
+        .filter(r => r.payment_status === "paid" && r.completed_at && format(new Date(r.completed_at), "yyyy-MM-dd") === dateStr)
+        .reduce((sum, r) => sum + (Number(r.payment_amount) || 0), 0);
+
+      return {
+        name: label,
+        "Выручка (₽)": dayRevenue
+      };
+    }).reverse();
+
+    return {
+      totalTasks: filteredTasks.length,
+      completedTasks: filteredTasks.filter(t => t.status === "completed").length,
+      inProgressTasks: filteredTasks.filter(t => t.status === "in_progress").length,
+      pendingTasks: filteredTasks.filter(t => t.status === "pending" || t.status === "assigned").length,
+      cancelledTasks: filteredTasks.filter(t => t.status === "cancelled").length,
+      
+      totalRequests: filteredRequests.length,
+      completedRequests: filteredRequests.filter(r => r.status === "completed").length,
+      inProgressRequests: filteredRequests.filter(r => r.status === "in_progress").length,
+      pendingRequests: filteredRequests.filter(r => r.status === "pending").length,
+      cancelledRequests: filteredRequests.filter(r => r.status === "cancelled").length,
+
+      totalRevenue,
+      cashRevenue,
+      onlineRevenue,
+      pendingPayments,
+      urgentRequests,
+      priorityData,
+      dynamicsData,
+      financeGraphData,
+      masterStats,
+      dispatcherStats,
+      allRequests: filteredRequests
+    };
+  }, [rawData, period]);
+
+  // Взаимодействие при переходе к конкретной задаче или заявке
+  const handleItemClick = (type: "requests" | "tasks", status: string, id: string) => {
+    console.log(`[FSMDashboard] Нажата ссылка для перехода к: ${type}, статус: ${status}, ID: ${id}`);
+    if (onNavigate) {
+      onNavigate(type, status, id);
     }
   };
 
-  const StatCard = ({ stat }: { stat: typeof taskCards[0] }) => (
-    <Card 
-      className="border-border/50 cursor-pointer hover:shadow-md hover:border-primary/30 transition-all active:scale-95"
-      onClick={() => handleCardClick(stat.id, stat.navigateTo)}
-    >
-      <CardContent className="p-3">
-        <div className="flex items-center gap-3">
-          <div className={`w-10 h-10 rounded-lg ${stat.bgColor} flex items-center justify-center flex-shrink-0`}>
-            <stat.icon className={`h-5 w-5 ${stat.color}`} />
-          </div>
-          <div className="min-w-0">
-            <p className="text-xl font-bold text-foreground">{stat.value}</p>
-            <p className="text-xs text-muted-foreground truncate">{stat.title}</p>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-96 gap-4">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        <p className="text-muted-foreground text-sm font-semibold">Загрузка аналитического дашборда...</p>
+      </div>
+    );
+  }
+
+  if (!analytics) return null;
 
   return (
-    <div className="space-y-4">
-      {/* Tasks Section */}
-      <div>
-        <h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
-          <ClipboardList className="h-4 w-4" />
-          Задачи
-        </h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-          {taskCards.map((stat) => (
-            <StatCard key={stat.id} stat={stat} />
-          ))}
-        </div>
-      </div>
-
-      {/* Requests Section */}
-      <div>
-        <h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
-          <FileText className="h-4 w-4" />
-          Заявки
-        </h3>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-          {requestCards.map((stat) => (
-            <StatCard key={stat.id} stat={stat} />
-          ))}
-        </div>
-      </div>
-
-      {/* Action Cards for Managers */}
-      {isManager && (
+    <div className="space-y-6">
+      {/* Шапка дашборда и период аналитики */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white/40 dark:bg-slate-900/40 backdrop-blur-md p-4 rounded-2xl border border-slate-200/50 dark:border-slate-800/50">
         <div>
-          <h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            Управление
-          </h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            {actionCards.map((stat) => (
-              <StatCard key={stat.id} stat={stat} />
+          <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+            <Zap className="h-5 w-5 text-primary animate-pulse" />
+            Аналитика FSM (Режим Онлайн)
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            Полноэкранный контроль процессов, платежей и KPI мастеров
+          </p>
+        </div>
+        
+        {/* Выбор периода */}
+        <div className="flex items-center gap-2 self-start md:self-auto">
+          <Calendar className="h-4 w-4 text-muted-foreground" />
+          <div className="grid grid-cols-5 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl text-xs font-semibold">
+            {[
+              { id: "current_month", label: "Месяц" },
+              { id: "last_month", label: "Прошлый" },
+              { id: "30_days", label: "30 дн" },
+              { id: "90_days", label: "90 дн" },
+              { id: "all", label: "Все" }
+            ].map(item => (
+              <button
+                key={item.id}
+                onClick={() => setPeriod(item.id as AnalyticsPeriod)}
+                className={`px-2 py-1.5 rounded-lg transition-all ${
+                  period === item.id 
+                    ? "bg-white dark:bg-slate-700 text-foreground shadow-sm scale-105" 
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {item.label}
+              </button>
             ))}
           </div>
         </div>
-      )}
-
-      {/* Recent Activity */}
-      <div className="grid md:grid-cols-2 gap-4">
-        <Card className="border-border/50">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Последние задачи</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <RecentTasks />
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/50">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Последние заявки</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <RecentRequests />
-          </CardContent>
-        </Card>
       </div>
 
-      {/* Detail Dialog */}
-      <Dialog open={!!detailType} onOpenChange={() => setDetailType(null)}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-auto">
-          <DialogHeader>
-            <DialogTitle>{getDialogTitle(detailType)}</DialogTitle>
-          </DialogHeader>
-          <DetailContent type={detailType} />
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-};
+      {/* Вкладки аналитики */}
+      <Tabs defaultValue="overview" className="w-full space-y-4">
+        <TabsList className="bg-slate-100 dark:bg-slate-800/60 p-1 rounded-xl w-full md:w-auto grid grid-cols-4 gap-1">
+          <TabsTrigger value="overview" className="rounded-lg text-xs font-bold">Обзор</TabsTrigger>
+          <TabsTrigger value="masters" className="rounded-lg text-xs font-bold">Мастера</TabsTrigger>
+          {isManager && <TabsTrigger value="dispatchers" className="rounded-lg text-xs font-bold">Диспетчеры</TabsTrigger>}
+          {isManager && <TabsTrigger value="finance" className="rounded-lg text-xs font-bold">Финансы</TabsTrigger>}
+        </TabsList>
 
-// Detail Content Component
-const DetailContent = ({ type }: { type: DetailType }) => {
-  if (!type) return null;
-  if (type === "employees") return <EmployeesList />;
-  if (type === "clients") return <ClientsList />;
-  if (type.includes("Tasks")) return <TasksList type={type as any} />;
-  if (type.includes("Requests")) return <RequestsList type={type as any} />;
-  return null;
-};
+        {/* 1. ВКЛАДКА: ОБЗОР */}
+        <TabsContent value="overview" className="space-y-6 outline-none">
+          {/* Блоки KPI в стиле Jobie */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            
+            {/* Карточка 1: Поступило */}
+            <Card className="border-border/50 bg-blue-50/40 dark:bg-blue-950/20 backdrop-blur-sm overflow-hidden relative group hover:border-blue-500/30 transition-all duration-300">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/10 rounded-full translate-x-8 -translate-y-8 group-hover:scale-125 transition-transform duration-300" />
+              <CardContent className="p-4 flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Поступило</span>
+                  <h3 className="text-2xl font-black mt-1 text-foreground">
+                    {analytics.totalRequests + analytics.totalTasks}
+                  </h3>
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    {analytics.totalRequests} заявок • {analytics.totalTasks} задач
+                  </p>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                  <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                </div>
+              </CardContent>
+            </Card>
 
-// Tasks List
-const TasksList = ({ type }: { type: "totalTasks" | "pendingTasks" | "inProgressTasks" | "completedTasks" }) => {
-  const { data: tasks, isLoading } = useQuery({
-    queryKey: ["detail-tasks", type],
-    queryFn: async () => {
-      let query = supabase
-        .from("tasks")
-        .select(`id, title, status, priority, scheduled_date, created_at, notes,
-          clients (name), assigned_employee:employees!tasks_assigned_to_fkey (full_name)`)
-        .order("created_at", { ascending: false });
+            {/* Карточка 2: Выполнено */}
+            <Card className="border-border/50 bg-green-50/40 dark:bg-emerald-950/10 backdrop-blur-sm overflow-hidden relative group hover:border-green-500/30 transition-all duration-300">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-green-500/10 rounded-full translate-x-8 -translate-y-8 group-hover:scale-125 transition-transform duration-300" />
+              <CardContent className="p-4 flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold text-green-600 dark:text-emerald-400 uppercase tracking-wider">Выполнено</span>
+                  <h3 className="text-2xl font-black mt-1 text-foreground">
+                    {analytics.completedRequests + analytics.completedTasks}
+                  </h3>
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Успешность: {((analytics.totalRequests + analytics.totalTasks) > 0) 
+                      ? Math.round(((analytics.completedRequests + analytics.completedTasks) / (analytics.totalRequests + analytics.totalTasks)) * 100) 
+                      : 0}%
+                  </p>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-green-500/20 flex items-center justify-center">
+                  <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-emerald-400" />
+                </div>
+              </CardContent>
+            </Card>
 
-      if (type === "pendingTasks") query = query.in("status", ["pending", "assigned"]);
-      else if (type === "inProgressTasks") query = query.eq("status", "in_progress");
-      else if (type === "completedTasks") query = query.eq("status", "completed");
+            {/* Карточка 3: В работе */}
+            <Card className="border-border/50 bg-orange-50/40 dark:bg-orange-950/10 backdrop-blur-sm overflow-hidden relative group hover:border-orange-500/30 transition-all duration-300">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-orange-500/10 rounded-full translate-x-8 -translate-y-8 group-hover:scale-125 transition-transform duration-300" />
+              <CardContent className="p-4 flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold text-orange-600 dark:text-orange-400 uppercase tracking-wider">В процессе</span>
+                  <h3 className="text-2xl font-black mt-1 text-foreground">
+                    {analytics.inProgressRequests + analytics.inProgressTasks}
+                  </h3>
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Мастера на выезде прямо сейчас
+                  </p>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-orange-500/20 flex items-center justify-center">
+                  <AlertTriangle className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                </div>
+              </CardContent>
+            </Card>
 
-      const { data, error } = await query.limit(50);
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  if (isLoading) return <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
-  if (!tasks?.length) return <p className="text-center text-muted-foreground py-8">Нет задач</p>;
-
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Название</TableHead>
-          <TableHead>Клиент</TableHead>
-          <TableHead>Исполнитель</TableHead>
-          <TableHead>Статус</TableHead>
-          <TableHead>Дата</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {tasks.map((task) => (
-          <TableRow key={task.id}>
-            <TableCell className="font-medium">{task.title}</TableCell>
-            <TableCell>{(task.clients as any)?.name || "—"}</TableCell>
-            <TableCell>{(task.assigned_employee as any)?.full_name || "—"}</TableCell>
-            <TableCell><StatusBadge status={task.status} /></TableCell>
-            <TableCell>{format(new Date(task.scheduled_date || task.created_at), "dd.MM.yyyy")}</TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  );
-};
-
-// Requests List
-const RequestsList = ({ type }: { type: "totalRequests" | "pendingRequests" | "inProgressRequests" | "completedRequests" | "cancelledRequests" }) => {
-  const { data: requests, isLoading } = useQuery({
-    queryKey: ["detail-requests", type],
-    queryFn: async () => {
-      let query = supabase
-        .from("requests")
-        .select(`id, name, phone, address, message, status, created_at, notes,
-          assigned_employee:employees!requests_assigned_to_fkey (full_name)`)
-        .order("created_at", { ascending: false });
-
-      if (type === "pendingRequests") query = query.eq("status", "pending");
-      else if (type === "inProgressRequests") query = query.eq("status", "in_progress");
-      else if (type === "completedRequests") query = query.eq("status", "completed");
-      else if (type === "cancelledRequests") query = query.eq("status", "cancelled");
-
-      const { data, error } = await query.limit(50);
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  if (isLoading) return <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
-  if (!requests?.length) return <p className="text-center text-muted-foreground py-8">Нет заявок</p>;
-
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Клиент</TableHead>
-          <TableHead>Адрес</TableHead>
-          <TableHead>Исполнитель</TableHead>
-          <TableHead>Статус</TableHead>
-          <TableHead>Дата</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {requests.map((req) => (
-          <TableRow key={req.id}>
-            <TableCell className="font-medium">{req.name}</TableCell>
-            <TableCell className="max-w-[200px] truncate">{req.address}</TableCell>
-            <TableCell>{(req.assigned_employee as any)?.full_name || "—"}</TableCell>
-            <TableCell><StatusBadge status={req.status} /></TableCell>
-            <TableCell>{format(new Date(req.created_at), "dd.MM.yyyy")}</TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  );
-};
-
-// Status Badge Component
-const StatusBadge = ({ status }: { status: string }) => {
-  const styles: Record<string, string> = {
-    pending: "bg-yellow-100 text-yellow-800",
-    assigned: "bg-blue-100 text-blue-800",
-    in_progress: "bg-orange-100 text-orange-800",
-    completed: "bg-green-100 text-green-800",
-    cancelled: "bg-gray-100 text-gray-800",
-  };
-  const labels: Record<string, string> = {
-    pending: "Ожидает",
-    assigned: "Назначена",
-    in_progress: "В работе",
-    completed: "Выполнена",
-    cancelled: "Отменена",
-  };
-  return <Badge className={styles[status]}>{labels[status]}</Badge>;
-};
-
-// Employees List
-const EmployeesList = () => {
-  const { data: employees, isLoading } = useQuery({
-    queryKey: ["detail-employees"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("employees").select("*").order("full_name");
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  if (isLoading) return <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
-  if (!employees?.length) return <p className="text-center text-muted-foreground py-8">Нет сотрудников</p>;
-
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>ФИО</TableHead>
-          <TableHead>Телефон</TableHead>
-          <TableHead>Должность</TableHead>
-          <TableHead>Статус</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {employees.map((emp) => (
-          <TableRow key={emp.id}>
-            <TableCell className="font-medium">{emp.full_name}</TableCell>
-            <TableCell>{emp.phone || "—"}</TableCell>
-            <TableCell>{emp.position || "—"}</TableCell>
-            <TableCell>
-              <Badge variant={emp.is_active ? "default" : "secondary"}>
-                {emp.is_active ? "Активен" : "Неактивен"}
-              </Badge>
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  );
-};
-
-// Clients List
-const ClientsList = () => {
-  const { data: clients, isLoading } = useQuery({
-    queryKey: ["detail-clients"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("clients").select("*").order("name");
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  if (isLoading) return <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
-  if (!clients?.length) return <p className="text-center text-muted-foreground py-8">Нет клиентов</p>;
-
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Название</TableHead>
-          <TableHead>Адрес</TableHead>
-          <TableHead>Контактное лицо</TableHead>
-          <TableHead>Телефон</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {clients.map((client) => (
-          <TableRow key={client.id}>
-            <TableCell className="font-medium">{client.name}</TableCell>
-            <TableCell>{client.address}</TableCell>
-            <TableCell>{client.contact_person || "—"}</TableCell>
-            <TableCell>{client.phone || "—"}</TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  );
-};
-
-// Recent Tasks Component
-const RecentTasks = () => {
-  const { data: tasks } = useQuery({
-    queryKey: ["recent-tasks-dashboard"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("tasks")
-        .select(`id, title, status, notes, clients (name)`)
-        .order("created_at", { ascending: false })
-        .limit(5);
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  if (!tasks?.length) return <p className="text-muted-foreground text-sm">Нет задач</p>;
-
-  return (
-    <div className="space-y-2">
-      {tasks.map((task) => (
-        <div key={task.id} className="flex items-start justify-between p-2 rounded-lg bg-muted/50 gap-2">
-          <div className="min-w-0 flex-1">
-            <p className="font-medium text-foreground text-sm truncate">{task.title}</p>
-            <p className="text-xs text-muted-foreground truncate">
-              {(task.clients as any)?.name || "Без клиента"}
-            </p>
-            {task.status === "completed" && task.notes && (
-              <p className="text-xs text-green-600 mt-1 line-clamp-1">✓ {task.notes}</p>
-            )}
-            {task.status === "cancelled" && task.notes && (
-              <p className="text-xs text-muted-foreground mt-1 line-clamp-1">✕ {task.notes}</p>
-            )}
+            {/* Карточка 4: Выручка */}
+            <Card className="border-border/50 bg-emerald-50/40 dark:bg-emerald-950/20 backdrop-blur-sm overflow-hidden relative group hover:border-emerald-500/30 transition-all duration-300">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full translate-x-8 -translate-y-8 group-hover:scale-125 transition-transform duration-300" />
+              <CardContent className="p-4 flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Оплаты</span>
+                  <h3 className="text-2xl font-black mt-1 text-foreground">
+                    {analytics.totalRevenue.toLocaleString()} ₽
+                  </h3>
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Ожидает: {analytics.pendingPayments.toLocaleString()} ₽
+                  </p>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                  <Banknote className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                </div>
+              </CardContent>
+            </Card>
           </div>
-          <MiniStatusBadge status={task.status} />
-        </div>
-      ))}
-    </div>
-  );
-};
 
-// Recent Requests Component
-const RecentRequests = () => {
-  const { data: requests } = useQuery({
-    queryKey: ["recent-requests-dashboard"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("requests")
-        .select(`id, name, address, status, notes`)
-        .order("created_at", { ascending: false })
-        .limit(5);
-      if (error) throw error;
-      return data;
-    },
-  });
+          {/* Графики Recharts */}
+          <div className="grid md:grid-cols-3 gap-6">
+            
+            {/* График 1: Динамика (Линейный/Областной) */}
+            <Card className="md:col-span-2 border-border/50 bg-white/40 dark:bg-slate-900/40 backdrop-blur-md">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Динамика обработки задач</CardTitle>
+                <CardDescription className="text-xs">Сравнение новых поступлений и завершенных нарядов за неделю</CardDescription>
+              </CardHeader>
+              <CardContent className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={analytics.dynamicsData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorIn" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                      </linearGradient>
+                      <linearGradient id="colorOut" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148, 163, 184, 0.1)" />
+                    <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} />
+                    <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} />
+                    <Tooltip contentStyle={{ background: "rgba(15, 23, 42, 0.9)", border: "none", borderRadius: "12px", color: "#fff", fontSize: "12px" }} />
+                    <Legend iconSize={8} wrapperStyle={{ fontSize: "10px" }} />
+                    <Area type="monotone" dataKey="Поступило заявок" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#colorIn)" />
+                    <Area type="monotone" dataKey="Выполнено" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorOut)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
 
-  if (!requests?.length) return <p className="text-muted-foreground text-sm">Нет заявок</p>;
-
-  return (
-    <div className="space-y-2">
-      {requests.map((req) => (
-        <div key={req.id} className="flex items-start justify-between p-2 rounded-lg bg-muted/50 gap-2">
-          <div className="min-w-0 flex-1">
-            <p className="font-medium text-foreground text-sm truncate">{req.name}</p>
-            <p className="text-xs text-muted-foreground truncate">{req.address}</p>
-            {req.status === "completed" && req.notes && (
-              <p className="text-xs text-green-600 mt-1 line-clamp-1">✓ {req.notes}</p>
-            )}
-            {req.status === "cancelled" && req.notes && (
-              <p className="text-xs text-muted-foreground mt-1 line-clamp-1">✕ {req.notes}</p>
-            )}
+            {/* График 2: Круговая диаграмма по уровням приоритета */}
+            <Card className="border-border/50 bg-white/40 dark:bg-slate-900/40 backdrop-blur-md flex flex-col justify-between">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Уровни важности задач</CardTitle>
+                <CardDescription className="text-xs">Распределение по критичности нарядов</CardDescription>
+              </CardHeader>
+              <CardContent className="h-48 flex items-center justify-center">
+                {analytics.priorityData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={analytics.priorityData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={50}
+                        outerRadius={70}
+                        paddingAngle={3}
+                        dataKey="value"
+                      >
+                        {analytics.priorityData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value) => [`${value} задач`, "Количество"]} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Нет данных для вывода</p>
+                )}
+              </CardContent>
+              {analytics.priorityData.length > 0 && (
+                <div className="p-4 grid grid-cols-2 gap-2 text-[10px] font-semibold border-t border-slate-100 dark:border-slate-800/80">
+                  {analytics.priorityData.map((item, idx) => (
+                    <div key={idx} className="flex items-center gap-1.5 truncate">
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                      <span className="text-muted-foreground truncate">{item.name}:</span>
+                      <span>{item.value}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
           </div>
-          <MiniStatusBadge status={req.status} />
-        </div>
-      ))}
-    </div>
-  );
-};
 
-// Mini Status Badge
-const MiniStatusBadge = ({ status }: { status: string }) => {
-  const styles: Record<string, string> = {
-    pending: "bg-yellow-500/20 text-yellow-600",
-    assigned: "bg-blue-500/20 text-blue-600",
-    in_progress: "bg-orange-500/20 text-orange-600",
-    completed: "bg-green-500/20 text-green-600",
-    cancelled: "bg-muted-foreground/20 text-muted-foreground",
-  };
-  const labels: Record<string, string> = {
-    pending: "Ждёт",
-    assigned: "Назн.",
-    in_progress: "В работе",
-    completed: "Готово",
-    cancelled: "Отмена",
-  };
-  return (
-    <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap ${styles[status]}`}>
-      {labels[status]}
-    </span>
+          {/* Срочные активные заявки */}
+          <Card className="border-border/50 bg-red-500/5 dark:bg-red-950/10 backdrop-blur-md border-2 border-red-500/20">
+            <CardHeader className="pb-2 flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-sm font-bold uppercase tracking-wider text-red-600 dark:text-red-400 flex items-center gap-2">
+                  <ShieldAlert className="h-5 w-5 text-red-500 animate-bounce" />
+                  Критические заявки (Требуют реагирования)
+                </CardTitle>
+                <CardDescription className="text-xs">Заявки со статусом «Срочно», ожидающие выполнения</CardDescription>
+              </div>
+              <Badge variant="destructive" className="animate-pulse">{analytics.urgentRequests.length}</Badge>
+            </CardHeader>
+            <CardContent>
+              {analytics.urgentRequests.length === 0 ? (
+                <p className="text-xs text-muted-foreground py-4 text-center">Нет срочных необработанных заявок</p>
+              ) : (
+                <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
+                  {analytics.urgentRequests.map(req => (
+                    <div 
+                      key={req.id} 
+                      onClick={() => handleItemClick("requests", "pending", req.id)}
+                      className="flex items-center justify-between p-3 rounded-xl bg-white/50 dark:bg-slate-900/60 border border-red-200/50 dark:border-red-900/30 hover:border-red-500/50 hover:scale-[1.005] transition-all cursor-pointer"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-foreground truncate">{req.name}</p>
+                        <p className="text-[10px] text-muted-foreground truncate">📍 {req.address}</p>
+                        <p className="text-[10px] text-red-500 dark:text-red-400 mt-1 italic line-clamp-1">💬 {req.message}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-muted-foreground">
+                          {format(new Date(req.created_at), "dd.MM.yyyy HH:mm")}
+                        </span>
+                        <ArrowUpRight className="h-4 w-4 text-red-500 shrink-0" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* 2. ВКЛАДКА: KPI МАСТЕРОВ */}
+        <TabsContent value="masters" className="space-y-4 outline-none">
+          <Card className="border-border/50 bg-white/40 dark:bg-slate-900/40 backdrop-blur-md">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-bold">Рейтинг эффективности мастеров</CardTitle>
+              <CardDescription className="text-xs">
+                Показатели закрытия нарядов, среднего времени реагирования и сбора наличных
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto rounded-xl border border-slate-100 dark:border-slate-800/80">
+                <table className="w-full text-sm text-left">
+                  <thead className="text-xs font-bold uppercase bg-slate-50 dark:bg-slate-800/60 text-muted-foreground border-b">
+                    <tr>
+                      <th className="px-4 py-3">Имя мастера</th>
+                      <th className="px-4 py-3 text-center">Назначено</th>
+                      <th className="px-4 py-3 text-center">Выполнено</th>
+                      <th className="px-4 py-3 text-center">Успешность (KPI)</th>
+                      <th className="px-4 py-3 text-center">Среднее время</th>
+                      <th className="px-4 py-3 text-right">Сбор (₽)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {analytics.masterStats.map((master, idx) => (
+                      <tr key={master.id} className="border-b hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-all">
+                        <td className="px-4 py-3 flex items-center gap-2">
+                          {idx === 0 && <Award className="h-4 w-4 text-yellow-500" />}
+                          <div>
+                            <p className="font-bold text-foreground">{master.name}</p>
+                            <p className="text-[10px] text-muted-foreground">{master.position}</p>
+                          </div>
+                          {!master.isActive && <Badge variant="secondary" className="text-[8px] h-4">Неактивен</Badge>}
+                        </td>
+                        <td className="px-4 py-3 text-center font-semibold">{master.assigned}</td>
+                        <td className="px-4 py-3 text-center font-bold text-emerald-600 dark:text-emerald-400">{master.completed}</td>
+                        <td className="px-4 py-3 text-center">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <div className="w-12 bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                              <div className="bg-primary h-full" style={{ width: `${master.successRate}%` }} />
+                            </div>
+                            <span className="font-bold text-xs">{master.successRate}%</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-center text-muted-foreground text-xs">
+                          {master.avgTimeMinutes > 0 
+                            ? `${Math.floor(master.avgTimeMinutes / 60)}ч ${master.avgTimeMinutes % 60}м`
+                            : "—"
+                          }
+                        </td>
+                        <td className="px-4 py-3 text-right font-black text-blue-600 dark:text-blue-400">
+                          {master.cashCollected.toLocaleString()} ₽
+                        </td>
+                      </tr>
+                    ))}
+                    {analytics.masterStats.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="text-center py-6 text-muted-foreground text-xs">Нет данных по мастерам</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* 3. ВКЛАДКА: АНАЛИТИКА ДИСПЕТЧЕРОВ */}
+        <TabsContent value="dispatchers" className="space-y-4 outline-none">
+          <Card className="border-border/50 bg-white/40 dark:bg-slate-900/40 backdrop-blur-md">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-bold">Активность диспетчеров</CardTitle>
+              <CardDescription className="text-xs">
+                Показатели создания задач и назначения исполнителей
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto rounded-xl border border-slate-100 dark:border-slate-800/80">
+                <table className="w-full text-sm text-left">
+                  <thead className="text-xs font-bold uppercase bg-slate-50 dark:bg-slate-800/60 text-muted-foreground border-b">
+                    <tr>
+                      <th className="px-4 py-3">Имя сотрудника</th>
+                      <th className="px-4 py-3 text-center">Создано задач</th>
+                      <th className="px-4 py-3 text-center">Выполнено из них</th>
+                      <th className="px-4 py-3 text-center">Эффективность назначения</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {analytics.dispatcherStats.map((disp) => (
+                      <tr key={disp.id} className="border-b hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-all">
+                        <td className="px-4 py-3 font-bold text-foreground">{disp.name}</td>
+                        <td className="px-4 py-3 text-center font-bold">{disp.created}</td>
+                        <td className="px-4 py-3 text-center font-semibold text-emerald-600 dark:text-emerald-400">{disp.completed}</td>
+                        <td className="px-4 py-3 text-center">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <div className="w-12 bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                              <div className="bg-primary h-full" style={{ width: `${disp.successRate}%` }} />
+                            </div>
+                            <span className="font-bold text-xs">{disp.successRate}%</span>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {analytics.dispatcherStats.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="text-center py-6 text-muted-foreground text-xs">Нет данных по диспетчерам</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* 4. ВКЛАДКА: ФИНАНСЫ И ПЛАТЕЖИ */}
+        <TabsContent value="finance" className="space-y-6 outline-none">
+          
+          {/* Сводный баланс сборов */}
+          <div className="grid md:grid-cols-3 gap-6">
+            <Card className="border-border/50 bg-white/40 dark:bg-slate-900/40 backdrop-blur-md md:col-span-2">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Сборы за период</CardTitle>
+                <CardDescription className="text-xs">Посуточный объем закрытых платных нарядов (выручка)</CardDescription>
+              </CardHeader>
+              <CardContent className="h-60">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={analytics.financeGraphData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148, 163, 184, 0.1)" />
+                    <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} />
+                    <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} />
+                    <Tooltip contentStyle={{ background: "rgba(15, 23, 42, 0.9)", border: "none", borderRadius: "12px", color: "#fff", fontSize: "12px" }} formatter={(value) => [`${value} ₽`, "Выручка"]} />
+                    <Bar dataKey="Выручка (₽)" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={30} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border/50 bg-white/40 dark:bg-slate-900/40 backdrop-blur-md flex flex-col justify-between">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Каналы поступления</CardTitle>
+                <CardDescription className="text-xs">Способы закрытия платных заявок</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="p-3 bg-green-500/10 rounded-xl border border-green-500/20 flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] text-green-600 dark:text-emerald-400 font-bold uppercase tracking-wider">Онлайн-платежи</p>
+                    <p className="text-lg font-black text-foreground">{analytics.onlineRevenue.toLocaleString()} ₽</p>
+                  </div>
+                  <span className="text-xs font-bold bg-green-500/20 text-green-600 px-2 py-0.5 rounded">
+                    {analytics.totalRevenue > 0 ? Math.round((analytics.onlineRevenue / analytics.totalRevenue) * 100) : 0}%
+                  </span>
+                </div>
+                <div className="p-3 bg-blue-500/10 rounded-xl border border-blue-500/20 flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] text-blue-600 dark:text-blue-400 font-bold uppercase tracking-wider">Наличными мастеру</p>
+                    <p className="text-lg font-black text-foreground">{analytics.cashRevenue.toLocaleString()} ₽</p>
+                  </div>
+                  <span className="text-xs font-bold bg-blue-500/20 text-blue-600 px-2 py-0.5 rounded">
+                    {analytics.totalRevenue > 0 ? Math.round((analytics.cashRevenue / analytics.totalRevenue) * 100) : 0}%
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* История финансовых операций по заявкам */}
+          <Card className="border-border/50 bg-white/40 dark:bg-slate-900/40 backdrop-blur-md">
+            <CardHeader className="pb-2 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <CardTitle className="text-base font-bold">История оплат по заявкам</CardTitle>
+                <CardDescription className="text-xs">Все платные вызовы в выбранном периоде</CardDescription>
+              </div>
+              
+              {/* Поиск платежа */}
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder="Имя, адрес..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-9 pr-4 py-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-medium border border-transparent focus:border-primary focus:outline-none"
+                />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto rounded-xl border border-slate-100 dark:border-slate-800/80">
+                <table className="w-full text-sm text-left">
+                  <thead className="text-xs font-bold uppercase bg-slate-50 dark:bg-slate-800/60 text-muted-foreground border-b">
+                    <tr>
+                      <th className="px-4 py-3">Имя клиента</th>
+                      <th className="px-4 py-3">Адрес</th>
+                      <th className="px-4 py-3 text-center">Метод</th>
+                      <th className="px-4 py-3 text-center">Статус</th>
+                      <th className="px-4 py-3 text-center">Дата операции</th>
+                      <th className="px-4 py-3 text-right">Сумма (₽)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {analytics.allRequests
+                      .filter(r => {
+                        const amt = Number(r.payment_amount) || 0;
+                        if (amt <= 0) return false;
+                        if (!searchTerm) return true;
+                        return r.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                               r.address.toLowerCase().includes(searchTerm.toLowerCase());
+                      })
+                      .map((req) => (
+                        <tr 
+                          key={req.id} 
+                          onClick={() => handleItemClick("requests", "pending", req.id)}
+                          className="border-b hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-all cursor-pointer"
+                        >
+                          <td className="px-4 py-3 font-semibold text-foreground flex items-center gap-1.5">
+                            {req.name}
+                          </td>
+                          <td className="px-4 py-3 text-muted-foreground max-w-[200px] truncate">{req.address}</td>
+                          <td className="px-4 py-3 text-center text-xs">
+                            {req.payment_method === "online" ? "💳 Онлайн" : "💵 Наличные"}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <Badge className={cn(
+                              "text-[9px] h-5 py-0 px-2 font-bold",
+                              req.payment_status === "paid" ? "bg-green-600 dark:bg-emerald-600 text-white" : "bg-orange-500 text-white animate-pulse"
+                            )}>
+                              {req.payment_status === "paid" ? "Оплачено" : "Ожидает"}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-3 text-center text-xs text-muted-foreground">
+                            {format(new Date(req.created_at), "dd.MM.yyyy HH:mm")}
+                          </td>
+                          <td className="px-4 py-3 text-right font-bold text-foreground">
+                            {Number(req.payment_amount).toFixed(0)} ₽
+                          </td>
+                        </tr>
+                      ))}
+                    {analytics.allRequests.filter(r => (Number(r.payment_amount) || 0) > 0).length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="text-center py-6 text-muted-foreground text-xs">Нет оплат по заявкам в этом периоде</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 };
 

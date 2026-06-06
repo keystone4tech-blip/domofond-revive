@@ -102,9 +102,15 @@ interface Employee {
 
 interface RequestsManagerProps {
   initialFilter?: string;
+  initialRequestId?: string;
+  onClearInitialRequestId?: () => void;
 }
 
-const RequestsManager = ({ initialFilter = "pending" }: RequestsManagerProps) => {
+const RequestsManager = ({ 
+  initialFilter = "pending",
+  initialRequestId,
+  onClearInitialRequestId
+}: RequestsManagerProps) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user, isManager } = useUserRole();
@@ -129,6 +135,7 @@ const RequestsManager = ({ initialFilter = "pending" }: RequestsManagerProps) =>
     priority: "medium",
     assigned_to: ""
   });
+
 
   // Items for request
   const [requestItems, setRequestItems] = useState<{ product_id: string; quantity: number; price: number }[]>([]);
@@ -228,6 +235,18 @@ const RequestsManager = ({ initialFilter = "pending" }: RequestsManagerProps) =>
       return data as Product[];
     },
   });
+
+  // Авто-открытие заявки при передаче ID
+  useEffect(() => {
+    if (initialRequestId && requests) {
+      const found = requests.find(r => r.id === initialRequestId);
+      if (found) {
+        console.log(`[RequestsManager] Авто-открытие заявки по ID: ${initialRequestId}`);
+        setSelectedRequest(found);
+      }
+    }
+  }, [initialRequestId, requests]);
+
 
   // Calculate request sum with items
   const getRequestSum = (requestId: string) => {
@@ -733,11 +752,15 @@ const RequestsManager = ({ initialFilter = "pending" }: RequestsManagerProps) =>
     return (
       <RequestDetails
         request={selectedRequest}
-        onBack={() => setSelectedRequest(null)}
+        onBack={() => {
+          setSelectedRequest(null);
+          if (onClearInitialRequestId) onClearInitialRequestId();
+        }}
         isManager={isManager}
       />
     );
   }
+
 
   // Get title for current tab
   const getTabTitle = () => {
