@@ -2715,8 +2715,9 @@ const Cabinet = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 animate-in fade-in duration-300">
                   {/* 5.5. Помещение (Подъезд) */}
                   <div className="space-y-2 relative text-left">
-                    <Label htmlFor="entrance" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                      🚪 Номер подъезда
+                    <Label htmlFor="entrance" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                      <DoorOpen className="h-3.5 w-3.5 text-primary/70 shrink-0" />
+                      Номер подъезда
                     </Label>
                     <Input
                       id="entrance"
@@ -2766,7 +2767,10 @@ const Cabinet = () => {
 
                   {/* 6. Помещение (Квартира/Офис) */}
                   <div className="space-y-2 relative text-left">
-                    <Label htmlFor="apartment" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">🏢 Квартира / Офис / Помещение</Label>
+                    <Label htmlFor="apartment" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                      <Home className="h-3.5 w-3.5 text-primary/70 shrink-0" />
+                      Квартира / Офис / Помещение
+                    </Label>
                     <Input
                       id="apartment"
                       value={apartment}
@@ -2821,7 +2825,10 @@ const Cabinet = () => {
 
                   {/* 7. Этаж */}
                   <div className="space-y-2 text-left">
-                    <Label htmlFor="floor" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">🏢 Этаж</Label>
+                    <Label htmlFor="floor" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                      <Building2 className="h-3.5 w-3.5 text-primary/70 shrink-0" />
+                      Этаж
+                    </Label>
                     <Input
                       id="floor"
                       value={floor}
