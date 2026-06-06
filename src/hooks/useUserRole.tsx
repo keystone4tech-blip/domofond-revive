@@ -22,50 +22,59 @@ export const useUserRole = (): UseUserRoleResult => {
   useEffect(() => {
     const fetchUserRoles = async (userId: string) => {
       try {
-        console.log("Fetching roles for user:", userId);
+        console.log("[useUserRole] Запрос ролей для пользователя:", userId);
         const { data, error } = await supabase
           .from("user_roles")
           .select("role")
           .eq("user_id", userId);
 
-        console.log("Roles response:", data, error);
-
         if (error) {
-          console.error("Error fetching roles:", error);
+          console.error("[useUserRole] Ошибка при запросе ролей:", error);
           return;
         }
 
         const rolesList = (data || []).map((r) => r.role as AppRole);
-        console.log("Setting roles:", rolesList);
+        console.log("[useUserRole] Роли установлены:", rolesList);
         setRoles(rolesList);
       } catch (err) {
-        console.error("Error:", err);
+        console.error("[useUserRole] Критическая ошибка:", err);
+      } finally {
+        setIsLoading(false); // Завершаем загрузку ТОЛЬКО после получения ролей
       }
     };
 
+    // Слушаем изменения авторизации
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          setTimeout(() => {
-            fetchUserRoles(session.user.id);
-          }, 0);
+        console.log("[useUserRole] Событие auth:", event);
+        const currentUser = session?.user ?? null;
+        setUser(currentUser);
+        
+        if (currentUser) {
+          setIsLoading(true);
+          fetchUserRoles(currentUser.id);
         } else {
           setRoles([]);
+          setIsLoading(false);
         }
-        setIsLoading(false);
       }
     );
 
+    // Получаем текущую сессию при инициализации
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchUserRoles(session.user.id);
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      
+      if (currentUser) {
+        fetchUserRoles(currentUser.id);
+      } else {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const hasRole = (role: AppRole) => roles.includes(role);
@@ -90,3 +99,4 @@ export const useUserRole = (): UseUserRoleResult => {
     hasRole,
   };
 };
+

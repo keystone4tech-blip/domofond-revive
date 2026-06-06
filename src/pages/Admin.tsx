@@ -20,6 +20,7 @@ import { VotingManager } from "@/components/admin/VotingManager";
 import { Loader2, Shield, Menu, ChevronRight } from "lucide-react";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -237,4 +238,10 @@ const Admin = () => {
   );
 };
 
-export default Admin;
+const AdminWithErrorBoundary = () => (
+  <ErrorBoundary title="Критическая ошибка панели администратора">
+    <Admin />
+  </ErrorBoundary>
+);
+
+export default AdminWithErrorBoundary;

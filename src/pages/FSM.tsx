@@ -18,6 +18,7 @@ import {
   ChevronRight,
   Shield
 } from "lucide-react";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import FSMDashboard from "@/components/fsm/FSMDashboard";
 import EmployeesManager from "@/components/fsm/EmployeesManager";
 import TasksManager from "@/components/fsm/TasksManager";
@@ -33,6 +34,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import PushNotificationToggle from "@/components/fsm/PushNotificationToggle";
 
 const FSM = () => {
+
   const [isVisible, setIsVisible] = useState({
     header: false,
     content: false
@@ -276,4 +278,11 @@ const FSM = () => {
   );
 };
 
-export default FSM;
+const FSMWithErrorBoundary = () => (
+  <ErrorBoundary title="Критическая ошибка FSM панели">
+    <FSM />
+  </ErrorBoundary>
+);
+
+export default FSMWithErrorBoundary;
+
