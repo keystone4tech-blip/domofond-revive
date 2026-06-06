@@ -9,7 +9,7 @@ RUN npm install
 
 # Копируем весь код и собираем продакшен билд
 COPY . .
-RUN npm run build
+RUN NODE_OPTIONS="--max-old-space-size=1536" npm run build
 
 # Stage 2: Serve with Nginx
 FROM nginx:alpine

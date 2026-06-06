@@ -1,4 +1,4 @@
-import { ArrowRight, CheckCircle2, Camera, DoorOpen, Settings, BrainCircuit } from "lucide-react";
+import { ArrowRight, CheckCircle2, Camera, DoorOpen, Settings, BrainCircuit, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import heroImage from "@/assets/hero-image.jpg";
@@ -41,30 +41,37 @@ const Hero = () => {
       <div className="container px-4 py-6 md:py-8 lg:py-12 relative z-10">
         <div className="grid gap-4 md:gap-6 lg:grid-cols-2 lg:gap-8 items-center">
           <div className="flex flex-col gap-3 md:gap-4">
-            <div className="space-y-2 md:space-y-3">
-              <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl md:text-5xl lg:text-6xl animate-fade-in bg-gradient-to-r from-primary via-blue-600 to-primary bg-clip-text text-transparent bg-[length:200%_auto] animate-gradient drop-shadow-lg">
-                Домофондар
-              </h1>
-              <h2 className="text-base font-bold tracking-tight sm:text-lg md:text-xl lg:text-2xl text-foreground/90 animate-fade-in drop-shadow-md" style={{ animationDelay: '0.2s' }}>
-                Профессиональное обслуживание домофонов
-              </h2>
+            {/* Бейдж сверху в стиле примера */}
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-400 text-xs font-medium mb-1.5 w-fit hover-scale animate-fade-in">
+              <Shield className="h-3.5 w-3.5 text-blue-500 animate-pulse" />
+              <span>Безопасность и контроль нового поколения</span>
             </div>
-            <p className="text-sm sm:text-base md:text-lg text-foreground/80 animate-fade-in drop-shadow" style={{ animationDelay: '0.4s' }}>
-              Обеспечиваем безопасность вашего дома. Установка, ремонт и техническое обслуживание домофонных систем, видеонаблюдения и систем контроля доступа любой сложности. 
-              Работаем быстро, качественно и с гарантией.
+
+            <div className="space-y-2 md:space-y-3">
+              <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-blue-950 to-blue-800 dark:from-white dark:to-neutral-400 leading-tight animate-fade-in">
+                Домофондар: <br />
+                Безопасность дома <br />
+                нового уровня
+              </h1>
+            </div>
+            
+            <p className="mt-2 text-slate-700 dark:text-neutral-300 text-sm sm:text-base md:text-lg leading-relaxed animate-fade-in" style={{ animationDelay: '0.2s' }}>
+              Умные домофоны, видеонаблюдение, автоматические ворота и контроль доступа — 
+              управляйте безопасностью вашего дома прямо с экрана смартфона.
             </p>
-            <div className="flex flex-col gap-2 md:gap-3 animate-fade-in" style={{ animationDelay: '0.6s' }}>
+
+            <div className="flex flex-col gap-2 md:gap-3 animate-fade-in" style={{ animationDelay: '0.4s' }}>
               <div className="flex items-center gap-2 hover-scale">
                 <CheckCircle2 className="h-4 w-4 md:h-5 md:w-5 text-primary flex-shrink-0" />
-                <span className="text-xs sm:text-sm md:text-base text-foreground/80">Выезд мастера в течение 2 часов</span>
+                <span className="text-xs sm:text-sm md:text-base text-slate-600 dark:text-neutral-300">Выезд мастера в течение 2 часов</span>
               </div>
               <div className="flex items-center gap-2 hover-scale">
                 <CheckCircle2 className="h-4 w-4 md:h-5 md:w-5 text-primary flex-shrink-0" />
-                <span className="text-xs sm:text-sm md:text-base text-foreground/80">Гарантия на все работы до 3 лет</span>
+                <span className="text-xs sm:text-sm md:text-base text-slate-600 dark:text-neutral-300">Гарантия на все работы до 3 лет</span>
               </div>
               <div className="flex items-center gap-2 hover-scale">
                 <CheckCircle2 className="h-4 w-4 md:h-5 md:w-5 text-primary flex-shrink-0" />
-                <span className="text-xs sm:text-sm md:text-base text-foreground/80">Работаем с 2005 года, более 10 000 клиентов</span>
+                <span className="text-xs sm:text-sm md:text-base text-slate-600 dark:text-neutral-300">Работаем с 2005 года, более 10 000 клиентов</span>
               </div>
             </div>
             <div className="flex flex-col sm:flex-row gap-4 animate-fade-in" style={{ animationDelay: '0.8s' }}>
