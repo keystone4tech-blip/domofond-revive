@@ -2,6 +2,8 @@ import { ArrowRight, CheckCircle2, Camera, DoorOpen, Settings, BrainCircuit } fr
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import heroImage from "@/assets/hero-image.jpg";
+import { SplineScene } from "@/components/ui/splite";
+import { Spotlight } from "@/components/ui/spotlight";
 
 const Hero = () => {
   const navigate = useNavigate();
@@ -97,13 +99,37 @@ const Hero = () => {
               </Button>
             </div>
           </div>
-          <div className="relative mt-6 md:mt-8 lg:mt-0 hidden md:block">
-            <div className="absolute inset-0 bg-gradient-to-tr from-primary/20 to-secondary/20 rounded-2xl blur-3xl" />
-            <img
-              src={heroImage}
-              alt="Профессиональная установка домофонов"
-              className="relative rounded-2xl shadow-2xl w-full h-auto object-cover"
+          <div className="relative mt-6 md:mt-8 lg:mt-0 hidden md:block w-full h-[400px] lg:h-[480px]">
+            {/* Spotlight подсветка с фирменным синим свечением бренда */}
+            <Spotlight
+              className="-top-20 left-0 md:left-20 md:-top-10"
+              fill="rgba(37, 99, 235, 0.22)"
             />
+            <div className="absolute inset-0 bg-gradient-to-tr from-primary/15 to-secondary/15 rounded-2xl blur-3xl" />
+            
+            {/* Обертка для 3D Сцены в стиле Premium Glassmorphism */}
+            <div className="w-full h-full rounded-2xl overflow-hidden border border-slate-200/50 dark:border-slate-800/50 glass-premium shadow-2xl relative">
+              {/* 
+                Интерактивная 3D сцена. По умолчанию отображает робота.
+                Чтобы заменить на видеокамеру (CCTV):
+                1. Откройте проект с 3D-камерой в редакторе Spline (https://spline.design/)
+                2. Нажмите кнопку "Export" -> вкладка "Viewer" -> скопируйте полученную ссылку .splinecode
+                3. Замените URL в параметре scene ниже.
+              */}
+              <SplineScene 
+                scene="https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode"
+                className="w-full h-full"
+              />
+              
+              {/* Fallback-подложка во время загрузки (или как резерв) */}
+              <div className="absolute inset-0 pointer-events-none z-[-1] bg-slate-950/5 flex items-center justify-center">
+                <img
+                  src={heroImage}
+                  alt="Профессиональная установка домофонов"
+                  className="w-full h-full object-cover opacity-10"
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>
