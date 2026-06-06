@@ -1,5 +1,30 @@
 # PROJECT_LOG.md
 
+## Дата: 2026-06-06 (Унификация заголовков, исправление обрезания в Hero и логотипа в Footer)
+### Изменения:
+- **`src/index.css`**:
+  * Добавлен универсальный градиентный класс `.section-title-gradient` для стилизации заголовков разделов (Outfit, градиент от темно-синего к синему на светлой теме и от белого к серому на темной теме).
+- **`src/components/Hero.tsx`**:
+  * Заголовок h1: увеличен padding-bottom (`pb-3 md:pb-4`) и изменена высота строки на `leading-[1.15]` c `inline-block`, чтобы предотвратить обрезание нижних частей букв «у» и «р» эффектом `bg-clip-text`.
+  * Добавлено логирование монтирования компонента.
+- **`src/components/Footer.tsx`**:
+  * Заменен старый значок телефонной трубки `Phone` на 3D-значок `ShieldCheck` со свечением `logo-icon-glow`.
+  * Надпись «Домофондар» оформлена классом `font-logo` (шрифт `Outfit`) с shimmer-эффектом (`text-shimmer`) и сделана кликабельной для перехода на главную.
+  * Добавлено логирование монтирования.
+- **`src/components/Services.tsx`, `src/components/About.tsx`, `src/components/PromotionsSection.tsx`, `src/components/NewsSection.tsx`, `src/components/Contact.tsx`, `src/components/FAQ.tsx`, `src/components/MediaGallery.tsx`, `src/components/Requisites.tsx`, `src/components/DocumentsList.tsx`**:
+  * Ключевые заголовки разделов переведены на класс `.section-title-gradient` для эстетической гармонии.
+  * Добавлено логирование монтирования.
+- **`src/pages/Domofony.tsx`, `src/pages/Videonablyudenie.tsx`, `src/pages/SmartIntercom.tsx`, `src/pages/NashiRaboty.tsx`, `src/pages/Voprosy.tsx`**:
+  * Заголовки страниц и подразделов изменены на градиентные.
+  * Добавлено логирование при монтировании страниц.
+### Структура проекта (ключевые модули):
+/src
+  /components     # Модульные компоненты (Hero, Services, Contact, Footer и др.)
+  /pages          # Основные страницы приложения (Domofony, Videonablyudenie и др.)
+  index.css       # Глобальные стили, переменные, классы и анимации
+### Заметки:
+- Автоматический деплой настроен через GitHub Action на VPS.
+
 ## Дата: 2026-06-06 (Интеграция 3D-значка ShieldCheck со свечением и shimmer-эффекта логотипа в Header)
 ### Изменения:
 - **`src/index.css`**:

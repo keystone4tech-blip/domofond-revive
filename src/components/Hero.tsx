@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { ArrowRight, CheckCircle2, Camera, DoorOpen, Settings, BrainCircuit, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
@@ -7,6 +8,11 @@ import { Spotlight } from "@/components/ui/spotlight";
 
 const Hero = () => {
   const navigate = useNavigate();
+
+  // Логирование монтирования компонента Hero для отслеживания рендеринга на клиенте
+  useEffect(() => {
+    console.log("[Hero] Компонент Hero успешно смонтирован. Заголовок настроен с увеличенным pb-4 и leading-[1.15] для предотвращения обрезания букв.");
+  }, []);
 
   const scrollToContact = () => {
     navigate("/kontakty");
@@ -48,7 +54,8 @@ const Hero = () => {
             </div>
 
             <div className="space-y-2 md:space-y-3">
-              <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-blue-950 to-blue-800 dark:from-white dark:to-neutral-400 leading-tight animate-fade-in">
+              {/* h1 заголовок: добавлен класс inline-block, pb-3 md:pb-4 и leading-[1.15] во избежание обрезания букв "у" и "р" */}
+              <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-blue-950 to-blue-800 dark:from-white dark:to-neutral-400 leading-[1.15] pb-3 md:pb-4 inline-block animate-fade-in">
                 Домофондар: <br />
                 Безопасность дома <br />
                 нового уровня

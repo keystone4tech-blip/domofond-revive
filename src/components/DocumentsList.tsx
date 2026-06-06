@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -12,6 +12,11 @@ interface Document {
 }
 
 const DocumentsList = () => {
+  // Логирование монтирования компонента DocumentsList
+  useEffect(() => {
+    console.log("[DocumentsList] Компонент документов смонтирован. Заголовок 'Документы' переведен на единый градиентный стиль.");
+  }, []);
+
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
@@ -96,7 +101,8 @@ const DocumentsList = () => {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold tracking-tight">Документы</h2>
+      {/* Унифицированный градиентный заголовок */}
+      <h2 className="text-2xl section-title-gradient">Документы</h2>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {documents.map((doc) => (

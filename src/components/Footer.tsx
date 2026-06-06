@@ -1,18 +1,26 @@
-import { Phone, Mail, MapPin } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Phone, Mail, MapPin, ShieldCheck } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
+  const navigate = useNavigate();
+
+  // Логирование монтирования компонента Footer
+  useEffect(() => {
+    console.log("[Footer] Компонент Footer смонтирован. Логотип обновлен: установлен 3D-значок ShieldCheck со свечением и переливающийся текст.");
+  }, []);
 
   return (
     <footer className="border-t bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
       <div className="container py-8">
         <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
           <div>
-            <div className="flex items-center gap-2 mb-4">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-                <Phone className="h-5 w-5 text-primary-foreground" />
-              </div>
-              <span className="text-lg font-bold">Домофондар</span>
+            <div className="flex items-center gap-2 mb-4 cursor-pointer logo-container" onClick={() => navigate("/")}>
+              <ShieldCheck className="h-7 w-7 text-blue-600 dark:text-blue-400 logo-icon-glow" />
+              <span className="text-2xl font-extrabold tracking-tight text-shimmer font-logo select-none">
+                Домофондар
+              </span>
             </div>
             <p className="text-sm text-muted-foreground">
               ООО "Домофондар" - Профессиональное обслуживание домофонных систем с 2005 года.

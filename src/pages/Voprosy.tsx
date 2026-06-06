@@ -9,6 +9,7 @@ const Voprosy = () => {
   });
 
   useEffect(() => {
+    console.log("[Voprosy] Страница 'Вопросы и ответы' смонтирована. Заголовок переведен на единый градиентный стиль.");
     // Анимация содержимого (0.5 сек)
     setTimeout(() => setIsVisible(prev => ({ ...prev, content: true })), 500);
   }, []);
@@ -25,7 +26,8 @@ const Voprosy = () => {
         <section className="py-8 md:py-12 bg-gradient-to-br from-primary/10 via-background to-primary/5">
           <div className="container">
             <div className="max-w-3xl mx-auto text-center">
-              <h1 className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl">
+              {/* Унифицированный градиентный заголовок */}
+              <h1 className="text-3xl sm:text-4xl md:text-5xl section-title-gradient">
                 Вопросы и ответы
               </h1>
               <p className="text-lg text-muted-foreground mt-4 mb-2">

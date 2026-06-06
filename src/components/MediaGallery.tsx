@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
@@ -14,6 +14,11 @@ interface MediaItem {
 
 const MediaGallery = () => {
   const [activeCategory, setActiveCategory] = useState<string>('all');
+
+  // Логирование монтирования компонента MediaGallery
+  useEffect(() => {
+    console.log("[MediaGallery] Компонент медиафайлов смонтирован. Заголовок 'Медиафайлы' переведен на единый градиентный стиль.");
+  }, []);
   
   const mediaItems: MediaItem[] = [
     {
@@ -59,7 +64,8 @@ const MediaGallery = () => {
     <section className="py-8 md:py-12">
       <div className="container">
         <div className="text-center mb-8">
-          <h2 className="text-2xl font-bold tracking-tight sm:text-3xl md:text-4xl">
+          {/* Унифицированный градиентный заголовок */}
+          <h2 className="text-2xl sm:text-3xl md:text-4xl section-title-gradient">
             Медиафайлы
           </h2>
           <p className="text-muted-foreground mt-2">

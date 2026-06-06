@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ShinyButton } from "@/components/ui/shiny-button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,12 @@ import { Copy, Check, Download, FileText, ShieldCheck } from "lucide-react";
  */
 const Requisites = () => {
   const { toast } = useToast();
+
+  // Логирование монтирования компонента Requisites
+  useEffect(() => {
+    console.log("[Requisites] Компонент реквизитов смонтирован. Заголовок 'Карта партнера' переведен на единый градиентный стиль.");
+  }, []);
+
   // Стейт для отслеживания скопированных полей (чтобы показывать Check вместо Copy)
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
@@ -68,8 +74,9 @@ const Requisites = () => {
   return (
     <div className="space-y-8 animate-in fade-in-50 duration-500">
       <div className="text-center md:text-left mb-6">
-        <h2 className="text-2xl font-bold tracking-tight sm:text-3xl md:text-4xl mb-3 flex items-center justify-center md:justify-start gap-2">
-          <ShieldCheck className="h-8 w-8 text-amber-500" />
+        {/* Унифицированный градиентный заголовок */}
+        <h2 className="text-2xl sm:text-3xl md:text-4xl mb-3 flex items-center justify-center md:justify-start gap-2 section-title-gradient">
+          <ShieldCheck className="h-8 w-8 text-amber-500 flex-shrink-0" />
           Карта партнера
         </h2>
         <p className="text-base text-muted-foreground max-w-2xl">

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Wrench, Settings, Shield, Camera, DoorClosed, Building } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import intercomSystem from "@/assets/intercom-system.jpg";
@@ -53,11 +54,17 @@ const services = [
 ];
 
 const Services = () => {
+  // Логирование монтирования компонента
+  useEffect(() => {
+    console.log("[Services] Секция 'Наши услуги' смонтирована. Заголовок переведен на единый градиентный стиль.");
+  }, []);
+
   return (
     <section id="services" className="py-8 md:py-12 bg-muted/30">
       <div className="container">
         <div className="text-center mb-8">
-          <h2 className="text-2xl font-bold tracking-tight sm:text-3xl md:text-4xl mb-4">
+          {/* Заголовок с использованием единого градиентного стиля */}
+          <h2 className="text-2xl sm:text-3xl md:text-4xl mb-4 section-title-gradient">
             Наши услуги
           </h2>
           <p className="text-base text-muted-foreground max-w-2xl mx-auto">

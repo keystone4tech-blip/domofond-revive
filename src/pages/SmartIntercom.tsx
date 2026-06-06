@@ -21,6 +21,7 @@ const SmartIntercom = () => {
   });
 
   useEffect(() => {
+    console.log("[SmartIntercom] Страница 'Умный домофон' смонтирована. Заголовки переведены на единый градиентный стиль.");
     // Анимация заголовка (0.5 сек)
     setTimeout(() => setIsVisible(prev => ({ ...prev, header: true })), 500);
 
@@ -88,8 +89,9 @@ const SmartIntercom = () => {
         <section className="py-8 md:py-12 bg-gradient-to-br from-primary/10 via-background to-primary/5">
           <div className="container">
             <div className="max-w-3xl mx-auto text-center">
+              {/* Унифицированный градиентный заголовок */}
               <h1
-                className={`text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl ${
+                className={`text-3xl sm:text-4xl md:text-5xl section-title-gradient ${
                   isVisible.header ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-10'
                 } transition-all duration-700 ease-out`}
               >

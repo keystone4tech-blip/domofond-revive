@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import {
   Accordion,
   AccordionContent,
@@ -33,11 +34,17 @@ const faqs = [
 ];
 
 const FAQ = () => {
+  // Логирование монтирования компонента FAQ
+  useEffect(() => {
+    console.log("[FAQ] Компонент FAQ смонтирован. Заголовок 'Часто задаваемые вопросы' переведен на единый градиентный стиль.");
+  }, []);
+
   return (
     <section id="faq" className="py-8 md:py-16 bg-transparent">
       <div className="container">
         <div className="text-center mb-12">
-          <h2 className="text-2xl font-bold tracking-tight sm:text-3xl md:text-4xl mb-4">
+          {/* Унифицированный градиентный заголовок */}
+          <h2 className="text-2xl sm:text-3xl md:text-4xl mb-4 section-title-gradient">
             Часто задаваемые вопросы
           </h2>
           <p className="text-base text-muted-foreground max-w-2xl mx-auto">

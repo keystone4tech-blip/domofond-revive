@@ -243,6 +243,11 @@
     background-clip: text;
   }
   
+  /* Унифицированный класс для красивых градиентных заголовков разделов (на светлой теме: синий градиент, на темной: белый/серый) */
+  .section-title-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-b from-blue-950 to-blue-800 dark:from-white dark:to-neutral-400 pb-2 inline-block;
+  }
+  
   .shadow-glow {
     box-shadow: var(--shadow-glow);
   }

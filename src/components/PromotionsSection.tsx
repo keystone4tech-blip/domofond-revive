@@ -23,6 +23,7 @@ export const PromotionsSection = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
+    console.log("[PromotionsSection] Секция 'Актуальные акции' смонтирована. Заголовок переведен на единый градиентный стиль.");
     fetchPromotions();
   }, []);
 
@@ -60,8 +61,9 @@ export const PromotionsSection = () => {
     <section className="py-8 md:py-12 bg-gradient-to-br from-primary/5 via-background to-primary/5">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-center gap-3 mb-8">
-          <Megaphone className="h-6 w-6 text-primary" />
-          <h2 className="text-2xl md:text-3xl font-bold text-center">Актуальные акции</h2>
+          <Megaphone className="h-6 w-6 text-primary flex-shrink-0" />
+          {/* Унифицированный градиентный заголовок */}
+          <h2 className="text-2xl md:text-3xl text-center section-title-gradient">Актуальные акции</h2>
         </div>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">

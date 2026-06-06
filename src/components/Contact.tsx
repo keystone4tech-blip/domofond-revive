@@ -1,5 +1,5 @@
+import { useState, useEffect } from "react";
 import { ShinyButton } from "@/components/ui/shiny-button";
-import { useState } from "react";
 import { Phone, Mail, MapPin, Clock, MessageCircle, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,12 @@ const contactSchema = z.object({
 
 const Contact = () => {
   const { toast } = useToast();
+
+  // Логирование монтирования компонента Contact
+  useEffect(() => {
+    console.log("[Contact] Компонент обратной связи смонтирован. Заголовок 'Свяжитесь с нами' и 'Оставить заявку' переведены на единый градиентный стиль.");
+  }, []);
+
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
@@ -105,7 +111,8 @@ const Contact = () => {
     <section id="contact" className="py-16 md:py-24">
       <div className="container">
         <div className="text-center mb-12">
-          <h2 className="text-2xl font-bold tracking-tight sm:text-3xl md:text-4xl mb-4">
+          {/* Унифицированный градиентный заголовок */}
+          <h2 className="text-2xl sm:text-3xl md:text-4xl mb-4 section-title-gradient">
             Свяжитесь с нами
           </h2>
           <p className="text-base text-muted-foreground max-w-2xl mx-auto">
@@ -214,8 +221,9 @@ const Contact = () => {
             </div>
           </div>
 
-          <div className="max-w-2xl mx-auto w-full">
-            <h3 className="text-2xl font-bold mb-6 text-center">Оставить заявку</h3>
+          <div className="max-w-2xl mx-auto w-full text-center">
+            {/* Унифицированный градиентный заголовок */}
+            <h3 className="text-2xl mb-6 section-title-gradient">Оставить заявку</h3>
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
                 <Input

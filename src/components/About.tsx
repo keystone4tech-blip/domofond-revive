@@ -1,10 +1,18 @@
+import { useEffect } from "react";
+
 const About = () => {
+  // Логирование монтирования
+  useEffect(() => {
+    console.log("[About] Секция 'Почему выбирают нас' смонтирована. Заголовок переведен на единый градиентный стиль.");
+  }, []);
+
   return (
     <section id="about" className="py-8 md:py-12">
       <div className="container">
         <div className="grid gap-8">
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight sm:text-3xl md:text-4xl mb-4 text-center">
+          <div className="text-center">
+            {/* Унифицированный градиентный заголовок */}
+            <h2 className="text-2xl sm:text-3xl md:text-4xl mb-4 section-title-gradient text-center">
               Почему выбирают нас
             </h2>
             <div className="space-y-4 text-muted-foreground">
