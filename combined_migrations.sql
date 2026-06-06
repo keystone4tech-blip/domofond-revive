@@ -1996,3 +1996,94 @@ USING (true)
 WITH CHECK (true);
 
 
+-- Migration: 20260606143000_fix_rls_public_content.sql
+
+-- 1. Создаем функцию безопасного получения UUID текущего авторизованного пользователя
+CREATE OR REPLACE FUNCTION public.get_current_user_id()
+RETURNS UUID
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT NULLIF(current_setting('request.jwt.claim.sub', true), '')::uuid;
+$$;
+
+COMMENT ON FUNCTION public.get_current_user_id() IS 'Безопасное получение UUID авторизованного пользователя без ошибок приведения типов при анонимных запросах.';
+
+-- 2. Обновляем политики для promotions (Акции)
+DROP POLICY IF EXISTS "Anyone can view active promotions" ON public.promotions;
+CREATE POLICY "Anyone can view active promotions"
+  ON public.promotions
+  FOR SELECT
+  USING (is_active = true OR public.has_role(public.get_current_user_id(), 'admin'));
+
+DROP POLICY IF EXISTS "Admin console can delete promotions" ON public.promotions;
+CREATE POLICY "Admin console can delete promotions"
+  ON public.promotions
+  FOR DELETE
+  TO public
+  USING (public.has_admin_console_access(public.get_current_user_id()));
+
+DROP POLICY IF EXISTS "Admin console can insert promotions" ON public.promotions;
+CREATE POLICY "Admin console can insert promotions"
+  ON public.promotions
+  FOR INSERT
+  TO public
+  WITH CHECK (public.has_admin_console_access(public.get_current_user_id()));
+
+DROP POLICY IF EXISTS "Admin console can update promotions" ON public.promotions;
+CREATE POLICY "Admin console can update promotions"
+  ON public.promotions
+  FOR UPDATE
+  TO public
+  USING (public.has_admin_console_access(public.get_current_user_id()))
+  WITH CHECK (public.has_admin_console_access(public.get_current_user_id()));
+
+-- 3. Обновляем политики для news (Новости)
+DROP POLICY IF EXISTS "Anyone can view published news" ON public.news;
+CREATE POLICY "Anyone can view published news"
+  ON public.news
+  FOR SELECT
+  USING (is_published = true OR public.has_role(public.get_current_user_id(), 'admin'));
+
+DROP POLICY IF EXISTS "Admin console can delete news" ON public.news;
+CREATE POLICY "Admin console can delete news"
+  ON public.news
+  FOR DELETE
+  TO public
+  USING (public.has_admin_console_access(public.get_current_user_id()));
+
+DROP POLICY IF EXISTS "Admin console can insert news" ON public.news;
+CREATE POLICY "Admin console can insert news"
+  ON public.news
+  FOR INSERT
+  TO public
+  WITH CHECK (public.has_admin_console_access(public.get_current_user_id()));
+
+DROP POLICY IF EXISTS "Admin console can update news" ON public.news;
+CREATE POLICY "Admin console can update news"
+  ON public.news
+  FOR UPDATE
+  TO public
+  USING (public.has_admin_console_access(public.get_current_user_id()))
+  WITH CHECK (public.has_admin_console_access(public.get_current_user_id()));
+
+-- 4. Обновляем политики для site_blocks (Контентные блоки сайта)
+DROP POLICY IF EXISTS "Anyone can view active blocks" ON public.site_blocks;
+CREATE POLICY "Anyone can view active blocks"
+  ON public.site_blocks
+  FOR SELECT
+  USING (is_active = true OR public.has_role(public.get_current_user_id(), 'admin'));
+
+DROP POLICY IF EXISTS "Admins can manage blocks" ON public.site_blocks;
+DROP POLICY IF EXISTS "Admin console can manage blocks" ON public.site_blocks;
+CREATE POLICY "Admin console can manage blocks"
+  ON public.site_blocks
+  FOR ALL
+  TO public
+  USING (public.has_admin_console_access(public.get_current_user_id()))
+  WITH CHECK (public.has_admin_console_access(public.get_current_user_id()));
+
+
+

@@ -57,11 +57,10 @@ const Header = () => {
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       {/* Верхняя строка с логотипом, телефоном, графиком и адресом */}
       <div className="container px-4 py-1 hidden md:flex items-center justify-between border-b border-border/50">
-        <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate("/")}>
-          <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-primary">
-            <Phone className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground" />
-          </div>
-          <span className="text-lg sm:text-xl font-bold text-foreground">Домофондар</span>
+        <div className="flex items-center cursor-pointer" onClick={() => navigate("/")}>
+          <span className="text-2xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-blue-950 to-blue-800 dark:from-white dark:to-neutral-400 font-logo select-none">
+            Домофондар
+          </span>
         </div>
 
         <div className="flex items-center gap-6">
@@ -86,11 +85,10 @@ const Header = () => {
 
       {/* Нижняя строка с навигацией */}
       <div className="container px-4 flex h-14 items-center justify-between">
-        <div className="flex items-center gap-2 cursor-pointer md:hidden" onClick={() => navigate("/")}>
-          <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-primary">
-            <Phone className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground" />
-          </div>
-          <span className="text-lg sm:text-xl font-bold text-foreground">Домофондар</span>
+        <div className="flex items-center cursor-pointer md:hidden" onClick={() => navigate("/")}>
+          <span className="text-2xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-blue-950 to-blue-800 dark:from-white dark:to-neutral-400 font-logo select-none">
+            Домофондар
+          </span>
         </div>
 
         {/* Desktop Navigation */}
