@@ -22,7 +22,7 @@ const Kontakty = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
+    <div className="min-h-screen transition-colors duration-300">
       <Header />
       <main className={`container mx-auto px-4 py-8 md:py-16 max-w-7xl transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
         

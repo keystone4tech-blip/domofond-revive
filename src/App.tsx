@@ -31,7 +31,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <div className="relative min-h-screen pb-16 lg:pb-0 bg-background overflow-x-hidden">
+        <div className="relative min-h-screen pb-16 lg:pb-0 bg-transparent">
           {/* Декоративные цветные сферы для премиального стекломорфизма (уровень $10,000)
               Сферы имеют z-0, чтобы лежать строго под контентом, но над базовым фоном body.
               Используется pointer-events-none, чтобы они не перехватывали клики мыши. */}

@@ -360,7 +360,7 @@ export default function Calculator() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F8FAFC] dark:bg-[#0F172A] transition-colors duration-300">
+    <div className="min-h-screen flex flex-col transition-colors duration-300">
       <TooltipProvider>
         <Header />
       <main className="flex-1 pt-20">

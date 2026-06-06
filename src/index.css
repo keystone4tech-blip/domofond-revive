@@ -114,6 +114,12 @@
     @apply border-border;
   }
 
+  html,
+  body {
+    overflow-x: hidden;
+    scroll-behavior: smooth;
+  }
+
   body {
     /* Базовый Tailwind цвет фона и текста */
     @apply bg-background text-foreground antialiased;
