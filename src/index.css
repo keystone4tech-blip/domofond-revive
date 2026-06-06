@@ -203,10 +203,10 @@
   /* Анимация бегущего блика света (Shimmer) */
   @keyframes text-shimmer-wave {
     0% {
-      background-position: -200% center;
+      background-position: 200% center;
     }
     100% {
-      background-position: 200% center;
+      background-position: -200% center;
     }
   }
 
