@@ -158,19 +158,49 @@ const SmartIntercom = () => {
           </div>
         </section>
 
-        {/* Информационное сообщение */}
+        {/* Информационное сообщение с кнопками перехода на заявку и калькулятор */}
         <section className="py-16 md:py-24 bg-muted/30">
           <div className="container">
             <div className="max-w-3xl mx-auto">
               <div 
-                className={`flex items-start gap-4 p-6 rounded-lg bg-background border border-border ${
+                className={`flex flex-col md:flex-row items-start gap-4 p-6 sm:p-8 rounded-2xl bg-background border border-border shadow-xl hover:shadow-2xl transition-shadow duration-300 ${
                   isVisible.infoBox ? 'opacity-100' : 'opacity-0'
                 } transition-opacity duration-700`}
               >
-                <div className="text-2xl font-bold text-primary flex-shrink-0">i</div>
-                <p className="text-muted-foreground">
-                  Если при подключении новой системы вы хотите отказаться от старых трубок и поставить видеомониторы в квартирах или подключить мобильное приложение, то обязательно укажите эту информацию менеджеру, мы все согласуем с Вами и проведем все необходимые работы.
-                </p>
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary flex-shrink-0 text-xl font-bold">
+                  i
+                </div>
+                <div className="flex-1 space-y-4">
+                  <p className="text-muted-foreground leading-relaxed text-sm sm:text-base">
+                    Если при подключении новой системы вы хотите отказаться от старых трубок и поставить видеомониторы в квартирах или подключить мобильное приложение, то обязательно укажите эту информацию менеджеру, мы все согласуем с Вами и проведем все необходимые работы.
+                  </p>
+                  <p className="text-sm sm:text-base font-semibold text-slate-800 dark:text-neutral-200">
+                    Также вы можете прямо сейчас рассчитать стоимость абонентского обслуживания для вашего дома с помощью нашего онлайн-калькулятора.
+                  </p>
+                  
+                  {/* Кнопки перенаправления */}
+                  <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        console.log("[SmartIntercom] Клик по кнопке 'Оставить заявку'. Переход на контакты.");
+                        navigate("/kontakty");
+                      }}
+                      className="w-full sm:w-auto hover-scale text-sm font-semibold py-2 px-5"
+                    >
+                      Оставить заявку
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        console.log("[SmartIntercom] Клик по кнопке 'Рассчитать тариф'. Переход на калькулятор.");
+                        navigate("/calculator");
+                      }}
+                      className="w-full sm:w-auto gradient-primary text-primary-foreground hover:opacity-90 transition-opacity shadow-lg hover-scale text-sm font-semibold py-2 px-5"
+                    >
+                      Рассчитать тариф
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

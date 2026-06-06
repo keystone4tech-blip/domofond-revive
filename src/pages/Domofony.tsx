@@ -130,11 +130,11 @@ const Domofony = () => {
               {systems.map((system, index) => (
                 <Card
                   key={index}
-                  className={`hover:shadow-lg transition-shadow ${
+                  className={`hover:shadow-2xl hover:-translate-y-1.5 border border-transparent hover:border-primary/30 dark:hover:border-primary/50 hover:bg-slate-50/50 dark:hover:bg-slate-900/50 cursor-pointer transition-all duration-300 ${
                     isVisible.systems[index]
                       ? 'opacity-100 translate-y-0 scale-100'
                       : 'opacity-0 translate-y-10 scale-95'
-                  } transition-all duration-700 ease-out`}
+                  } ease-out`}
                 >
                   <CardHeader>
                     <CardTitle>{system.title}</CardTitle>
@@ -160,8 +160,8 @@ const Domofony = () => {
         {/* Why Choose Us */}
         <section className="py-8 md:py-12 bg-muted/30">
           <div className="container">
-            <div className="max-w-3xl mx-auto">
-              {/* Унифицированный градиентный заголовок */}
+            <div className="max-w-3xl mx-auto text-center">
+              {/* Унифицированный градиентный заголовок с правильным центрированием в родительском контейнере */}
               <h2
                 className={`text-3xl sm:text-4xl mb-8 text-center section-title-gradient ${
                   isVisible.whyChooseUs ? 'opacity-100' : 'opacity-0'
@@ -171,9 +171,9 @@ const Domofony = () => {
               </h2>
               <div className="grid gap-4 md:grid-cols-2">
                 <Card
-                  className={`${
+                  className={`hover:shadow-xl hover:-translate-y-1 border border-transparent hover:border-primary/30 dark:hover:border-primary/50 hover:bg-slate-50/50 dark:hover:bg-slate-900/50 cursor-pointer transition-all duration-300 ${
                     isVisible.whyChooseUs ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-10 scale-95'
-                  } transition-all duration-700 ease-out`}
+                  } ease-out`}
                 >
                   <CardHeader>
                     <CardTitle className="text-lg">Опыт более 10 лет</CardTitle>
@@ -186,9 +186,9 @@ const Domofony = () => {
                 </Card>
 
                 <Card
-                  className={`${
+                  className={`hover:shadow-xl hover:-translate-y-1 border border-transparent hover:border-primary/30 dark:hover:border-primary/50 hover:bg-slate-50/50 dark:hover:bg-slate-900/50 cursor-pointer transition-all duration-300 ${
                     isVisible.whyChooseUs ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-10 scale-95'
-                  } transition-all duration-700 ease-out delay-100`}
+                  } ease-out delay-100`}
                 >
                   <CardHeader>
                     <CardTitle className="text-lg">Гарантия качества</CardTitle>
@@ -201,9 +201,9 @@ const Domofony = () => {
                 </Card>
 
                 <Card
-                  className={`${
+                  className={`hover:shadow-xl hover:-translate-y-1 border border-transparent hover:border-primary/30 dark:hover:border-primary/50 hover:bg-slate-50/50 dark:hover:bg-slate-900/50 cursor-pointer transition-all duration-300 ${
                     isVisible.whyChooseUs ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-10 scale-95'
-                  } transition-all duration-700 ease-out delay-200`}
+                  } ease-out delay-200`}
                 >
                   <CardHeader>
                     <CardTitle className="text-lg">Быстрый монтаж</CardTitle>
@@ -216,9 +216,9 @@ const Domofony = () => {
                 </Card>
 
                 <Card
-                  className={`${
+                  className={`hover:shadow-xl hover:-translate-y-1 border border-transparent hover:border-primary/30 dark:hover:border-primary/50 hover:bg-slate-50/50 dark:hover:bg-slate-900/50 cursor-pointer transition-all duration-300 ${
                     isVisible.whyChooseUs ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-10 scale-95'
-                  } transition-all duration-700 ease-out delay-300`}
+                  } ease-out delay-300`}
                 >
                   <CardHeader>
                     <CardTitle className="text-lg">Сервисная поддержка</CardTitle>
