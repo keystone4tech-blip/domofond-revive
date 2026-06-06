@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useUserRole } from "@/hooks/useUserRole";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -747,19 +748,7 @@ const RequestsManager = ({
     );
   }
 
-  // Show request details view
-  if (selectedRequest) {
-    return (
-      <RequestDetails
-        request={selectedRequest}
-        onBack={() => {
-          setSelectedRequest(null);
-          if (onClearInitialRequestId) onClearInitialRequestId();
-        }}
-        isManager={isManager}
-      />
-    );
-  }
+  // Детали теперь отображаются в модальном окне Dialog
 
 
   // Get title for current tab
@@ -773,6 +762,196 @@ const RequestsManager = ({
       case "reports": return { title: "Финансовые отчёты", icon: Banknote, count: null };
       default: return { title: "Заявки", icon: FileText, count: stats.total };
     }
+  };
+
+  // Функция для рендеринга компактной таблицы заявок в стиле "одна строка - одна заявка"
+  const renderRequestsTable = (requestsList: Request[]) => {
+    if (requestsList.length === 0) {
+      return (
+        <div className="text-center py-8 text-muted-foreground font-semibold">
+          Нет заявок в этом разделе
+        </div>
+      );
+    }
+
+    return (
+      <div className="overflow-x-auto rounded-xl border border-slate-200/60 dark:border-slate-800/60 bg-white/50 dark:bg-slate-900/40 backdrop-blur-md">
+        <table className="w-full text-sm text-left border-collapse">
+          <thead className="text-xs font-bold uppercase bg-slate-50/80 dark:bg-slate-800/60 text-muted-foreground border-b border-slate-200 dark:border-slate-800">
+            <tr>
+              <th className="px-4 py-3">Дата</th>
+              <th className="px-4 py-3">Клиент</th>
+              <th className="px-4 py-3">Адрес</th>
+              <th className="px-4 py-3">Описание</th>
+              <th className="px-4 py-3 text-center">Состояние</th>
+              <th className="px-4 py-3">Мастер / Исполнитель</th>
+              <th className="px-4 py-3 text-right">Сумма</th>
+              <th className="px-4 py-3 text-center">Действия</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+            {requestsList.map((request) => {
+              const { total } = getRequestSum(request.id);
+              return (
+                <tr 
+                  key={request.id} 
+                  className={cn(
+                    "hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-all cursor-pointer",
+                    request.priority === 'urgent' && "bg-red-500/[0.02] dark:bg-red-500/[0.01]"
+                  )}
+                  onClick={() => setSelectedRequest(request)}
+                >
+                  {/* Дата создания заявки */}
+                  <td className="px-4 py-3 whitespace-nowrap text-xs text-muted-foreground">
+                    <div className="flex items-center gap-1.5">
+                      <Calendar className="h-3.5 w-3.5 text-muted-foreground/70 shrink-0" />
+                      <span>{format(new Date(request.created_at), "dd.MM.yy HH:mm")}</span>
+                    </div>
+                  </td>
+                  
+                  {/* Информация о клиенте (Имя, Телефон) */}
+                  <td className="px-4 py-3">
+                    <div className="space-y-0.5">
+                      <div className="font-bold text-foreground flex items-center gap-1.5">
+                        <User className="h-3.5 w-3.5 text-primary shrink-0" />
+                        <span>{request.name}</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-xs">
+                        <Phone className="h-3 w-3 text-muted-foreground shrink-0" />
+                        <a
+                          href={`tel:${request.phone}`}
+                          className="text-primary hover:underline font-medium"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {request.phone}
+                        </a>
+                      </div>
+                    </div>
+                  </td>
+                  
+                  {/* Адрес объекта */}
+                  <td className="px-4 py-3 max-w-[180px]">
+                    <div className="flex items-start gap-1.5">
+                      <MapPin className="h-3.5 w-3.5 text-primary/70 shrink-0 mt-0.5" />
+                      <span className="truncate block font-medium" title={request.address}>{request.address}</span>
+                    </div>
+                  </td>
+                  
+                  {/* Краткое описание неисправности/проблемы */}
+                  <td className="px-4 py-3 max-w-[220px]">
+                    <p className="text-xs text-muted-foreground truncate" title={request.message}>
+                      {request.message}
+                    </p>
+                  </td>
+                  
+                  {/* Состояние (приоритет + статус выполнения + статус оплаты) */}
+                  <td className="px-4 py-3">
+                    <div className="flex flex-col items-center gap-1">
+                      <div className="flex gap-1 flex-wrap justify-center">
+                        {getPriorityBadge(request.priority)}
+                        {getStatusBadge(request.status)}
+                      </div>
+                      {request.payment_amount && Number(request.payment_amount) > 0 && (
+                        <div className="mt-0.5">
+                          {request.payment_status === "paid" ? (
+                            <Badge className="bg-emerald-600 hover:bg-emerald-600 dark:bg-emerald-700 text-white border-none text-[9px] h-4 py-0 px-1.5 font-bold">✓ Оплачено</Badge>
+                          ) : request.payment_status === "on_site" ? (
+                            <Badge className="bg-blue-600 hover:bg-blue-600 dark:bg-blue-700 text-white border-none text-[9px] h-4 py-0 px-1.5 font-bold">💵 На месте</Badge>
+                          ) : (
+                            <Badge className="bg-orange-500 hover:bg-orange-500 dark:bg-orange-600 text-white border-none text-[9px] h-4 py-0 px-1.5 font-bold animate-pulse">⏳ Ожидает</Badge>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                  
+                  {/* Исполнитель (Мастер) */}
+                  <td className="px-4 py-3">
+                    {request.accepted_employee ? (
+                      <div className="space-y-0.5">
+                        <div className="font-semibold text-xs text-green-700 dark:text-green-400 flex items-center gap-1">
+                          <HandMetal className="h-3 w-3 shrink-0" />
+                          <span>{request.accepted_employee.full_name}</span>
+                        </div>
+                        {request.accepted_at && (
+                          <div className="text-[10px] text-muted-foreground">
+                            Принял: {format(new Date(request.accepted_at), "dd.MM HH:mm")}
+                          </div>
+                        )}
+                      </div>
+                    ) : request.assigned_employee ? (
+                      <div className="space-y-0.5">
+                        <div className="font-semibold text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                          <User className="h-3 w-3 shrink-0" />
+                          <span>Назначен: {request.assigned_employee.full_name}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground italic">Не назначен</span>
+                    )}
+                  </td>
+                  
+                  {/* Финансовая сумма товаров/услуг */}
+                  <td className="px-4 py-3 text-right font-bold text-foreground whitespace-nowrap">
+                    {total > 0 ? (
+                      <div className="flex items-center justify-end gap-0.5 text-xs text-blue-700 dark:text-blue-400 font-bold">
+                        <Banknote className="h-3 w-3 shrink-0" />
+                        <span>{total.toFixed(0)} ₽</span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </td>
+                  
+                  {/* Кнопка "Подробнее" и Dropdown действий */}
+                  <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center justify-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2 text-xs font-semibold"
+                        onClick={() => setSelectedRequest(request)}
+                      >
+                        <Eye className="h-3.5 w-3.5 mr-1" />
+                        Подробнее
+                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-7 w-7">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {request.status === "pending" && (
+                            <DropdownMenuItem onClick={() => acceptRequestMutation.mutate(request.id)}>
+                              <HandMetal className="h-4 w-4 mr-2 text-green-600" />
+                              Принять в работу
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem onClick={() => startEdit(request)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Редактировать
+                          </DropdownMenuItem>
+                          {isManager && (
+                            <DropdownMenuItem 
+                              className="text-destructive"
+                              onClick={() => deleteRequestMutation.mutate(request.id)}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Удалить
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    );
   };
 
   const tabInfo = getTabTitle();
@@ -959,15 +1138,7 @@ const RequestsManager = ({
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {pendingRequests.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  Нет новых заявок
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {pendingRequests.map(renderRequestCard)}
-                </div>
-              )}
+              {renderRequestsTable(pendingRequests)}
             </CardContent>
           </Card>
         </TabsContent>
@@ -982,15 +1153,7 @@ const RequestsManager = ({
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {inProgressRequests.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  Нет заявок в работе
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {inProgressRequests.map(renderRequestCard)}
-                </div>
-              )}
+              {renderRequestsTable(inProgressRequests)}
             </CardContent>
           </Card>
         </TabsContent>
@@ -1005,15 +1168,7 @@ const RequestsManager = ({
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {completedRequests.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  Нет выполненных заявок
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {completedRequests.map(renderRequestCard)}
-                </div>
-              )}
+              {renderRequestsTable(completedRequests)}
             </CardContent>
           </Card>
         </TabsContent>
@@ -1028,15 +1183,7 @@ const RequestsManager = ({
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {cancelledRequests.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  Нет отменённых заявок
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {cancelledRequests.map(renderRequestCard)}
-                </div>
-              )}
+              {renderRequestsTable(cancelledRequests)}
             </CardContent>
           </Card>
         </TabsContent>
@@ -1068,9 +1215,7 @@ const RequestsManager = ({
                     )}
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-3">
-                      {masterRequests.map(renderRequestCard)}
-                    </div>
+                    {renderRequestsTable(masterRequests)}
                   </CardContent>
                 </Card>
               ))
@@ -1147,6 +1292,33 @@ const RequestsManager = ({
               Добавить
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Модальное окно с деталями заявки */}
+      <Dialog 
+        open={!!selectedRequest} 
+        onOpenChange={(open) => { 
+          if (!open) { 
+            setSelectedRequest(null); 
+            if (onClearInitialRequestId) onClearInitialRequestId(); 
+          } 
+        }}
+      >
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Детали заявки</DialogTitle>
+          </DialogHeader>
+          {selectedRequest && (
+            <RequestDetails
+              request={selectedRequest}
+              onBack={() => {
+                setSelectedRequest(null);
+                if (onClearInitialRequestId) onClearInitialRequestId();
+              }}
+              isManager={isManager}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </div>
