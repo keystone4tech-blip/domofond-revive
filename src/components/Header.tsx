@@ -40,7 +40,11 @@ const Header = () => {
   }, []);
 
   const isFSMUser = userRoles.some((r) => 
-    ["admin", "director", "dispatcher", "master", "engineer", "manager"].includes(r)
+    ["admin", "director", "dispatcher", "master", "engineer", "manager", "superadmin"].includes(r)
+  );
+
+  const isAdmin = userRoles.some((r) => 
+    ["admin", "director", "superadmin"].includes(r)
   );
 
   const scrollToSection = (sectionId: string) => {
@@ -153,28 +157,37 @@ const Header = () => {
           </a>
           <ThemeToggle />
           {user ? (
-            <div className="hidden md:flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              {isAdmin && (
+                <ShinyButton
+                  onClick={() => navigate("/admin")}
+                  className="py-1.5 px-2.5 sm:px-3 text-xs rounded-xl bg-purple-600 hover:bg-purple-700 text-white shadow-sm"
+                >
+                  <ShieldCheck className="h-3.5 w-3.5 sm:mr-1.5" />
+                  <span className="hidden sm:inline">Админка</span>
+                </ShinyButton>
+              )}
               {isFSMUser && (
                 <ShinyButton
                   onClick={() => navigate("/fsm")}
-                  className="py-1.5 px-3.5 text-xs rounded-xl"
+                  className="py-1.5 px-2.5 sm:px-3 text-xs rounded-xl"
                 >
-                  <LayoutDashboard className="h-3.5 w-3.5 md:mr-1.5" />
-                  <span className="hidden lg:inline">FSM</span>
+                  <LayoutDashboard className="h-3.5 w-3.5 sm:mr-1.5" />
+                  <span className="hidden sm:inline">FSM</span>
                 </ShinyButton>
               )}
               <ShinyButton
                 onClick={() => navigate("/cabinet")}
-                className="py-1.5 px-3.5 text-xs rounded-xl"
+                className="py-1.5 px-2.5 sm:px-3 text-xs rounded-xl"
               >
-                <User className="h-3.5 w-3.5 md:mr-1.5" />
-                <span className="hidden lg:inline">Кабинет</span>
+                <User className="h-3.5 w-3.5 sm:mr-1.5" />
+                <span className="hidden sm:inline">Кабинет</span>
               </ShinyButton>
             </div>
           ) : (
             <ShinyButton
               onClick={() => navigate("/auth")}
-              className="hidden md:inline-flex py-1.5 px-4 text-xs rounded-xl"
+              className="py-1.5 px-4 text-xs rounded-xl"
             >
               Войти
             </ShinyButton>

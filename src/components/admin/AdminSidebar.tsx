@@ -4,7 +4,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { 
   Calculator, Sparkles, Newspaper, Vote, BarChart3, Tag, 
   FileText, Crown, MessageSquare, Hash, Grid, CreditCard, 
-  Bot, History, Home, LogOut, Shield, ChevronLeft, ChevronRight, Database
+  Bot, History, Home, LogOut, Shield, ChevronLeft, ChevronRight, Database,
+  LayoutDashboard, User
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -94,8 +95,22 @@ export const AdminSidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }: Adm
         </nav>
       </div>
 
-      {/* Нижний блок: Навигация на сайт и Выход */}
+      {/* Нижний блок: Навигация в FSM, на сайт, в ЛК и Выход */}
       <div className="p-4 border-t border-slate-100 dark:border-slate-800/80 space-y-1 bg-white/40 dark:bg-slate-900/40">
+        <Link 
+          to="/fsm" 
+          className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50/70 dark:hover:bg-blue-950/30 hover:text-blue-700 transition-all duration-200"
+        >
+          <LayoutDashboard className="h-4 w-4 shrink-0" />
+          <span>FSM Заявки</span>
+        </Link>
+        <Link 
+          to="/cabinet" 
+          className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold text-muted-foreground hover:bg-slate-100/70 dark:hover:bg-slate-800/50 hover:text-foreground transition-all duration-200"
+        >
+          <User className="h-4 w-4 shrink-0" />
+          <span>Личный кабинет</span>
+        </Link>
         <Link 
           to="/" 
           className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold text-muted-foreground hover:bg-slate-100/70 dark:hover:bg-slate-800/50 hover:text-foreground transition-all duration-200"

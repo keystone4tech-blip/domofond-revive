@@ -8,6 +8,7 @@ import {
   Home, LogOut, Shield, User, FileSpreadsheet, DoorClosed, KeyRound, ClipboardCheck
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useUserRole } from "@/hooks/useUserRole";
 
 // Пропсы для боковой панели FSM
 interface FSMSidebarProps {
@@ -21,6 +22,7 @@ interface FSMSidebarProps {
 export const FSMSidebar = ({ activeTab, setActiveTab, isManager, isOpen, setIsOpen }: FSMSidebarProps) => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { isAdmin } = useUserRole();
 
   // Получение количества активных задач, заявок и верификаций для бейджей (онлайн опрос каждые 5 сек)
   const { data: counts } = useQuery({
@@ -179,21 +181,30 @@ export const FSMSidebar = ({ activeTab, setActiveTab, isManager, isOpen, setIsOp
         </nav>
       </div>
 
-      {/* Нижний блок: Навигация на сайт, в ЛК и Выход */}
+      {/* Нижний блок: Навигация в Админку, на сайт, в ЛК и Выход */}
       <div className="p-4 border-t border-slate-100 dark:border-slate-800/80 space-y-1 bg-white/40 dark:bg-slate-900/40">
-        <Link 
-          to="/" 
-          className="flex items-center gap-3 px-4 py-2 rounded-xl text-sm font-semibold text-muted-foreground hover:bg-slate-100/70 dark:hover:bg-slate-800/50 hover:text-foreground transition-all duration-200"
-        >
-          <Home className="h-4 w-4 shrink-0" />
-          <span>На сайт</span>
-        </Link>
+        {isAdmin && (
+          <Link 
+            to="/admin" 
+            className="flex items-center gap-3 px-4 py-2 rounded-xl text-sm font-semibold text-purple-600 dark:text-purple-400 hover:bg-purple-50/70 dark:hover:bg-purple-950/30 hover:text-purple-700 transition-all duration-200"
+          >
+            <Shield className="h-4 w-4 shrink-0" />
+            <span>Панель управления</span>
+          </Link>
+        )}
         <Link 
           to="/cabinet" 
           className="flex items-center gap-3 px-4 py-2 rounded-xl text-sm font-semibold text-muted-foreground hover:bg-slate-100/70 dark:hover:bg-slate-800/50 hover:text-foreground transition-all duration-200"
         >
           <User className="h-4 w-4 shrink-0" />
           <span>Личный кабинет</span>
+        </Link>
+        <Link 
+          to="/" 
+          className="flex items-center gap-3 px-4 py-2 rounded-xl text-sm font-semibold text-muted-foreground hover:bg-slate-100/70 dark:hover:bg-slate-800/50 hover:text-foreground transition-all duration-200"
+        >
+          <Home className="h-4 w-4 shrink-0" />
+          <span>На сайт</span>
         </Link>
         <button 
           onClick={handleLogout}

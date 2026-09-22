@@ -1,4 +1,4 @@
-import { Home, Phone as PhoneIcon, Wrench, HelpCircle, User, LayoutDashboard, LogIn, Calculator } from "lucide-react";
+import { Home, Phone as PhoneIcon, Wrench, HelpCircle, User, LayoutDashboard, LogIn, Calculator, ShieldCheck } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
@@ -46,7 +46,11 @@ const MobileBottomNav = () => {
   }, []);
 
   const isFSMUser = userRoles.some((r) => 
-    ["admin", "director", "dispatcher", "master", "engineer", "manager"].includes(r)
+    ["admin", "director", "dispatcher", "master", "engineer", "manager", "superadmin"].includes(r)
+  );
+
+  const isAdmin = userRoles.some((r) => 
+    ["admin", "director", "superadmin"].includes(r)
   );
 
   // Hide on FSM pages - they have their own nav
@@ -100,12 +104,20 @@ const MobileBottomNav = () => {
     },
   ];
 
-  // Add FSM and/or Cabinet/Login button based on auth state
+  // Добавляем кнопки Админки, FSM и Кабинета в зависимости от ролей
   if (user) {
+    if (isAdmin) {
+      navItems.push({
+        icon: <ShieldCheck className="h-5 w-5 text-purple-600 dark:text-purple-400" />,
+        label: "Админка",
+        action: () => navigate("/admin"),
+        isActive: location.pathname === "/admin",
+      });
+    }
     if (isFSMUser) {
       navItems.push({
-        icon: <LayoutDashboard className="h-5 w-5" />,
-        label: "Домофондар",
+        icon: <LayoutDashboard className="h-5 w-5 text-blue-600 dark:text-blue-400" />,
+        label: "FSM",
         action: () => navigate("/fsm"),
         isActive: location.pathname === "/fsm",
       });
