@@ -197,9 +197,14 @@ const Header = () => {
               </ShinyButton>
             </div>
           ) : (
+            // Кнопка входа для десктопа (на мобильных устройствах скрыта hidden md:inline-flex, 
+            // так как вынесена в нижний дашборд с эффектным переливом)
             <ShinyButton
-              onClick={() => navigate("/auth")}
-              className="py-1 px-2.5 sm:px-4 text-xs rounded-xl shrink-0"
+              onClick={() => {
+                console.log("[Header] Нажата кнопка входа (десктоп)");
+                navigate("/auth");
+              }}
+              className="hidden md:inline-flex py-1 px-2.5 sm:px-4 text-xs rounded-xl shrink-0"
             >
               Войти
             </ShinyButton>

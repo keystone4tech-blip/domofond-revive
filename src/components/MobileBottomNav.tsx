@@ -138,23 +138,63 @@ const MobileBottomNav = () => {
   }
 
   return (
-    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-border safe-area-inset-bottom">
-      <div className="flex items-center justify-around h-16 px-2">
-        {navItems.slice(0, 6).map((item, index) => (
-          <button
-            key={index}
-            onClick={item.action}
-            className={cn(
-              "flex flex-col items-center justify-center flex-1 h-full gap-0.5 transition-colors",
-              item.isActive
-                ? "text-primary"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {item.icon}
-            <span className="text-[10px] font-medium">{item.label}</span>
-          </button>
-        ))}
+    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-t border-border safe-area-inset-bottom shadow-lg">
+      <div className="flex items-center justify-around h-16 px-1.5">
+        {navItems.slice(0, 6).map((item, index) => {
+          // Проверяем, является ли данный элемент кнопкой входа для неавторизованных пользователей
+          const isLoginButton = item.label === "Войти";
+
+          // Если это кнопка «Войти», выделяем её акцентной капсулой с бегущим переливом (shimmer)
+          if (isLoginButton) {
+            return (
+              <button
+                key={index}
+                onClick={() => {
+                  // Логируем нажатие акцентной кнопки авторизации
+                  console.log("[MobileBottomNav] Нажата выделенная кнопка 'Войти'");
+                  item.action();
+                }}
+                className="relative flex flex-col items-center justify-center flex-1 h-full py-1 px-1 transition-transform active:scale-95 group focus:outline-none"
+                aria-label="Войти в личный кабинет"
+              >
+                {/* Капсула кнопки с неоновым дыханием границы и мягким градиентом */}
+                <div className="relative flex flex-col items-center justify-center w-full max-w-[62px] py-1 px-1 rounded-xl bg-gradient-to-b from-blue-50 to-blue-100/80 dark:from-blue-950/80 dark:to-blue-900/50 border border-blue-500/50 dark:border-blue-400/50 overflow-hidden shadow-sm glow-shimmer-btn">
+                  {/* Анимированный бегущий луч света (shimmer wave) */}
+                  <div className="absolute inset-0 w-1/2 h-full bg-gradient-to-r from-transparent via-white/80 dark:via-white/30 to-transparent pointer-events-none animate-nav-shimmer" />
+
+                  {/* Контрастная иконка входа */}
+                  <LogIn className="h-4 w-4 text-blue-600 dark:text-blue-400 drop-shadow-sm mb-0.5 transition-transform group-hover:scale-110" />
+
+                  {/* Акцентная жирная надпись */}
+                  <span className="text-[10px] font-bold tracking-tight text-blue-600 dark:text-blue-400 leading-tight">
+                    {item.label}
+                  </span>
+                </div>
+              </button>
+            );
+          }
+
+          // Стандартная отрисовка остальных кнопок нижнего меню
+          return (
+            <button
+              key={index}
+              onClick={() => {
+                // Логируем выбор стандартного пункта мобильного меню
+                console.log(`[MobileBottomNav] Нажат пункт меню: ${item.label}`);
+                item.action();
+              }}
+              className={cn(
+                "flex flex-col items-center justify-center flex-1 h-full gap-0.5 transition-colors",
+                item.isActive
+                  ? "text-primary font-semibold"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {item.icon}
+              <span className="text-[10px] font-medium">{item.label}</span>
+            </button>
+          );
+        })}
       </div>
     </nav>
   );
