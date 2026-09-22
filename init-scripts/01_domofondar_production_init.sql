@@ -614,8 +614,9 @@ GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO authenticated;
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO authenticated;
 
 -- Публичные права (anon): чтение только общедоступных данных
-GRANT SELECT ON news, promotions, products, comments, site_blocks, unique_houses, seo_page_meta, seo_settings TO anon;
-GRANT INSERT ON requests, calculations, contacts, comments, likes TO anon;
+GRANT SELECT ON news, promotions, products, comments, site_blocks, unique_houses, seo_page_meta, seo_settings, calculations TO anon;
+GRANT INSERT, UPDATE ON calculations TO anon;
+GRANT INSERT ON requests, contacts, comments, likes TO anon;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon;
 
 -- Запрещаем анонимный доступ к персональным данным жильцов и лицевым счетам через PostgREST

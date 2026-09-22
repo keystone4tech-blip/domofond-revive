@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { downloadProposal, generateProposalDocx } from "@/utils/docxGenerator";
+import { saveAs } from "file-saver";
 import { FileText, CheckCircle2, Loader2 as Spinner, HelpCircle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -238,42 +239,41 @@ export default function Calculator() {
     setIsSubmitting(true);
 
     try {
-      const { error } = await supabase.from("calculations").insert({
-        name: name.trim(),
-        phone: phone.trim(),
-        entrances,
-        total_apartments: totalApartments,
-        smart_intercoms: smartIntercoms,
-        additional_cameras: additionalCameras,
-        elevator_cameras: elevatorCameras,
-        gates,
-        tariff_per_apt: generalRates.valid ? tariffPerApt : 0,
-        is_individual: !generalRates.valid,
-        tariff_details: {
-          aptsPerEntrance,
-          aptsPerIntercom,
-          smartRate: smartIntercoms > 0 ? intercomRates.smart : 0,
-          additionalCameraRate: generalRates.addCam,
-          elevatorRate: generalRates.elev,
-          gateRate: gatePrice,
-          gateTotalCost: gates * gateMaintenanceCost,
-          individualGate: false,
-        },
-      });
-
-      if (error) throw error;
-
-      // Получаем ID созданной записи
-      const { data: latestCalc } = await supabase
+      // Сохраняем расчет в базу данных и сразу получаем идентификатор новой записи
+      const { data: insertedData, error } = await supabase
         .from("calculations")
+        .insert({
+          name: name.trim(),
+          phone: phone.trim(),
+          entrances,
+          total_apartments: totalApartments,
+          smart_intercoms: smartIntercoms,
+          additional_cameras: additionalCameras,
+          elevator_cameras: elevatorCameras,
+          gates,
+          tariff_per_apt: generalRates.valid ? tariffPerApt : 0,
+          is_individual: !generalRates.valid,
+          tariff_details: {
+            aptsPerEntrance,
+            aptsPerIntercom,
+            smartRate: smartIntercoms > 0 ? intercomRates.smart : 0,
+            additionalCameraRate: generalRates.addCam,
+            elevatorRate: generalRates.elev,
+            gateRate: gatePrice,
+            gateTotalCost: gates * gateMaintenanceCost,
+            individualGate: false,
+          },
+        })
         .select("id")
-        .eq("phone", phone.trim())
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
-      
-      if (latestCalc) {
-        setLastCalculationId(latestCalc.id);
+        .maybeSingle();
+
+      if (error) {
+        console.error("[Calculator] Ошибка сохранения расчета в базу данных:", error);
+        throw error;
+      }
+
+      if (insertedData?.id) {
+        setLastCalculationId(insertedData.id);
       }
 
       setShowResult(true);
@@ -362,8 +362,8 @@ export default function Calculator() {
         if (updateError) console.error("Database update error:", updateError);
       }
 
-      // 4. Скачиваем пользователю
-      await downloadProposal(proposalData);
+      // 4. Скачиваем пользователю напрямую сгенерированный blob
+      saveAs(blob, fileName);
 
       setIsCPDialogOpen(false);
       toast({

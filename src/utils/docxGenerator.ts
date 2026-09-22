@@ -76,22 +76,24 @@ export const generateProposalDocx = async (data: ProposalData): Promise<Blob> =>
 
   const tariffText = tariffTextArray.join(" ") + ` Итого общий тариф составляет ${calculation.tariffPerApt} рублей по квитанциям ООО «ДомофонДар».`;
 
-  // Подготовка премиального логотипа компании в формате PNG
+  // Подготовка премиального логотипа компании
   let logoImage: ImageRun | null = null;
   try {
     const response = await fetch("/logo.png");
     if (response.ok) {
       const buffer = await response.arrayBuffer();
+      // Явно указываем type: "jpg", так как файл логотипа является JPEG/JFIF форматом
       logoImage = new ImageRun({
         data: new Uint8Array(buffer),
         transformation: {
-          width: 300,
-          height: 60,
+          width: 280,
+          height: 56,
         },
-      } as any);
+        type: "jpg",
+      });
     }
   } catch (error) {
-    console.error("Ошибка загрузки логотипа:", error);
+    console.warn("[docxGenerator] Логотип не загружен, формируем документ без изображения:", error);
   }
 
   const doc = new Document({
@@ -245,16 +247,22 @@ export const generateProposalDocx = async (data: ProposalData): Promise<Blob> =>
           "Полная гарантия на все оборудование!",
           "Бесплатные вызовы и ремонт в неограниченном количестве!",
         ].map(text => new Paragraph({
-          text: text,
-          bullet: { level: 0 },
-          spacing: { before: 120 }
+          children: [
+            new TextRun({
+              text: `•  ${text}`,
+              size: 21,
+            })
+          ],
+          spacing: { before: 100 },
+          indent: { left: 240 }
         })),
 
         new Paragraph({
           children: [
             new TextRun({
               text: "Наше домофонное оборудование имеет следующие функциональные возможности и технические характеристики:",
-              bold: true
+              bold: true,
+              size: 22,
             })
           ],
           spacing: { before: 300, after: 150 },
@@ -270,16 +278,22 @@ export const generateProposalDocx = async (data: ProposalData): Promise<Blob> =>
           "Разрешение IP камеры: 2Mpx (1920x1080) с ИК-подсветкой;",
           "Ночной режим: Высокое качество изображения в темное время суток."
         ].map(text => new Paragraph({
-          text: text,
-          bullet: { level: 0 },
-          spacing: { before: 80 }
+          children: [
+            new TextRun({
+              text: `•  ${text}`,
+              size: 21,
+            })
+          ],
+          spacing: { before: 80 },
+          indent: { left: 240 }
         })),
 
         new Paragraph({
           children: [
             new TextRun({
               text: "Плановое техническое обслуживание домофонной системы проводится один раз в месяц и включает в себя:",
-              bold: true
+              bold: true,
+              size: 22,
             })
           ],
           spacing: { before: 300, after: 150 },
@@ -297,9 +311,14 @@ export const generateProposalDocx = async (data: ProposalData): Promise<Blob> =>
           "Замена информационной наклейки.",
           "Проверка надежности коммутации вызывной панели, блока питания, коммутатора."
         ].map(text => new Paragraph({
-          text: text,
-          bullet: { level: 0 },
-          spacing: { before: 80 }
+          children: [
+            new TextRun({
+              text: `•  ${text}`,
+              size: 21,
+            })
+          ],
+          spacing: { before: 80 },
+          indent: { left: 240 }
         })),
 
         new Paragraph({ text: "", spacing: { after: 600 } }),
