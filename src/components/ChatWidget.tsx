@@ -3,6 +3,7 @@ import { MessageCircle, X, Send, Loader2, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import ReactMarkdown from "react-markdown";
+import { generateUUID } from "@/lib/uuid";
 
 type Msg = { role: "user" | "assistant" | "tool"; content: string; tool_call_id?: string };
 
@@ -11,7 +12,8 @@ const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 function getSessionId() {
   let id = sessionStorage.getItem("chat_session_id");
   if (!id) {
-    id = crypto.randomUUID();
+    // Безопасный вызов генератора UUID с поддержкой HTTP окружения
+    id = generateUUID();
     sessionStorage.setItem("chat_session_id", id);
   }
   return id;

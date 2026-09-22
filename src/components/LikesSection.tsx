@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Heart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { generateUUID } from "@/lib/uuid";
 
 interface LikesSectionProps {
   contentType: "promotion" | "news";
@@ -16,10 +17,10 @@ export const LikesSection = ({ contentType, contentId }: LikesSectionProps) => {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Получаем или создаем session ID для анонимных пользователей
+    // Безопасно получаем или создаем session ID для анонимных пользователей (с фоллбеком для HTTP)
     let sid = localStorage.getItem("session_id");
     if (!sid) {
-      sid = crypto.randomUUID();
+      sid = generateUUID();
       localStorage.setItem("session_id", sid);
     }
     setSessionId(sid);
@@ -29,34 +30,43 @@ export const LikesSection = ({ contentType, contentId }: LikesSectionProps) => {
   }, [contentId]);
 
   const fetchLikes = async () => {
-    const { data, error } = await supabase
-      .from("likes")
-      .select("id")
-      .eq("content_type", contentType)
-      .eq("content_id", contentId);
+    try {
+      const { data, error } = await supabase
+        .from("likes")
+        .select("id")
+        .eq("content_type", contentType)
+        .eq("content_id", contentId);
 
-    if (!error && data) {
-      setLikesCount(data.length);
+      if (!error && data) {
+        setLikesCount(data.length);
+      }
+    } catch (e) {
+      console.error("[LikesSection] Ошибка получения количества лайков:", e);
     }
   };
 
   const checkIfLiked = async (sid: string) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    let query = supabase
-      .from("likes")
-      .select("id")
-      .eq("content_type", contentType)
-      .eq("content_id", contentId);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      let query = supabase
+        .from("likes")
+        .select("id")
+        .eq("content_type", contentType)
+        .eq("content_id", contentId);
 
-    if (user) {
-      query = query.eq("user_id", user.id);
-    } else {
-      query = query.eq("session_id", sid);
+      if (user) {
+        query = query.eq("user_id", user.id);
+      } else {
+        query = query.eq("session_id", sid);
+      }
+
+      // Используем maybeSingle вместо single, чтобы отсутствие записей не вызывало ошибку 406
+      const { data } = await query.maybeSingle();
+      setIsLiked(!!data);
+    } catch (e) {
+      console.error("[LikesSection] Ошибка проверки статуса лайка:", e);
     }
-
-    const { data } = await query.single();
-    setIsLiked(!!data);
   };
 
   const handleLike = async () => {

@@ -48,15 +48,19 @@ export const CommentsSection = ({ contentType, contentId }: CommentsSectionProps
   };
 
   const fetchComments = async () => {
-    const { data, error } = await supabase
-      .from("comments")
-      .select("id, user_id, text, created_at")
-      .eq("content_type", contentType)
-      .eq("content_id", contentId)
-      .order("created_at", { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from("comments")
+        .select("id, user_id, text, created_at")
+        .eq("content_type", contentType)
+        .eq("content_id", contentId)
+        .order("created_at", { ascending: false });
 
-    if (!error && data) {
-      setComments(data);
+      if (!error && data) {
+        setComments(data);
+      }
+    } catch (err) {
+      console.error("[CommentsSection] Ошибка получения комментариев:", err);
     }
   };
 

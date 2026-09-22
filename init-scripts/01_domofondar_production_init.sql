@@ -299,7 +299,11 @@ CREATE TABLE IF NOT EXISTS comments (
     content TEXT,
     rating INTEGER,
     is_approved BOOLEAN DEFAULT false,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    user_id UUID,
+    content_type VARCHAR(50) DEFAULT 'news',
+    content_id UUID,
+    text TEXT
 );
 
 CREATE TABLE IF NOT EXISTS likes (
@@ -307,7 +311,11 @@ CREATE TABLE IF NOT EXISTS likes (
     target_type VARCHAR(50),
     target_id UUID,
     user_ip VARCHAR(50),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    content_type VARCHAR(50) DEFAULT 'news',
+    content_id UUID,
+    user_id UUID,
+    session_id VARCHAR(255)
 );
 
 CREATE TABLE IF NOT EXISTS news (
