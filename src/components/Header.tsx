@@ -89,11 +89,15 @@ const Header = () => {
         </div>
       </div>
 
-      {/* Нижняя строка с навигацией */}
-      <div className="container px-4 flex h-14 items-center justify-between">
-        <div className="flex items-center gap-2 cursor-pointer md:hidden logo-container" onClick={() => navigate("/")}>
-          <ShieldCheck className="h-7 w-7 text-blue-600 dark:text-blue-400 logo-icon-glow" />
-          <span className="text-2xl font-extrabold tracking-tight text-shimmer font-logo select-none">
+      {/* Нижняя строка с навигацией и мобильной шапкой */}
+      <div className="container px-3 sm:px-4 flex h-14 items-center justify-between gap-2 overflow-x-hidden">
+        {/* Мобильный логотип: shrink-0 и whitespace-nowrap предотвращают разрыв слова «Домофондар» */}
+        <div 
+          className="flex items-center gap-1.5 sm:gap-2 cursor-pointer md:hidden logo-container shrink-0" 
+          onClick={() => navigate("/")}
+        >
+          <ShieldCheck className="h-6 w-6 sm:h-7 sm:w-7 text-blue-600 dark:text-blue-400 logo-icon-glow shrink-0" />
+          <span className="text-lg sm:text-xl font-extrabold tracking-tight text-shimmer font-logo select-none whitespace-nowrap">
             Домофондар
           </span>
         </div>
@@ -150,49 +154,56 @@ const Header = () => {
           </button>
         </nav>
 
-        <div className="flex items-center gap-2 sm:gap-3 lg:gap-4">
-          <a href="tel:+79034118393" className="flex md:hidden items-center gap-2 text-sm font-semibold text-primary whitespace-nowrap">
-            <Phone className="h-4 w-4" />
-            +7 (903) 411-83-93
+        {/* Правый блок: телефон, переключатель темы и кнопки кабинета */}
+        <div className="flex items-center gap-1 sm:gap-2 lg:gap-4 shrink-0">
+          {/* Телефон для мобильных устройств: кликабельная компактная плашка с четким номером без искажений */}
+          <a 
+            href="tel:+79034118393" 
+            aria-label="Позвонить: +7 (903) 411-83-93" 
+            className="flex md:hidden items-center gap-1 sm:gap-1.5 px-2 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800/40 text-xs sm:text-sm font-semibold whitespace-nowrap shrink-0 hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-colors"
+          >
+            <Phone className="h-3.5 w-3.5 shrink-0 fill-current" />
+            <span className="tabular-nums tracking-tight font-bold">+7 (903) 411-83-93</span>
           </a>
+
           <ThemeToggle />
+
           {user ? (
-            <div className="flex items-center gap-1.5 sm:gap-2">
+            <div className="flex items-center gap-1 sm:gap-1.5">
               {isAdmin && (
                 <ShinyButton
                   onClick={() => navigate("/admin")}
-                  className="py-1.5 px-2.5 sm:px-3 text-xs rounded-xl bg-purple-600 hover:bg-purple-700 text-white shadow-sm"
+                  className="py-1 px-2 text-xs rounded-xl bg-purple-600 hover:bg-purple-700 text-white shadow-sm shrink-0"
                 >
-                  <ShieldCheck className="h-3.5 w-3.5 sm:mr-1.5" />
-                  <span className="hidden sm:inline">Админ панель</span>
+                  <ShieldCheck className="h-3.5 w-3.5 sm:mr-1" />
+                  <span className="hidden sm:inline">Админ</span>
                 </ShinyButton>
               )}
               {isFSMUser && (
                 <ShinyButton
                   onClick={() => navigate("/fsm")}
-                  className="py-1.5 px-2.5 sm:px-3 text-xs rounded-xl"
+                  className="py-1 px-2 text-xs rounded-xl shrink-0"
                 >
-                  <LayoutDashboard className="h-3.5 w-3.5 sm:mr-1.5" />
+                  <LayoutDashboard className="h-3.5 w-3.5 sm:mr-1" />
                   <span className="hidden sm:inline">CRM</span>
                 </ShinyButton>
               )}
               <ShinyButton
                 onClick={() => navigate("/cabinet")}
-                className="py-1.5 px-2.5 sm:px-3 text-xs rounded-xl"
+                className="py-1 px-2 text-xs rounded-xl shrink-0"
               >
-                <User className="h-3.5 w-3.5 sm:mr-1.5" />
+                <User className="h-3.5 w-3.5 sm:mr-1" />
                 <span className="hidden sm:inline">Кабинет</span>
               </ShinyButton>
             </div>
           ) : (
             <ShinyButton
               onClick={() => navigate("/auth")}
-              className="py-1.5 px-4 text-xs rounded-xl"
+              className="py-1 px-2.5 sm:px-4 text-xs rounded-xl shrink-0"
             >
               Войти
             </ShinyButton>
           )}
-
         </div>
       </div>
     </header>

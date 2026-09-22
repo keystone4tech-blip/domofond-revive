@@ -245,7 +245,7 @@ const Contact = ({ isTabPage = false }: ContactProps) => {
               <div>
                 <Input
                   name="phone"
-                  placeholder="Телефон *"
+                  placeholder="Ваш номер телефона"
                   type="tel"
                   value={formData.phone}
                   onChange={handleChange}
@@ -259,7 +259,7 @@ const Contact = ({ isTabPage = false }: ContactProps) => {
               <div>
                 <Input
                   name="address"
-                  placeholder="Адрес *"
+                  placeholder="Адрес дома (улица, номер дома, подъезд)"
                   value={formData.address}
                   onChange={handleChange}
                   className={errors.address ? "border-destructive" : ""}

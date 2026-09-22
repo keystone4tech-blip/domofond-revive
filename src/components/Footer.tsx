@@ -16,9 +16,9 @@ const Footer = () => {
       <div className="container py-8">
         <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
           <div>
-            <div className="flex items-center gap-2 mb-4 cursor-pointer logo-container" onClick={() => navigate("/")}>
-              <ShieldCheck className="h-7 w-7 text-blue-600 dark:text-blue-400 logo-icon-glow" />
-              <span className="text-2xl font-extrabold tracking-tight text-shimmer font-logo select-none">
+            <div className="flex items-center gap-2 mb-4 cursor-pointer logo-container shrink-0" onClick={() => navigate("/")}>
+              <ShieldCheck className="h-7 w-7 text-blue-600 dark:text-blue-400 logo-icon-glow shrink-0" />
+              <span className="text-2xl font-extrabold tracking-tight text-shimmer font-logo select-none whitespace-nowrap">
                 Домофондар
               </span>
             </div>
