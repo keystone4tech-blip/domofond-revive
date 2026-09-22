@@ -68,6 +68,8 @@ const Admin = () => {
         return;
       }
 
+      console.log("[Admin] Проверка прав доступа для пользователя:", user.id);
+      // 1. Проверяем роль в таблице базы данных
       const { data: role, error } = await supabase
         .from("user_roles")
         .select("role")
@@ -76,7 +78,12 @@ const Admin = () => {
         .limit(1)
         .maybeSingle();
 
-      if (error || !role) {
+      // 2. Резервная проверка роли из данных текущей сессии
+      const localRole = (user as any)?.role || (user as any)?.userRole;
+      const hasLocalAdminRole = ["admin", "director", "superadmin"].includes(localRole);
+
+      if ((error || !role) && !hasLocalAdminRole) {
+        console.warn("[Admin] Доступ отклонен. DB role:", role, "ошибка:", error, "localRole:", localRole);
         toast({
           title: "Доступ запрещен",
           description: "У вас нет прав для доступа к панели управления",
@@ -86,9 +93,10 @@ const Admin = () => {
         return;
       }
 
+      console.log("[Admin] Доступ к панели администратора разрешен:", role?.role || localRole);
       setHasConsoleAccess(true);
     } catch (error) {
-      console.error("Error checking admin access:", error);
+      console.error("[Admin] Ошибка при проверке доступа администратора:", error);
       navigate("/");
     } finally {
       setLoading(false);

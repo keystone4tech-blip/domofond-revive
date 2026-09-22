@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, LogOut, CheckCircle, AlertCircle, AlertTriangle, ClipboardList, Calendar, Shield, CreditCard, Wallet, Pencil, Trash2, UserCheck, Plus, Minus, Clock, Wrench, CheckCircle2, XCircle, Send, Smartphone, KeyRound, PhoneCall, DoorOpen, DoorClosed, Info, User, Phone, Mail, Lock, Lightbulb, Hash, MapPin, Building, Home, Building2, History, FileSpreadsheet, Copy, Eye, EyeOff, ShieldCheck, Sparkles } from "lucide-react";
+import { useUserRole } from "@/hooks/useUserRole";
+import { Loader2, LogOut, CheckCircle, AlertCircle, AlertTriangle, ClipboardList, Calendar, Shield, CreditCard, Wallet, Pencil, Trash2, UserCheck, Plus, Minus, Clock, Wrench, CheckCircle2, XCircle, Send, Smartphone, KeyRound, PhoneCall, DoorOpen, DoorClosed, Info, User, Phone, Mail, Lock, Lightbulb, Hash, MapPin, Building, Home, Building2, History, FileSpreadsheet, Copy, Eye, EyeOff, ShieldCheck, Sparkles, LayoutDashboard } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -1174,6 +1175,8 @@ const Cabinet = () => {
   const [profile, setProfile] = useState<any>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [userRoles, setUserRoles] = useState<string[]>([]);
+  // Проверяем права пользователя: администратор, директор, сотрудник FSM
+  const { isFSMUser, isAdmin } = useUserRole();
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
@@ -3124,17 +3127,31 @@ const Cabinet = () => {
               Личный кабинет
             </h1>
             <div
-              className={`flex flex-wrap gap-2 ${
+              className={`flex flex-wrap items-center gap-2 ${
                 isVisible.header ? 'opacity-100' : 'opacity-0'
               } transition-opacity duration-700 delay-300`}
             >
-              <div className="text-xs text-red-500 absolute -top-4 right-0">{JSON.stringify(userRoles)}</div>
-              {true && (
-                <ShinyButton onClick={() => navigate("/admin")} className="py-1 px-3 text-xs rounded-xl h-9">
-                  <Shield className="h-3.5 w-3.5 mr-1" />
-                  Админка
+              {/* Кнопка быстрого перехода в CRM Панель управления (FSM) */}
+              {isFSMUser && (
+                <ShinyButton 
+                  onClick={() => navigate("/fsm")} 
+                  className="py-1 px-3 text-xs rounded-xl h-9 bg-blue-600/10 text-blue-600 hover:bg-blue-600/20 dark:bg-blue-500/10 dark:text-blue-400 border border-blue-500/20"
+                >
+                  <LayoutDashboard className="h-3.5 w-3.5 mr-1" />
+                  CRM Панель
                 </ShinyButton>
               )}
+              {/* Кнопка быстрого перехода в Админ панель */}
+              {isAdmin && (
+                <ShinyButton 
+                  onClick={() => navigate("/admin")} 
+                  className="py-1 px-3 text-xs rounded-xl h-9 bg-purple-600/10 text-purple-600 hover:bg-purple-600/20 dark:bg-purple-500/10 dark:text-purple-400 border border-purple-500/20"
+                >
+                  <Shield className="h-3.5 w-3.5 mr-1" />
+                  Админ панель
+                </ShinyButton>
+              )}
+              {/* Кнопка выхода из системы */}
               <ShinyButton onClick={handleLogout} className="py-1 px-3 text-xs rounded-xl h-9">
                 <LogOut className="h-3.5 w-3.5 mr-1" />
                 Выйти

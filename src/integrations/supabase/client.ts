@@ -49,7 +49,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
       const token = getAuthToken();
       options = options || {};
 
-      // Нормализуем объект заголовков: options.headers может быть экземпляром Headers или простым объектом
+      // Нормализуем объект заголовков: проверяем options.headers, а также input.headers (если передан Request)
       const headersObj: Record<string, string> = {};
       if (options.headers instanceof Headers) {
         options.headers.forEach((value, key) => {
@@ -57,6 +57,15 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
         });
       } else if (options.headers && typeof options.headers === 'object') {
         Object.assign(headersObj, options.headers);
+      } else if (input && typeof input === 'object' && 'headers' in input && (input as any).headers) {
+        const reqHeaders = (input as any).headers;
+        if (reqHeaders instanceof Headers) {
+          reqHeaders.forEach((value, key) => {
+            headersObj[key] = value;
+          });
+        } else if (typeof reqHeaders === 'object') {
+          Object.assign(headersObj, reqHeaders);
+        }
       }
 
       // Проверяем наличие валидного токена пользователя
@@ -73,8 +82,15 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
         console.log(`[Supabase Client] Анонимный запрос к API без заголовка Authorization (роль anon)`); // Логирование анонимного доступа
       }
 
-      // Применяем очищенные заголовки
-      options.headers = headersObj;
+      // Извлекаем метод запроса (по умолчанию GET)
+      const method = options.method || (input && typeof input === 'object' && 'method' in input ? (input as any).method : 'GET');
+
+      // Применяем очищенные заголовки и метод
+      options = {
+        ...options,
+        method,
+        headers: headersObj,
+      };
 
       return fetch(url, options);
     }

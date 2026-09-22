@@ -21,26 +21,41 @@ export const useUserRole = (): UseUserRoleResult => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchUserRoles = async (userId: string) => {
+    const fetchUserRoles = async (currentUser: User) => {
       try {
-        console.log("[useUserRole] Запрос ролей для пользователя:", userId);
+        console.log("[useUserRole] Запрос ролей для пользователя:", currentUser.id);
         const { data, error } = await supabase
           .from("user_roles")
           .select("role")
-          .eq("user_id", userId);
+          .eq("user_id", currentUser.id);
 
         if (error) {
-          console.error("[useUserRole] Ошибка при запросе ролей:", error);
+          console.error("[useUserRole] Ошибка при запросе ролей из БД:", error);
+          // Фоллбек на локальную роль пользователя из профиля сессии
+          const localRole = (currentUser as any)?.role as AppRole;
+          if (localRole) {
+            console.log("[useUserRole] Использована резервная роль из сессии:", localRole);
+            setRoles([localRole]);
+          }
           return;
         }
 
-        const rolesList = (data || []).map((r) => r.role as AppRole);
-        console.log("[useUserRole] Роли установлены:", rolesList);
+        let rolesList = (data || []).map((r) => r.role as AppRole);
+        // Если из таблицы user_roles ничего не вернулось, но у пользователя задана роль в сессии
+        const fallbackRole = (currentUser as any)?.role as AppRole;
+        if (rolesList.length === 0 && fallbackRole) {
+          rolesList = [fallbackRole];
+        }
+        console.log("[useUserRole] Итоговые роли пользователя установлены:", rolesList);
         setRoles(rolesList);
       } catch (err) {
-        console.error("[useUserRole] Критическая ошибка:", err);
+        console.error("[useUserRole] Критическая ошибка при определении ролей:", err);
+        const localRole = (currentUser as any)?.role as AppRole;
+        if (localRole) {
+          setRoles([localRole]);
+        }
       } finally {
-        setIsLoading(false); // Завершаем загрузку ТОЛЬКО после получения ролей
+        setIsLoading(false); // Завершаем загрузку ролей
       }
     };
 
@@ -53,7 +68,7 @@ export const useUserRole = (): UseUserRoleResult => {
         
         if (currentUser) {
           setIsLoading(true);
-          fetchUserRoles(currentUser.id);
+          fetchUserRoles(currentUser);
         } else {
           setRoles([]);
           setIsLoading(false);
@@ -67,7 +82,7 @@ export const useUserRole = (): UseUserRoleResult => {
       setUser(currentUser);
       
       if (currentUser) {
-        fetchUserRoles(currentUser.id);
+        fetchUserRoles(currentUser);
       } else {
         setIsLoading(false);
       }
