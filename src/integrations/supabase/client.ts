@@ -49,40 +49,60 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
       const token = getAuthToken();
       options = options || {};
 
-      // Нормализуем объект заголовков: проверяем options.headers, а также input.headers (если передан Request)
+      // Нормализуем объект заголовков: собираем служебные заголовки (Prefer, Range, Accept, etc.)
       const headersObj: Record<string, string> = {};
+
+      const appendHeader = (k: string, v: string) => {
+        const lowerKey = k.toLowerCase();
+        // Полностью исключаем дубликаты заголовков авторизации и apikey от старого SDK
+        if (lowerKey === 'authorization' || lowerKey === 'apikey') {
+          return;
+        }
+        headersObj[k] = v;
+      };
+
+      // Извлекаем заголовки из options.headers
       if (options.headers instanceof Headers) {
-        options.headers.forEach((value, key) => {
-          headersObj[key] = value;
-        });
+        options.headers.forEach((value, key) => appendHeader(key, value));
       } else if (options.headers && typeof options.headers === 'object') {
-        Object.assign(headersObj, options.headers);
-      } else if (input && typeof input === 'object' && 'headers' in input && (input as any).headers) {
-        const reqHeaders = (input as any).headers;
-        if (reqHeaders instanceof Headers) {
-          reqHeaders.forEach((value, key) => {
-            headersObj[key] = value;
-          });
-        } else if (typeof reqHeaders === 'object') {
-          Object.assign(headersObj, reqHeaders);
+        for (const [k, v] of Object.entries(options.headers)) {
+          if (typeof v === 'string') appendHeader(k, v);
         }
       }
 
-      // Проверяем наличие валидного токена пользователя
-      if (token && token !== 'dummy' && token !== 'undefined' && token !== 'null') {
-        // Устанавливаем заголовок авторизации с токеном JWT
-        headersObj['Authorization'] = `Bearer ${token}`;
-        console.log(`[Supabase Client] Запрос к API авторизован токеном JWT`); // Логирование авторизации
+      // Извлекаем заголовки из input.headers (если input это Request)
+      if (input && typeof input === 'object' && 'headers' in input && (input as any).headers) {
+        const reqHeaders = (input as any).headers;
+        if (reqHeaders instanceof Headers) {
+          reqHeaders.forEach((value, key) => appendHeader(key, value));
+        } else if (typeof reqHeaders === 'object') {
+          for (const [k, v] of Object.entries(reqHeaders)) {
+            if (typeof v === 'string') appendHeader(k, v);
+          }
+        }
+      }
+
+      // Очищаем токен авторизации от возможного префикса 'Bearer '
+      let cleanToken = (token || '').trim();
+      if (cleanToken.toLowerCase().startsWith('bearer ')) {
+        cleanToken = cleanToken.slice(7).trim();
+      }
+
+      // Проверяем: JWT токен валиден, если он состоит ровно из 3-х частей, разделенных точками (header.payload.signature)
+      const tokenParts = cleanToken.split('.');
+      if (cleanToken && cleanToken !== 'dummy' && cleanToken !== 'undefined' && cleanToken !== 'null' && tokenParts.length === 3) {
+        // Устанавливаем ЕДИНСТВЕННЫЙ заголовок Authorization
+        headersObj['Authorization'] = `Bearer ${cleanToken}`;
+        console.log(`[Supabase Client] Запрос к API авторизован токеном JWT (3 части)`); // Логирование авторизации
       } else {
-        // При отсутствии токена полностью удаляем заголовок Authorization (в любом регистре),
-        // чтобы PostgREST не отклонял запрос из-за псевдо-токена 'dummy' (ошибка PGRST301),
-        // а автоматически выполнял запрос от встроенной роли анонима anon (PGRST_DB_ANON_ROLE)
+        // Если пользователь не авторизован или токен невалиден — запрос отправляется БЕЗ заголовка Authorization
+        // PostgREST гарантированно обрабатывает его от встроенной роли анонима anon (PGRST_DB_ANON_ROLE)
         delete headersObj['Authorization'];
         delete headersObj['authorization'];
         console.log(`[Supabase Client] Анонимный запрос к API без заголовка Authorization (роль anon)`); // Логирование анонимного доступа
       }
 
-      // Извлекаем метод запроса (по умолчанию GET)
+      // Извлекаем HTTP-метод запроса (по умолчанию GET)
       const method = options.method || (input && typeof input === 'object' && 'method' in input ? (input as any).method : 'GET');
 
       // Применяем очищенные заголовки и метод
