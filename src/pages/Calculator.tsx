@@ -273,6 +273,7 @@ export default function Calculator() {
       }
 
       if (insertedData?.id) {
+        console.log("[Calculator] Расчет успешно сохранен с ID:", insertedData.id); // Логирование успешного ID
         setLastCalculationId(insertedData.id);
       }
 
@@ -280,7 +281,15 @@ export default function Calculator() {
       setIsDialogOpen(false);
       toast({ title: "Успех", description: "Расчёт сохранён и отправлен в админ-панель." });
     } catch (e: unknown) {
-      const errorMessage = e instanceof Error ? e.message : "Не удалось сохранить данные";
+      // Извлекаем понятный текст ошибки от Supabase / PostgREST
+      let errorMessage = "Не удалось сохранить данные";
+      if (e && typeof e === "object") {
+        const anyErr = e as any;
+        errorMessage = anyErr.message || anyErr.error_description || anyErr.details || errorMessage;
+      } else if (typeof e === "string") {
+        errorMessage = e;
+      }
+      console.error("[Calculator] Ошибка при сохранении расчета в базу данных:", e); // Логирование ошибки
       toast({ title: "Ошибка", description: errorMessage, variant: "destructive" });
     } finally {
       setIsSubmitting(false);
@@ -301,6 +310,7 @@ export default function Calculator() {
     }
 
     setIsGeneratingCP(true);
+    console.log("[Calculator] Начало генерации коммерческого предложения DOCX для адреса:", address); // Логирование старта
     try {
       const proposalData = {
         address,
@@ -321,26 +331,34 @@ export default function Calculator() {
         }
       };
 
-      // 1. Генерируем файл
+      // 1. Генерируем Word-файл (DOCX) на стороне браузера
+      console.log("[Calculator] Формирование структуры Word-документа..."); // Логирование генерации
       const blob = await generateProposalDocx(proposalData);
       const fileName = `КП_Домофондар_${address.street.replace(/\s+/g, '_')}_${address.house}.docx`;
       const filePath = `${Date.now()}_${fileName}`;
+      console.log("[Calculator] DOCX документ успешно сгенерирован, размер:", blob.size, "байт"); // Логирование размера
 
-      // 2. Загружаем в Storage
-      const { error: uploadError, data: uploadData } = await supabase.storage
-         .from("proposals")
-         .upload(filePath, blob);
-
+      // 2. Загружаем в Storage (безопасно: если хранилище не настроено, не блокируем пользователя)
       let publicUrl = "";
-      if (!uploadError && uploadData) {
-        const { data: { publicUrl: url } } = supabase.storage
+      try {
+        const { error: uploadError, data: uploadData } = await supabase.storage
           .from("proposals")
-          .getPublicUrl(filePath);
-        publicUrl = url;
+          .upload(filePath, blob);
+
+        if (!uploadError && uploadData) {
+          const { data: { publicUrl: url } } = supabase.storage
+            .from("proposals")
+            .getPublicUrl(filePath);
+          publicUrl = url;
+          console.log("[Calculator] Документ сохранен в хранилище Supabase Storage:", publicUrl);
+        }
+      } catch (storageErr) {
+        console.warn("[Calculator] Supabase Storage не подключен, продолжаем локальную отдачу:", storageErr);
       }
 
-      // 3. Обновляем запись в БД
+      // 3. Обновляем запись в БД, привязывая адрес к сохраненному расчету
       if (lastCalculationId) {
+        console.log("[Calculator] Обновление записи расчета в базе данных с ID:", lastCalculationId);
         const { error: updateError } = await supabase
           .from("calculations")
           .update({
@@ -354,15 +372,21 @@ export default function Calculator() {
               gateTotalCost: gates * gateMaintenanceCost,
               individualGate: false,
               address_info: address,
+              cp_file_name: fileName,
               cp_url: publicUrl || null
             }
           })
           .eq("id", lastCalculationId);
           
-        if (updateError) console.error("Database update error:", updateError);
+        if (updateError) {
+          console.error("[Calculator] Ошибка обновления записи расчета в базе данных:", updateError);
+        } else {
+          console.log("[Calculator] Расчет успешно дополнен адресом коммерческого предложения");
+        }
       }
 
-      // 4. Скачиваем пользователю напрямую сгенерированный blob
+      // 4. Скачиваем сформированный blob напрямую пользователю
+      console.log("[Calculator] Отправка файла пользователю через saveAs:", fileName);
       saveAs(blob, fileName);
 
       setIsCPDialogOpen(false);
@@ -371,10 +395,14 @@ export default function Calculator() {
         description: "Коммерческое предложение сформировано и скачано.",
       });
     } catch (error) {
-      console.error("CP Generation error:", error);
+      console.error("[Calculator] Ошибка формирования коммерческого предложения:", error); // Логирование ошибки
+      let errMsg = "Не удалось создать документ. Попробуйте позже.";
+      if (error && typeof error === "object") {
+        errMsg = (error as any).message || errMsg;
+      }
       toast({
         title: "Ошибка",
-        description: "Не удалось создать документ. Попробуйте позже.",
+        description: errMsg,
         variant: "destructive",
       });
     } finally {

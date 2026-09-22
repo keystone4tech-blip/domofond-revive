@@ -43,18 +43,39 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
           : 'url' in input
             ? input.url
             : input.href;
+      // Подменяем путь Supabase REST на путь PostgREST
       const url = requestUrl.replace('/rest/v1/', '/');
+      // Вспомогательный токен авторизованного пользователя
       const token = getAuthToken();
       options = options || {};
-      options.headers = options.headers || {};
-      if (token) {
-        (options.headers as any).Authorization = `Bearer ${token}`;
+
+      // Нормализуем объект заголовков: options.headers может быть экземпляром Headers или простым объектом
+      const headersObj: Record<string, string> = {};
+      if (options.headers instanceof Headers) {
+        options.headers.forEach((value, key) => {
+          headersObj[key] = value;
+        });
+      } else if (options.headers && typeof options.headers === 'object') {
+        Object.assign(headersObj, options.headers);
+      }
+
+      // Проверяем наличие валидного токена пользователя
+      if (token && token !== 'dummy' && token !== 'undefined' && token !== 'null') {
+        // Устанавливаем заголовок авторизации с токеном JWT
+        headersObj['Authorization'] = `Bearer ${token}`;
         console.log(`[Supabase Client] Запрос к API авторизован токеном JWT`); // Логирование авторизации
       } else {
-        // При отсутствии токена НЕ передаем заголовок Authorization,
-        // чтобы PostgREST мог использовать встроенную анонимную роль anon (PGRST_DB_ANON_ROLE)
-        console.log(`[Supabase Client] Анонимный запрос к API без заголовка Authorization`); // Логирование анонимного доступа
+        // При отсутствии токена полностью удаляем заголовок Authorization (в любом регистре),
+        // чтобы PostgREST не отклонял запрос из-за псевдо-токена 'dummy' (ошибка PGRST301),
+        // а автоматически выполнял запрос от встроенной роли анонима anon (PGRST_DB_ANON_ROLE)
+        delete headersObj['Authorization'];
+        delete headersObj['authorization'];
+        console.log(`[Supabase Client] Анонимный запрос к API без заголовка Authorization (роль anon)`); // Логирование анонимного доступа
       }
+
+      // Применяем очищенные заголовки
+      options.headers = headersObj;
+
       return fetch(url, options);
     }
   }
