@@ -50,7 +50,8 @@ import {
   Banknote,
   Calendar,
   ClipboardCheck,
-  FileText
+  FileText,
+  Wrench
 } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -267,21 +268,67 @@ const RequestsManager = ({
     return { serviceSum, productSum, total: serviceSum + productSum, items };
   };
 
+  // Фильтр по типу обращения (Все, Ремонт, Заказы оборудования, Неоплаченные)
+  const [orderTypeFilter, setOrderTypeFilter] = useState<"all" | "repair" | "equipment" | "unpaid">("all");
+
+  // Определение: является ли обращение заказом оборудования
+  const isEquipmentOrder = (req: Request) => {
+    return (
+      req.order_type === "equipment_order" ||
+      (req.payment_amount && Number(req.payment_amount) > 0) ||
+      allRequestItems?.some(item => item.request_id === req.id)
+    );
+  };
+
+  // Фильтрация заявок: заказы оборудования попадают мастерам ТОЛЬКО после подтверждения оплаты ('paid')!
+  const filterByActiveAndType = (list: Request[] | null | undefined) => {
+    if (!list) return [];
+    return list.filter(r => {
+      const isEquip = isEquipmentOrder(r);
+      const isPaid = r.payment_status === "paid";
+
+      // 1. Если выбран режим просмотра неоплаченных заказов (для менеджеров)
+      if (orderTypeFilter === "unpaid") {
+        return isEquip && !isPaid;
+      }
+
+      // 2. Требование: заказы оборудования попадают мастерам ТОЛЬКО когда они оплачены!
+      // Неоплаченные заказы скрываются из рабочей очереди
+      if (isEquip && !isPaid) {
+        return false;
+      }
+
+      // 3. Фильтр по категории
+      if (orderTypeFilter === "repair") {
+        return !isEquip;
+      }
+      if (orderTypeFilter === "equipment") {
+        return isEquip && isPaid;
+      }
+
+      return true;
+    });
+  };
+
+  // Получаем отфильтрованный список по выбранному типу и оплате
+  const filteredAllRequests = useMemo(() => 
+    filterByActiveAndType(requests), [requests, orderTypeFilter, allRequestItems]);
+
   // Get filtered requests by status
   const pendingRequests = useMemo(() => 
-    requests?.filter(r => r.status === "pending") || [], [requests]);
+    filteredAllRequests.filter(r => r.status === "pending"), [filteredAllRequests]);
   const inProgressRequests = useMemo(() => 
-    requests?.filter(r => r.status === "in_progress") || [], [requests]);
+    filteredAllRequests.filter(r => r.status === "in_progress"), [filteredAllRequests]);
   const completedRequests = useMemo(() => 
-    requests?.filter(r => r.status === "completed") || [], [requests]);
+    filteredAllRequests.filter(r => r.status === "completed"), [filteredAllRequests]);
   const cancelledRequests = useMemo(() => 
-    requests?.filter(r => r.status === "cancelled") || [], [requests]);
+    filteredAllRequests.filter(r => r.status === "cancelled"), [filteredAllRequests]);
 
   // Get masters with active requests
   const mastersWithRequests = useMemo(() => {
     const masterMap = new Map<string, { employee: Employee; requests: Request[] }>();
     
-    requests?.forEach(req => {
+    filteredAllRequests.forEach(req => {
       const empId = req.accepted_by;
       const emp = req.accepted_employee;
       if (empId && emp) {
@@ -293,16 +340,16 @@ const RequestsManager = ({
     });
     
     return Array.from(masterMap.values());
-  }, [requests]);
+  }, [filteredAllRequests]);
 
   // Statistics
   const stats = {
-    total: requests?.length || 0,
+    total: filteredAllRequests.length,
     pending: pendingRequests.length,
     inProgress: inProgressRequests.length,
     completed: completedRequests.length,
     cancelled: cancelledRequests.length,
-    urgent: requests?.filter(r => r.priority === "urgent").length || 0,
+    urgent: filteredAllRequests.filter(r => r.priority === "urgent").length,
   };
 
   // Create request mutation
@@ -844,10 +891,21 @@ const RequestsManager = ({
                     </p>
                   </td>
                   
-                  {/* Состояние (приоритет + статус выполнения + статус оплаты) */}
+                  {/* Состояние (приоритет + тип заявки + статус выполнения + статус оплаты) */}
                   <td className="px-4 py-3">
                     <div className="flex flex-col items-center gap-1">
                       <div className="flex gap-1 flex-wrap justify-center">
+                        {isEquipmentOrder(request) ? (
+                          <Badge variant="outline" className="bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-200 text-[10px] h-4 py-0 px-1.5 font-bold flex items-center gap-1">
+                            <Package className="h-2.5 w-2.5" />
+                            <span>Заказ оборудования</span>
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-200 text-[10px] h-4 py-0 px-1.5 font-semibold flex items-center gap-1">
+                            <Wrench className="h-2.5 w-2.5" />
+                            <span>Ремонт</span>
+                          </Badge>
+                        )}
                         {getPriorityBadge(request.priority)}
                         {getStatusBadge(request.status)}
                       </div>
@@ -1124,6 +1182,54 @@ const RequestsManager = ({
               </form>
             </DialogContent>
           </Dialog>
+      </div>
+
+      {/* Панель фильтрации по типу обращения (Все, Ремонт, Оплаченные заказы оборудования) */}
+      <div className="flex flex-wrap items-center justify-between gap-2 p-2 bg-slate-100/70 dark:bg-slate-800/40 rounded-xl border border-slate-200/50 dark:border-slate-800/50">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <Button
+            variant={orderTypeFilter === "all" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setOrderTypeFilter("all")}
+            className="h-8 text-xs font-semibold rounded-lg"
+          >
+            Все заявки ({filteredAllRequests.length})
+          </Button>
+          <Button
+            variant={orderTypeFilter === "repair" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setOrderTypeFilter("repair")}
+            className="h-8 text-xs font-semibold rounded-lg gap-1.5"
+          >
+            <Wrench className="h-3.5 w-3.5" />
+            <span>Ремонт и сервис</span>
+          </Button>
+          <Button
+            variant={orderTypeFilter === "equipment" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setOrderTypeFilter("equipment")}
+            className="h-8 text-xs font-semibold rounded-lg gap-1.5"
+          >
+            <Package className="h-3.5 w-3.5" />
+            <span>Заказы оборудования (Оплачено)</span>
+          </Button>
+          {isManager && (
+            <Button
+              variant={orderTypeFilter === "unpaid" ? "destructive" : "ghost"}
+              size="sm"
+              onClick={() => setOrderTypeFilter("unpaid")}
+              className="h-8 text-xs font-semibold rounded-lg gap-1.5"
+            >
+              <Clock className="h-3.5 w-3.5" />
+              <span>Ожидают оплаты</span>
+            </Button>
+          )}
+        </div>
+        <span className="text-[11px] text-muted-foreground font-medium hidden md:inline px-2">
+          {orderTypeFilter === "unpaid" 
+            ? "Неоплаченные корзины скрыты от мастеров"
+            : "Мастерам доступны только оплаченные заказы"}
+        </span>
       </div>
 
       {/* Content based on active tab */}

@@ -1,62 +1,92 @@
 version: '3.8'
 
 services:
+  # ------------------------------------------------------------------------------
+  # 1. База данных PostgreSQL 15
+  # ------------------------------------------------------------------------------
   db:
     image: postgres:15-alpine
-    container_name: domofond_postgres
+    container_name: domofondar_postgres
     restart: always
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-domofond}
-      POSTGRES_HOST_AUTH_METHOD: trust
+      POSTGRES_DB: ${POSTGRES_DB:-domofondar}
+      POSTGRES_USER: ${POSTGRES_USER:-domofondar}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-domofondar_secure_pass_2026}
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./init-scripts:/docker-entrypoint-initdb.d
+      - ./backups:/backups
+    # Порт 5432 закрыт от внешнего интернета, доступен только внутри Docker-сети
+    expose:
+      - "5432"
 
+  # ------------------------------------------------------------------------------
+  # 2. Бэкенд API (Node.js Express + pg_dump)
+  # ------------------------------------------------------------------------------
   backend:
     build:
       context: ./server
       dockerfile: Dockerfile
-    container_name: domofond_backend
+    container_name: domofondar_backend
     restart: always
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-domofond}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-domofondar}:${POSTGRES_PASSWORD:-domofondar_secure_pass_2026}@db:5432/${POSTGRES_DB:-domofondar}
+      - POSTGRES_DB=${POSTGRES_DB:-domofondar}
+      - POSTGRES_USER=${POSTGRES_USER:-domofondar}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-domofondar_secure_pass_2026}
+      - DB_HOST=db
+      - DB_PORT=5432
+      - JWT_SECRET=${JWT_SECRET:-super-secret-jwt-token-with-at-least-32-characters-long}
+      - BACKUP_DIR=/backups
       - PORT=5000
-    ports:
-      - "5000:5000"
+    volumes:
+      - ./backups:/backups
     depends_on:
       - db
-    # Убраны volumes с исходным кодом, в продакшене код запекается в образ
+    expose:
+      - "5000"
 
+  # ------------------------------------------------------------------------------
+  # 3. PostgREST API
+  # ------------------------------------------------------------------------------
+  postgrest:
+    image: postgrest/postgrest:latest
+    container_name: domofondar_postgrest
+    restart: always
+    environment:
+      PGRST_DB_URI: postgres://${POSTGRES_USER:-domofondar}:${POSTGRES_PASSWORD:-domofondar_secure_pass_2026}@db:5432/${POSTGRES_DB:-domofondar}
+      PGRST_DB_SCHEMA: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-token-with-at-least-32-characters-long}
+    depends_on:
+      - db
+    expose:
+      - "3000"
+
+  # ------------------------------------------------------------------------------
+  # 4. Фронтенд и Nginx веб-сервер (домофондар.рф)
+  # ------------------------------------------------------------------------------
   frontend:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: domofond_frontend
+    container_name: domofondar_frontend
     restart: always
     ports:
+      # Основные порты веб-сервера
+      - "80:80"
+      - "443:443"
       - "8080:8080"
     environment:
-      - VITE_API_URL=http://localhost:5000
+      - VITE_API_URL=/backend-api
+    volumes:
+      # Сертификаты Let's Encrypt и ACME challenge
+      - ./certbot/conf:/etc/letsencrypt:ro
+      - ./certbot/www:/var/www/certbot:ro
     depends_on:
       - backend
       - postgrest
-    # Убраны volumes, Nginx раздает собранную статику
-
-  postgrest:
-    image: postgrest/postgrest:latest
-    container_name: domofond_postgrest
-    restart: always
-    ports:
-      - "3000:3000"
-    environment:
-      PGRST_DB_URI: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-domofond}
-      PGRST_DB_SCHEMA: public
-      PGRST_DB_ANON_ROLE: anon
-      PGRST_JWT_SECRET: super-secret-jwt-token-with-at-least-32-characters-long
-    depends_on:
-      - db
 
 volumes:
   pgdata:
+    name: domofondar_pgdata

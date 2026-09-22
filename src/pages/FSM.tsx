@@ -27,6 +27,10 @@ import LocationMap from "@/components/fsm/LocationMap";
 import FSMReports from "@/components/fsm/FSMReports";
 import RequestsManager from "@/components/fsm/RequestsManager";
 import ProductsManager from "@/components/fsm/ProductsManager";
+import AddressesManager from "@/components/fsm/AddressesManager";
+import { AccountsManager } from "@/components/admin/AccountsManager";
+import IntercomLoginsManager from "@/components/fsm/IntercomLoginsManager";
+import InstallerSheetManager from "@/components/fsm/InstallerSheetManager";
 import VerificationManager from "@/components/fsm/VerificationManager";
 import FSMBottomNav from "@/components/fsm/FSMBottomNav";
 import { FSMSidebar } from "@/components/fsm/FSMSidebar";
@@ -141,6 +145,7 @@ const FSM = () => {
       case "dashboard": return "Панель управления";
       case "tasks": return "Задачи";
       case "requests": return "Заявки клиентов";
+      case "installer-sheet": return "Лист монтажника (Акты выдачи)";
       case "products": return "Товары и услуги";
       case "employees": return "Кадровый состав";
       case "clients": return "Список клиентов";
@@ -237,8 +242,28 @@ const FSM = () => {
               />
             </TabsContent>
 
+            {/* Вкладка Лист монтажника (сводная выдача оборудования по домам) */}
+            <TabsContent value="installer-sheet" className="mt-0 outline-none">
+              <InstallerSheetManager />
+            </TabsContent>
+
             <TabsContent value="products" className="mt-0 outline-none">
               <ProductsManager />
+            </TabsContent>
+
+            {/* Вкладка управления лицевыми счетами и задолженностями */}
+            <TabsContent value="accounts" className="mt-0 outline-none">
+              <AccountsManager />
+            </TabsContent>
+
+            {/* Вкладка дерева адресов и привязки оборудования к подъездам */}
+            <TabsContent value="addresses" className="mt-0 outline-none">
+              <AddressesManager />
+            </TabsContent>
+
+            {/* Вкладка управления логопасами умного домофона (выгрузки логинов и паролей) */}
+            <TabsContent value="logins" className="mt-0 outline-none">
+              <IntercomLoginsManager />
             </TabsContent>
 
             {isManager && (

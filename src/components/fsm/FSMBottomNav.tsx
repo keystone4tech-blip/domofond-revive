@@ -1,12 +1,12 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Link, useNavigate } from "react-router-dom";
 import { 
   LayoutDashboard, ClipboardList, FileText, Package,
   Users, Building2, MapPin, BarChart3, ShieldCheck,
   X, Clock, AlertTriangle, CheckCircle2, CircleDashed,
-  HandMetal, Banknote, User, Menu, Home, LogOut
+  HandMetal, Banknote, User, Menu, Home, LogOut, FileSpreadsheet, DoorClosed, KeyRound, ClipboardCheck
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -18,31 +18,65 @@ interface FSMBottomNavProps {
 
 const FSMBottomNav = ({ activeTab, onTabChange, isManager }: FSMBottomNavProps) => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [showTasksSubmenu, setShowTasksSubmenu] = useState(false);
   const [showRequestsSubmenu, setShowRequestsSubmenu] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false); // Для дополнительных разделов менеджера
 
-  // Запрос счетчиков активных задач и заявок для бейджей
+  // Слушатель событий для онлайн-обновления счетчиков верификаций
+  useEffect(() => {
+    const handleVerificationUpdate = () => {
+      console.log("[FSMBottomNav] Получен сигнал о верификации, обновляем счетчики...");
+      queryClient.invalidateQueries({ queryKey: ["fsm-bottom-nav-counts"] });
+    };
+
+    window.addEventListener("verification_submitted", handleVerificationUpdate);
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === "verification_last_update") {
+        queryClient.invalidateQueries({ queryKey: ["fsm-bottom-nav-counts"] });
+      }
+    };
+    window.addEventListener("storage", handleStorage);
+
+    return () => {
+      window.removeEventListener("verification_submitted", handleVerificationUpdate);
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, [queryClient]);
+
+  // Запрос счетчиков активных задач, заявок и поступивших верификаций для бейджей в режиме онлайн
   const { data: counts } = useQuery({
     queryKey: ["fsm-bottom-nav-counts"],
     queryFn: async () => {
-      console.log("[FSMBottomNav] Обновление счетчиков задач и заявок...");
-      const [tasksRes, requestsRes] = await Promise.all([
+      console.log("[FSMBottomNav] Онлайн обновление счетчиков задач, заявок и верификаций...");
+      const [tasksRes, requestsRes, profilesRes] = await Promise.all([
         supabase.from("tasks").select("status"),
         supabase.from("requests").select("status"),
+        supabase.from("profiles").select("id, is_verified, verification_status, verification_document_url, full_name"),
       ]);
       
       const tasks = tasksRes.data || [];
       const requests = requestsRes.data || [];
+      const profiles = profilesRes.data || [];
+
+      // Количество пользователей, ожидающих проверки верификации
+      const pendingVerifications = profiles.filter((p: any) => {
+        if (p.is_verified) return false;
+        if (p.verification_status === "rejected") return false;
+        if (p.verification_status === "pending") return true;
+        if (p.verification_document_url) return true;
+        return false;
+      }).length;
       
       return {
         pendingTasks: tasks.filter((t) => t.status === "pending" || t.status === "assigned").length,
         inProgressTasks: tasks.filter((t) => t.status === "in_progress").length,
         pendingRequests: requests.filter((r) => r.status === "pending").length,
         inProgressRequests: requests.filter((r) => r.status === "in_progress").length,
+        pendingVerifications,
       };
     },
-    refetchInterval: 30000, // Обновление каждые 30 секунд
+    refetchInterval: 5000, // Обновление каждые 5 секунд для режима онлайн
   });
 
   // Основные 4 кнопки в нижнем меню
@@ -199,6 +233,42 @@ const FSMBottomNav = ({ activeTab, onTabChange, isManager }: FSMBottomNavProps) 
               <span className="text-xs font-semibold">Товары</span>
             </button>
 
+            {/* Раздел Лист монтажника */}
+            <button
+              onClick={() => { onTabChange("installer-sheet"); closeAllMenus(); }}
+              className={cn("flex items-center gap-3 p-3 rounded-xl text-left transition-all active:scale-95 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800", activeTab === "installer-sheet" && "bg-primary/10 text-primary")}
+            >
+              <ClipboardCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+              <span className="text-xs font-semibold">Лист монтажника</span>
+            </button>
+
+            {/* Раздел Лицевые счета для сотрудников */}
+            <button
+              onClick={() => { onTabChange("accounts"); closeAllMenus(); }}
+              className={cn("flex items-center gap-3 p-3 rounded-xl text-left transition-all active:scale-95 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800", activeTab === "accounts" && "bg-primary/10 text-primary")}
+            >
+              <FileSpreadsheet className="h-4 w-4 text-teal-600 dark:text-teal-400" />
+              <span className="text-xs font-semibold">Счета</span>
+            </button>
+
+            {/* Раздел Адреса и подъезды */}
+            <button
+              onClick={() => { onTabChange("addresses"); closeAllMenus(); }}
+              className={cn("flex items-center gap-3 p-3 rounded-xl text-left transition-all active:scale-95 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800", activeTab === "addresses" && "bg-primary/10 text-primary")}
+            >
+              <DoorClosed className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              <span className="text-xs font-semibold">Адреса</span>
+            </button>
+
+            {/* Раздел Логопасы умного домофона */}
+            <button
+              onClick={() => { onTabChange("logins"); closeAllMenus(); }}
+              className={cn("flex items-center gap-3 p-3 rounded-xl text-left transition-all active:scale-95 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800", activeTab === "logins" && "bg-primary/10 text-primary")}
+            >
+              <KeyRound className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+              <span className="text-xs font-semibold">Логопасы</span>
+            </button>
+
             {isManager && (
               <>
                 <button
@@ -231,10 +301,17 @@ const FSMBottomNav = ({ activeTab, onTabChange, isManager }: FSMBottomNavProps) 
                 </button>
                 <button
                   onClick={() => { onTabChange("verification"); closeAllMenus(); }}
-                  className={cn("flex items-center gap-3 p-3 rounded-xl text-left transition-all active:scale-95 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800", activeTab === "verification" && "bg-primary/10 text-primary")}
+                  className={cn("flex items-center justify-between p-3 rounded-xl text-left transition-all active:scale-95 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800", activeTab === "verification" && "bg-primary/10 text-primary")}
                 >
-                  <ShieldCheck className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
-                  <span className="text-xs font-semibold">Верификация</span>
+                  <div className="flex items-center gap-3">
+                    <ShieldCheck className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
+                    <span className="text-xs font-semibold">Верификация</span>
+                  </div>
+                  {(counts?.pendingVerifications || 0) > 0 && (
+                    <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-[10px] font-bold text-white bg-red-500 rounded-full shadow-sm animate-pulse">
+                      {counts.pendingVerifications}
+                    </span>
+                  )}
                 </button>
               </>
             )}
@@ -319,11 +396,18 @@ const FSMBottomNav = ({ activeTab, onTabChange, isManager }: FSMBottomNavProps) 
                 setShowRequestsSubmenu(false);
               }}
               className={cn(
-                "flex flex-col items-center justify-center min-w-[50px] py-1 px-2 rounded-xl transition-all active:scale-90",
+                "flex flex-col items-center justify-center min-w-[50px] py-1 px-2 rounded-xl transition-all active:scale-90 relative",
                 showMoreMenu ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground"
               )}
             >
-              <Menu className="h-5 w-5" />
+              <div className="relative">
+                <Menu className="h-5 w-5" />
+                {(counts?.pendingVerifications || 0) > 0 && (
+                  <span className="absolute -top-1.5 -right-2 min-w-[15px] h-[15px] bg-destructive text-destructive-foreground text-[8px] font-bold rounded-full flex items-center justify-center animate-pulse">
+                    {counts.pendingVerifications > 99 ? "99+" : counts.pendingVerifications}
+                  </span>
+                )}
+              </div>
               <span className="text-[10px] font-semibold mt-1 leading-none">Еще</span>
             </button>
           ) : (

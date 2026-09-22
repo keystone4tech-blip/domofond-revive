@@ -4,7 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { 
   Calculator, Sparkles, Newspaper, Vote, BarChart3, Tag, 
   FileText, Crown, MessageSquare, Hash, Grid, CreditCard, 
-  Bot, History, Home, LogOut, Shield, ChevronLeft, ChevronRight
+  Bot, History, Home, LogOut, Shield, ChevronLeft, ChevronRight, Database
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -19,6 +19,8 @@ interface AdminSidebarProps {
 // Элементы навигации админки
 const menuItems = [
   { id: "calculations", label: "Расчёты", icon: Calculator },
+  { id: "accounts", label: "Лиц. счета", icon: CreditCard },
+  { id: "backups", label: "💾 Бэкапы БД", icon: Database },
   { id: "seo", label: "🪄 SEO AI", icon: Sparkles },
   { id: "autonews", label: "📰 Авто-новости", icon: Newspaper },
   { id: "voting", label: "🗳️ Голосования", icon: Vote },
@@ -29,7 +31,6 @@ const menuItems = [
   { id: "comments", label: "Комментарии", icon: MessageSquare },
   { id: "statsblocks", label: "Счётчики", icon: Hash },
   { id: "blocks", label: "Блоки", icon: Grid },
-  { id: "accounts", label: "Лиц. счета", icon: CreditCard },
   { id: "chatwidget", label: "AI-чат", icon: Bot },
   { id: "chathistory", label: "История чатов", icon: History },
 ];

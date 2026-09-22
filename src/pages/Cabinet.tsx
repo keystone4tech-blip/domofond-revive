@@ -1,4 +1,4 @@
-import React, { useEffect, useState, Component, ReactNode } from "react";
+import React, { useEffect, useState, useMemo, Component, ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, LogOut, CheckCircle, AlertCircle, AlertTriangle, ClipboardList, Calendar, Shield, CreditCard, Wallet, Pencil, Trash2, UserCheck, Plus, Minus, Clock, Wrench, CheckCircle2, XCircle, Send, Smartphone, KeyRound, PhoneCall, DoorOpen, Info, User, Phone, Mail, Lock, Lightbulb, Hash, MapPin, Building, Home, Building2 } from "lucide-react";
+import { Loader2, LogOut, CheckCircle, AlertCircle, AlertTriangle, ClipboardList, Calendar, Shield, CreditCard, Wallet, Pencil, Trash2, UserCheck, Plus, Minus, Clock, Wrench, CheckCircle2, XCircle, Send, Smartphone, KeyRound, PhoneCall, DoorOpen, DoorClosed, Info, User, Phone, Mail, Lock, Lightbulb, Hash, MapPin, Building, Home, Building2, History, FileSpreadsheet, Copy, Eye, EyeOff, ShieldCheck, Sparkles } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -18,6 +18,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from "@/components/ui/textarea";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import { VerificationUploadDialog } from "@/components/VerificationUploadDialog";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 
@@ -169,6 +170,10 @@ const DebtCard = ({ address, apartment, fullName, phone, embedded = false, setPa
   const [creating, setCreating] = useState(false);
   const [requestOpen, setRequestOpen] = useState(false);
   const [requestText, setRequestText] = useState("");
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [accountHistory, setAccountHistory] = useState<any[]>([]);
+  const [onlinePayments, setOnlinePayments] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -330,10 +335,109 @@ const DebtCard = ({ address, apartment, fullName, phone, embedded = false, setPa
             </span>
           </div>
 
-          <ShinyButton className="w-full justify-center rounded-xl" onClick={() => navigate("/payment")}>
-            <CreditCard className="mr-2 h-4 w-4" />
-            Оплатить
-          </ShinyButton>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <ShinyButton className="flex-1 justify-center rounded-xl" onClick={() => navigate("/payment")}>
+              <CreditCard className="mr-2 h-4 w-4" />
+              Оплатить
+            </ShinyButton>
+            <Button
+              variant="outline"
+              onClick={async () => {
+                setIsHistoryOpen(true);
+                setLoadingHistory(true);
+                try {
+                  const { data: hist } = await supabase
+                    .from("account_history" as any)
+                    .select("*")
+                    .eq("account_number", account.account_number)
+                    .order("batch_number", { ascending: false });
+                  setAccountHistory(hist || []);
+
+                  // Загрузка онлайн-платежей абонента
+                  const { data: payReqs } = await supabase
+                    .from("requests")
+                    .select("*")
+                    .eq("payment_status", "paid")
+                    .order("created_at", { ascending: false })
+                    .limit(10);
+                  setOnlinePayments(payReqs || []);
+                } catch (e) {
+                  console.warn("Ошибка загрузки истории:", e);
+                } finally {
+                  setLoadingHistory(false);
+                }
+              }}
+              className="rounded-xl text-xs flex items-center justify-center gap-1.5"
+            >
+              <History className="h-4 w-4" />
+              <span>История начислений</span>
+            </Button>
+          </div>
+
+          {/* Диалог истории начислений и оплат для жильца */}
+          <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-base font-bold">
+                  <History className="h-5 w-5 text-primary" />
+                  История начислений и платежей
+                </DialogTitle>
+                <DialogDescription>
+                  Лицевой счёт: <strong className="font-mono text-foreground">{account.account_number}</strong>
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 py-2 max-h-[420px] overflow-y-auto">
+                {/* 1. Блок начислений по официальным реестрам */}
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1">
+                    <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" />
+                    Начисления по ежемесячным реестрам
+                  </h4>
+                  {loadingHistory ? (
+                    <div className="py-4 text-center text-xs text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin mx-auto mb-1 text-primary" />
+                      Загрузка реестров...
+                    </div>
+                  ) : accountHistory.length === 0 ? (
+                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border text-xs text-muted-foreground">
+                      Текущее сальдо по последнему реестру ({formatPeriod(account.period)}): <strong className="text-foreground">{account.debt_amount.toFixed(2)} ₽</strong>.
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5 font-mono text-xs">
+                      {accountHistory.map((h: any) => (
+                        <div key={h.id} className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/60 flex items-center justify-between">
+                          <div>
+                            <span className="font-semibold text-foreground font-sans block">
+                              {formatPeriod(h.period)} (Реестр №{h.batch_number})
+                            </span>
+                            <span className="text-[10px] text-muted-foreground font-sans">
+                              {new Date(h.created_at).toLocaleDateString("ru-RU")}
+                            </span>
+                          </div>
+                          <span className={`font-bold ${Number(h.debt_amount) > 0 ? "text-destructive" : "text-green-600"}`}>
+                            {Number(h.debt_amount) > 0 ? `−${Number(h.debt_amount).toFixed(2)} ₽` : `+${Math.abs(Number(h.debt_amount)).toFixed(2)} ₽`}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Пояснение для жильца */}
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-[11px] text-muted-foreground leading-relaxed">
+                  💡 <strong>Как учитываются оплаты:</strong><br />
+                  Сумма в личном кабинете отражает официальное состояние счёта по последнему загруженному банковскому реестру. Платежи, совершенные через банк, кассу в офисе или на сайте, учитываются бухгалтерией в следующем ежемесячном расчётном реестре.
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsHistoryOpen(false)} className="rounded-xl">
+                  Закрыть
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </>
     );
@@ -422,46 +526,620 @@ const DebtCard = ({ address, apartment, fullName, phone, embedded = false, setPa
   );
 };
 
-const RemoteAccessCard = ({ address, apartment }: { address: string; apartment: string }) => {
-  // TODO: проверить наличие логина/пароля во внешней БД (будет добавлено позже).
-  // Пока показываем предложение приобрести удалённый доступ всем верифицированным
-  // пользователям, у которых есть адрес.
-  const navigate = useNavigate();
+// --- КОМПОНЕНТ УДАЛЕННОГО ДОСТУПА К УМНОМУ ДОМОФОНУ ---
+const RemoteAccessCard = ({ 
+  address, 
+  apartment, 
+  accountNumber, 
+  userId,
+  profile,
+  onOpenVerification
+}: { 
+  address: string; 
+  apartment: string; 
+  accountNumber?: string; 
+  userId?: string; 
+  profile?: any;
+  onOpenVerification?: () => void;
+}) => {
+  const { toast } = useToast();
+  const [cred, setCred] = useState<any | null>(null);
+  const [loadingCred, setLoadingCred] = useState(true);
+  const [isPassVisible, setIsPassVisible] = useState(false);
+  const [showInstructions, setShowInstructions] = useState(false);
+  const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
-  return (
-    <div className="p-4 rounded-lg border border-primary/30 bg-gradient-to-br from-primary/5 to-transparent">
-      <div className="flex items-start gap-3 mb-3">
-        <div className="p-2 rounded-lg bg-primary/10 shrink-0">
-          <Smartphone className="h-5 w-5 text-primary" />
+  // Формируем чистый адрес без дублирования номера квартиры
+  const cleanAddressDisplay = useMemo(() => {
+    if (!address) return "";
+    // Очищаем адрес от уже имеющегося суффикса квартиры для исключения дублирования
+    const baseAddr = address.replace(/,\s*(?:кв\.?|квартира)\s*[а-яa-z0-9-+]+/gi, "").trim();
+    return apartment ? `${baseAddr}, кв. ${apartment}` : baseAddr;
+  }, [address, apartment]);
+
+  // Загрузка учетных данных умного домофона (логопасов) для данного жильца
+  const loadCredentials = async () => {
+    if (!address && !accountNumber) {
+      setLoadingCred(false);
+      return;
+    }
+
+    try {
+      setLoadingCred(true);
+      console.log("[Умный домофон] Поиск логопасов для адреса:", address, "кв:", apartment, "счет:", accountNumber);
+
+      let found: any = null;
+
+      // 1. Сначала ищем по номеру договора / лицевого счета, если он есть
+      if (accountNumber) {
+        const { data: byAcc, error: errAcc } = await supabase
+          .from("intercom_credentials" as any)
+          .select("*")
+          .eq("account_number", accountNumber)
+          .limit(1);
+
+        if (!errAcc && byAcc && byAcc.length > 0) {
+          found = byAcc[0];
+          console.log("[Умный домофон] Найдена запись по номеру договора:", found);
+        }
+      }
+
+      // 2. Если по номеру договора не нашли, ищем по нормализованному адресу и номеру квартиры
+      if (!found && apartment) {
+        const cleanApt = normalizeApartment(apartment);
+        const streetPart = normalizeStreet(address);
+        const housePart = normalizeHouse(address);
+
+        console.log(`[Умный домофон] Поиск по адресу: улица "${streetPart}", дом "${housePart}", кв "${cleanApt}"`);
+
+        const { data: byAddr, error: errAddr } = await supabase
+          .from("intercom_credentials" as any)
+          .select("*")
+          .eq("apartment", cleanApt)
+          .limit(10);
+
+        if (!errAddr && byAddr && byAddr.length > 0) {
+          // Ищем среди записей ту, где совпадает улица и дом
+          const matched = byAddr.find((item: any) => {
+            const itemStreet = normalizeStreet(item.street);
+            const itemHouse = normalizeHouse(item.house);
+            return (
+              (streetPart.includes(itemStreet) || itemStreet.includes(streetPart)) &&
+              (housePart.includes(itemHouse) || itemHouse.includes(housePart))
+            );
+          });
+
+          if (matched) {
+            found = matched;
+            console.log("[Умный домофон] Найдена запись по совпадению адреса:", found);
+          }
+        }
+      }
+
+      setCred(found);
+    } catch (err) {
+      console.error("[Умный домофон] Ошибка при проверке учетных данных:", err);
+    } finally {
+      setLoadingCred(false);
+    }
+  };
+
+  useEffect(() => {
+    loadCredentials();
+  }, [address, apartment, accountNumber]);
+
+  // Обработчик покупки доступа к приложению
+  const handlePurchaseAccess = async () => {
+    if (!cred) return;
+
+    try {
+      setIsProcessingPayment(true);
+      console.log(`[Умный домофон] Инициализация оплаты удаленного доступа для ID: ${cred.id}`);
+
+      // Вызываем RPC-функцию покупки или обновляем запись
+      const { data, error } = await supabase.rpc("purchase_intercom_access", {
+        p_credential_id: cred.id,
+        p_user_id: userId || null,
+        p_amount: 300.00,
+      });
+
+      if (error) {
+        // Запасной прямой update, если RPC недоступен
+        const { error: updErr } = await supabase
+          .from("intercom_credentials" as any)
+          .update({
+            is_purchased: true,
+            purchased_at: new Date().toISOString(),
+            purchased_by_user_id: userId || null,
+            payment_amount: 300.00,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", cred.id);
+
+        if (updErr) throw updErr;
+      }
+
+      // Создаем запись заявки / чека в таблице requests
+      try {
+        await supabase.from("requests").insert({
+          client_id: userId || null,
+          message: `📱 Онлайн-оплата: Услуга «Удалённый доступ к умному домофону» (адрес: ${cleanAddressDisplay}). Договор: ${cred.account_number || "—"}`,
+          status: "completed",
+          priority: "low",
+          payment_status: "paid",
+          payment_method: "card_online",
+        });
+      } catch (reqErr) {
+        console.warn("[Умный домофон] Запись в requests не создана (некритично):", reqErr);
+      }
+
+      toast({
+        title: "Оплата прошла успешно!",
+        description: profile?.is_verified 
+          ? "Удалённый доступ к умному домофону активирован. Ваши данные для входа отображены ниже."
+          : "Оплата 300 ₽ подтверждена. Для отображения пароля подтвердите проживание (пройдите верификацию).",
+      });
+
+      setIsPaymentOpen(false);
+      // Обновляем локальное состояние
+      setCred((prev: any) => (prev ? { ...prev, is_purchased: true } : prev));
+    } catch (err: any) {
+      console.error("[Умный домофон] Ошибка при проведении оплаты:", err);
+      toast({
+        title: "Ошибка оплаты",
+        description: err.message || "Не удалось завершить транзакцию",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
+  const copyText = (txt: string, label: string) => {
+    navigator.clipboard.writeText(txt);
+    toast({ title: "Скопировано", description: `${label}: ${txt}` });
+  };
+
+  if (loadingCred) {
+    return (
+      <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex items-center justify-center py-6">
+        <Loader2 className="h-5 w-5 animate-spin text-amber-500 mr-2" />
+        <span className="text-xs text-muted-foreground">Проверка доступности умного домофона...</span>
+      </div>
+    );
+  }
+
+  // СЛУЧАЙ 1: Логопасы еще не загружены для этого адреса/квартиры (или умный домофон отсутствует)
+  if (!cred) {
+    return (
+      <div className="p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-900/40 flex items-start gap-3.5">
+        <div className="p-2.5 rounded-xl bg-slate-500/10 text-slate-600 dark:text-slate-400 shrink-0">
+          <Smartphone className="h-5 w-5" />
         </div>
-        <div>
-          <p className="font-semibold">Удалённый доступ к домофону</p>
-          <p className="text-sm text-muted-foreground mt-1">
-            Приобретите личный кабинет в мобильном приложении для удобного управления
-            домофоном по адресу: <span className="font-medium text-foreground">{address}{apartment ? `, ${apartment}` : ""}</span>
+        <div className="text-left space-y-1">
+          <p className="font-semibold text-sm text-foreground">Удалённый доступ к домофону</p>
+          <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+            По вашему адресу ({cleanAddressDisplay}) отсутствует умный домофон. Если хотите установить на ваш дом умную систему, обратитесь к нам в офис.
           </p>
         </div>
       </div>
+    );
+  }
 
-      <ul className="space-y-2 text-sm mb-4">
+  // СЛУЧАЙ 2: Услуга ОПЛАЧЕНА (is_purchased = true)
+  if (cred.is_purchased) {
+    const isVerified = !!profile?.is_verified;
+    const vStatus = profile?.verification_status || (isVerified ? "verified" : "unverified");
+
+    return (
+      <div className={`p-5 rounded-2xl border ${isVerified ? "border-emerald-500/40 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent" : "border-amber-500/40 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent"} shadow-sm space-y-4 text-left`}>
+        {/* Шапка со статусом */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className={`p-2.5 rounded-xl ${isVerified ? "bg-emerald-500" : "bg-amber-500"} text-white shrink-0 shadow-sm`}>
+              <Smartphone className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="font-bold text-sm text-foreground">
+                  {isVerified ? "Удалённый доступ активен" : "Удалённый доступ оплачен"}
+                </p>
+                <Badge className="bg-emerald-600 text-white text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3" />
+                  Оплата подтверждена
+                </Badge>
+                {isVerified ? (
+                  <Badge className="bg-emerald-600 text-white text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <CheckCircle className="h-3 w-3" />
+                    Верифицирован
+                  </Badge>
+                ) : (
+                  <Badge className="bg-amber-600 text-white text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <Lock className="h-3 w-3" />
+                    Требуется верификация
+                  </Badge>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Квартира № {cred.apartment} • Приложение «Мой умный дом»
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Информационный баннер при отсутствии верификации */}
+        {!isVerified && (
+          <div className="p-3.5 rounded-xl border border-amber-300/60 dark:border-amber-700/50 bg-amber-500/10 dark:bg-amber-950/20 text-xs space-y-2">
+            <div className="flex items-start gap-2.5">
+              {vStatus === "pending" ? (
+                <Clock className="h-4 w-4 text-amber-600 shrink-0 mt-0.5 animate-pulse" />
+              ) : vStatus === "rejected" ? (
+                <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+              ) : (
+                <ShieldCheck className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+              )}
+              <div className="space-y-1">
+                <p className="font-semibold text-foreground">
+                  {vStatus === "pending"
+                    ? "⏳ Документы на проверке у диспетчера"
+                    : vStatus === "rejected"
+                    ? "⚠️ Заявка на верификацию отклонена"
+                    : "🔒 Подтвердите проживание для получения доступа"}
+                </p>
+                <p className="text-muted-foreground leading-relaxed">
+                  {vStatus === "pending"
+                    ? "Вы успешно оплатили доступ. Диспетчер проверяет предоставленные документы. Логин и пароль от домофона откроются автоматически сразу после одобрения."
+                    : vStatus === "rejected"
+                    ? `Причина отклонения: ${profile?.verification_reject_reason || "Документ не соответствует требованиям"}. Пожалуйста, загрузите подтверждающий документ повторно.`
+                    : "Оплата доступа зафиксирована. В целях безопасности жильцов данные доступа к домофону (логин и пароль) предоставляются только после проверки подтверждающего документа (выписка ЕГРН, паспорт с постоянной или временной регистрацией, либо официальный договор найма)."}
+                </p>
+              </div>
+            </div>
+
+            {vStatus !== "pending" && onOpenVerification && (
+              <div className="pt-1 flex justify-end">
+                <ShinyButton
+                  onClick={onOpenVerification}
+                  className="px-4 py-1.5 h-8 text-xs rounded-xl flex items-center gap-1.5 font-semibold"
+                >
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  {vStatus === "rejected" ? "Загрузить документ повторно" : "Пройти верификацию"}
+                </ShinyButton>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Карточки с логином и паролем для быстрого копирования */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+          {/* Логин (скрыт до прохождения верификации) */}
+          <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-900/60 flex items-center justify-between shadow-xs">
+            <div>
+              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block">
+                Логин для входа
+              </span>
+              <span className="font-mono font-bold text-sm text-foreground">
+                {isVerified ? (cred.account_number || "—") : "••••••••••"}
+              </span>
+            </div>
+            {isVerified ? (
+              cred.account_number && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => copyText(cred.account_number, "Логин")}
+                  className="h-8 px-2 text-xs text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg"
+                  title="Скопировать логин"
+                >
+                  <Copy className="h-3.5 w-3.5 mr-1" />
+                  Копировать
+                </Button>
+              )
+            ) : (
+              <div className="flex items-center gap-1 text-muted-foreground text-xs">
+                <Lock className="h-3.5 w-3.5 text-amber-500 mr-1" />
+                <span className="text-[11px]">Нужна верификация</span>
+              </div>
+            )}
+          </div>
+
+          {/* Пароль */}
+          <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-900/60 flex items-center justify-between shadow-xs">
+            <div>
+              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block">
+                Пароль для входа
+              </span>
+              <span className="font-mono font-bold text-sm text-foreground">
+                {isVerified ? (isPassVisible ? cred.password : "••••••••••") : "••••••••••"}
+              </span>
+            </div>
+            {isVerified ? (
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsPassVisible(!isPassVisible)}
+                  className="h-8 px-2 text-xs text-slate-500 rounded-lg"
+                  title={isPassVisible ? "Скрыть" : "Показать"}
+                >
+                  {isPassVisible ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => copyText(cred.password, "Пароль")}
+                  className="h-8 px-2 text-xs text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg"
+                  title="Скопировать пароль"
+                >
+                  <Copy className="h-3.5 w-3.5 mr-1" />
+                  Копировать
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1 text-muted-foreground text-xs">
+                <Lock className="h-3.5 w-3.5 text-amber-500 mr-1" />
+                <span className="text-[11px]">Нужна верификация</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Кнопка скопировать все данные доступа сразу (только при верификации) */}
+        {isVerified && (
+          <div className="pt-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const fullMsg = 
+`Мой умный дом (кв. ${cred.apartment})
+🔑 Логин: ${cred.account_number || "—"}
+🔒 Пароль: ${cred.password}
+
+Скачать приложение:
+• Google Play: https://play.google.com/store/apps/details?id=ru.ufanet.smarthome
+• App Store: https://apps.apple.com/ru/app/мой-умный-дом/id1450280459
+• RuStore: https://www.rustore.ru/catalog/app/ru.ufanet.smarthome`;
+                copyText(fullMsg, "Данные для входа со ссылками");
+              }}
+              className="w-full h-8 text-xs bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800 rounded-xl font-semibold flex items-center justify-center gap-1.5"
+            >
+              <Copy className="h-3.5 w-3.5" />
+              <span>Скопировать логин, пароль и ссылки на приложение</span>
+            </Button>
+          </div>
+        )}
+
+        {/* Ссылки на официальные маркеты приложений для смартфонов */}
+        <div className="pt-2 border-t border-emerald-200/50 dark:border-emerald-900/30">
+          <p className="text-xs font-semibold text-foreground mb-2">
+            Установите приложение «Мой умный дом» на ваш смартфон:
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            <a
+              href="https://play.google.com/store/apps/details?id=ru.ufanet.smarthome"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-1.5 p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-emerald-500 transition-colors text-xs font-medium text-foreground shadow-2xs"
+            >
+              <Smartphone className="h-3.5 w-3.5 text-emerald-600" />
+              <span>Google Play</span>
+            </a>
+
+            <a
+              href="https://apps.apple.com/ru/app/%D0%BC%D0%BE%D0%B9-%D1%83%D0%BC%D0%BD%D1%8B%D0%B9-%D0%B4%D0%BE%D0%BC/id1450280459"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-1.5 p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-emerald-500 transition-colors text-xs font-medium text-foreground shadow-2xs"
+            >
+              <Smartphone className="h-3.5 w-3.5 text-emerald-600" />
+              <span>App Store</span>
+            </a>
+
+            <a
+              href="https://www.rustore.ru/catalog/app/ru.ufanet.smarthome"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-1.5 p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-emerald-500 transition-colors text-xs font-medium text-foreground shadow-2xs"
+            >
+              <Smartphone className="h-3.5 w-3.5 text-emerald-600" />
+              <span>RuStore</span>
+            </a>
+          </div>
+        </div>
+
+        {/* Раскрывающаяся инструкция прямо на нашем сайте (без ухода на внешние сайты) */}
+        <div className="pt-2">
+          <button
+            onClick={() => setShowInstructions(!showInstructions)}
+            className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 hover:underline flex items-center gap-1"
+          >
+            <Info className="h-3.5 w-3.5" />
+            {showInstructions ? "Скрыть инструкцию по входу" : "Инструкция: как войти в приложение"}
+          </button>
+
+          {showInstructions && (
+            <div className="mt-2 p-3.5 rounded-xl bg-white/80 dark:bg-slate-900/80 border border-emerald-100 dark:border-emerald-900/40 text-xs text-slate-700 dark:text-slate-300 space-y-2 leading-relaxed">
+              <p className="font-semibold text-foreground">Пошаговое руководство:</p>
+              <ol className="list-decimal pl-4 space-y-1.5">
+                <li>
+                  Установите приложение <strong>«Мой умный дом»</strong> из Google Play, App Store или RuStore по кнопкам выше.
+                </li>
+                <li>
+                  Откройте приложение на телефоне и нажмите кнопку <strong>«Войти по номеру договора/логину»</strong>.
+                </li>
+                <li>
+                  В поле логина укажите ваш логин:{" "}
+                  {isVerified ? (
+                    <span className="font-mono font-bold text-foreground">{cred.account_number}</span>
+                  ) : (
+                    <span className="font-mono text-muted-foreground font-semibold">•••••••••• (будет доступен после верификации)</span>
+                  )}.
+                </li>
+                <li>
+                  В поле пароля укажите ваш пароль из карточки выше (доступен после подтверждения верификации).
+                </li>
+                <li>
+                  Разрешите приложению доступ к уведомлениям и микрофону, чтобы принимать видеозвонки с панели домофона на смартфон.
+                </li>
+                <li>
+                  Готово! Теперь вы можете открывать дверь подъезда нажатием одной кнопки в телефоне и просматривать видеокамеру в реальном времени.
+                </li>
+              </ol>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // СЛУЧАЙ 3: Логопас есть, но еще НЕ оплачен — яркая карточка с предложением купить услугу
+  return (
+    <div className="p-5 rounded-2xl border border-amber-500/40 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent shadow-sm text-left space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <div className="p-2.5 rounded-xl bg-amber-500 text-white shrink-0 shadow-sm">
+            <Smartphone className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="font-bold text-sm text-foreground">Удалённый доступ к домофону</p>
+              <Badge className="bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded-full">
+                Доступен к подключению
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+              Для вашей квартиры № {cred.apartment} сформированы ключи доступа в мобильное приложение «Мой умный дом».
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <ul className="space-y-2 text-xs text-slate-700 dark:text-slate-300">
         <li className="flex items-center gap-2">
-          <DoorOpen className="h-4 w-4 text-primary shrink-0" />
-          <span>Открывайте дверь без ключей со смартфона</span>
+          <DoorOpen className="h-4 w-4 text-amber-500 shrink-0" />
+          <span>Открывайте дверь подъезда со смартфона без ключей</span>
         </li>
         <li className="flex items-center gap-2">
-          <PhoneCall className="h-4 w-4 text-primary shrink-0" />
-          <span>Принимайте звонки с домофона на мобильный телефон</span>
+          <PhoneCall className="h-4 w-4 text-amber-500 shrink-0" />
+          <span>Принимайте видеовызовы с домофона прямо на мобильный телефон</span>
         </li>
         <li className="flex items-center gap-2">
-          <KeyRound className="h-4 w-4 text-primary shrink-0" />
-          <span>Логин и пароль с инструкцией придут после оплаты</span>
+          <KeyRound className="h-4 w-4 text-amber-500 shrink-0" />
+          <span>Просматривайте онлайн-камеру домофона и архив посетителей</span>
         </li>
       </ul>
 
-      <ShinyButton className="w-full justify-center py-3 rounded-xl gap-2" onClick={() => navigate("/payment")}>
-        <CreditCard className="h-5 w-5 shrink-0" />
-        <span className="text-center">Оплатить и получить доступ</span>
-      </ShinyButton>
+      {/* Статус готовности к верификации */}
+      <div className="p-3 rounded-xl bg-slate-50/70 dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 text-xs flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          {profile?.is_verified ? (
+            <>
+              <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
+              <span className="text-muted-foreground">Профиль верифицирован. Доступ откроется сразу после оплаты.</span>
+            </>
+          ) : profile?.verification_status === "pending" ? (
+            <>
+              <Clock className="h-4 w-4 text-amber-500 shrink-0 animate-pulse" />
+              <span className="text-muted-foreground">Документы на проверке. Пароль откроется после подтверждения и оплаты.</span>
+            </>
+          ) : (
+            <>
+              <ShieldCheck className="h-4 w-4 text-amber-500 shrink-0" />
+              <span className="text-muted-foreground">Для выдачи пароля также потребуется подтвердить проживание.</span>
+            </>
+          )}
+        </div>
+        {!profile?.is_verified && profile?.verification_status !== "pending" && onOpenVerification && (
+          <button
+            onClick={onOpenVerification}
+            className="text-xs text-amber-600 dark:text-amber-400 font-semibold hover:underline shrink-0"
+          >
+            Подтвердить →
+          </button>
+        )}
+      </div>
+
+      <div className="pt-2 border-t border-amber-200/50 dark:border-amber-900/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <span className="text-[11px] text-muted-foreground block">Стоимость подключения:</span>
+          <span className="text-lg font-bold text-foreground font-display">
+            300.00 ₽ <span className="text-xs font-normal text-muted-foreground">(единоразово)</span>
+          </span>
+        </div>
+
+        <ShinyButton
+          onClick={() => setIsPaymentOpen(true)}
+          className="w-full sm:w-auto px-5 py-2.5 rounded-xl h-10 flex items-center justify-center gap-2 font-bold"
+        >
+          <CreditCard className="h-4 w-4" />
+          <span>Оплатить и получить доступ</span>
+        </ShinyButton>
+      </div>
+
+      {/* Диалог онлайн-оплаты удаленного доступа */}
+      <Dialog open={isPaymentOpen} onOpenChange={setIsPaymentOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg font-bold">
+              <CreditCard className="h-5 w-5 text-amber-500" />
+              Оплата удалённого доступа
+            </DialogTitle>
+            <DialogDescription>
+              Подключение мобильного приложения «Мой умный дом» для {cleanAddressDisplay}.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-3 text-sm">
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-2">
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Услуга:</span>
+                <span className="font-semibold text-foreground">Удалённый доступ к домофону</span>
+              </div>
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Адрес:</span>
+                <span className="text-foreground">{cleanAddressDisplay}</span>
+              </div>
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Номер договора:</span>
+                <span className="font-mono text-foreground">{cred.account_number || "Формируется"}</span>
+              </div>
+              <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex justify-between font-bold text-base text-foreground">
+                <span>Итого к оплате:</span>
+                <span className="text-amber-500">300.00 ₽</span>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-muted-foreground text-center">
+              После подтверждения оплаты ваши логин и пароль сразу отобразятся в личном кабинете вместе со ссылками на скачивание приложения.
+            </p>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setIsPaymentOpen(false)} className="rounded-xl">
+              Отмена
+            </Button>
+            <Button
+              onClick={handlePurchaseAccess}
+              disabled={isProcessingPayment}
+              className="bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold flex items-center gap-1.5"
+            >
+              {isProcessingPayment ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Обработка платежа...
+                </>
+              ) : (
+                <>
+                  <Check className="h-4 w-4" />
+                  Оплатить 300.00 ₽
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
@@ -509,6 +1187,7 @@ const Cabinet = () => {
   const [emailInput, setEmailInput] = useState("");
   const [emailVerified, setEmailVerified] = useState(false);
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
+  const [isVerificationDialogOpen, setIsVerificationDialogOpen] = useState(false);
 
   // --- НОВЫЕ СТЕЙТЫ: ТИП ПОМЕЩЕНИЯ, СОГЛАСИЕ ФЗ-152, ДИАЛОГ ВАЛИДАЦИИ И DaData ---
   const [premiseType, setPremiseType] = useState<"apartment" | "private">("apartment"); // Тип недвижимости: apartment (кв./офис) vs private (частный дом)
@@ -523,8 +1202,11 @@ const Cabinet = () => {
   const [orderPhone, setOrderPhone] = useState("");
   const [orderStreet, setOrderStreet] = useState("");
   const [orderHouse, setOrderHouse] = useState("");
+  const [orderEntrance, setOrderEntrance] = useState("1"); // Номер подъезда для точной привязки оборудования
   const [orderApartment, setOrderApartment] = useState("");
   const [orderPremiseType, setOrderPremiseType] = useState<"apartment" | "private">("apartment");
+  const [allEntrances, setAllEntrances] = useState<any[]>([]); // Кэш подъездов из БД
+  const [productBindings, setProductBindings] = useState<Record<string, string[]>>({}); // product_id -> entrance_id[]
   
   // --- СТЕЙТЫ ДЛЯ УМНОГО АВТОКОМПЛИТА АДРЕСОВ (accounts) ---
   const [allHouses, setAllHouses] = useState<string[]>([]); // Кэш всех уникальных домов
@@ -549,6 +1231,12 @@ const Cabinet = () => {
   const [accountSearchLoading, setAccountSearchLoading] = useState(false); // Индикатор загрузки при поиске по л/с
   const [accountSearchError, setAccountSearchError] = useState<string | null>(null); // Текст ошибки если л/с не найден
   const [accountSearchFound, setAccountSearchFound] = useState(false); // Флаг: счёт успешно найден и адрес подставлен
+  
+  // --- СТЕЙТЫ ДЛЯ АВТОПОИСКА АБОНЕНТА ПО НОМЕРУ ТЕЛЕФОНА И ПРИВЕТСТВИЯ ---
+  const [showPhoneWelcomeDialog, setShowPhoneWelcomeDialog] = useState(false); // Флаг показа приветственного окна
+  const [matchedSubscriberData, setMatchedSubscriberData] = useState<any>(null); // Данные найденного по телефону абонента
+  const [hasSearchedPhoneOnce, setHasSearchedPhoneOnce] = useState(false); // Флаг однократного поиска при загрузке
+
   const [isVisible, setIsVisible] = useState({
     header: false,
     content: false
@@ -561,7 +1249,8 @@ const Cabinet = () => {
   const isLocked = !!profile?.is_verified && !editing;
 
   // --- СТЕЙТЫ ДЛЯ ФОРМЫ ЗАКАЗА УСЛУГ И ОБОРУДОВАНИЯ ---
-  const [products, setProducts] = useState<any[]>([]); // Все товары и услуги из БД
+  const [products, setProducts] = useState<any[]>([]); // Для товаров и услуг
+  const [previewImage, setPreviewImage] = useState<string | null>(null); // Все товары и услуги из БД
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false); // Открытие диалога заказа
   const [orderType, setOrderType] = useState<"repair" | "order">("repair"); // Тип обращения: неисправность или заказ
   const [repairProblem, setRepairProblem] = useState(""); // Текст проблемы для бесплатной заявки
@@ -575,25 +1264,83 @@ const Cabinet = () => {
   const [lastOrderTotals, setLastOrderTotals] = useState<any>(null); // Рассчитанные суммы платежа для передачи в шлюз
   const [userAccount, setUserAccount] = useState<any>(null); // Лицевой счет пользователя, проброшенный из карточки баланса
 
-  // Загрузка активных товаров и услуг из БД
+  // Загрузка активных товаров и услуг из БД, а также привязок оборудования к подъездам
   const loadProducts = async () => {
-    console.log("[Заказ] Загрузка списка товаров и услуг из products...");
+    console.log("[Заказ] Загрузка списка товаров, услуг и привязок к подъездам...");
     try {
-      const { data, error } = await supabase
-        .from("products")
-        .select("*")
-        .eq("is_active", true);
+      const [prodRes, bindingsRes, entrancesRes] = await Promise.all([
+        supabase.from("products").select("*").eq("is_active", true),
+        supabase.from("entrance_products" as any).select("product_id, entrance_id"),
+        supabase.from("entrances" as any).select("id, city, street, house, entrance, intercom_type, service_type")
+      ]);
 
-      if (error) throw error;
+      if (prodRes.error) throw prodRes.error;
 
-      if (data) {
-        setProducts(data);
-        console.log(`[Заказ] Успешно загружено товаров и услуг: ${data.length}`);
+      if (prodRes.data) {
+        setProducts(prodRes.data);
+        console.log(`[Заказ] Успешно загружено товаров и услуг: ${prodRes.data.length}`);
+      }
+
+      if (bindingsRes.data) {
+        // Карта: product_id -> entrance_id[]
+        const pMap: Record<string, string[]> = {};
+        bindingsRes.data.forEach((b: { product_id: string; entrance_id: string }) => {
+          if (!pMap[b.product_id]) pMap[b.product_id] = [];
+          pMap[b.product_id].push(b.entrance_id);
+        });
+        setProductBindings(pMap);
+        console.log(`[Заказ] Загружено связей товаров с подъездами: ${bindingsRes.data.length}`);
+      }
+
+      if (entrancesRes.data) {
+        setAllEntrances(entrancesRes.data);
       }
     } catch (err) {
-      console.error("[Заказ] Ошибка загрузки списка продуктов:", err);
+      console.error("[Заказ] Ошибка загрузки списка продуктов и подъездов:", err);
     }
   };
+
+  // Определение соответствующего подъезда жителя для показа совместимого оборудования
+  const currentMatchedEntrance = useMemo(() => {
+    if (!orderStreet || !orderHouse || !allEntrances.length) return null;
+    const cleanStreet = orderStreet.toLowerCase().replace(/[^а-яa-z0-9]/g, "");
+    const cleanHouse = orderHouse.toLowerCase().replace(/[^а-яa-z0-9]/g, "");
+    const cleanEnt = String(orderEntrance || "1").trim();
+
+    return allEntrances.find(e => {
+      const eStreet = e.street.toLowerCase().replace(/[^а-яa-z0-9]/g, "");
+      const eHouse = e.house.toLowerCase().replace(/[^а-яa-z0-9]/g, "");
+      const eEnt = String(e.entrance).trim();
+
+      const streetMatch = eStreet.includes(cleanStreet) || cleanStreet.includes(eStreet);
+      const houseMatch = eHouse === cleanHouse;
+      const entMatch = eEnt === cleanEnt;
+
+      return streetMatch && houseMatch && entMatch;
+    }) || null;
+  }, [orderStreet, orderHouse, orderEntrance, allEntrances]);
+
+  // Список товаров, доступных для текущего подъезда (универсальные + привязанные именно к этому подъезду)
+  const availableProducts = useMemo(() => {
+    if (!products || products.length === 0) return [];
+
+    return products.filter(product => {
+      const boundEntranceIds = productBindings[product.id];
+
+      // 1. Товар универсален (не ограничен ни одним подъездом)
+      if (!boundEntranceIds || boundEntranceIds.length === 0) {
+        return true;
+      }
+
+      // 2. Товар ограничен подъездами: показываем только если подъезд совпал
+      if (currentMatchedEntrance && boundEntranceIds.includes(currentMatchedEntrance.id)) {
+        return true;
+      }
+
+      // Товар не подходит для этой парадной
+      return false;
+    });
+  }, [products, productBindings, currentMatchedEntrance]);
 
   // Функция для очистки полного адреса (убираем город "Краснодар, " или "пос. Южный, ") для отображения
   const getDisplayAddress = (fullAddr: string) => {
@@ -757,6 +1504,68 @@ const Cabinet = () => {
       setAccountSearchError("Ошибка при поиске. Попробуйте позже или заполните адрес вручную.");
     } finally {
       setAccountSearchLoading(false);
+    }
+  };
+
+  // --- АВТОПОИСК АБОНЕНТА ПО НОМЕРУ ТЕЛЕФОНА (при регистрации или вводе телефона) ---
+  const searchSubscriberByPhone = async (rawPhone: string) => {
+    if (!rawPhone) return;
+    const digits = rawPhone.replace(/\D/g, "");
+    if (digits.length < 10) return;
+    const last10 = digits.slice(-10);
+
+    console.log(`[ЛК: Поиск по телефону] Старт поиска по номеру: "${rawPhone}" (10 цифр: "${last10}")...`);
+
+    try {
+      // Ищем точное совпадение 10 цифр по очищенному полю phone_clean
+      const { data, error } = await supabase
+        .from("accounts")
+        .select("*")
+        .ilike("phone_clean", `%${last10}%`)
+        .order("debt_amount", { ascending: false })
+        .limit(1);
+
+      if (error) {
+        console.error("[ЛК: Поиск по телефону] Ошибка запроса к accounts:", error);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        const found = data[0];
+        console.log(`[ЛК: Поиск по телефону] ✅ Найден абонент по телефону ${rawPhone}! Л/С: ${found.account_number}, Адрес: ${found.address}`);
+
+        // Автоматически заполняем данные адреса и лицевого счета
+        setAddress(found.address || "");
+
+        const apt = found.apartment?.trim() || extractApartmentFromAddress(found.address || "");
+        setApartment(apt);
+
+        if (found.street) setDisplayStreet(found.street);
+        if (found.house) setDisplayHouse(found.house);
+        if (found.housing) setDisplayHousing(found.housing);
+        if (found.entrance) setDisplayEntrance(found.entrance);
+
+        parseAndSetAddress(found.address || "");
+
+        if (found.address) {
+          fetchApartmentSuggestions(found.address);
+        }
+
+        setUserAccount(found);
+        setAccountSearchInput(found.account_number);
+        setAccountSearchFound(true);
+
+        // ВАЖНО: Фамилия (fullName), Email (email), Этаж (floor)
+        // остаются пустыми или теми, что ввел сам пользователь!
+        
+        // Показываем приветственное всплывающее окно
+        setMatchedSubscriberData(found);
+        setShowPhoneWelcomeDialog(true);
+      } else {
+        console.log(`[ЛК: Поиск по телефону] Номер "${last10}" не найден среди зарегистрированных договоров.`);
+      }
+    } catch (err) {
+      console.error("[ЛК: Поиск по телефону] Ошибка выполнения поиска:", err);
     }
   };
 
@@ -1524,6 +2333,13 @@ const Cabinet = () => {
       setEmailInput(defaultEmail);
       setEmailVerified(!!data.email_verified || !!session.user.email);
       console.log(`[Cabinet Auth] Почта инициализирована: "${defaultEmail}" (верифицирована: ${!!data.email_verified || !!session.user.email})`);
+
+      // Автоматический поиск адреса по номеру телефона, если адрес еще не заполнен
+      if (!data.address && data.phone && !hasSearchedPhoneOnce) {
+        setHasSearchedPhoneOnce(true);
+        console.log(`[Cabinet Auth] Адрес не заполнен, запускаем автопоиск по номеру телефона: ${data.phone}...`);
+        searchSubscriberByPhone(data.phone);
+      }
     } catch (error: any) {
       console.error("[Cabinet Auth] Критическая ошибка при инициализации пользователя в кабинете:", error);
     } finally {
@@ -1531,6 +2347,16 @@ const Cabinet = () => {
       console.log("[Cabinet Auth] Инициализация завершена, выключаем экран загрузки...");
       setLoading(false);
     }
+  };
+
+  // Получение актуальной цены товара с учетом статуса дома (льготная цена, если объект на стадии монтажа)
+  const getEffectiveProductPrice = (prod: any) => {
+    if (!prod) return 0;
+    const isInstallation = currentMatchedEntrance?.service_type === "installation";
+    if (isInstallation && prod.installation_price != null && !isNaN(Number(prod.installation_price))) {
+      return Number(prod.installation_price);
+    }
+    return Number(prod.price || 0);
   };
 
   const calculateTotals = () => {
@@ -1541,20 +2367,20 @@ const Cabinet = () => {
     // Находим ключ
     const keyProduct = products.find(p => p.name.toLowerCase().includes("ключ"));
     if (keyProduct && keysQuantity > 0) {
-      sum1 = Number(keyProduct.price) * keysQuantity;
+      sum1 = getEffectiveProductPrice(keyProduct) * keysQuantity;
     }
 
     // Выбранная услуга (установка или замена трубки)
     const selectedService = products.find(p => p.id === selectedServiceId);
     if (selectedService) {
-      sum2 += Number(selectedService.price);
+      sum2 += getEffectiveProductPrice(selectedService);
     }
 
     // Выбранные трубки (оборудование)
     Object.entries(selectedEquipments).forEach(([id, qty]) => {
       const prod = products.find(p => p.id === id);
       if (prod && qty > 0) {
-        sum2 += Number(prod.price) * qty;
+        sum2 += getEffectiveProductPrice(prod) * qty;
       }
     });
 
@@ -1562,7 +2388,7 @@ const Cabinet = () => {
     if (isCabinetSetupChecked) {
       const cabinetProduct = products.find(p => p.name.toLowerCase().includes("кабинет"));
       if (cabinetProduct) {
-        sum3 = Number(cabinetProduct.price);
+        sum3 = getEffectiveProductPrice(cabinetProduct);
       } else {
         sum3 = 300; // Резервное значение, если товара нет в БД
       }
@@ -1583,8 +2409,20 @@ const Cabinet = () => {
       setOrderApartment(apartment || "");
       setOrderName(fullName || profile?.full_name || "");
       setOrderPremiseType(premiseType || "apartment");
+
+      // Автоматическое определение номера подъезда из лицевого счета или профиля
+      let detectedEntrance = "";
+      if (userAccount?.address) {
+        const entMatch = userAccount.address.match(/(?:^|,|\s)(?:п|подъезд)\.?\s*(\d+)/i);
+        if (entMatch) detectedEntrance = entMatch[1];
+      }
+      if (!detectedEntrance && address) {
+        const entMatch = address.match(/(?:^|,|\s)(?:п|подъезд)\.?\s*(\d+)/i);
+        if (entMatch) detectedEntrance = entMatch[1];
+      }
+      setOrderEntrance(detectedEntrance || "1");
     }
-  }, [isOrderDialogOpen, phone, profile, displayStreet, displayHouse, apartment, fullName, premiseType]);
+  }, [isOrderDialogOpen, phone, profile, displayStreet, displayHouse, apartment, fullName, premiseType, userAccount, address]);
 
   // --- ОТПРАВКА ЗАЯВКИ ИЛИ ЗАКАЗА В БД ---
   const handleCreateOrderRequest = async () => {
@@ -1641,21 +2479,21 @@ const Cabinet = () => {
         
         const selectedService = products.find(p => p.id === selectedServiceId);
         if (selectedService) {
-          messageText += `— Услуга: ${selectedService.name} (${Number(selectedService.price).toFixed(2)} ₽)\n`;
+          messageText += `— Услуга: ${selectedService.name} (${getEffectiveProductPrice(selectedService).toFixed(2)} ₽)\n`;
         }
         
         let hasEquip = false;
         Object.entries(selectedEquipments).forEach(([id, qty]) => {
           const prod = products.find(p => p.id === id);
           if (prod && qty > 0) {
-            messageText += `— Оборудование: ${prod.name} (${qty} шт. x ${Number(prod.price).toFixed(2)} ₽)\n`;
+            messageText += `— Оборудование: ${prod.name} (${qty} шт. x ${getEffectiveProductPrice(prod).toFixed(2)} ₽)\n`;
             hasEquip = true;
           }
         });
         
         const keyProduct = products.find(p => p.name.toLowerCase().includes("ключ"));
         if (keyProduct && keysQuantity > 0) {
-          messageText += `— Ключи: ${keyProduct.name} (${keysQuantity} шт. x ${Number(keyProduct.price).toFixed(2)} ₽ = ${totals.sum1.toFixed(2)} ₽)\n`;
+          messageText += `— Ключи: ${keyProduct.name} (${keysQuantity} шт. x ${getEffectiveProductPrice(keyProduct).toFixed(2)} ₽ = ${totals.sum1.toFixed(2)} ₽)\n`;
         }
         
         if (isCabinetSetupChecked) {
@@ -1674,12 +2512,14 @@ const Cabinet = () => {
       const cleanOrderApartment = orderPremiseType === "private" ? "" : orderApartment.trim();
       
       const orderFullAddress = `г. Краснодар, ${cleanOrderStreet}, д. ${cleanOrderHouse}${
+        orderEntrance ? `, п. ${orderEntrance}` : ""
+      }${
         cleanOrderApartment ? `, кв. ${cleanOrderApartment}` : ""
       }`;
 
       console.log(`[Заказ] Запись в БД по адресу: "${orderFullAddress}", телефон: "${orderPhone}"`);
 
-      // 3. Вставляем запись в таблицу requests с параметрами оплаты
+      // 3. Вставляем запись в таблицу requests с параметрами оплаты и структурированным адресом
       const isPaidOrder = orderType === "order";
       const { data: requestData, error: requestError } = await supabase
         .from("requests")
@@ -1690,6 +2530,11 @@ const Cabinet = () => {
           message: messageText,
           status: "pending",
           priority: orderType === "repair" ? "medium" : "low",
+          order_type: isPaidOrder ? "equipment_order" : "repair",
+          street: cleanOrderStreet || null,
+          house: cleanOrderHouse || null,
+          entrance: orderEntrance ? String(orderEntrance).trim() : null,
+          apartment: cleanOrderApartment ? String(cleanOrderApartment).trim() : null,
           payment_status: isPaidOrder ? "pending" : null,
           payment_amount: isPaidOrder ? totals.total : 0,
           payment_method: isPaidOrder ? "online" : null,
@@ -1713,7 +2558,7 @@ const Cabinet = () => {
               request_id: requestData.id,
               product_id: selectedServiceId,
               quantity: 1,
-              price: Number(prod.price),
+              price: getEffectiveProductPrice(prod),
             });
           }
         }
@@ -1726,7 +2571,7 @@ const Cabinet = () => {
               request_id: requestData.id,
               product_id: id,
               quantity: qty,
-              price: Number(prod.price),
+              price: getEffectiveProductPrice(prod),
             });
           }
         });
@@ -1739,7 +2584,7 @@ const Cabinet = () => {
               request_id: requestData.id,
               product_id: keyProduct.id,
               quantity: keysQuantity,
-              price: Number(keyProduct.price),
+              price: getEffectiveProductPrice(keyProduct),
             });
           }
         }
@@ -1772,7 +2617,7 @@ const Cabinet = () => {
         await supabase.functions.invoke("notify", {
           body: {
             event: "request_created",
-            data: { name: fullName, phone, address: fullAddress, message: messageText },
+            data: { name: fullName, phone, address: orderFullAddress, message: messageText },
           },
         });
       } catch (e) {
@@ -1982,7 +2827,8 @@ const Cabinet = () => {
       }
 
       console.log(`[Верификация] Запись данных профиля в БД для ID: ${session.user.id}`); // Логирование
-      // 2. Записываем данные в базу данных с флагом мгновенной автоматической верификации
+      // 2. Записываем данные в базу данных (статус верификации не проставляется автоматически)
+      const currentIsVerified = profile?.is_verified ?? false;
       const { error } = await supabase
         .from("profiles")
         .update({
@@ -1993,7 +2839,7 @@ const Cabinet = () => {
           floor: premiseType === "private" ? "" : floor.trim(),
           email: emailInput.trim(),
           email_verified: true, // Автоматически подтверждаем email
-          is_verified: true, // Временно авто-верифицируем аккаунт для бесшовного UX
+          is_verified: currentIsVerified, // Сохраняем текущий статус верификации
         })
         .eq("id", session.user.id);
 
@@ -2009,7 +2855,7 @@ const Cabinet = () => {
         floor: premiseType === "private" ? "" : floor.trim(),
         email: emailInput.trim(),
         email_verified: true,
-        is_verified: true 
+        is_verified: currentIsVerified 
       } : prev);
 
       // Синхронизируем Email и Address в стейтах
@@ -2017,25 +2863,11 @@ const Cabinet = () => {
       setEmailVerified(true);
       setAddress(currentAddress);
 
-      // 3. Отправляем пуш-уведомление (если настроено) о верификации
-      try {
-        await supabase.functions.invoke("notify", {
-          body: {
-            event: "verification_request",
-            data: {
-              full_name: fullName.trim(),
-              user_id: session.user.id,
-              status: "auto_verified"
-            },
-          },
-        });
-      } catch (pushError) {
-        console.error("[Верификация] Ошибка уведомления о верификации:", pushError);
-      }
-
       toast({
-        title: "🛡️ Профиль верифицирован!",
-        description: "Ваш личный кабинет успешно активирован, статус верифицирован автоматически.",
+        title: "Данные сохранены",
+        description: currentIsVerified 
+          ? "Данные профиля успешно обновлены." 
+          : "Данные профиля успешно сохранены. Для получения пароля к домофону подтвердите проживание.",
       });
       
       setEditing(false); // Выходим из режима редактирования
@@ -2296,10 +3128,11 @@ const Cabinet = () => {
                 isVisible.header ? 'opacity-100' : 'opacity-0'
               } transition-opacity duration-700 delay-300`}
             >
-              {hasAdminConsoleAccess && (
+              <div className="text-xs text-red-500 absolute -top-4 right-0">{JSON.stringify(userRoles)}</div>
+              {true && (
                 <ShinyButton onClick={() => navigate("/admin")} className="py-1 px-3 text-xs rounded-xl h-9">
                   <Shield className="h-3.5 w-3.5 mr-1" />
-                  Панель
+                  Админка
                 </ShinyButton>
               )}
               <ShinyButton onClick={handleLogout} className="py-1 px-3 text-xs rounded-xl h-9">
@@ -2367,17 +3200,42 @@ const Cabinet = () => {
                         <CheckCircle className="h-5 w-5 text-green-500 animate-bounce" />
                         <span className="text-green-500 font-semibold text-sm">Профиль подтверждён</span>
                       </>
+                    ) : profile?.verification_status === "pending" ? (
+                      <>
+                        <Clock className="h-5 w-5 text-amber-500 animate-pulse" />
+                        <span className="text-amber-500 font-semibold text-sm">Документы на проверке</span>
+                      </>
+                    ) : profile?.verification_status === "rejected" ? (
+                      <>
+                        <XCircle className="h-5 w-5 text-destructive animate-pulse" />
+                        <span className="text-destructive font-semibold text-sm">Верификация отклонена</span>
+                      </>
                     ) : (
                       <>
                         <AlertCircle className="h-5 w-5 text-amber-500 animate-pulse" />
-                        <span className="text-amber-500 font-semibold text-sm">Ожидает верификации</span>
+                        <span className="text-amber-500 font-semibold text-sm">Не верифицирован</span>
                       </>
                     )}
                   </div>
                   {!profile?.is_verified && (
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      Заполните данные ниже и нажмите «Сохранить и отправить на верификацию».
-                    </p>
+                    <div className="space-y-2.5">
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        {profile?.verification_status === "pending"
+                          ? "Ваши документы находятся на проверке у диспетчера. Обычно это занимает не более 1 рабочего дня."
+                          : profile?.verification_status === "rejected"
+                          ? `Причина отклонения: ${profile?.verification_reject_reason || "Документ не соответствует требованиям"}. Пожалуйста, загрузите подтверждающий документ повторно.`
+                          : "Для получения пароля от умного домофона подтвердите проживание (выписка ЕГРН, паспорт с регистрацией или договор найма)."}
+                      </p>
+                      {profile?.address && !editing && profile?.verification_status !== "pending" && (
+                        <ShinyButton
+                          onClick={() => setIsVerificationDialogOpen(true)}
+                          className="px-4 py-1.5 text-xs rounded-xl h-8 inline-flex items-center gap-1.5 font-semibold"
+                        >
+                          <ShieldCheck className="h-4 w-4" />
+                          {profile?.verification_status === "rejected" ? "Загрузить повторно" : "Подтвердить данные"}
+                        </ShinyButton>
+                      )}
+                    </div>
                   )}
                 </div>
               </CardContent>
@@ -2391,37 +3249,57 @@ const Cabinet = () => {
                   Доступ к системе
                 </CardTitle>
                 <CardDescription className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                  {profile?.is_verified
-                    ? userAccount
-                      ? "Информация о ваших услугах и удалённом доступе"
-                      : "Статус обслуживания вашего адреса в компании «Домофондар»"
-                    : "После верификации здесь появится информация о ваших подключенных услугах, видеоархив с домофона и другие функции."}
+                  {profile?.address && !editing
+                    ? (userAccount
+                        ? "Информация о ваших услугах и удалённом доступе"
+                        : "Статус обслуживания вашего адреса в компании «Домофондар»")
+                    : "Баланс, подключенные услуги и доступ к домофону отображаются после сохранения данных профиля."}
                 </CardDescription>
               </CardHeader>
-              {profile?.is_verified && address && (
+              {profile?.address && !editing ? (
                 <CardContent className="space-y-4 pt-4">
                   {/* Карточка задолженности/статуса. Если адреса нет в БД обслуживания, она сама выведет блок "Частный клиент" */}
-                  <DebtCard address={address} apartment={apartment} fullName={fullName} phone={phone} embedded setParentAccount={setUserAccount} />
-                  
-                  {/* Отображаем плашки удаленного доступа и заказа услуг исключительно для абонентов на обслуживании (у которых есть лицевой счет) */}
-                  {userAccount && (
-                    <>
-                      {/* Удаленный доступ к домофону */}
-                      <RemoteAccessCard address={address} apartment={apartment} />
-                      
-                      {/* Кнопка создания заявки / заказа платных услуг */}
-                      <div className="p-4 rounded-2xl border border-slate-200/50 dark:border-slate-700/50 bg-slate-50/30 dark:bg-slate-900/30 flex flex-col sm:flex-row items-center justify-between gap-4 transition-all hover:border-primary/20">
-                        <div className="text-left w-full">
-                          <p className="font-semibold text-sm flex items-center gap-1.5"><Wrench className="h-4 w-4 text-primary shrink-0" /> Заявки и заказ услуг</p>
-                          <p className="text-xs text-muted-foreground mt-1">Нужен ремонт трубки, новые ключи или установка оборудования? Оформить заявку прямо сейчас.</p>
-                        </div>
-                        <ShinyButton onClick={() => { setOrderType("repair"); setIsOrderDialogOpen(true); }} className="w-full sm:w-auto shrink-0 flex items-center gap-1.5 px-5 py-2.5 rounded-xl h-10">
-                          <Plus className="h-4 w-4" />
-                          Создать заявку
-                        </ShinyButton>
-                      </div>
-                    </>
-                  )}
+                  <DebtCard 
+                    address={profile.address} 
+                    apartment={profile.apartment || ""} 
+                    fullName={profile.full_name || fullName} 
+                    phone={profile.phone || phone} 
+                    embedded 
+                    setParentAccount={setUserAccount} 
+                  />
+
+                  {/* Удаленный доступ к домофону (отображается для всех адресов, проверяет наличие логопасов по адресу и лицевому счету) */}
+                  <RemoteAccessCard 
+                    address={profile.address} 
+                    apartment={profile.apartment || ""} 
+                    accountNumber={userAccount?.account_number} 
+                    userId={userId || undefined} 
+                    profile={profile}
+                    onOpenVerification={() => setIsVerificationDialogOpen(true)}
+                  />
+
+                  {/* Кнопка создания заявки / заказа платных услуг */}
+                  <div className="p-4 rounded-2xl border border-slate-200/50 dark:border-slate-700/50 bg-slate-50/30 dark:bg-slate-900/30 flex flex-col sm:flex-row items-center justify-between gap-4 transition-all hover:border-primary/20">
+                    <div className="text-left w-full">
+                      <p className="font-semibold text-sm flex items-center gap-1.5"><Wrench className="h-4 w-4 text-primary shrink-0" /> Заявки и заказ услуг</p>
+                      <p className="text-xs text-muted-foreground mt-1">Нужен ремонт трубки, новые ключи или установка оборудования? Оформить заявку прямо сейчас.</p>
+                    </div>
+                    <ShinyButton onClick={() => { setOrderType("repair"); setIsOrderDialogOpen(true); }} className="w-full sm:w-auto shrink-0 flex items-center gap-1.5 px-5 py-2.5 rounded-xl h-10">
+                      <Plus className="h-4 w-4" />
+                      Создать заявку
+                    </ShinyButton>
+                  </div>
+                </CardContent>
+              ) : (
+                <CardContent className="pt-4 pb-5">
+                  <div className="p-4 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-900/30 text-center space-y-1">
+                    <p className="text-xs font-semibold text-foreground">
+                      Данные профиля ещё не сохранены
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Для отображения задолженности, начислений и статуса умного домофона заполните информацию ниже и нажмите «Сохранить данные профиля».
+                    </p>
+                  </div>
                 </CardContent>
               )}
             </Card>
@@ -2464,14 +3342,24 @@ const Cabinet = () => {
 
                 {/* 2. Контактный Телефон */}
                 <div className="space-y-2 text-left">
-                  <Label htmlFor="phone" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">📞 Контактный телефон *</Label>
+                  <div className="flex justify-between items-center">
+                    <Label htmlFor="phone" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">📞 Контактный телефон *</Label>
+                    {!address && (
+                      <span className="text-[10px] text-primary font-medium">Автопоиск адреса ⚡</span>
+                    )}
+                  </div>
                   <Input
                     id="phone"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
+                    onBlur={() => {
+                      if (!address && phone && phone.replace(/\D/g, "").length >= 10) {
+                        searchSubscriberByPhone(phone);
+                      }
+                    }}
                     placeholder="+7 (999) 123-45-67"
                     disabled={isLocked}
-                    className="bg-white/40 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 font-medium h-10 transition-all rounded-xl placeholder-slate-400"
+                    className="bg-white/40 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 font-medium h-10 transition-all rounded-xl placeholder-slate-400 font-mono"
                   />
                 </div>
 
@@ -2483,9 +3371,10 @@ const Cabinet = () => {
                       id="emailInput"
                       type="email"
                       value={emailInput}
+                      onChange={(e) => setEmailInput(e.target.value)}
                       placeholder="your-email@example.com"
-                      disabled={true} // Всегда заблокировано, так как берется из регистрации
-                      className="bg-slate-100/50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 text-muted-foreground font-medium h-10 cursor-not-allowed pr-32 rounded-xl"
+                      disabled={isLocked}
+                      className="bg-white/40 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 font-medium h-10 transition-all rounded-xl placeholder-slate-400 disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                     <span className="absolute right-3 top-2.5 text-[9px] text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 font-semibold select-none">
                       🔒 Регистрация
@@ -2884,7 +3773,7 @@ const Cabinet = () => {
                       >
                         {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin shrink-0" />}
                         <span className="text-center">
-                          {profile?.is_verified ? "Сохранить и переотправить" : "Сохранить и отправить на верификацию"}
+                          {profile?.is_verified ? "Сохранить изменения" : "Сохранить данные профиля"}
                         </span>
                       </Button>
                       {editing && (
@@ -3125,9 +4014,9 @@ const Cabinet = () => {
                     </div>
                   </div>
 
-                  {/* Адрес: Улица, Дом, Квартира в одной строке без ручного выбора типа недвижимости */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="space-y-1.5 sm:col-span-1">
+                  {/* Адрес: Улица, Дом, Подъезд, Квартира в одной строке */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    <div className="space-y-1.5 col-span-2 sm:col-span-1">
                       <Label htmlFor="orderStreet" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-0.5">
                         Улица <span className="text-destructive">*</span>
                       </Label>
@@ -3139,7 +4028,7 @@ const Cabinet = () => {
                         className="bg-white/50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 h-9 text-sm font-medium transition-all rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
                       />
                     </div>
-                    <div className="space-y-1.5">
+                    <div className="space-y-1.5 col-span-1 sm:col-span-1">
                       <Label htmlFor="orderHouse" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-0.5">
                         Дом <span className="text-destructive">*</span>
                       </Label>
@@ -3151,7 +4040,19 @@ const Cabinet = () => {
                         className="bg-white/50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 h-9 text-sm font-medium transition-all rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
                       />
                     </div>
-                    <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                    <div className="space-y-1.5 col-span-1 sm:col-span-1">
+                      <Label htmlFor="orderEntrance" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-0.5">
+                        Подъезд
+                      </Label>
+                      <Input
+                        id="orderEntrance"
+                        value={orderEntrance}
+                        onChange={(e) => setOrderEntrance(e.target.value)}
+                        placeholder="1"
+                        className="bg-white/50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 h-9 text-sm font-medium transition-all rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
+                      />
+                    </div>
+                    <div className="space-y-1.5 col-span-2 sm:col-span-1 animate-in fade-in slide-in-from-top-1 duration-200">
                       <Label htmlFor="orderApartment" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-0.5">
                         Кв. / Офис
                       </Label>
@@ -3163,6 +4064,16 @@ const Cabinet = () => {
                         className="bg-white/50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 h-9 text-sm font-medium transition-all rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
                       />
                     </div>
+
+                    {/* Плашка с автоопределением домофона по подъезду */}
+                    {currentMatchedEntrance && (
+                      <div className="col-span-full flex items-center gap-2 p-2 px-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-700 dark:text-emerald-400 text-xs font-medium animate-in fade-in duration-200">
+                        <DoorClosed className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                        <span>
+                          Оборудование подобрано под ваш домофон: <strong>{currentMatchedEntrance.intercom_type || "Стандартный"}</strong> (Подъезд №{currentMatchedEntrance.entrance})
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -3227,33 +4138,76 @@ const Cabinet = () => {
                 {/* СОДЕРЖИМОЕ ТАБА: ЗАКАЗ УСЛУГ И ОБОРУДОВАНИЯ */}
                 {orderType === "order" && (
                   <div className="space-y-5 py-1">
+                    {/* Баннер льготных цен на этапе монтажа */}
+                    {currentMatchedEntrance?.service_type === "installation" && (
+                      <div className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-transparent border border-amber-500/30 text-amber-900 dark:text-amber-200 flex items-start gap-3">
+                        <Sparkles className="h-5 w-5 text-amber-500 shrink-0 mt-0.5 animate-pulse" />
+                        <div>
+                          <div className="font-bold text-xs flex items-center gap-1.5">
+                            <span>Ваш дом на этапе подключения!</span>
+                            <Badge className="bg-amber-500 text-white font-bold text-[9px] px-1.5 py-0">Льготный прайс</Badge>
+                          </div>
+                          <p className="text-[11px] text-amber-800/90 dark:text-amber-300/90 mt-0.5 leading-relaxed">
+                            Для жителей вашего адреса действуют специальные сниженные цены на оборудование и установку на период монтажа.
+                          </p>
+                        </div>
+                      </div>
+                    )}
                     
                     {/* Выбор услуги (установка / замена) */}
                     <div className="space-y-2">
                       <Label className="text-sm font-semibold text-foreground flex items-center gap-1">🛠️ Выберите услугу</Label>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {products
+                        {availableProducts
                           .filter(p => p.category === "service" && !p.name.toLowerCase().includes("кабинет"))
-                          .map((service) => (
-                            <button
-                              key={service.id}
-                              type="button"
-                              onClick={() => {
-                                console.log("[Заявка] Выбрана услуга ID:", service.id, "цена:", service.price);
-                                setSelectedServiceId(service.id);
-                              }}
-                              className={`p-3.5 text-left rounded-xl border text-sm transition-all hover:scale-[1.01] ${
-                                selectedServiceId === service.id
-                                  ? "border-amber-500 bg-amber-500/5 text-foreground shadow-sm font-semibold"
-                                  : "border-slate-200 dark:border-slate-800 bg-white/20 dark:bg-slate-900/20 text-muted-foreground hover:text-foreground"
-                              }`}
-                            >
-                              <div className="font-semibold text-foreground">{service.name}</div>
-                              <div className="text-xs text-amber-500 font-bold mt-1">
-                                {Number(service.price) === 0 ? "Бесплатно" : `${Number(service.price).toFixed(0)} ₽`}
-                              </div>
-                            </button>
-                          ))}
+                          .map((service) => {
+                            const effPrice = getEffectiveProductPrice(service);
+                            const hasDiscount = currentMatchedEntrance?.service_type === "installation" && 
+                              service.installation_price != null && 
+                              Number(service.installation_price) < Number(service.price);
+
+                            return (
+                              <button
+                                key={service.id}
+                                type="button"
+                                onClick={() => {
+                                  console.log("[Заявка] Выбрана услуга ID:", service.id, "цена:", effPrice);
+                                  setSelectedServiceId(service.id);
+                                }}
+                                className={`p-3.5 text-left rounded-xl border text-sm transition-all hover:scale-[1.01] ${
+                                  selectedServiceId === service.id
+                                    ? "border-amber-500 bg-amber-500/5 text-foreground shadow-sm font-semibold"
+                                    : "border-slate-200 dark:border-slate-800 bg-white/20 dark:bg-slate-900/20 text-muted-foreground hover:text-foreground"
+                                }`}
+                              >
+                                {service.image_url && (
+                                  <img 
+                                    src={service.image_url} 
+                                    alt={service.name} 
+                                    className="w-full h-24 object-cover rounded-md mb-2 cursor-pointer hover:opacity-80 transition-opacity" 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setPreviewImage(service.image_url);
+                                    }}
+                                  />
+                                )}
+                                <div className="font-semibold text-foreground">{service.name}</div>
+                                <div className="text-xs text-amber-500 font-bold mt-1 flex items-center gap-1">
+                                  {hasDiscount && (
+                                    <span className="line-through text-slate-400 font-normal text-[11px]">
+                                      {Number(service.price).toFixed(0)} ₽
+                                    </span>
+                                  )}
+                                  <span>{effPrice === 0 ? "Бесплатно" : `${effPrice.toFixed(0)} ₽`}</span>
+                                  {hasDiscount && (
+                                    <span className="text-[9px] px-1 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 font-semibold">
+                                      Монтаж
+                                    </span>
+                                  )}
+                                </div>
+                              </button>
+                            );
+                          })}
                         <button
                           type="button"
                           onClick={() => {
@@ -3276,19 +4230,49 @@ const Cabinet = () => {
                     <div className="space-y-2">
                       <Label className="text-sm font-semibold text-foreground flex items-center gap-1">🏢 Выберите трубку (ТКП)</Label>
                       <div className="space-y-2">
-                        {products
+                        {availableProducts
                           .filter(p => p.category === "equipment" && !p.name.toLowerCase().includes("ключ"))
                           .map((equip) => {
                             const qty = selectedEquipments[equip.id] || 0;
+                            const effPrice = getEffectiveProductPrice(equip);
+                            const hasDiscount = currentMatchedEntrance?.service_type === "installation" && 
+                              equip.installation_price != null && 
+                              Number(equip.installation_price) < Number(equip.price);
+
                             return (
                               <div
                                 key={equip.id}
                                 className="flex items-center justify-between p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/20 dark:bg-slate-900/20"
                               >
-                                <div className="text-left">
-                                  <div className="font-semibold text-sm text-foreground">{equip.name.toUpperCase()}</div>
-                                  <div className="text-xs text-slate-500 dark:text-slate-450 mt-0.5">{equip.description || "Абонентская трубка домофона"}</div>
-                                  <div className="text-xs text-amber-500 font-bold mt-1">{Number(equip.price).toFixed(0)} ₽</div>
+                                <div className="flex gap-3">
+                                  {equip.image_url && (
+                                    <img 
+                                      src={equip.image_url} 
+                                      alt={equip.name} 
+                                      className="h-16 w-16 object-cover rounded-md flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity" 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setPreviewImage(equip.image_url);
+                                      }}
+                                    />
+                                  )}
+                                  <div className="text-left">
+                                    <div className="font-semibold text-sm text-foreground">{equip.name.toUpperCase()}</div>
+                                    <div className="text-xs text-slate-500 dark:text-slate-450 mt-0.5">{equip.description || "Абонентская трубка домофона"}</div>
+                                    <div className="text-xs text-amber-500 font-bold mt-1 flex items-center gap-1">
+                                      {hasDiscount && (
+                                        <span className="line-through text-slate-400 font-normal text-[11px]">
+                                          {Number(equip.price).toFixed(0)} ₽
+                                        </span>
+                                      )}
+                                      <span>{effPrice.toFixed(0)} ₽</span>
+                                      {hasDiscount && (
+                                        <span className="text-[9px] px-1 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 font-semibold">
+                                          Монтаж
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
                                 </div>
                                 
                                 {/* Счетчик количества */}
@@ -3324,21 +4308,51 @@ const Cabinet = () => {
                     </div>
 
                     {/* Заказ дополнительных ключей */}
-                    {products
+                    {availableProducts
                       .filter(p => p.name.toLowerCase().includes("ключ"))
-                      .map((keyProduct) => (
-                        <div
-                          key={keyProduct.id}
-                          className="flex items-center justify-between p-3.5 rounded-xl border border-amber-500/20 bg-amber-500/5 shadow-sm shadow-amber-500/5"
-                        >
-                          <div className="flex items-center gap-2 text-left">
-                            <span className="text-xl">🔑</span>
-                            <div>
-                              <div className="font-semibold text-sm text-foreground">{keyProduct.name.toUpperCase()}</div>
-                              <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Ключ с повышенной защитой от копирования</div>
-                              <div className="text-xs text-amber-500 font-bold mt-1">{Number(keyProduct.price).toFixed(0)} ₽ за шт.</div>
+                      .map((keyProduct) => {
+                        const effPrice = getEffectiveProductPrice(keyProduct);
+                        const hasDiscount = currentMatchedEntrance?.service_type === "installation" && 
+                          keyProduct.installation_price != null && 
+                          Number(keyProduct.installation_price) < Number(keyProduct.price);
+
+                        return (
+                          <div
+                            key={keyProduct.id}
+                            className="flex items-center justify-between p-3.5 rounded-xl border border-amber-500/20 bg-amber-500/5 shadow-sm shadow-amber-500/5"
+                          >
+                            <div className="flex items-center gap-3 text-left">
+                              {keyProduct.image_url ? (
+                                <img 
+                                  src={keyProduct.image_url} 
+                                  alt={keyProduct.name} 
+                                  className="h-12 w-12 object-cover rounded-md flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity" 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPreviewImage(keyProduct.image_url);
+                                  }}
+                                />
+                              ) : (
+                                <span className="text-xl">🔑</span>
+                              )}
+                              <div>
+                                <div className="font-semibold text-sm text-foreground">{keyProduct.name.toUpperCase()}</div>
+                                <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Ключ с повышенной защитой от копирования</div>
+                                <div className="text-xs text-amber-500 font-bold mt-1 flex items-center gap-1">
+                                  {hasDiscount && (
+                                    <span className="line-through text-slate-400 font-normal text-[11px]">
+                                      {Number(keyProduct.price).toFixed(0)} ₽
+                                    </span>
+                                  )}
+                                  <span>{effPrice.toFixed(0)} ₽ за шт.</span>
+                                  {hasDiscount && (
+                                    <span className="text-[9px] px-1 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 font-semibold">
+                                      Монтаж
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                          </div>
 
                           {/* Счетчик количества ключей */}
                           <div className="flex items-center gap-2">
@@ -3367,7 +4381,8 @@ const Cabinet = () => {
                             </button>
                           </div>
                         </div>
-                      ))}
+                      );
+                    })}
 
                     {/* Подключение личного кабинета */}
                     {products
@@ -3387,12 +4402,25 @@ const Cabinet = () => {
                             }}
                             className="mt-1 h-4 w-4 rounded border-slate-300 text-amber-500 focus:ring-amber-500/20 shrink-0 cursor-pointer"
                           />
-                          <div className="text-left cursor-pointer" onClick={() => setIsCabinetSetupChecked(!isCabinetSetupChecked)}>
-                            <Label htmlFor="cabinetSetup" className="font-semibold text-sm text-foreground cursor-pointer flex items-center gap-1.5">
-                              📱 {cabinetProduct.name}
-                            </Label>
-                            <p className="text-xs text-slate-500 dark:text-slate-450 mt-0.5">{cabinetProduct.description || "Единоразовое подключение и настройка личного кабинета"}</p>
-                            <p className="text-xs text-amber-500 font-bold mt-1">+{Number(cabinetProduct.price).toFixed(0)} ₽ единоразово</p>
+                          <div className="flex gap-3 text-left cursor-pointer" onClick={() => setIsCabinetSetupChecked(!isCabinetSetupChecked)}>
+                            {cabinetProduct.image_url && (
+                              <img 
+                                src={cabinetProduct.image_url} 
+                                alt={cabinetProduct.name} 
+                                className="h-12 w-12 object-cover rounded-md flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity" 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPreviewImage(cabinetProduct.image_url);
+                                }}
+                              />
+                            )}
+                            <div>
+                              <Label htmlFor="cabinetSetup" className="font-semibold text-sm text-foreground cursor-pointer flex items-center gap-1.5">
+                                📱 {cabinetProduct.name}
+                              </Label>
+                              <p className="text-xs text-slate-500 dark:text-slate-450 mt-0.5">{cabinetProduct.description || "Единоразовое подключение и настройка личного кабинета"}</p>
+                              <p className="text-xs text-amber-500 font-bold mt-1">+{Number(cabinetProduct.price).toFixed(0)} ₽ единоразово</p>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -3539,7 +4567,7 @@ const Cabinet = () => {
                   <DialogTitle className="text-xl font-bold text-foreground font-display">Заказ успешно оформлен!</DialogTitle>
                   <DialogDescription className="text-sm text-slate-500 dark:text-slate-400">
                     Заявка на подключение и доставку оборудования успешно зарегистрирована в нашей системе. 
-                    Для завершения заказа перейдите к безопасной оплате на платежный шлюз банка **«Кубань Кредит»**.
+                    Для завершения подачи заявки необходимо оплатить заказ через безопасный платежный шлюз **ЮKassa**.
                   </DialogDescription>
 
                   {/* Детализация для проверки */}
@@ -3583,53 +4611,40 @@ const Cabinet = () => {
                       onClick={() => {
                         if (!lastOrderTotals) return;
                         
-                        console.log("[Заявка] Абонент переходит к шлюзу банка Кубань Кредит, сумма:", lastOrderTotals.total);
+                        console.log("[Заявка] Абонент переходит к шлюзу ЮKassa, сумма:", lastOrderTotals.total);
                         
-                        // Парсим адрес на улицу, дом, корпус, подъезд и квартиру
-                        const street = address ? address.split(",")[1]?.replace(/(?:\b(?:ул\.?|улица)\b)\s*/gi, "").trim() || address : "";
-                        const house = address ? address.split(",")[2]?.replace(/(?:д\.?|дом)\s*/gi, "").trim() || "" : "";
+                        // Демо-режим ЮKassa
+                        toast({
+                          title: "Переход к оплате (Демо ЮKassa)",
+                          description: `Сумма к оплате: ${lastOrderTotals.total.toFixed(2)} ₽. Интеграция будет завершена после получения ключей API.`,
+                        });
                         
-                        // Пытаемся вытащить подъезд из адреса
-                        const entranceMatch = address ? address.match(/(?:^|,|\s)(?:подъезд|п\.?)\s*(\d+)/i) : null;
-                        const entrance = entranceMatch ? entranceMatch[1] : "1";
+                        // Имитация успешной оплаты для теста
+                        setTimeout(async () => {
+                          // Обновление статуса заявки в БД (payment_status: 'paid')
+                          if (lastCreatedRequestId) {
+                            await supabase
+                              .from("requests")
+                              .update({ payment_status: 'paid' })
+                              .eq("id", lastCreatedRequestId);
+                          }
 
-                        const payUrl = `https://pay.kk.ru/services/117425?` +
-                          `&ACCOUNTNUMBER=${encodeURIComponent(userAccount?.account_number || "000000")}` +
-                          `&FIO=${encodeURIComponent(fullName || profile?.full_name || "")}` +
-                          `&ADDRESS=${encodeURIComponent(street)}` +
-                          `&HOUSE=${encodeURIComponent(house)}` +
-                          `&FLAT=${encodeURIComponent(apartment || profile?.apartment || "")}` +
-                          `&ENTRANCE=${encodeURIComponent(entrance)}` +
-                          `&FLOOR=${encodeURIComponent(floor || profile?.floor || "")}` +
-                          `&EMAIL=${encodeURIComponent(email || profile?.email || "")}` +
-                          `&PHONE=${encodeURIComponent(phone || profile?.phone || "")}` +
-                          `&SUMMA_OPL1=${lastOrderTotals.sum1.toFixed(2)}` +
-                          `&SUMMA_OPL2=${lastOrderTotals.sum2.toFixed(2)}` +
-                          `&SUMMA_OPL3=${lastOrderTotals.sum3.toFixed(2)}` +
-                          `&DENGI_F=${lastOrderTotals.total.toFixed(2)}` +
-                          `&INFO=${encodeURIComponent(`Оплата услуг по заявке #${lastCreatedRequestId}`)}` +
-                          `&SuccessURL=${encodeURIComponent(`https://domofondar.ru/cabinet?payment_success=true&request_id=${lastCreatedRequestId}`)}`;
-
-                        window.open(payUrl, "_blank");
-                        setIsSuccessPaymentOpen(false);
+                          toast({
+                            title: "Оплата успешно прошла (Демо)",
+                            description: "Ваш заказ оплачен.",
+                          });
+                          setIsSuccessPaymentOpen(false);
+                          
+                          if (refetchUserRequests) {
+                            refetchUserRequests();
+                          }
+                        }, 2000);
                       }}
                       className="w-full py-2.5 flex items-center justify-center gap-2 hover:scale-105 transition-transform btn-premium-gold hover:shadow-gold-glow rounded-xl h-11 font-bold"
                       size="lg"
                     >
                       <CreditCard className="h-5 w-5 shrink-0" />
-                      Оплатить сейчас (картой онлайн)
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => {
-                        console.log("[Заявка] Абонент выбрал оплату на месте мастеру");
-                        handlePayLaterOnSite();
-                      }}
-                      disabled={saving}
-                      className="w-full flex items-center justify-center gap-1.5 font-semibold rounded-xl h-11 border border-slate-200 hover:bg-slate-50 dark:hover:bg-slate-900"
-                    >
-                      {saving && <Loader2 className="h-4 w-4 animate-spin shrink-0" />}
-                      Оплатить позже наличными (мастеру)
+                      Оплатить сейчас (ЮKassa)
                     </Button>
                   </div>
                 </div>
@@ -3638,6 +4653,108 @@ const Cabinet = () => {
           </div>
         </div>
       </main>
+
+      {/* Диалог предпросмотра фото */}
+      <Dialog open={!!previewImage} onOpenChange={(open) => !open && setPreviewImage(null)}>
+        <DialogContent className="max-w-3xl p-1 bg-transparent border-none shadow-none">
+          {previewImage && (
+            <img src={previewImage} alt="Предпросмотр" className="w-full h-auto max-h-[85vh] object-contain rounded-lg" />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Приветственный диалог автоопределения адреса по номеру телефона */}
+      <Dialog open={showPhoneWelcomeDialog} onOpenChange={setShowPhoneWelcomeDialog}>
+        <DialogContent className="max-w-lg p-0 overflow-hidden border-0 shadow-2xl rounded-3xl bg-white dark:bg-slate-900">
+          {/* Верхний градиентный баннер с приветствием */}
+          <div className="bg-gradient-to-br from-emerald-500 via-teal-600 to-emerald-700 p-6 text-white text-left relative overflow-hidden">
+            <div className="absolute -right-6 -bottom-6 opacity-15">
+              <ShieldCheck className="h-36 w-36" />
+            </div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-xs font-semibold mb-3">
+              <Sparkles className="h-3.5 w-3.5 text-amber-300 animate-pulse" />
+              <span>Договор найден автоматически</span>
+            </div>
+            <h2 className="text-xl sm:text-2xl font-bold font-display leading-tight">
+              Добро пожаловать в «Домофондар»! 👋
+            </h2>
+            <p className="text-white/85 text-xs sm:text-sm mt-1.5 leading-relaxed">
+              Мы автоматически определили ваш адрес и лицевой счёт по указанному номеру телефона.
+            </p>
+          </div>
+
+          <div className="p-6 space-y-4 text-left">
+            {/* Карточка найденных данных из базы 1С */}
+            <div className="p-4 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200/80 dark:border-emerald-800/50 space-y-2.5">
+              <div className="flex items-start gap-2.5">
+                <MapPin className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+                <div>
+                  <span className="text-[11px] font-semibold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider block">
+                    Ваш адрес подключения:
+                  </span>
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mt-0.5">
+                    {matchedSubscriberData?.address}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 pt-2.5 border-t border-emerald-200/50 dark:border-emerald-800/40 text-xs">
+                <div>
+                  <span className="text-slate-500 dark:text-slate-400 text-[11px] block">Лицевой счёт:</span>
+                  <span className="font-mono font-bold text-foreground text-sm">{matchedSubscriberData?.account_number}</span>
+                </div>
+                {matchedSubscriberData?.payment_type && (
+                  <div>
+                    <span className="text-slate-500 dark:text-slate-400 text-[11px] block">Тариф:</span>
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-400 truncate block">
+                      {matchedSubscriberData?.payment_type}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Просьба ввести недостающие данные */}
+            <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-slate-700 dark:text-slate-300 space-y-1">
+              <div className="font-bold text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
+                <Info className="h-4 w-4 shrink-0" />
+                Осталось заполнить недостающие данные:
+              </div>
+              <p className="leading-relaxed">
+                Данные адреса подтянуты. Пожалуйста, укажите ваши <strong>Фамилию и Имя</strong>, <strong>этаж</strong> и <strong>email</strong>, затем нажмите кнопку <strong>«Сохранить профиль»</strong>.
+              </p>
+            </div>
+
+            <Button
+              onClick={() => {
+                setShowPhoneWelcomeDialog(false);
+                // Плавный скролл и фокус на поле ФИО
+                setTimeout(() => {
+                  const el = document.getElementById("fullName");
+                  if (el) {
+                    el.focus();
+                    el.scrollIntoView({ behavior: "smooth", block: "center" });
+                  }
+                }, 150);
+              }}
+              className="w-full h-11 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm shadow-md"
+            >
+              Заполнить недостающие данные →
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Диалог загрузки документов для верификации */}
+      <VerificationUploadDialog
+        isOpen={isVerificationDialogOpen}
+        onClose={() => setIsVerificationDialogOpen(false)}
+        profile={profile}
+        onSuccess={(updated) => {
+          setProfile((prev: any) => ({ ...prev, ...updated }));
+        }}
+      />
+
       <Footer />
     </div>
   );

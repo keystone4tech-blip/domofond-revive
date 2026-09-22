@@ -1,11 +1,11 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Link, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { 
   LayoutDashboard, ClipboardList, FileText, Package, 
   Users, Building2, MapPin, BarChart3, ShieldCheck, 
-  Home, LogOut, Shield, User
+  Home, LogOut, Shield, User, FileSpreadsheet, DoorClosed, KeyRound, ClipboardCheck
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -20,27 +20,55 @@ interface FSMSidebarProps {
 
 export const FSMSidebar = ({ activeTab, setActiveTab, isManager, isOpen, setIsOpen }: FSMSidebarProps) => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
-  // Получение количества активных задач и заявок для бейджей (обновление каждые 15 сек)
+  // Получение количества активных задач, заявок и верификаций для бейджей (онлайн опрос каждые 5 сек)
   const { data: counts } = useQuery({
     queryKey: ["fsm-sidebar-counts"],
     queryFn: async () => {
-      console.log("[FSMSidebar] Получение счетчиков для бейджей...");
-      const [tasksRes, requestsRes] = await Promise.all([
+      console.log("[FSMSidebar] Онлайн-запрос счетчиков для бейджей (задачи, заявки, верификации)...");
+      const [tasksRes, requestsRes, profilesRes] = await Promise.all([
         supabase.from("tasks").select("status"),
         supabase.from("requests").select("status"),
+        supabase.from("profiles").select("id, is_verified, verification_status, verification_document_url, full_name"),
       ]);
       
       const tasks = tasksRes.data || [];
       const requests = requestsRes.data || [];
+      const profiles = profilesRes.data || [];
       
+      // Подсчет количества поступивших заявок на верификацию
+      const pendingVerifications = profiles.filter((p: any) => {
+        if (p.is_verified) return false;
+        if (p.verification_status === "rejected") return false;
+        if (p.verification_status === "pending") return true;
+        if (p.verification_document_url) return true;
+        return false;
+      }).length;
+
       return {
         pendingTasks: tasks.filter((t) => t.status === "pending" || t.status === "assigned" || t.status === "in_progress").length,
         pendingRequests: requests.filter((r) => r.status === "pending" || r.status === "in_progress").length,
+        pendingVerifications,
       };
     },
-    refetchInterval: 15000, // Авто-обновление каждые 15 секунд
+    refetchInterval: 5000, // Онлайн-обновление каждые 5 секунд
   });
+
+  // Мгновенная синхронизация через локальные события при отправке верификации в ЛК
+  useEffect(() => {
+    const handleSync = () => {
+      console.log("[FSMSidebar] Получен сигнал обновления верификации, синхронизируем счётчики...");
+      queryClient.invalidateQueries({ queryKey: ["fsm-sidebar-counts"] });
+    };
+
+    window.addEventListener("storage", handleSync);
+    window.addEventListener("verification_submitted", handleSync);
+    return () => {
+      window.removeEventListener("storage", handleSync);
+      window.removeEventListener("verification_submitted", handleSync);
+    };
+  }, [queryClient]);
 
   // Элементы навигации
   const menuItems = [
@@ -57,7 +85,15 @@ export const FSMSidebar = ({ activeTab, setActiveTab, isManager, isOpen, setIsOp
       icon: FileText, 
       badge: counts?.pendingRequests || 0 
     },
+    // Раздел поквартирной ведомости оборудования по домам для монтажников
+    { id: "installer-sheet", label: "Лист монтажника", icon: ClipboardCheck },
     { id: "products", label: "Товары и услуги", icon: Package },
+    // Раздел управления адресами и привязкой оборудования к подъездам
+    { id: "addresses", label: "Адреса и подъезды", icon: DoorClosed },
+    // Раздел управления и загрузки лицевых счетов для сотрудников
+    { id: "accounts", label: "Лицевые счета", icon: FileSpreadsheet },
+    // Раздел управления логопасами умного домофона (учетными данными приложения)
+    { id: "logins", label: "Логопасы", icon: KeyRound },
   ];
 
   // Элементы навигации только для менеджера
@@ -66,7 +102,12 @@ export const FSMSidebar = ({ activeTab, setActiveTab, isManager, isOpen, setIsOp
     { id: "clients", label: "Клиенты / Объекты", icon: Building2 },
     { id: "map", label: "Карта мастеров", icon: MapPin },
     { id: "reports", label: "Финансовые отчеты", icon: BarChart3 },
-    { id: "verification", label: "Верификация", icon: ShieldCheck },
+    { 
+      id: "verification", 
+      label: "Верификация", 
+      icon: ShieldCheck,
+      badge: counts?.pendingVerifications || 0 
+    },
   ];
 
   const visibleItems = isManager ? [...menuItems, ...managerItems] : menuItems;

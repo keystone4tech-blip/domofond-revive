@@ -83,9 +83,11 @@ const TasksManager = ({
       setStatusFilter(initialFilter);
     }
   }, [initialFilter]);
-  const { data: tasks, isLoading } = useQuery({
+  // Запрос списка задач с фильтрацией по статусу
+  const { data: tasks, isLoading, isError, error } = useQuery({
     queryKey: ["tasks", statusFilter],
     queryFn: async () => {
+      console.log(`[TasksManager] Запрос задач из БД (фильтр статуса: "${statusFilter}")...`); // Логирование
       let query = supabase
         .from("tasks")
         .select(`
@@ -101,7 +103,11 @@ const TasksManager = ({
       }
 
       const { data, error } = await query;
-      if (error) throw error;
+      if (error) {
+        console.error("[TasksManager] Ошибка при выборке задач:", error); // Логирование ошибки
+        throw error;
+      }
+      console.log(`[TasksManager] Успешно получено задач: ${data?.length || 0}`);
       return data as Task[];
     },
   });
@@ -515,6 +521,21 @@ const TasksManager = ({
         {isLoading ? (
           <div className="flex justify-center py-8">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : isError ? (
+          <div className="p-6 text-center text-destructive space-y-2 border border-destructive/20 rounded-xl bg-destructive/5 my-4">
+            <p className="font-semibold text-sm">Не удалось загрузить задачи</p>
+            <p className="text-xs text-muted-foreground">
+              {(error as Error)?.message || "Ошибка подключения к серверу"}
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => queryClient.invalidateQueries({ queryKey: ["tasks"] })}
+              className="mt-2"
+            >
+              Повторить попытку
+            </Button>
           </div>
         ) : tasks?.length === 0 ? (
           <p className="text-center text-muted-foreground py-8">Нет задач</p>

@@ -23,6 +23,13 @@ interface StatBlock {
   order_index: number;
 }
 
+const DEFAULT_STATS: StatBlock[] = [
+  { id: "default-clients", icon: "Users", value: "10 000+", label: "Довольных клиентов", order_index: 0 },
+  { id: "default-years", icon: "Clock", value: "18 лет", label: "На рынке с 2005 года", order_index: 1 },
+  { id: "default-quality", icon: "Award", value: "100%", label: "Гарантия качества", order_index: 2 },
+  { id: "default-support", icon: "Shield", value: "24/7", label: "Аварийная служба", order_index: 3 },
+];
+
 const StatCard = ({ stat }: { stat: StatBlock }) => {
   const Icon = iconMap[stat.icon as keyof typeof iconMap] || Users;
   const numericValue = parseInt(stat.value.replace(/[^\d]/g, '')) || 0;
@@ -81,15 +88,11 @@ const Stats = () => {
         setStats(statsData);
       } else {
         // Default stats if none in database
-        setStats([
-          { id: '1', icon: 'Users', value: '10 000+', label: 'Довольных клиентов', order_index: 0 },
-          { id: '2', icon: 'Clock', value: '18 лет', label: 'На рынке с 2005 года', order_index: 1 },
-          { id: '3', icon: 'Award', value: '100%', label: 'Гарантия качества', order_index: 2 },
-          { id: '4', icon: 'Shield', value: '24/7', label: 'Аварийная служба', order_index: 3 },
-        ]);
+        setStats(DEFAULT_STATS);
       }
     } catch (error) {
       console.error("Error fetching stats:", error);
+      setStats(DEFAULT_STATS);
     } finally {
       setLoading(false);
     }

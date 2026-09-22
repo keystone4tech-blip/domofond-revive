@@ -17,6 +17,9 @@ export default {
         sans: ['Inter', 'system-ui', 'sans-serif'],
       },
       colors: {
+        slate: {
+          850: "#172033", // Промежуточный темный оттенок между 800 (#1e293b) и 900 (#0f172a)
+        },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

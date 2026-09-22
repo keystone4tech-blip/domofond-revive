@@ -17,6 +17,7 @@ import { AccountsManager } from "@/components/admin/AccountsManager";
 import { SEOManager } from "@/components/admin/SEOManager";
 import { NewsAutomation } from "@/components/admin/NewsAutomation";
 import { VotingManager } from "@/components/admin/VotingManager";
+import { BackupsManager } from "@/components/admin/BackupsManager";
 import { Loader2, Shield, Menu, ChevronRight } from "lucide-react";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -71,7 +72,8 @@ const Admin = () => {
         .from("user_roles")
         .select("role")
         .eq("user_id", user.id)
-        .in("role", ["admin", "director"])
+        .in("role", ["admin", "director", "superadmin"])
+        .limit(1)
         .maybeSingle();
 
       if (error || !role) {
@@ -222,6 +224,10 @@ const Admin = () => {
 
             <TabsContent value="accounts" className="mt-0 outline-none">
               <AccountsManager />
+            </TabsContent>
+
+            <TabsContent value="backups" className="mt-0 outline-none">
+              <BackupsManager />
             </TabsContent>
 
             <TabsContent value="chatwidget" className="mt-0 outline-none">

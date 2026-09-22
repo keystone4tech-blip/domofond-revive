@@ -2087,3 +2087,309 @@ CREATE POLICY "Admin console can manage blocks"
 
 
 
+A L T E R   T A B L E   p r o f i l e s   A D D   C O L U M N   I F   N O T   E X I S T S   f l o o r   V A R C H A R ( 5 0 ) ,   A D D   C O L U M N   I F   N O T   E X I S T S   e m a i l   V A R C H A R ( 2 5 5 ) ,   A D D   C O L U M N   I F   N O T   E X I S T S   e m a i l _ v e r i f i e d   B O O L E A N   D E F A U L T   f a l s e ;  
+ C R E A T E   P O L I C Y   " A n y o n e   c a n   v i e w   p r o d u c t s "   O N   p r o d u c t s   F O R   S E L E C T   U S I N G   ( t r u e ) ;  
+ A L T E R   T A B L E   p r o d u c t s   A D D   C O L U M N   I F   N O T   E X I S T S   i m a g e _ u r l   T E X T ;  
+ 
+-- Added payment columns to requests
+ALTER TABLE requests ADD COLUMN IF NOT EXISTS payment_status VARCHAR(50);
+ALTER TABLE requests ADD COLUMN IF NOT EXISTS payment_amount DECIMAL(10, 2);
+ALTER TABLE requests ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50);
+
+CREATE POLICY "Anyone can insert request items" ON public.request_items FOR INSERT WITH CHECK (true);
+
+ALTER TABLE request_items ADD COLUMN IF NOT EXISTS price DECIMAL(10, 2);
+
+-- Policy for FSM users to manage accounts
+CREATE POLICY "FSM users can manage accounts" ON public.accounts FOR ALL TO authenticated USING (has_fsm_role((current_setting('request.jwt.claim.sub', true))::uuid)) WITH CHECK (has_fsm_role((current_setting('request.jwt.claim.sub', true))::uuid));
+-- ----------------------------------------------------
+-- Addresses & Entrances Equipment Binding System
+-- ----------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.entrances (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    city VARCHAR(100) NOT NULL,
+    street VARCHAR(255) NOT NULL,
+    house VARCHAR(50) NOT NULL,
+    entrance VARCHAR(50) NOT NULL,
+    intercom_type VARCHAR(100),
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT unique_entrance UNIQUE (city, street, house, entrance)
+);
+
+CREATE INDEX IF NOT EXISTS idx_entrances_city ON public.entrances(city);
+CREATE INDEX IF NOT EXISTS idx_entrances_street ON public.entrances(street);
+CREATE INDEX IF NOT EXISTS idx_entrances_house ON public.entrances(house);
+CREATE INDEX IF NOT EXISTS idx_entrances_entrance ON public.entrances(entrance);
+
+CREATE TABLE IF NOT EXISTS public.entrance_products (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    entrance_id UUID NOT NULL REFERENCES public.entrances(id) ON DELETE CASCADE,
+    product_id UUID NOT NULL REFERENCES public.products(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT unique_entrance_product UNIQUE (entrance_id, product_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_entrance_products_entrance ON public.entrance_products(entrance_id);
+CREATE INDEX IF NOT EXISTS idx_entrance_products_product ON public.entrance_products(product_id);
+
+ALTER TABLE public.entrances ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.entrance_products ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Anyone can view entrances" ON public.entrances FOR SELECT USING (true);
+CREATE POLICY "Anyone can view entrance_products" ON public.entrance_products FOR SELECT USING (true);
+
+CREATE POLICY "FSM users can manage entrances" ON public.entrances FOR ALL TO authenticated
+USING (has_fsm_role((current_setting('request.jwt.claim.sub', true))::uuid))
+WITH CHECK (has_fsm_role((current_setting('request.jwt.claim.sub', true))::uuid));
+
+CREATE POLICY "FSM users can manage entrance_products" ON public.entrance_products FOR ALL TO authenticated
+USING (has_fsm_role((current_setting('request.jwt.claim.sub', true))::uuid))
+WITH CHECK (has_fsm_role((current_setting('request.jwt.claim.sub', true))::uuid));
+
+CREATE OR REPLACE FUNCTION public.sync_entrances_from_accounts()
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    inserted_count integer := 0;
+BEGIN
+    WITH inserted AS (
+        INSERT INTO public.entrances (city, street, house, entrance)
+        SELECT DISTINCT
+            TRIM(split_part(address, ',', 1)) as city,
+            TRIM(split_part(address, ',', 2)) as street,
+            TRIM(REGEXP_REPLACE(SUBSTRING(address FROM '�\.[^,]+(?:,\s*����\.[^,]+)?'), '^�\.\s*', '')) as house,
+            SUBSTRING(address FROM '�\s+([0-9]+)') as entrance
+        FROM public.accounts
+        WHERE address LIKE '%� %'
+          AND SUBSTRING(address FROM '�\s+([0-9]+)') IS NOT NULL
+          AND TRIM(split_part(address, ',', 1)) <> ''
+          AND TRIM(split_part(address, ',', 2)) <> ''
+          AND TRIM(REGEXP_REPLACE(SUBSTRING(address FROM '�\.[^,]+(?:,\s*����\.[^,]+)?'), '^�\.\s*', '')) <> ''
+        ON CONFLICT (city, street, house, entrance) DO NOTHING
+        RETURNING id
+    )
+    SELECT count(*) INTO inserted_count FROM inserted;
+
+    RETURN inserted_count;
+END;
+$$;
+
+-- ----------------------------------------------------
+-- Product Categories (Folders & Tree structure)
+-- ----------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.product_categories (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(150) NOT NULL,
+    parent_id UUID REFERENCES public.product_categories(id) ON DELETE CASCADE,
+    sort_order INT DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_product_categories_parent_id ON public.product_categories(parent_id);
+
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS category_id UUID REFERENCES public.product_categories(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_products_category_id ON public.products(category_id);
+
+ALTER TABLE public.product_categories ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Anyone can view product_categories" ON public.product_categories FOR SELECT USING (true);
+
+CREATE POLICY "FSM users can manage product_categories" ON public.product_categories FOR ALL TO authenticated
+USING (has_fsm_role((current_setting('request.jwt.claim.sub', true))::uuid))
+WITH CHECK (has_fsm_role((current_setting('request.jwt.claim.sub', true))::uuid));
+
+
+-- INTERCOM CREDENTIALS MIGRATION
+-- Создание таблицы для учетных данных умного домофона (логопасов)
+CREATE TABLE IF NOT EXISTS public.intercom_credentials (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    city VARCHAR(100) NOT NULL DEFAULT 'Краснодар',
+    street VARCHAR(255) NOT NULL,
+    house VARCHAR(50) NOT NULL,
+    entrance VARCHAR(50),
+    apartment VARCHAR(50) NOT NULL,
+    account_number VARCHAR(100),
+    password VARCHAR(100) NOT NULL,
+    raw_address TEXT,
+    entrance_id UUID REFERENCES public.entrances(id) ON DELETE SET NULL,
+    account_id UUID REFERENCES public.accounts(id) ON DELETE SET NULL,
+    is_purchased BOOLEAN NOT NULL DEFAULT false,
+    purchased_at TIMESTAMP WITH TIME ZONE,
+    purchased_by_user_id UUID,
+    payment_amount NUMERIC(10,2) DEFAULT 300.00,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Уникальный индекс, предотвращающий дублирование для одной квартиры в подъезде
+CREATE UNIQUE INDEX IF NOT EXISTS idx_intercom_cred_unique 
+ON public.intercom_credentials(city, street, house, COALESCE(entrance, ''), apartment);
+
+-- Дополнительные индексы для высокой скорости поиска в ЛК и FSM
+CREATE INDEX IF NOT EXISTS idx_intercom_cred_account_num ON public.intercom_credentials(account_number);
+CREATE INDEX IF NOT EXISTS idx_intercom_cred_address ON public.intercom_credentials(city, street, house);
+CREATE INDEX IF NOT EXISTS idx_intercom_cred_entrance_id ON public.intercom_credentials(entrance_id);
+CREATE INDEX IF NOT EXISTS idx_intercom_cred_is_purchased ON public.intercom_credentials(is_purchased);
+
+-- Включение RLS
+ALTER TABLE public.intercom_credentials ENABLE ROW LEVEL SECURITY;
+
+-- Удаление старых политик при повторном накате
+DROP POLICY IF EXISTS "FSM users can manage intercom_credentials" ON public.intercom_credentials;
+DROP POLICY IF EXISTS "Users can view intercom_credentials" ON public.intercom_credentials;
+DROP POLICY IF EXISTS "Anyone can view intercom_credentials" ON public.intercom_credentials;
+
+-- Политика: FSM сотрудники имеют полный доступ
+CREATE POLICY "FSM users can manage intercom_credentials"
+ON public.intercom_credentials FOR ALL TO authenticated
+USING (has_fsm_role((current_setting('request.jwt.claim.sub'::text, true))::uuid))
+WITH CHECK (has_fsm_role((current_setting('request.jwt.claim.sub'::text, true))::uuid));
+
+-- Политика: авторизованные пользователи могут читать записи
+CREATE POLICY "Users can view intercom_credentials"
+ON public.intercom_credentials FOR SELECT TO authenticated
+USING (true);
+
+-- Триггер автоматической привязки к подъездам и лицевым счетам
+CREATE OR REPLACE FUNCTION public.link_intercom_credential()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_entrance_id UUID;
+    v_account_id UUID;
+    v_found_acc_num VARCHAR(100);
+BEGIN
+    -- 1. Поиск соответствующего подъезда в entrances
+    IF NEW.entrance_id IS NULL THEN
+        SELECT id INTO v_entrance_id FROM public.entrances
+        WHERE city = NEW.city
+          AND street = NEW.street
+          AND house = NEW.house
+          AND entrance = COALESCE(NEW.entrance, entrance)
+        LIMIT 1;
+        
+        IF v_entrance_id IS NOT NULL THEN
+            NEW.entrance_id := v_entrance_id;
+        END IF;
+    END IF;
+
+    -- 2. Поиск лицевого счета по номеру договора
+    IF NEW.account_id IS NULL AND NEW.account_number IS NOT NULL THEN
+        SELECT id INTO v_account_id FROM public.accounts
+        WHERE account_number = NEW.account_number
+        LIMIT 1;
+
+        IF v_account_id IS NOT NULL THEN
+            NEW.account_id := v_account_id;
+        END IF;
+    END IF;
+
+    -- 3. Если лицевой счет не найден по номеру, ищем по адресу и номеру квартиры
+    IF NEW.account_id IS NULL THEN
+        SELECT id, account_number INTO v_account_id, v_found_acc_num FROM public.accounts
+        WHERE address ILIKE '%' || NEW.street || '%'
+          AND address ILIKE '%' || NEW.house || '%'
+          AND apartment = NEW.apartment
+        LIMIT 1;
+
+        IF v_account_id IS NOT NULL THEN
+            NEW.account_id := v_account_id;
+            IF NEW.account_number IS NULL OR NEW.account_number = '' THEN
+                NEW.account_number := v_found_acc_num;
+            END IF;
+        END IF;
+    END IF;
+
+    NEW.updated_at := CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_link_intercom_credential ON public.intercom_credentials;
+CREATE TRIGGER trg_link_intercom_credential
+BEFORE INSERT OR UPDATE ON public.intercom_credentials
+FOR EACH ROW EXECUTE FUNCTION public.link_intercom_credential();
+
+-- Функция безопасной покупки доступа в ЛК (SECURITY DEFINER)
+CREATE OR REPLACE FUNCTION public.purchase_intercom_access(
+    p_credential_id UUID,
+    p_user_id UUID,
+    p_amount NUMERIC DEFAULT 300.00
+) RETURNS BOOLEAN AS $$
+BEGIN
+    UPDATE public.intercom_credentials
+    SET is_purchased = true,
+        purchased_at = CURRENT_TIMESTAMP,
+        purchased_by_user_id = p_user_id,
+        payment_amount = p_amount,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = p_credential_id;
+
+    RETURN true;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Уведомляем PostgREST о перезагрузке схемы
+NOTIFY pgrst, 'reload schema';
+
+
+-- ACCOUNT REGISTRY AND HISTORY MIGRATION
+-- 1. Таблица истории загруженных файлов реестров
+CREATE TABLE IF NOT EXISTS public.account_registry_uploads (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    filename VARCHAR(255) NOT NULL,
+    batch_number INT NOT NULL,
+    period VARCHAR(50) NOT NULL,
+    total_records INT NOT NULL DEFAULT 0,
+    total_debt_amount NUMERIC(14,2) NOT NULL DEFAULT 0.00,
+    uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_registry_batch ON public.account_registry_uploads(batch_number);
+CREATE INDEX IF NOT EXISTS idx_registry_period ON public.account_registry_uploads(period);
+
+-- 2. Таблица истории ежемесячных начислений по лицевым счетам (срезы реестров)
+CREATE TABLE IF NOT EXISTS public.account_history (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    account_number VARCHAR(100) NOT NULL,
+    period VARCHAR(50) NOT NULL,
+    debt_amount NUMERIC(10,2) NOT NULL,
+    batch_number INT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_acc_hist_unique ON public.account_history(account_number, batch_number);
+CREATE INDEX IF NOT EXISTS idx_acc_hist_acc_num ON public.account_history(account_number);
+
+-- Включение RLS
+ALTER TABLE public.account_registry_uploads ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.account_history ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "FSM users can manage account_registry_uploads" ON public.account_registry_uploads;
+DROP POLICY IF EXISTS "Anyone can view account_registry_uploads" ON public.account_registry_uploads;
+DROP POLICY IF EXISTS "FSM users can manage account_history" ON public.account_history;
+DROP POLICY IF EXISTS "Users can view account_history" ON public.account_history;
+
+CREATE POLICY "FSM users can manage account_registry_uploads"
+ON public.account_registry_uploads FOR ALL TO authenticated
+USING (has_fsm_role((current_setting('request.jwt.claim.sub'::text, true))::uuid))
+WITH CHECK (has_fsm_role((current_setting('request.jwt.claim.sub'::text, true))::uuid));
+
+CREATE POLICY "Anyone can view account_registry_uploads"
+ON public.account_registry_uploads FOR SELECT TO authenticated
+USING (true);
+
+CREATE POLICY "FSM users can manage account_history"
+ON public.account_history FOR ALL TO authenticated
+USING (has_fsm_role((current_setting('request.jwt.claim.sub'::text, true))::uuid))
+WITH CHECK (has_fsm_role((current_setting('request.jwt.claim.sub'::text, true))::uuid));
+
+CREATE POLICY "Users can view account_history"
+ON public.account_history FOR SELECT TO authenticated
+USING (true);
+
+NOTIFY pgrst, 'reload schema';

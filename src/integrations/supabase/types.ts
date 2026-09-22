@@ -24,6 +24,15 @@ export type Database = {
           id: string
           period: string
           updated_at: string | null
+          phone: string | null
+          full_name: string | null
+          street: string | null
+          house: string | null
+          housing: string | null
+          entrance: string | null
+          has_handset: boolean | null
+          payment_type: string | null
+          phone_clean: string | null
         }
         Insert: {
           account_number: string
@@ -32,8 +41,17 @@ export type Database = {
           created_at?: string | null
           debt_amount?: number
           id?: string
-          period: string
+          period?: string
           updated_at?: string | null
+          phone?: string | null
+          full_name?: string | null
+          street?: string | null
+          house?: string | null
+          housing?: string | null
+          entrance?: string | null
+          has_handset?: boolean | null
+          payment_type?: string | null
+          phone_clean?: string | null
         }
         Update: {
           account_number?: string
@@ -44,6 +62,15 @@ export type Database = {
           id?: string
           period?: string
           updated_at?: string | null
+          phone?: string | null
+          full_name?: string | null
+          street?: string | null
+          house?: string | null
+          housing?: string | null
+          entrance?: string | null
+          has_handset?: boolean | null
+          payment_type?: string | null
+          phone_clean?: string | null
         }
         Relationships: []
       }
@@ -634,31 +661,58 @@ export type Database = {
           address: string | null
           apartment: string | null
           created_at: string | null
+          email: string | null
+          email_verified: boolean | null
+          floor: string | null
           full_name: string | null
           id: string
           is_verified: boolean | null
           phone: string | null
           updated_at: string | null
+          verification_document_type: string | null
+          verification_document_url: string | null
+          verification_reject_reason: string | null
+          verification_reviewed_at: string | null
+          verification_status: string | null
+          verification_submitted_at: string | null
         }
         Insert: {
           address?: string | null
           apartment?: string | null
           created_at?: string | null
+          email?: string | null
+          email_verified?: boolean | null
+          floor?: string | null
           full_name?: string | null
           id: string
           is_verified?: boolean | null
           phone?: string | null
           updated_at?: string | null
+          verification_document_type?: string | null
+          verification_document_url?: string | null
+          verification_reject_reason?: string | null
+          verification_reviewed_at?: string | null
+          verification_status?: string | null
+          verification_submitted_at?: string | null
         }
         Update: {
           address?: string | null
           apartment?: string | null
           created_at?: string | null
+          email?: string | null
+          email_verified?: boolean | null
+          floor?: string | null
           full_name?: string | null
           id?: string
           is_verified?: boolean | null
           phone?: string | null
           updated_at?: string | null
+          verification_document_type?: string | null
+          verification_document_url?: string | null
+          verification_reject_reason?: string | null
+          verification_reviewed_at?: string | null
+          verification_status?: string | null
+          verification_submitted_at?: string | null
         }
         Relationships: []
       }
@@ -872,6 +926,14 @@ export type Database = {
           priority: string
           status: string
           updated_at: string | null
+          payment_status: string | null
+          payment_amount: number | null
+          payment_method: string | null
+          order_type: string | null
+          street: string | null
+          house: string | null
+          entrance: string | null
+          apartment: string | null
         }
         Insert: {
           accepted_at?: string | null
@@ -888,6 +950,14 @@ export type Database = {
           priority?: string
           status?: string
           updated_at?: string | null
+          payment_status?: string | null
+          payment_amount?: number | null
+          payment_method?: string | null
+          order_type?: string | null
+          street?: string | null
+          house?: string | null
+          entrance?: string | null
+          apartment?: string | null
         }
         Update: {
           accepted_at?: string | null
@@ -904,6 +974,14 @@ export type Database = {
           priority?: string
           status?: string
           updated_at?: string | null
+          payment_status?: string | null
+          payment_amount?: number | null
+          payment_method?: string | null
+          order_type?: string | null
+          street?: string | null
+          house?: string | null
+          entrance?: string | null
+          apartment?: string | null
         }
         Relationships: [
           {

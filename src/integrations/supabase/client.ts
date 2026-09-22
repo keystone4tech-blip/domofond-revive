@@ -32,11 +32,18 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     autoRefreshToken: true,
   },
   global: {
-    fetch: (url, options) => {
+    fetch: (input, options) => {
       // Подменяем пути Supabase API на пути локального PostgREST
-      if (typeof url === 'string') {
-        url = url.replace('/rest/v1/', '/');
-      }
+      // supabase-js передаёт сюда URL, а не строку. В таком случае прежняя
+      // проверка не срабатывала и запрос уходил на /api/rest/v1/... вместо
+      // /api/..., что PostgREST отвечает 404.
+      const requestUrl =
+        typeof input === 'string'
+          ? input
+          : 'url' in input
+            ? input.url
+            : input.href;
+      const url = requestUrl.replace('/rest/v1/', '/');
       const token = getAuthToken();
       options = options || {};
       options.headers = options.headers || {};

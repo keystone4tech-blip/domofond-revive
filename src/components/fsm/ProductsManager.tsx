@@ -38,6 +38,7 @@ interface Product {
   name: string;
   description: string | null;
   price: number;
+  installation_price?: number | null; // Льготная сниженная цена на этапе ввода дома на монтаже
   unit: string;
   category: string | null;
   is_active: boolean;
@@ -72,6 +73,7 @@ const ProductsManager = () => {
     name: "",
     description: "",
     price: "",
+    installation_price: "", // Льготная цена на период монтажа
     unit: "шт",
     category: "service",
     is_active: true,
@@ -101,6 +103,7 @@ const ProductsManager = () => {
         name: data.name,
         description: data.description || null,
         price: parseFloat(data.price),
+        installation_price: data.installation_price.trim() ? parseFloat(data.installation_price) : null,
         unit: data.unit,
         category: data.category,
         is_active: data.is_active,
@@ -163,6 +166,7 @@ const ProductsManager = () => {
       name: "",
       description: "",
       price: "",
+      installation_price: "",
       unit: "шт",
       category: "service",
       is_active: true,
@@ -178,6 +182,7 @@ const ProductsManager = () => {
         name: formData.name,
         description: formData.description || null,
         price: parseFloat(formData.price),
+        installation_price: formData.installation_price.trim() ? parseFloat(formData.installation_price) : null,
         unit: formData.unit,
         category: formData.category,
         is_active: formData.is_active,
@@ -193,6 +198,7 @@ const ProductsManager = () => {
       name: product.name,
       description: product.description || "",
       price: product.price.toString(),
+      installation_price: product.installation_price != null ? product.installation_price.toString() : "",
       unit: product.unit,
       category: product.category || "service",
       is_active: product.is_active,
@@ -263,8 +269,8 @@ const ProductsManager = () => {
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="price">Цена *</Label>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="price" className="text-xs font-semibold">Розничная цена (₽) *</Label>
                     <Input
                       id="price"
                       type="number"
@@ -273,8 +279,28 @@ const ProductsManager = () => {
                       value={formData.price}
                       onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                       required
+                      placeholder="1500.00"
                     />
+                    <p className="text-[10px] text-muted-foreground">Для домов на ТО и Аренде</p>
                   </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="installation_price" className="text-xs font-semibold text-amber-600 dark:text-amber-400 flex items-center justify-between">
+                      <span>На монтаже (₽)</span>
+                      <span className="text-[9px] px-1 py-0.5 rounded bg-amber-100 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-300 font-medium">Льготная</span>
+                    </Label>
+                    <Input
+                      id="installation_price"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.installation_price}
+                      onChange={(e) => setFormData({ ...formData, installation_price: e.target.value })}
+                      placeholder="Оставьте пустым, если = розничной"
+                      className="border-amber-200 dark:border-amber-900/60"
+                    />
+                    <p className="text-[10px] text-muted-foreground">Сниженная цена для жильцов в период монтажа</p>
+                  </div>
+                </div>
                   <div className="space-y-2">
                     <Label>Единица измерения</Label>
                     <Select
@@ -291,7 +317,6 @@ const ProductsManager = () => {
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
                 <div className="space-y-2">
                   <Label>Категория</Label>
                   <Select
@@ -342,7 +367,8 @@ const ProductsManager = () => {
                 <TableRow>
                   <TableHead>Название</TableHead>
                   <TableHead>Категория</TableHead>
-                  <TableHead className="text-right">Цена</TableHead>
+                  <TableHead className="text-right">Розница (ТО/Аренда)</TableHead>
+                  <TableHead className="text-right">На монтаже</TableHead>
                   <TableHead>Ед.</TableHead>
                   <TableHead>Активен</TableHead>
                   <TableHead className="text-right">Действия</TableHead>
@@ -362,8 +388,17 @@ const ProductsManager = () => {
                       </div>
                     </TableCell>
                     <TableCell>{getCategoryLabel(product.category)}</TableCell>
-                    <TableCell className="text-right font-semibold">
+                    <TableCell className="text-right font-semibold text-foreground">
                       {product.price.toFixed(0)} ₽
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {product.installation_price != null ? (
+                        <span className="font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 px-2 py-0.5 rounded-lg text-xs">
+                          {product.installation_price.toFixed(0)} ₽
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
                     </TableCell>
                     <TableCell>{product.unit}</TableCell>
                     <TableCell>

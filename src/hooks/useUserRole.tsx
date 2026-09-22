@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 
-export type AppRole = "admin" | "user" | "director" | "dispatcher" | "master" | "engineer" | "manager";
+export type AppRole = "admin" | "user" | "director" | "dispatcher" | "master" | "engineer" | "manager" | "superadmin";
 
 interface UseUserRoleResult {
   user: User | null;
@@ -11,6 +11,7 @@ interface UseUserRoleResult {
   isManager: boolean;
   isFSMUser: boolean;
   isAdmin: boolean;
+  isSuperAdmin: boolean;
   hasRole: (role: AppRole) => boolean;
 }
 
@@ -80,14 +81,15 @@ export const useUserRole = (): UseUserRoleResult => {
   const hasRole = (role: AppRole) => roles.includes(role);
   
   const isManager = roles.some((r) => 
-    ["admin", "director", "dispatcher", "manager"].includes(r)
+    ["admin", "director", "dispatcher", "manager", "superadmin"].includes(r)
   );
   
   const isFSMUser = roles.some((r) => 
-    ["admin", "director", "dispatcher", "master", "engineer", "manager"].includes(r)
+    ["admin", "director", "dispatcher", "master", "engineer", "manager", "superadmin"].includes(r)
   );
   
-  const isAdmin = roles.includes("admin");
+  const isSuperAdmin = roles.includes("superadmin");
+  const isAdmin = roles.includes("admin") || roles.includes("director") || roles.includes("superadmin");
 
   return {
     user,
@@ -96,6 +98,7 @@ export const useUserRole = (): UseUserRoleResult => {
     isManager,
     isFSMUser,
     isAdmin,
+    isSuperAdmin,
     hasRole,
   };
 };

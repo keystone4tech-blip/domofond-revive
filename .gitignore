@@ -7,6 +7,7 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Node dependencies
 node_modules
 dist
 dist-ssr
@@ -22,3 +23,33 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Security & Credentials (CRITICAL: NEVER COMMIT TO GIT)
+.env
+.env.*
+!.env.example
+CONFIG_BACKUP.md
+логины и пароли.txt
+PRODUCTION_CREDENTIALS_AND_RECOVERY.md
+*.pem
+*.key
+*.cert
+*.crt
+
+# Database Backups & Dumps
+backups/
+*.sql.gz
+*.dump
+*.tar.gz
+*.zip
+
+# Sensitive subscriber registries and temporary office locks
+~$*
+Список всех абонентов*.txt
+2311283958*.txt
+Лист_монтажника*.xlsx
+*.xlsx
+*.xls
+scratch_*.*
+*.sql
+!init-scripts/*.sql

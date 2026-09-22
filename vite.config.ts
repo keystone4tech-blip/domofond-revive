@@ -19,6 +19,15 @@ export default defineConfig(({ mode }) => ({
           return path.replace(/^\/api/, "");
         },
       },
+      // Все запросы к /backend-api перенаправляем на локальный Express-бэкенд (порт 5000)
+      "/backend-api": {
+        target: "http://localhost:5000",
+        changeOrigin: true,
+        rewrite: (path) => {
+          console.log(`[Vite Proxy] Перенаправление /backend-api запроса: ${path}`);
+          return path.replace(/^\/backend-api/, "");
+        },
+      },
       // Все запросы к /auth перенаправляем на локальный Express-бэкенд (порт 5000)
       "/auth": {
         target: "http://localhost:5000",

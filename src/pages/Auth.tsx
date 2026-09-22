@@ -12,11 +12,28 @@ import Footer from "@/components/Footer";
 
 const Auth = () => {
   const [email, setEmail] = useState(""); // Стейт для хранения Email адреса
+  const [phone, setPhone] = useState(""); // Стейт для хранения номера телефона пользователя
   const [password, setPassword] = useState(""); // Стейт для хранения пароля
   const [confirmPassword, setConfirmPassword] = useState(""); // Стейт для подтверждения пароля (повторный ввод)
   const [fullName, setFullName] = useState(""); // Стейт для полного имени (передается пустым при регистрации)
   const [loading, setLoading] = useState(false); // Стейт процесса загрузки запроса к API
   const [agreedToTerms, setAgreedToTerms] = useState(true); // Стейт согласия на обработку персональных данных (ФЗ-152 РФ, включен по умолчанию)
+
+  // Форматирование номера телефона в формат +7 (XXX) XXX-XX-XX
+  const handlePhoneChange = (val: string) => {
+    let digits = val.replace(/\D/g, "");
+    if (digits.startsWith("8")) digits = "7" + digits.slice(1);
+    if (!digits.startsWith("7") && digits.length > 0) digits = "7" + digits;
+    digits = digits.slice(0, 11);
+    
+    let formatted = "";
+    if (digits.length > 0) formatted = "+7";
+    if (digits.length > 1) formatted += ` (${digits.slice(1, 4)}`;
+    if (digits.length >= 4) formatted += `) ${digits.slice(4, 7)}`;
+    if (digits.length >= 7) formatted += `-${digits.slice(7, 9)}`;
+    if (digits.length >= 9) formatted += `-${digits.slice(9, 11)}`;
+    setPhone(formatted);
+  };
 
   // Вспомогательная функция для оценки надежности пароля (возвращает оценку от 0 до 5)
   // Используется для визуальной шкалы безопасности в форме регистрации
@@ -85,11 +102,11 @@ const Auth = () => {
     }
 
     try {
-      console.log(`[Регистрация] Отправка запроса на регистрацию для Email: "${cleanEmail}"`); // Логирование
+      console.log(`[Регистрация] Отправка запроса на регистрацию для Email: "${cleanEmail}", Телефон: "${phone}"`); // Логирование
       const response = await fetch(`${API_URL}/api/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: cleanEmail, password, full_name: "" }), // Передаем пустое имя, ФИО заполняется в ЛК
+        body: JSON.stringify({ email: cleanEmail, password, full_name: "", phone: phone.trim() }), // Передаем email, пароль и телефон
       });
 
       const data = await response.json();
@@ -281,6 +298,25 @@ const Auth = () => {
                       required
                       className="bg-background/50 border-border/80 focus:border-primary/50 transition-all"
                     />
+                  </div>
+
+                  {/* Поле Номер телефона (для мгновенного автоопределения адреса по базе абонентов) */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <Label htmlFor="signup-phone">Номер телефона (необязательно)</Label>
+                      <span className="text-[11px] text-primary font-medium">Автопоиск адреса ⚡</span>
+                    </div>
+                    <Input
+                      id="signup-phone"
+                      type="tel"
+                      placeholder="+7 (___) ___-__-__"
+                      value={phone}
+                      onChange={(e) => handlePhoneChange(e.target.value)}
+                      className="bg-background/50 border-border/80 focus:border-primary/50 transition-all font-mono"
+                    />
+                    <p className="text-[11px] text-muted-foreground leading-tight">
+                      Если ваш номер есть в договоре на домофон — адрес и лицевой счет подтянутся автоматически!
+                    </p>
                   </div>
 
                   {/* Поле первого ввода Пароля */}
