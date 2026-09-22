@@ -164,7 +164,7 @@ const Header = () => {
                   className="py-1.5 px-2.5 sm:px-3 text-xs rounded-xl bg-purple-600 hover:bg-purple-700 text-white shadow-sm"
                 >
                   <ShieldCheck className="h-3.5 w-3.5 sm:mr-1.5" />
-                  <span className="hidden sm:inline">Админка</span>
+                  <span className="hidden sm:inline">Админ панель</span>
                 </ShinyButton>
               )}
               {isFSMUser && (
@@ -173,7 +173,7 @@ const Header = () => {
                   className="py-1.5 px-2.5 sm:px-3 text-xs rounded-xl"
                 >
                   <LayoutDashboard className="h-3.5 w-3.5 sm:mr-1.5" />
-                  <span className="hidden sm:inline">FSM</span>
+                  <span className="hidden sm:inline">CRM</span>
                 </ShinyButton>
               )}
               <ShinyButton

@@ -109,7 +109,7 @@ const MobileBottomNav = () => {
     if (isAdmin) {
       navItems.push({
         icon: <ShieldCheck className="h-5 w-5 text-purple-600 dark:text-purple-400" />,
-        label: "Админка",
+        label: "Админ панель",
         action: () => navigate("/admin"),
         isActive: location.pathname === "/admin",
       });
@@ -117,7 +117,7 @@ const MobileBottomNav = () => {
     if (isFSMUser) {
       navItems.push({
         icon: <LayoutDashboard className="h-5 w-5 text-blue-600 dark:text-blue-400" />,
-        label: "FSM",
+        label: "CRM",
         action: () => navigate("/fsm"),
         isActive: location.pathname === "/fsm",
       });

@@ -66,8 +66,8 @@ export const AdminSidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }: Adm
         <div className="h-16 flex items-center gap-3 px-6 border-b border-slate-100 dark:border-slate-800/80">
           <Shield className="h-6 w-6 text-primary animate-pulse" />
           <div className="flex flex-col text-left">
-            <span className="font-logo font-extrabold text-sm tracking-wide text-foreground uppercase">LuxTech Security</span>
-            <span className="text-[10px] text-muted-foreground font-semibold">Панель управления</span>
+            <span className="font-logo font-extrabold text-sm tracking-wide text-foreground uppercase">Домофондар</span>
+            <span className="text-[10px] text-muted-foreground font-semibold">Админ панель</span>
           </div>
         </div>
 

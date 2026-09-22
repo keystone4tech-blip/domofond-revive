@@ -183,7 +183,7 @@ const FSM = () => {
 
             {/* Хлебные крошки / Текущий раздел */}
             <div className="flex items-center gap-2 text-sm">
-              <span className="text-muted-foreground font-semibold uppercase tracking-wider text-[10px] hidden sm:inline">FSM</span>
+              <span className="text-muted-foreground font-semibold uppercase tracking-wider text-[10px] hidden sm:inline">CRM</span>
               <ChevronRight className="h-3 w-3 text-muted-foreground/60 hidden sm:inline" />
               <span className="font-bold text-foreground tracking-tight">{getTabTitle()}</span>
             </div>

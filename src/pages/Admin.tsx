@@ -153,7 +153,7 @@ const Admin = () => {
 
             {/* Хлебные крошки */}
             <div className="flex items-center gap-2 text-sm">
-              <span className="text-muted-foreground font-semibold uppercase tracking-wider text-[10px] hidden sm:inline">Панель</span>
+              <span className="text-muted-foreground font-semibold uppercase tracking-wider text-[10px] hidden sm:inline">Админ панель</span>
               <ChevronRight className="h-3 w-3 text-muted-foreground/60 hidden sm:inline" />
               <span className="font-bold text-foreground tracking-tight">{getTabLabel()}</span>
             </div>
