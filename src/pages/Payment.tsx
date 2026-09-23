@@ -52,7 +52,7 @@ const Payment = () => {
             </h1>
             
             <p className="text-sm sm:text-base text-muted-foreground max-w-2xl mx-auto">
-              Быстрая и безопасная оплата услуг ООО «Домофондар» без комиссии. Принимаются банковские карты любых российских банков (МИР, Visa, Mastercard). Регистрация на сайте не требуется.
+              Быстрая и безопасная оплата услуг ООО «Домофондар». Принимаются банковские карты любых российских банков (МИР, Visa, Mastercard). Регистрация на сайте не требуется.
             </p>
           </div>
 
@@ -104,7 +104,7 @@ const Payment = () => {
             </span>
             <span className="flex items-center gap-1.5">
               <CreditCard className="h-4 w-4 text-primary" />
-              Без дополнительных комиссий
+              Оплата банковской картой онлайн
             </span>
             <span className="flex items-center gap-1.5">
               <Building2 className="h-4 w-4 text-sky-500" />
