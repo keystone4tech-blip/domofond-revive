@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { ArrowRight, CheckCircle2, Camera, DoorOpen, Settings, BrainCircuit, Shield } from "lucide-react";
+import { ArrowRight, CheckCircle2, Camera, DoorOpen, Settings, BrainCircuit, Shield, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import heroImage from "@/assets/hero-image.jpg";
@@ -95,9 +95,10 @@ const Hero = () => {
                   size="lg"
                   variant="secondary"
                   onClick={() => navigate("/payment")}
-                  className="text-sm sm:text-base w-full sm:w-auto"
+                  className="text-sm sm:text-base w-full sm:w-auto font-medium flex items-center justify-center gap-2"
                 >
-                  Оплатить за техническое обслуживание
+                  <CreditCard className="h-4 w-4 text-primary shrink-0" />
+                  <span>Оплатить ТО (Банк «Кубань Кредит»)</span>
                 </Button>
               </div>
               <Button

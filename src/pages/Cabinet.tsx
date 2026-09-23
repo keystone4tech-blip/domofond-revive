@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, Component, ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useUserRole } from "@/hooks/useUserRole";
-import { Loader2, LogOut, CheckCircle, AlertCircle, AlertTriangle, ClipboardList, Calendar, Shield, CreditCard, Wallet, Pencil, Trash2, UserCheck, Plus, Minus, Clock, Wrench, CheckCircle2, XCircle, Send, Smartphone, KeyRound, PhoneCall, DoorOpen, DoorClosed, Info, User, Phone, Mail, Lock, Lightbulb, Hash, MapPin, Building, Home, Building2, History, FileSpreadsheet, Copy, Eye, EyeOff, ShieldCheck, Sparkles, LayoutDashboard } from "lucide-react";
+import { Loader2, LogOut, CheckCircle, AlertCircle, AlertTriangle, ClipboardList, Calendar, Shield, CreditCard, Wallet, Pencil, Trash2, UserCheck, Plus, Minus, Clock, Wrench, CheckCircle2, XCircle, Send, Smartphone, KeyRound, PhoneCall, DoorOpen, DoorClosed, Info, User, Phone, Mail, Lock, Lightbulb, Hash, MapPin, Building, Home, Building2, History, FileSpreadsheet, Copy, Eye, EyeOff, ShieldCheck, Sparkles, LayoutDashboard, Zap } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -165,7 +165,25 @@ const parseAddressParts = (fullAddr: string) => {
   return { street: parsedStreet, house: parsedHouse };
 };
 
-const DebtCard = ({ address, apartment, fullName, phone, embedded = false, setParentAccount }: { address: string; apartment: string; fullName: string; phone: string; embedded?: boolean; setParentAccount?: (acc: any) => void }) => {
+const DebtCard = ({ 
+  address, 
+  apartment, 
+  fullName, 
+  phone, 
+  embedded = false, 
+  setParentAccount,
+  isVerified = false,
+  userId = null,
+}: { 
+  address: string; 
+  apartment: string; 
+  fullName: string; 
+  phone: string; 
+  embedded?: boolean; 
+  setParentAccount?: (acc: any) => void;
+  isVerified?: boolean;
+  userId?: string | null;
+}) => {
   const [account, setAccount] = useState<{ account_number: string; period: string; debt_amount: number; address: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -175,6 +193,12 @@ const DebtCard = ({ address, apartment, fullName, phone, embedded = false, setPa
   const [accountHistory, setAccountHistory] = useState<any[]>([]);
   const [onlinePayments, setOnlinePayments] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+
+  // Стейты для быстрой онлайн-оплаты через платёжный шлюз ЮKassa
+  const [isYooKassaOpen, setIsYooKassaOpen] = useState(false);
+  const [payAmount, setPayAmount] = useState<string>("300");
+  const [isPayingYooKassa, setIsPayingYooKassa] = useState(false);
+
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -239,6 +263,8 @@ const DebtCard = ({ address, apartment, fullName, phone, embedded = false, setPa
         if (filtered.length > 0) {
           best = filtered[0];
           console.log(`[Баланс] Лицевой счет найден: ${best.account_number}, сумма: ${best.debt_amount} ₽`); // Логирование
+          const currentDebt = Number(best.debt_amount) || 0;
+          setPayAmount(currentDebt > 0 ? currentDebt.toFixed(2) : "300");
         } else {
           console.log(`[Баланс] Адрес совпал по улице и дому, но квартира ${apartment} не найдена в обслуживаемых лицевых счетах`); // Логирование
         }
@@ -251,6 +277,60 @@ const DebtCard = ({ address, apartment, fullName, phone, embedded = false, setPa
     };
     loadDebt();
   }, [address, apartment, setParentAccount]);
+
+  // Обработчик создания платежа через шлюз ЮKassa
+  const handleYooKassaPay = async () => {
+    if (!account) return;
+    const numAmount = parseFloat(payAmount);
+    if (isNaN(numAmount) || numAmount < 10) {
+      toast({
+        title: "Некорректная сумма",
+        description: "Минимальная сумма для онлайн-оплаты через ЮKassa — 10 ₽",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsPayingYooKassa(true);
+    console.log(`[ЮKassa: Оплата] Создание платежной сессии: сумма ${numAmount} ₽, л/с ${account.account_number}, userId ${userId || "нет"}`);
+
+    try {
+      const resp = await fetch("/backend-api/api/payments/yookassa/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: numAmount,
+          description: `Оплата ТО домофона, л/с ${account.account_number}, ${address}${apartment ? `, кв. ${apartment}` : ""}`,
+          accountNumber: account.account_number,
+          userId: userId || undefined,
+          returnUrl: `${window.location.origin}/cabinet?payment=success&account=${account.account_number}`,
+        }),
+      });
+
+      const data = await resp.json();
+      console.log("[ЮKassa: Ответ бэкенда]", data);
+
+      if (!resp.ok || !data.success) {
+        throw new Error(data.error || "Не удалось инициализировать оплату ЮKassa");
+      }
+
+      if (data.confirmationUrl) {
+        console.log(`[ЮKassa] Переход по платежной ссылке: ${data.confirmationUrl}`);
+        window.location.href = data.confirmationUrl;
+      } else {
+        throw new Error("Не получен URL подтверждения оплаты");
+      }
+    } catch (err: any) {
+      console.error("[ЮKassa: Ошибка]", err);
+      toast({
+        title: "Ошибка оплаты",
+        description: err.message || "Не удалось создать платёж в ЮKassa. Попробуйте оплатить через Банк «Кубань Кредит».",
+        variant: "destructive",
+      });
+    } finally {
+      setIsPayingYooKassa(false);
+    }
+  };
 
   const formatPeriod = (period: string) => {
     if (period.length === 4) {
@@ -336,44 +416,216 @@ const DebtCard = ({ address, apartment, fullName, phone, embedded = false, setPa
             </span>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-2">
-            <ShinyButton className="flex-1 justify-center rounded-xl" onClick={() => navigate("/payment")}>
-              <CreditCard className="mr-2 h-4 w-4" />
-              Оплатить
-            </ShinyButton>
-            <Button
-              variant="outline"
-              onClick={async () => {
-                setIsHistoryOpen(true);
-                setLoadingHistory(true);
-                try {
-                  const { data: hist } = await supabase
-                    .from("account_history" as any)
-                    .select("*")
-                    .eq("account_number", account.account_number)
-                    .order("batch_number", { ascending: false });
-                  setAccountHistory(hist || []);
+          {/* Блок кнопок оплаты:
+              - Если абонент верифицирован: доступна Быстрая оплата картой/СБП через ЮKassa и кнопка Банка «Кубань Кредит».
+              - Если не верифицирован: кнопка Банка «Кубань Кредит» + подсказка о доступности ЮKassa после подтверждения адреса. */}
+          <div className="space-y-2.5">
+            {isVerified ? (
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button
+                  className="flex-1 justify-center rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white font-bold shadow-md shadow-amber-500/20 hover:shadow-amber-500/30 transition-all gap-2"
+                  onClick={() => {
+                    const currentDebt = Number(account.debt_amount) || 0;
+                    setPayAmount(currentDebt > 0 ? currentDebt.toFixed(2) : "300");
+                    setIsYooKassaOpen(true);
+                  }}
+                >
+                  <Zap className="h-4 w-4 fill-current" />
+                  <span>Быстрая оплата ЮKassa</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="rounded-xl text-xs flex items-center justify-center gap-1.5 border-slate-300 dark:border-slate-700"
+                  onClick={() => navigate("/payment")}
+                  title="Оплата через платёжный терминал Банка «Кубань Кредит»"
+                >
+                  <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span>Банк «Кубань Кредит»</span>
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <ShinyButton className="w-full justify-center rounded-xl" onClick={() => navigate("/payment")}>
+                  <CreditCard className="mr-2 h-4 w-4" />
+                  Оплатить (Банк «Кубань Кредит»)
+                </ShinyButton>
+                <div className="p-2.5 rounded-xl border border-amber-500/20 bg-amber-500/5 flex items-center gap-2 text-[11px] text-amber-800 dark:text-amber-300">
+                  <Zap className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                  <span>Быстрая онлайн-оплата картой через <strong>ЮKassa</strong> станет доступна после подтверждения адреса (верификации).</span>
+                </div>
+              </div>
+            )}
 
-                  // Загрузка онлайн-платежей абонента
-                  const { data: payReqs } = await supabase
-                    .from("requests")
-                    .select("*")
-                    .eq("payment_status", "paid")
-                    .order("created_at", { ascending: false })
-                    .limit(10);
-                  setOnlinePayments(payReqs || []);
-                } catch (e) {
-                  console.warn("Ошибка загрузки истории:", e);
-                } finally {
-                  setLoadingHistory(false);
-                }
-              }}
-              className="rounded-xl text-xs flex items-center justify-center gap-1.5"
-            >
-              <History className="h-4 w-4" />
-              <span>История начислений</span>
-            </Button>
+            <div className="flex justify-end">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={async () => {
+                  setIsHistoryOpen(true);
+                  setLoadingHistory(true);
+                  try {
+                    const { data: hist } = await supabase
+                      .from("account_history" as any)
+                      .select("*")
+                      .eq("account_number", account.account_number)
+                      .order("batch_number", { ascending: false });
+                    setAccountHistory(hist || []);
+
+                    // Загрузка онлайн-платежей абонента
+                    const { data: payReqs } = await supabase
+                      .from("requests")
+                      .select("*")
+                      .eq("payment_status", "paid")
+                      .order("created_at", { ascending: false })
+                      .limit(10);
+                    setOnlinePayments(payReqs || []);
+                  } catch (e) {
+                    console.warn("Ошибка загрузки истории:", e);
+                  } finally {
+                    setLoadingHistory(false);
+                  }
+                }}
+                className="rounded-xl text-xs flex items-center justify-center gap-1.5 h-8 text-muted-foreground hover:text-foreground"
+              >
+                <History className="h-3.5 w-3.5" />
+                <span>История начислений</span>
+              </Button>
+            </div>
           </div>
+
+          {/* Диалог быстрой оплаты через платёжный шлюз ЮKassa */}
+          <Dialog open={isYooKassaOpen} onOpenChange={setIsYooKassaOpen}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-base font-bold">
+                  <div className="h-8 w-8 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                    <Zap className="h-4 w-4 fill-current" />
+                  </div>
+                  Быстрая оплата ЮKassa
+                </DialogTitle>
+                <DialogDescription>
+                  Безопасная онлайн-оплата банковской картой, СБП или SberPay
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 py-2">
+                {/* Сведения о лицевом счете */}
+                <div className="p-3.5 rounded-xl border bg-muted/40 space-y-1.5 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Лицевой счёт:</span>
+                    <span className="font-mono font-bold text-foreground">{account.account_number}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Адрес:</span>
+                    <span className="font-medium text-foreground text-right truncate max-w-[240px]">{address}{apartment ? `, кв. ${apartment}` : ""}</span>
+                  </div>
+                  <div className="flex justify-between pt-1 border-t">
+                    <span className="text-muted-foreground">{isDebt ? "Текущий долг:" : "Баланс:"}</span>
+                    <span className={`font-bold ${isDebt ? "text-destructive" : "text-green-600"}`}>
+                      {debt.toFixed(2)} ₽
+                    </span>
+                  </div>
+                </div>
+
+                {/* Выбор суммы */}
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold">Сумма к оплате (₽)</Label>
+                  <Input
+                    type="number"
+                    min="10"
+                    step="10"
+                    value={payAmount}
+                    onChange={(e) => setPayAmount(e.target.value)}
+                    placeholder="Введите сумму"
+                    className="text-lg font-bold font-mono"
+                  />
+
+                  {/* Быстрые пресеты */}
+                  <div className="grid grid-cols-4 gap-1.5 pt-1">
+                    {debt > 0 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="text-xs h-7 px-1 truncate"
+                        onClick={() => setPayAmount(debt.toFixed(2))}
+                        title={`Весь долг: ${debt.toFixed(2)} ₽`}
+                      >
+                        Долг ({debt.toFixed(0)} ₽)
+                      </Button>
+                    )}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="text-xs h-7 px-1"
+                      onClick={() => setPayAmount("300")}
+                    >
+                      300 ₽
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="text-xs h-7 px-1"
+                      onClick={() => setPayAmount("900")}
+                    >
+                      900 ₽
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="text-xs h-7 px-1"
+                      onClick={() => setPayAmount("1800")}
+                    >
+                      1800 ₽
+                    </Button>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    💡 300 ₽ — ~1 мес. обслуживания, 900 ₽ — квартал, 1800 ₽ — полгода.
+                  </p>
+                </div>
+
+                {/* Преимущества и безопасность */}
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border text-[11px] text-muted-foreground space-y-1">
+                  <div className="flex items-center gap-1.5 text-foreground font-medium">
+                    <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+                    Защищено стандартами безопасности PCI DSS
+                  </div>
+                  <p>Оплата зачисляется мгновенно. После завершения платежа вы вернётесь в личный кабинет.</p>
+                </div>
+              </div>
+
+              <DialogFooter className="flex-col sm:flex-row gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsYooKassaOpen(false)}
+                  disabled={isPayingYooKassa}
+                  className="rounded-xl"
+                >
+                  Отмена
+                </Button>
+                <Button
+                  onClick={handleYooKassaPay}
+                  disabled={isPayingYooKassa || !payAmount || parseFloat(payAmount) <= 0}
+                  className="rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white font-bold gap-2"
+                >
+                  {isPayingYooKassa ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Подготовка...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="h-4 w-4 fill-current" />
+                      <span>Оплатить {payAmount ? `${parseFloat(payAmount) || 0} ₽` : ""}</span>
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           {/* Диалог истории начислений и оплат для жильца */}
           <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
@@ -1245,9 +1497,26 @@ const Cabinet = () => {
     content: false
   });
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   // Глобальные переменные и утилиты, вынесенные ниже объявлений всех стейтов для предотвращения ReferenceError (temporal dead zone)
   const { toast } = useToast();
+
+  // Логика обработки успешного платежа через ЮKassa при возврате пользователя
+  useEffect(() => {
+    const paymentStatus = searchParams.get("payment");
+    if (paymentStatus === "success") {
+      const accountNum = searchParams.get("account");
+      const reqId = searchParams.get("request_id");
+      console.log(`[Cabinet: ЮKassa] Платёж успешно завершён! Л/С: ${accountNum || "—"}, ID заявки: ${reqId || "—"}`);
+      toast({
+        title: "Оплата принята!",
+        description: "Ваш платёж через ЮKassa успешно совершён и принят в обработку.",
+      });
+      // Очищаем адресную строку от технических query-параметров оплаты
+      navigate("/cabinet", { replace: true });
+    }
+  }, [searchParams, navigate, toast]);
   const hasAdminConsoleAccess = userRoles.some((role) => ["admin", "director"].includes(role));
   const isLocked = !!profile?.is_verified && !editing;
 
@@ -3282,7 +3551,9 @@ const Cabinet = () => {
                     fullName={profile.full_name || fullName} 
                     phone={profile.phone || phone} 
                     embedded 
-                    setParentAccount={setUserAccount} 
+                    setParentAccount={setUserAccount}
+                    isVerified={profile?.is_verified === true || profile?.verification_status === "verified"}
+                    userId={userId}
                   />
 
                   {/* Удаленный доступ к домофону (отображается для всех адресов, проверяет наличие логопасов по адресу и лицевому счету) */}
@@ -4625,37 +4896,49 @@ const Cabinet = () => {
 
                   <div className="flex flex-col gap-2 w-full pt-2">
                     <Button
-                      onClick={() => {
-                        if (!lastOrderTotals) return;
+                      onClick={async () => {
+                        if (!lastOrderTotals || lastOrderTotals.total <= 0) return;
                         
-                        console.log("[Заявка] Абонент переходит к шлюзу ЮKassa, сумма:", lastOrderTotals.total);
-                        
-                        // Демо-режим ЮKassa
+                        console.log("[Заявка: ЮKassa] Создание платежа на сумму:", lastOrderTotals.total);
                         toast({
-                          title: "Переход к оплате (Демо ЮKassa)",
-                          description: `Сумма к оплате: ${lastOrderTotals.total.toFixed(2)} ₽. Интеграция будет завершена после получения ключей API.`,
+                          title: "Переход к оплате",
+                          description: `Сумма к оплате: ${lastOrderTotals.total.toFixed(2)} ₽. Перенаправляем на защищенный шлюз ЮKassa...`,
                         });
                         
-                        // Имитация успешной оплаты для теста
-                        setTimeout(async () => {
-                          // Обновление статуса заявки в БД (payment_status: 'paid')
-                          if (lastCreatedRequestId) {
-                            await supabase
-                              .from("requests")
-                              .update({ payment_status: 'paid' })
-                              .eq("id", lastCreatedRequestId);
+                        try {
+                          const resp = await fetch("/backend-api/api/payments/yookassa/create", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              amount: lastOrderTotals.total,
+                              description: `Оплата заказа по заявке №${lastCreatedRequestId || "б/н"}, адрес: ${orderStreet || address} ${orderHouse || ""}${orderApartment ? `, кв. ${orderApartment}` : ""}`,
+                              accountNumber: userAccount?.account_number || undefined,
+                              requestId: lastCreatedRequestId || undefined,
+                              userId: userId || undefined,
+                              returnUrl: `${window.location.origin}/cabinet?payment=success&request_id=${lastCreatedRequestId || ""}`,
+                            }),
+                          });
+
+                          const pData = await resp.json();
+                          console.log("[Заявка: Ответ ЮKassa]", pData);
+
+                          if (!resp.ok || !pData.success) {
+                            throw new Error(pData.error || "Ошибка инициализации оплаты в ЮKassa");
                           }
 
-                          toast({
-                            title: "Оплата успешно прошла (Демо)",
-                            description: "Ваш заказ оплачен.",
-                          });
-                          setIsSuccessPaymentOpen(false);
-                          
-                          if (refetchUserRequests) {
-                            refetchUserRequests();
+                          if (pData.confirmationUrl) {
+                            window.location.href = pData.confirmationUrl;
+                          } else {
+                            throw new Error("Не получен URL подтверждения оплаты от ЮKassa");
                           }
-                        }, 2000);
+                        } catch (err: any) {
+                          console.error("[Заявка: Ошибка ЮKassa]", err);
+                          toast({
+                            title: "Ошибка оплаты",
+                            description: err.message || "Не удалось связаться со шлюзом оплаты ЮKassa",
+                            variant: "destructive",
+                          });
+                        }
                       }}
                       className="w-full py-2.5 flex items-center justify-center gap-2 hover:scale-105 transition-transform btn-premium-gold hover:shadow-gold-glow rounded-xl h-11 font-bold"
                       size="lg"
