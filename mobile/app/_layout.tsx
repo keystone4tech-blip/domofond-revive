@@ -1,71 +1,94 @@
-import { useEffect } from 'react';
+// mobile/app/_layout.tsx — Корневой компонент навигации приложения «Домофондар»
+// Инициализирует глобальные провайдеры (React Query, тема), управляет жизненным циклом сплэш-скрина и роутингом
+
+import { useEffect, useState } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider, DarkTheme, DefaultTheme } from '@react-navigation/native';
-import { useColorScheme } from 'react-native';
+import { useColorScheme, View, ActivityIndicator } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
-import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
+import { useAuthStore } from '@/store/auth.store';
 
-// Инициализация QueryClient для TanStack Query
-const queryClient = new QueryClient();
+// Инициализация клиента кэширования серверных запросов
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 2,
+      staleTime: 1000 * 60 * 5, // 5 минут актуальности данных
+    },
+  },
+});
 
-// Предотвращаем автоматическое скрытие сплеш-скрина
-SplashScreen.preventAutoHideAsync();
+// Предотвращаем автоматическое скрытие сплэша до инициализации состояния
+SplashScreen.preventAutoHideAsync().catch(() => {
+  // Игнорируем ошибку, если сплэш уже скрыт
+});
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const router = useRouter();
   const segments = useSegments();
-  
-  // Загрузка пользовательских шрифтов
-  const [loaded, error] = useFonts({
-    // Здесь можно добавить пользовательские шрифты
-  });
+  const [isReady, setIsReady] = useState(false);
 
-  // Эмуляция проверки авторизации (в реальном проекте используем store)
-  const isAuthenticated = false; // Замените на реальную логику
+  // Получаем состояние авторизации из глобального Zustand-стора
+  const { isAuthenticated, loadProfile } = useAuthStore();
 
   useEffect(() => {
-    if (error) throw error;
-  }, [error]);
-
-  useEffect(() => {
-    if (loaded) {
-      // Скрываем сплеш-скрин после загрузки
-      SplashScreen.hideAsync();
+    // Асинхронная инициализация приложения (проверка токенов, загрузка настроек)
+    async function prepareApp() {
+      try {
+        console.log('[App] Инициализация приложения Домофондар...');
+        // Проверяем сохраненную сессию в SecureStore
+        await loadProfile();
+      } catch (err) {
+        console.warn('[App] Ошибка фоновой загрузки профиля:', err);
+      } finally {
+        // Устанавливаем флаг готовности
+        setIsReady(true);
+        // Гарантированно скрываем нативную заставку (Splash Screen)
+        console.log('[App] Скрытие сплэш-скрина');
+        await SplashScreen.hideAsync().catch(() => {});
+      }
     }
-  }, [loaded]);
 
+    prepareApp();
+  }, []);
+
+  // Редирект в зависимости от статуса авторизации после того, как приложение готово
   useEffect(() => {
-    if (!loaded) return;
+    if (!isReady) return;
 
     const inAuthGroup = segments[0] === '(auth)';
-    
-    // Перенаправление в зависимости от статуса авторизации
+
     if (!isAuthenticated && !inAuthGroup) {
-      console.log('Пользователь не авторизован. Перенаправление на экран входа.');
+      console.log('[App] Сессия не найдена. Переход на экран входа.');
       router.replace('/(auth)/login');
     } else if (isAuthenticated && inAuthGroup) {
-      console.log('Пользователь авторизован. Перенаправление на главную.');
+      console.log('[App] Пользователь авторизован. Переход в главное меню.');
       router.replace('/(tabs)/home');
     }
-  }, [isAuthenticated, segments, loaded]);
+  }, [isReady, isAuthenticated, segments]);
 
-  if (!loaded) {
-    return null;
+  // Пока идет начальная проверка, показываем фоновый цвет
+  if (!isReady) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#0F172A', justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#10B981" />
+      </View>
+    );
   }
 
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
         <Stack screenOptions={{ headerShown: false }}>
+          {/* Только реально существующие группы маршрутов */}
+          <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="(auth)" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="staff" options={{ headerShown: false }} />
-          <Stack.Screen name="admin" options={{ headerShown: false }} />
         </Stack>
-        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+        <StatusBar style="light" backgroundColor="#0F172A" />
       </ThemeProvider>
     </QueryClientProvider>
   );

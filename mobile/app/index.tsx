@@ -1,37 +1,14 @@
-import { useEffect } from 'react';
+// mobile/app/index.tsx — Стартовый шлюз приложения «Домофондар»
+// Отображает фирменный загрузчик пока RootLayout проверяет сессию
+
 import { View, ActivityIndicator, StyleSheet, Text } from 'react-native';
-import { useRouter } from 'expo-router';
 
 export default function Index() {
-  const router = useRouter();
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        console.log('Проверка токена в SecureStore...');
-        // const token = await SecureStore.getItemAsync('jwt_token');
-        const token = null; // Эмуляция
-
-        if (token) {
-          console.log('Токен найден. Переход на главную.');
-          router.replace('/(tabs)/home');
-        } else {
-          console.log('Токен не найден. Переход на экран входа.');
-          router.replace('/(auth)/login');
-        }
-      } catch (error) {
-        console.error('Ошибка при проверке авторизации:', error);
-        router.replace('/(auth)/login');
-      }
-    };
-
-    checkAuth();
-  }, []);
-
   return (
     <View style={styles.container}>
       <Text style={styles.logoText}>Домофондар</Text>
-      <ActivityIndicator size="large" color="#10B981" />
+      <Text style={styles.subText}>Сервис умного доступа</Text>
+      <ActivityIndicator size="large" color="#10B981" style={styles.loader} />
     </View>
   );
 }
@@ -45,8 +22,16 @@ const styles = StyleSheet.create({
   },
   logoText: {
     color: '#10B981',
-    fontSize: 32,
+    fontSize: 34,
     fontWeight: 'bold',
-    marginBottom: 20,
-  }
+    letterSpacing: 1,
+  },
+  subText: {
+    color: '#94A3B8',
+    fontSize: 15,
+    marginTop: 8,
+  },
+  loader: {
+    marginTop: 28,
+  },
 });
