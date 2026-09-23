@@ -540,14 +540,49 @@ export const AccountsManager: React.FC = () => {
     console.log(`[AccountsManager: Абоненты] Выбран файл: ${file.name}, размер: ${file.size} байт`);
 
     try {
-      const text = await file.text();
+      // 1. Читаем файл в бинарный буфер для поддержки кодировок Windows-1251 (1C) и UTF-8
+      const buffer = await file.arrayBuffer();
+      let text = "";
+
+      try {
+        // Декодируем в Windows-1251 (основная кодировка выгрузок 1С на Windows)
+        const decoder1251 = new TextDecoder("windows-1251");
+        const text1251 = decoder1251.decode(buffer);
+
+        // Также декодируем в UTF-8 для сравнительного анализа
+        const decoderUtf8 = new TextDecoder("utf-8");
+        const textUtf8 = decoderUtf8.decode(buffer);
+
+        // Подсчитываем количество распознанных кириллических букв и символов искажения
+        const cyr1251 = (text1251.match(/[а-яА-ЯёЁ]/g) || []).length;
+        const cyrUtf8 = (textUtf8.match(/[а-яА-ЯёЁ]/g) || []).length;
+        const utf8Errors = (textUtf8.match(/\uFFFD/g) || []).length;
+
+        console.log(`[AccountsManager: Кодировка] Cyrillic 1251: ${cyr1251}, Cyrillic UTF-8: ${cyrUtf8}, UTF-8 Errors: ${utf8Errors}`);
+
+        // Если в UTF-8 обнаружены спецсимволы ошибок или в Windows-1251 кириллицы значительно больше
+        if (utf8Errors > 0 || cyr1251 > cyrUtf8) {
+          text = text1251;
+          console.log("[AccountsManager: Абоненты] Использована кодировка Windows-1251 (1C)");
+        } else {
+          text = textUtf8;
+          console.log("[AccountsManager: Абоненты] Использована кодировка UTF-8");
+        }
+      } catch (decErr) {
+        console.warn("[AccountsManager: Кодировка] Ошибка декодера, fallback на file.text():", decErr);
+        text = await file.text();
+      }
+
+      // Разделяем на строки и удаляем пустые
       const lines = text.split("\n").filter(l => l.trim());
-      console.log(`[AccountsManager: Абоненты] Всего строк: ${lines.length}`);
+      console.log(`[AccountsManager: Абоненты] Всего строк в файле: ${lines.length}`);
 
       const recordsMap = new Map<string, any>();
 
       for (let i = 1; i < lines.length; i++) {
-        const p = lines[i].split("\t");
+        // Очищаем строку от символов возврата каретки Windows \r
+        const cleanLine = lines[i].replace(/\r$/, "");
+        const p = cleanLine.split("\t");
         if (p.length < 5 || !p[0].trim()) continue;
 
         const accNum = p[0].trim().replace(/\D/g, "").padStart(10, "0");
@@ -555,7 +590,11 @@ export const AccountsManager: React.FC = () => {
 
         const fullName = p[1]?.trim() || null;
         const phone = p[2]?.trim() || null;
-        const hasHandset = (p[3]?.trim().toLowerCase() === "да");
+        
+        // Гибкое определение наличия трубки: "Да", "да", "1", "+", "true", "есть"
+        const rawHandset = p[3]?.trim().toLowerCase() || "";
+        const hasHandset = rawHandset === "да" || rawHandset === "1" || rawHandset === "+" || rawHandset === "true" || rawHandset === "есть" || rawHandset.includes("да");
+        
         const street = p[5]?.trim() || "";
         const house = p[6]?.trim() || "";
         const housing = p[7]?.trim() || null;
@@ -596,7 +635,8 @@ export const AccountsManager: React.FC = () => {
       }
 
       const parsed = Array.from(recordsMap.values());
-      console.log(`[AccountsManager: Абоненты] Распознано уникальных лицевых счетов: ${parsed.length}`);
+      const handsetsCount = parsed.filter(s => s.has_handset).length;
+      console.log(`[AccountsManager: Абоненты] Распознано уникальных счетов: ${parsed.length}, с трубками: ${handsetsCount}`);
       setParsedSubscribers(parsed);
 
       if (parsed.length === 0) {
@@ -646,6 +686,7 @@ export const AccountsManager: React.FC = () => {
               housing: c.housing,
               entrance: c.entrance,
               payment_type: c.payment_type,
+              period: "",
               updated_at: new Date().toISOString(),
             })),
             { onConflict: "account_number" }
