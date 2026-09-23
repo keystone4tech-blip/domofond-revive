@@ -10,12 +10,13 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useUserRole } from "@/hooks/useUserRole";
-import { Loader2, LogOut, CheckCircle, AlertCircle, AlertTriangle, ClipboardList, Calendar, Shield, CreditCard, Wallet, Pencil, Trash2, UserCheck, Plus, Minus, Clock, Wrench, CheckCircle2, XCircle, Send, Smartphone, KeyRound, PhoneCall, DoorOpen, DoorClosed, Info, User, Phone, Mail, Lock, Lightbulb, Hash, MapPin, Building, Home, Building2, History, FileSpreadsheet, Copy, Eye, EyeOff, ShieldCheck, Sparkles, LayoutDashboard, Zap } from "lucide-react";
+import { Loader2, LogOut, CheckCircle, AlertCircle, AlertTriangle, ClipboardList, Calendar, Shield, CreditCard, Wallet, Pencil, Trash2, UserCheck, Plus, Minus, Clock, Wrench, CheckCircle2, XCircle, Send, Smartphone, KeyRound, PhoneCall, DoorOpen, DoorClosed, Info, User, Phone, Mail, Lock, Lightbulb, Hash, MapPin, Building, Home, Building2, History, FileSpreadsheet, Copy, Eye, EyeOff, ShieldCheck, Sparkles, LayoutDashboard, Zap, Printer, Receipt, FileText } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -193,6 +194,7 @@ const DebtCard = ({
   const [accountHistory, setAccountHistory] = useState<any[]>([]);
   const [onlinePayments, setOnlinePayments] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [selectedReceipt, setSelectedReceipt] = useState<any | null>(null);
 
   // Стейты для быстрой онлайн-оплаты через платёжный шлюз ЮKassa
   const [isYooKassaOpen, setIsYooKassaOpen] = useState(false);
@@ -252,9 +254,6 @@ const DebtCard = ({
           
           if (isMatch) {
             console.log(`[Баланс: Сравнение] ✅ Совпадение! БД улица: "${dbStreetNorm}" (ввод: "${userStreetNorm}"), БД дом: "${dbHouseNorm}" (ввод: "${userHouseNorm}"), БД кв: "${dbAptNorm}" (ввод: "${userAptNorm}")`);
-          } else {
-            // Подробный лог несовпадения для упрощения отладки в консоли
-            console.log(`[Баланс: Сравнение] ❌ Не совпало. БД: у (${dbStreetNorm}) д (${dbHouseNorm}) кв (${dbAptNorm}) | Ввод: у (${userStreetNorm}) д (${userHouseNorm}) кв (${userAptNorm})`);
           }
 
           return isMatch;
@@ -262,11 +261,27 @@ const DebtCard = ({
 
         if (filtered.length > 0) {
           best = filtered[0];
-          console.log(`[Баланс] Лицевой счет найден: ${best.account_number}, сумма: ${best.debt_amount} ₽`); // Логирование
+          console.log(`[Баланс] Лицевой счет найден: ${best.account_number}, сумма в БД: ${best.debt_amount} ₽`);
+
+          // Фоновая синхронизация платежей ЮKassa с бэкендом
+          try {
+            const syncRes = await fetch(`/backend-api/api/payments/yookassa/sync/${best.account_number}`);
+            const syncData = await syncRes.json();
+            if (syncData.success && syncData.account) {
+              best.debt_amount = Number(syncData.account.debt_amount);
+              console.log(`[Баланс: ЮKassa Синхронизация] Актуализирован долг счета ${best.account_number}: ${best.debt_amount} ₽`);
+              if (syncData.payments) {
+                setOnlinePayments(syncData.payments);
+              }
+            }
+          } catch (syncErr) {
+            console.warn("[Баланс: Синхронизация ЮKassa]", syncErr);
+          }
+
           const currentDebt = Number(best.debt_amount) || 0;
           setPayAmount(currentDebt > 0 ? currentDebt.toFixed(2) : "300");
         } else {
-          console.log(`[Баланс] Адрес совпал по улице и дому, но квартира ${apartment} не найдена в обслуживаемых лицевых счетах`); // Логирование
+          console.log(`[Баланс] Адрес совпал по улице и дому, но квартира ${apartment} не найдена в обслуживаемых лицевых счетах`);
         }
       }
       setAccount(best);
@@ -274,6 +289,17 @@ const DebtCard = ({
         setParentAccount(best);
       }
       setLoading(false);
+
+      // Проверка возврата после платежа в системе ЮKassa
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get("payment") === "success") {
+        console.log("[ЮKassa] Пользователь вернулся после успешного платежа!");
+        window.history.replaceState({}, document.title, window.location.pathname);
+        toast({
+          title: "✅ Оплата успешно зачислена!",
+          description: "Платеж проведён через ЮKassa, баланс обновлён. Электронный чек доступен в истории платежей.",
+        });
+      }
     };
     loadDebt();
   }, [address, apartment, setParentAccount]);
@@ -470,21 +496,28 @@ const DebtCard = ({
                   setIsHistoryOpen(true);
                   setLoadingHistory(true);
                   try {
+                    // 1. Синхронизируем и загружаем онлайн-платежи через ЮKassa
+                    if (account.account_number) {
+                      const syncRes = await fetch(`/backend-api/api/payments/yookassa/sync/${account.account_number}`);
+                      const syncData = await syncRes.json();
+                      if (syncData.success) {
+                        setOnlinePayments(syncData.payments || []);
+                        if (syncData.account) {
+                          setAccount((prev: any) => prev ? { ...prev, debt_amount: Number(syncData.account.debt_amount) } : prev);
+                          if (setParentAccount) {
+                            setParentAccount((prev: any) => prev ? { ...prev, debt_amount: Number(syncData.account.debt_amount) } : prev);
+                          }
+                        }
+                      }
+                    }
+
+                    // 2. Загружаем историю начислений из реестров
                     const { data: hist } = await supabase
                       .from("account_history" as any)
                       .select("*")
                       .eq("account_number", account.account_number)
                       .order("batch_number", { ascending: false });
                     setAccountHistory(hist || []);
-
-                    // Загрузка онлайн-платежей абонента
-                    const { data: payReqs } = await supabase
-                      .from("requests")
-                      .select("*")
-                      .eq("payment_status", "paid")
-                      .order("created_at", { ascending: false })
-                      .limit(10);
-                    setOnlinePayments(payReqs || []);
                   } catch (e) {
                     console.warn("Ошибка загрузки истории:", e);
                   } finally {
@@ -493,8 +526,8 @@ const DebtCard = ({
                 }}
                 className="rounded-xl text-xs flex items-center justify-center gap-1.5 h-8 text-muted-foreground hover:text-foreground"
               >
-                <History className="h-3.5 w-3.5" />
-                <span>История начислений</span>
+                <Receipt className="h-3.5 w-3.5 text-emerald-600" />
+                <span>История и чеки</span>
               </Button>
             </div>
           </div>
@@ -639,35 +672,129 @@ const DebtCard = ({
 
           {/* Диалог истории начислений и оплат для жильца */}
           <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-lg">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2 text-base font-bold">
-                  <History className="h-5 w-5 text-primary" />
-                  История начислений и платежей
+                  <Receipt className="h-5 w-5 text-emerald-600" />
+                  История начислений и онлайн-чеки
                 </DialogTitle>
                 <DialogDescription>
                   Лицевой счёт: <strong className="font-mono text-foreground">{account.account_number}</strong>
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="space-y-4 py-2 max-h-[420px] overflow-y-auto">
-                {/* 1. Блок начислений по официальным реестрам */}
-                <div className="space-y-2">
-                  <h4 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1">
-                    <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" />
-                    Начисления по ежемесячным реестрам
-                  </h4>
+              <Tabs defaultValue="payments" className="w-full">
+                <TabsList className="grid grid-cols-2 mb-3">
+                  <TabsTrigger value="payments" className="text-xs flex items-center gap-1.5">
+                    <Receipt className="h-3.5 w-3.5 text-emerald-600" />
+                    <span>Онлайн-платежи ({onlinePayments.length})</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="registry" className="text-xs flex items-center gap-1.5">
+                    <FileSpreadsheet className="h-3.5 w-3.5 text-blue-600" />
+                    <span>Реестры ({accountHistory.length})</span>
+                  </TabsTrigger>
+                </TabsList>
+
+                {/* Вкладка 1: Онлайн-платежи ЮKassa и просмотр чеков */}
+                <TabsContent value="payments" className="space-y-3">
                   {loadingHistory ? (
-                    <div className="py-4 text-center text-xs text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin mx-auto mb-1 text-primary" />
+                    <div className="py-8 text-center text-xs text-muted-foreground">
+                      <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2 text-primary" />
+                      Синхронизация и загрузка платежей...
+                    </div>
+                  ) : onlinePayments.length === 0 ? (
+                    <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-900 border text-center space-y-1.5">
+                      <Receipt className="h-8 w-8 text-muted-foreground mx-auto mb-1 opacity-40" />
+                      <p className="text-xs font-semibold text-foreground">Онлайн-платежей пока не зафиксировано</p>
+                      <p className="text-[11px] text-muted-foreground max-w-xs mx-auto">
+                        После оплаты через кнопку «Быстрая оплата ЮKassa» платежи и официальные электронные чеки сразу отобразятся здесь.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-[340px] overflow-y-auto pr-1">
+                      {onlinePayments.map((p: any) => {
+                        const isSucceeded = p.status === "succeeded";
+                        const isPending = p.status === "pending";
+                        return (
+                          <div
+                            key={p.id || p.yookassa_payment_id}
+                            className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:border-emerald-500/40 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                          >
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-sm text-foreground font-mono">
+                                  {Number(p.amount).toFixed(2)} ₽
+                                </span>
+                                {isSucceeded ? (
+                                  <Badge className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 text-[10px] py-0 font-medium">
+                                    <CheckCircle2 className="h-3 w-3 mr-1 text-emerald-600 inline" />
+                                    Зачислен
+                                  </Badge>
+                                ) : isPending ? (
+                                  <Badge className="bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 text-[10px] py-0 font-medium">
+                                    <Clock className="h-3 w-3 mr-1 text-amber-600 inline" />
+                                    В обработке
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="destructive" className="text-[10px] py-0 font-medium">
+                                    Отменён
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-muted-foreground">
+                                {new Date(p.created_at).toLocaleString("ru-RU", {
+                                  day: "2-digit",
+                                  month: "2-digit",
+                                  year: "numeric",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })} • ЮKassa (СБП/Карта)
+                              </p>
+                              {p.yookassa_payment_id && (
+                                <p className="text-[10px] font-mono text-muted-foreground/80 truncate max-w-[260px]">
+                                  № {p.yookassa_payment_id}
+                                </p>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setSelectedReceipt(p)}
+                                className="h-8 px-2.5 text-xs rounded-xl flex items-center gap-1.5 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 font-medium"
+                              >
+                                <Receipt className="h-3.5 w-3.5 text-emerald-600" />
+                                <span>Электронный чек</span>
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-800 dark:text-emerald-300 leading-relaxed flex items-start gap-2">
+                    <span className="text-sm leading-none select-none">💡</span>
+                    <span>
+                      Оплаты через защищенный шлюз ЮKassa зачисляются мгновенно. Электронный чек подтверждает успешное списание и зачисление средств на ваш лицевой счёт.
+                    </span>
+                  </div>
+                </TabsContent>
+
+                {/* Вкладка 2: Реестры начислений */}
+                <TabsContent value="registry" className="space-y-3">
+                  {loadingHistory ? (
+                    <div className="py-8 text-center text-xs text-muted-foreground">
+                      <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2 text-primary" />
                       Загрузка реестров...
                     </div>
                   ) : accountHistory.length === 0 ? (
-                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border text-xs text-muted-foreground">
+                    <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border text-xs text-muted-foreground">
                       Текущее сальдо по последнему реестру ({formatPeriod(account.period)}): <strong className="text-foreground">{account.debt_amount.toFixed(2)} ₽</strong>.
                     </div>
                   ) : (
-                    <div className="space-y-1.5 font-mono text-xs">
+                    <div className="space-y-1.5 font-mono text-xs max-h-[340px] overflow-y-auto pr-1">
                       {accountHistory.map((h: any) => (
                         <div key={h.id} className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/60 flex items-center justify-between">
                           <div>
@@ -685,18 +812,115 @@ const DebtCard = ({
                       ))}
                     </div>
                   )}
-                </div>
 
-                {/* 2. Пояснение для жильца */}
-                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-[11px] text-muted-foreground leading-relaxed">
-                  💡 <strong>Как учитываются оплаты:</strong><br />
-                  Сумма в личном кабинете отражает официальное состояние счёта по последнему загруженному банковскому реестру. Платежи, совершенные через банк, кассу в офисе или на сайте, учитываются бухгалтерией в следующем ежемесячном расчётном реестре.
-                </div>
-              </div>
+                  <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-[11px] text-muted-foreground leading-relaxed">
+                    💡 <strong>Как учитываются оплаты:</strong><br />
+                    Сумма в личном кабинете отражает официальное состояние счёта по последнему загруженному расчётному реестру. Онлайн-оплаты сразу уменьшают задолженность в системе.
+                  </div>
+                </TabsContent>
+              </Tabs>
 
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsHistoryOpen(false)} className="rounded-xl">
                   Закрыть
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Диалог просмотра и печати официального электронного чека */}
+          <Dialog open={!!selectedReceipt} onOpenChange={(open) => !open && setSelectedReceipt(null)}>
+            <DialogContent className="max-w-md print:p-0 print:border-none print:shadow-none">
+              <DialogHeader className="print:hidden">
+                <DialogTitle className="flex items-center gap-2 text-base font-bold">
+                  <Receipt className="h-5 w-5 text-emerald-600" />
+                  Электронный чек оплаты
+                </DialogTitle>
+                <DialogDescription>
+                  Официальная квитанция об оплате ТО домофона через платёжный шлюз ЮKassa
+                </DialogDescription>
+              </DialogHeader>
+
+              {selectedReceipt && (
+                <div id="payment-receipt" className="space-y-4 py-2 text-xs">
+                  {/* Шапка чека */}
+                  <div className="text-center pb-3 border-b border-dashed border-slate-300 dark:border-slate-700">
+                    <div className="font-extrabold text-sm uppercase tracking-wider text-foreground">ООО «ДОМОФОНДАР»</div>
+                    <div className="text-[11px] text-muted-foreground mt-0.5">ИНН: 2311311000 • ОГРН: 1202300063250</div>
+                    <div className="text-[10px] text-muted-foreground">г. Краснодар • Тел.: +7 (861) 205-00-55</div>
+                    <div className="mt-2.5 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-semibold text-[11px] border border-emerald-500/20">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                      ОПЛАЧЕНО ОНЛАЙН • ЧЕК ПРОВЕДЁН
+                    </div>
+                  </div>
+
+                  {/* Детали платежа */}
+                  <div className="space-y-2 py-1">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Номер транзакции:</span>
+                      <span className="font-mono font-medium text-foreground select-all text-right text-[11px]">
+                        {selectedReceipt.yookassa_payment_id || selectedReceipt.id}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Лицевой счёт:</span>
+                      <span className="font-mono font-bold text-foreground">
+                        {selectedReceipt.account_number || account?.account_number}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Дата и время:</span>
+                      <span className="font-medium text-foreground">
+                        {new Date(selectedReceipt.created_at).toLocaleString("ru-RU")}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Способ оплаты:</span>
+                      <span className="font-medium text-foreground">
+                        ЮKassa (Карта / СБП / SberPay)
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-start">
+                      <span className="text-muted-foreground shrink-0">Назначение:</span>
+                      <span className="font-medium text-foreground text-right max-w-[240px]">
+                        {selectedReceipt.description || "Оплата ТО домофона"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Итоговая сумма */}
+                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex justify-between items-center">
+                    <div>
+                      <span className="text-[11px] text-muted-foreground block">Сумма платежа:</span>
+                      <span className="text-[10px] text-muted-foreground">НДС не облагается (УСН)</span>
+                    </div>
+                    <span className="text-lg font-black font-mono text-emerald-600 dark:text-emerald-400">
+                      {Number(selectedReceipt.amount).toFixed(2)} ₽
+                    </span>
+                  </div>
+
+                  {/* Подвал чека с защитной отметкой */}
+                  <div className="pt-2 text-center text-[10px] text-muted-foreground space-y-1">
+                    <p>Платежный оператор: ООО НКО «ЮМани» (лицензия ЦБ РФ № 3510-К)</p>
+                    <p>Квитанция сформирована автоматически в ЛК «Домофондар» и подтверждает зачисление средств.</p>
+                  </div>
+                </div>
+              )}
+
+              <DialogFooter className="flex-col sm:flex-row gap-2 pt-2 print:hidden">
+                <Button
+                  variant="outline"
+                  onClick={() => setSelectedReceipt(null)}
+                  className="rounded-xl"
+                >
+                  Закрыть
+                </Button>
+                <Button
+                  onClick={() => window.print()}
+                  className="rounded-xl bg-primary text-primary-foreground font-semibold flex items-center gap-1.5"
+                >
+                  <Printer className="h-4 w-4" />
+                  Распечатать чек
                 </Button>
               </DialogFooter>
             </DialogContent>

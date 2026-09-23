@@ -786,6 +786,133 @@ app.post('/api/payments/yookassa/webhook', async (req, res) => {
   }
 });
 
+/**
+ * Автоматическая синхронизация статуса платежей по лицевому счету
+ * Опрашивает API ЮKassa для всех "pending" платежей счета, обновляет БД и баланс
+ */
+app.get('/api/payments/yookassa/sync/:accountNumber', async (req, res) => {
+  try {
+    const { accountNumber } = req.params;
+    if (!accountNumber) {
+      return res.status(400).json({ error: 'Не указан лицевой счет' });
+    }
+
+    console.log(`[Бэкенд: ЮKassa Синхронизация] Запуск проверки оплат для л/с "${accountNumber}"...`);
+
+    // 1. Ищем все незавершенные платежи по данному лицевому счету
+    const pendingRes = await pool.query(
+      `SELECT * FROM payments WHERE account_number = $1 AND status = 'pending' ORDER BY created_at DESC`,
+      [accountNumber]
+    );
+
+    const authHeader = 'Basic ' + Buffer.from(`${YOOKASSA_SHOP_ID}:${YOOKASSA_SECRET_KEY}`).toString('base64');
+    let updatedCount = 0;
+
+    for (const payment of pendingRes.rows) {
+      try {
+        const yooRes = await fetch(`https://api.yookassa.ru/v3/payments/${payment.yookassa_payment_id}`, {
+          headers: { 'Authorization': authHeader },
+        });
+
+        if (!yooRes.ok) continue;
+
+        const yooData = await yooRes.json();
+
+        if (yooData.status === 'succeeded' || yooData.paid === true) {
+          const paidAmount = parseFloat(yooData.amount?.value || payment.amount || 0);
+          const reqId = yooData.metadata?.request_id || payment.request_id;
+          const paymentMethod = yooData.payment_method?.type || 'bank_card';
+
+          // Обновляем статус платежа в таблице payments
+          await pool.query(
+            `UPDATE payments SET status = 'succeeded', payment_method = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+            [paymentMethod, payment.id]
+          );
+
+          // Обновляем долг в accounts (уменьшаем сумму задолженности)
+          if (paidAmount > 0) {
+            await pool.query(
+              `UPDATE accounts SET debt_amount = debt_amount - $1, updated_at = CURRENT_TIMESTAMP WHERE account_number = $2`,
+              [paidAmount, accountNumber]
+            );
+            console.log(`[Бэкенд: ЮKassa Синхронизация] Зачислен платеж ${paidAmount} ₽ по л/с ${accountNumber}, баланс обновлен!`);
+          }
+
+          // Обновляем заявку, если привязана
+          if (reqId) {
+            await pool.query(
+              `UPDATE requests SET payment_status = 'paid', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+              [reqId]
+            );
+          }
+
+          updatedCount++;
+        } else if (yooData.status === 'canceled') {
+          await pool.query(
+            `UPDATE payments SET status = 'canceled', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+            [payment.id]
+          );
+        }
+      } catch (err) {
+        console.warn(`[Бэкенд: ЮKassa Синхронизация] Ошибка проверки платежа ${payment.yookassa_payment_id}:`, err.message);
+      }
+    }
+
+    // 2. Получаем актуальный список всех платежей по этому лицевому счету
+    const allPayments = await pool.query(
+      `SELECT id, yookassa_payment_id, account_number, user_id, request_id, amount, status, payment_method, description, metadata, created_at, updated_at
+       FROM payments 
+       WHERE account_number = $1
+       ORDER BY created_at DESC`,
+      [accountNumber]
+    );
+
+    // 3. Получаем текущее сальдо счета
+    const accRes = await pool.query(
+      `SELECT account_number, debt_amount, period FROM accounts WHERE account_number = $1 LIMIT 1`,
+      [accountNumber]
+    );
+
+    res.json({
+      success: true,
+      updatedCount,
+      payments: allPayments.rows,
+      account: accRes.rows[0] || null,
+    });
+  } catch (err) {
+    console.error('[Бэкенд: ЮKassa Синхронизация] Ошибка:', err.message);
+    res.status(500).json({ error: 'Ошибка синхронизации платежей' });
+  }
+});
+
+/**
+ * Получение истории онлайн-платежей по лицевому счету
+ */
+app.get('/api/payments/yookassa/history/:accountNumber', async (req, res) => {
+  try {
+    const { accountNumber } = req.params;
+    if (!accountNumber) {
+      return res.status(400).json({ error: 'Не указан лицевой счет' });
+    }
+
+    const result = await pool.query(
+      `SELECT id, yookassa_payment_id, account_number, user_id, request_id, amount, status, payment_method, description, metadata, created_at, updated_at
+       FROM payments 
+       WHERE account_number = $1
+       ORDER BY created_at DESC`,
+      [accountNumber]
+    );
+
+    res.json({
+      success: true,
+      payments: result.rows,
+    });
+  } catch (err) {
+    console.error('[Бэкенд: ЮKassa История] Ошибка:', err.message);
+    res.status(500).json({ error: 'Ошибка получения истории платежей' });
+  }
+});
+
 // Запуск сервера
 app.listen(port, () => {
   console.log(`[Бэкенд: Domofondar] Сервер успешно запущен на порту ${port}`);
