@@ -53,10 +53,25 @@ export interface Account {
   phone?: string | null;
   entrance?: string | null;
   has_handset?: boolean | null;
+  has_lk?: boolean | null; // Флаг наличия личного кабинета (из файла абонентов)
   payment_type?: string | null;
   street?: string | null;
   house?: string | null;
   housing?: string | null;
+}
+
+// Интерфейс разобранной строки реестра начислений
+export interface ParsedRegistryRow {
+  account_number: string;
+  address: string;
+  apartment: string | null;
+  period: string;
+  debt_amount: number;
+  full_name?: string | null;
+  street?: string | null;
+  house?: string | null;
+  housing?: string | null;
+  entrance?: string | null;
 }
 
 // Интерфейс загруженного файла реестра
@@ -154,7 +169,7 @@ export const AccountsManager: React.FC = () => {
   // --- Модальное окно загрузки реестра ---
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [parsedRows, setParsedRows] = useState<Array<{ account_number: string; address: string; apartment: string | null; period: string; debt_amount: number }>>([]);
+  const [parsedRows, setParsedRows] = useState<ParsedRegistryRow[]>([]);
   const [parsedBatchNum, setParsedBatchNum] = useState<number | null>(null);
   const [parsedPeriod, setParsedPeriod] = useState<string>("");
   const [isProcessingFile, setIsProcessingFile] = useState(false);
@@ -345,7 +360,7 @@ export const AccountsManager: React.FC = () => {
     return { totalDebt, totalOverpayment, debtorsCount };
   }, [displayedAccounts]);
 
-  // --- Чтение и парсинг файла реестра (.txt / .csv) ---
+  // --- Чтение и парсинг файла реестра (.txt / .csv / Взаиморасчеты общие) ---
   const handleFileSelect = async (file: File) => {
     setUploadFile(file);
     setIsProcessingFile(true);
@@ -375,44 +390,136 @@ export const AccountsManager: React.FC = () => {
 
       // 2. Читаем файл с автоопределением кодировки (Windows-1251 -> UTF-8)
       const buffer = await file.arrayBuffer();
-      let text: string;
+      let text = "";
       try {
-        const decoder = new TextDecoder("windows-1251");
-        text = decoder.decode(buffer);
-        if (!text.includes("Краснодар") && !text.includes("ул") && !text.includes("д.") && !text.includes("кв")) {
-          throw new Error("Not CP1251");
+        const decoder1251 = new TextDecoder("windows-1251");
+        const text1251 = decoder1251.decode(buffer);
+        const decoderUtf8 = new TextDecoder("utf-8");
+        const textUtf8 = decoderUtf8.decode(buffer);
+
+        const cyr1251 = (text1251.match(/[а-яА-ЯёЁ]/g) || []).length;
+        const cyrUtf8 = (textUtf8.match(/[а-яА-ЯёЁ]/g) || []).length;
+        const utf8Errors = (textUtf8.match(/\uFFFD/g) || []).length;
+
+        if (utf8Errors > 0 || cyr1251 >= cyrUtf8) {
+          text = text1251;
+          console.log("[AccountsManager: Реестр] Использована кодировка Windows-1251");
+        } else {
+          text = textUtf8;
+          console.log("[AccountsManager: Реестр] Использована кодировка UTF-8");
         }
       } catch {
-        text = new TextDecoder("utf-8").decode(buffer);
+        text = await file.text();
       }
 
       const lines = text.trim().split("\n").filter(l => l.trim());
-      const records: Array<{ account_number: string; address: string; apartment: string | null; period: string; debt_amount: number }> = [];
+      const records: ParsedRegistryRow[] = [];
       let detectedPeriod = "";
 
-      for (const line of lines) {
-        const parts = line.trim().replace(/\r$/, "").split(";");
-        if (parts.length < 5) continue;
+      // Вспомогательная функция очистки денежной суммы (удаление неразрывных пробелов \xa0 и пробелов)
+      const cleanAmountStr = (s: string) => (s || "").replace(/\xa0/g, "").replace(/\s/g, "").replace(",", ".");
 
-        const accNum = parts[0].trim();
-        const addr = parts[2].trim();
-        const per = parts[3].trim();
-        const debt = parseFloat(parts[4].replace(",", ".")) || 0;
+      // Определяем формат файла: TSV (табуляция, как во Взаиморасчетах) или точка с запятой ';'
+      const isTsvFormat = lines.some(l => l.includes("\t") && (l.includes("Взаиморасчеты") || l.includes("Лицевой счет") || l.includes("Долг абонента")));
 
-        if (!detectedPeriod && per) detectedPeriod = per;
+      console.log(`[AccountsManager: Реестр] Формат файла: ${isTsvFormat ? "TSV (Взаиморасчеты общие 1С)" : "Разделитель ';'"}`);
 
-        // Извлекаем номер квартиры
-        const aptMatch = addr.match(/(?:кв\.|квартира|кв)\s*([a-zA-Zа-яА-Я0-9_-]+)/i);
-        const apartment = aptMatch ? aptMatch[1] : null;
+      if (isTsvFormat) {
+        // Формат «Взаиморасчеты общие.txt»:
+        // Строка 0: Лицевой счет \t Абонент \t Адрес \t Долг абонента \t Наш долг
+        // Строка 1: \t \t Город, Улица, Дом, Корпус, Подъезд, Квартира \t \t
+        // Данные: 4000000001 \t Иванов И.И. \t Краснодар, Душистая (ул), 50, , 1, 1 \t 150,00 \t 0,00
+        const defaultPer = format(new Date(), "yyyy-MM");
+        detectedPeriod = defaultPer;
 
-        if (accNum && addr) {
+        for (const line of lines) {
+          const cleanLine = line.trim().replace(/\r$/, "");
+          // Пропускаем строки заголовков
+          if (cleanLine.includes("Лицевой счет") || cleanLine.includes("Город, Улица") || cleanLine.includes("Долг абонента")) {
+            continue;
+          }
+
+          const parts = cleanLine.split("\t");
+          if (parts.length < 4) continue;
+
+          const rawAcc = parts[0].trim().replace(/\D/g, "");
+          if (!rawAcc) continue;
+          const accNum = rawAcc.padStart(10, "0");
+          if (accNum === "0000000000") continue;
+
+          // Колонка [длина - 2] = Долг абонента (положительный долг)
+          // Колонка [длина - 1] = Наш долг (переплата абонента со знаком минус)
+          const subDebt = parseFloat(cleanAmountStr(parts[parts.length - 2])) || 0;
+          const ourDebt = parseFloat(cleanAmountStr(parts[parts.length - 1])) || 0;
+
+          let debtAmount = 0;
+          if (subDebt > 0) {
+            debtAmount = subDebt;
+          } else if (ourDebt > 0) {
+            debtAmount = -ourDebt; // Отрицательная сумма = переплата
+          }
+
+          // Колонка [длина - 3] = Адрес
+          const rawAddr = parts[parts.length - 3]?.trim() || "";
+          const addrParts = rawAddr.split(",").map(s => s.trim());
+          const city = addrParts[0] || "Краснодар";
+          const street = addrParts[1] || "";
+          const house = addrParts[2] || "";
+          const housing = addrParts[3] || null;
+          const entrance = addrParts[4] || null;
+          const apartment = addrParts[5] || null;
+
+          let fullAddr = `${city}, ${street}`;
+          if (house) fullAddr += `, д. ${house}`;
+          if (housing) fullAddr += `, корп. ${housing}`;
+          if (entrance) fullAddr += `, п. ${entrance}`;
+          if (apartment) fullAddr += `, кв. ${apartment}`;
+
+          // ФИО абонента: все колонки между лицевым счетом и адресом
+          const fullName = parts.slice(1, parts.length - 3).join(" ").trim() || null;
+
           records.push({
             account_number: accNum,
-            address: addr,
+            address: fullAddr,
             apartment,
-            period: per,
-            debt_amount: debt,
+            period: defaultPer,
+            debt_amount: debtAmount,
+            full_name: fullName,
+            street,
+            house,
+            housing,
+            entrance,
           });
+        }
+      } else {
+        // Классический формат с разделителем ';'
+        // счет;флаг;адрес;период;сумма
+        for (const line of lines) {
+          const parts = line.trim().replace(/\r$/, "").split(";");
+          if (parts.length < 5) continue;
+
+          const accNum = parts[0].trim().replace(/\D/g, "").padStart(10, "0");
+          if (!accNum || accNum === "0000000000") continue;
+
+          const addr = parts[2].trim();
+          const per = parts[3].trim();
+          const debt = parseFloat(cleanAmountStr(parts[4])) || 0;
+
+          if (!detectedPeriod && per) detectedPeriod = per;
+
+          // Извлекаем номер квартиры
+          const aptMatch = addr.match(/(?:кв\.|квартира|кв)\s*([a-zA-Zа-яА-Я0-9_-]+)/i);
+          const apartment = aptMatch ? aptMatch[1] : null;
+
+          if (accNum && addr) {
+            records.push({
+              account_number: accNum,
+              address: addr,
+              apartment,
+              period: per,
+              debt_amount: debt,
+            });
+          }
         }
       }
 
@@ -423,7 +530,7 @@ export const AccountsManager: React.FC = () => {
       if (records.length === 0) {
         toast({
           title: "Ошибка формата",
-          description: "Не удалось распознать записи с разделителем ';' в файле.",
+          description: "Не удалось распознать записи в файле реестра. Проверьте разделитель (табуляция или ';').",
           variant: "destructive",
         });
       }
@@ -439,7 +546,7 @@ export const AccountsManager: React.FC = () => {
     }
   };
 
-  // --- Сохранение реестра в базу данных ---
+  // --- Сохранение реестра в базу данных (с автодобавлением новых счетов и адресов) ---
   const handleSaveRegistry = async () => {
     if (!uploadFile || parsedRows.length === 0) return;
 
@@ -449,7 +556,7 @@ export const AccountsManager: React.FC = () => {
 
     try {
       const batchNum = parsedBatchNum || (lastRegistry ? lastRegistry.batch_number + 1 : 1);
-      const period = parsedPeriod || "—";
+      const period = parsedPeriod || format(new Date(), "yyyy-MM");
       const totalAmount = parsedRows.reduce((sum, r) => sum + r.debt_amount, 0);
 
       // 1. Фиксируем запись о загрузке реестра в account_registry_uploads
@@ -462,26 +569,41 @@ export const AccountsManager: React.FC = () => {
       });
 
       // 2. Пакетная вставка/обновление в accounts (батчами по 200 записей)
+      // При этом новые лицевые счета автоматически создаются с адресом, подъездом, квартирой и ФИО!
       const batchSize = 200;
       for (let i = 0; i < parsedRows.length; i += batchSize) {
         const chunk = parsedRows.slice(i, i + batchSize);
-        
+
+        // Готовим записи для accounts
+        const accountsToUpsert = chunk.map(c => {
+          const item: any = {
+            account_number: c.account_number,
+            address: c.address,
+            apartment: c.apartment,
+            period: c.period || period,
+            debt_amount: c.debt_amount,
+            updated_at: new Date().toISOString(),
+          };
+
+          // Добавляем структурированные поля адреса и абонента, если они были распарсены
+          if (c.full_name) item.full_name = c.full_name;
+          if (c.street) item.street = c.street;
+          if (c.house) item.house = c.house;
+          if (c.housing) item.housing = c.housing;
+          if (c.entrance) item.entrance = c.entrance;
+
+          return item;
+        });
+
         // Upsert в accounts
         const { error: accErr } = await supabase
           .from("accounts")
-          .upsert(
-            chunk.map(c => ({
-              account_number: c.account_number,
-              address: c.address,
-              apartment: c.apartment,
-              period: c.period,
-              debt_amount: c.debt_amount,
-              updated_at: new Date().toISOString(),
-            })),
-            { onConflict: "account_number" }
-          );
+          .upsert(accountsToUpsert, { onConflict: "account_number" });
 
-        if (accErr) throw accErr;
+        if (accErr) {
+          console.error("[AccountsManager] Ошибка upsert в accounts:", accErr);
+          throw accErr;
+        }
 
         // Фиксация в account_history (срезы начислений)
         await supabase
@@ -489,7 +611,7 @@ export const AccountsManager: React.FC = () => {
           .upsert(
             chunk.map(c => ({
               account_number: c.account_number,
-              period: c.period,
+              period: c.period || period,
               debt_amount: c.debt_amount,
               batch_number: batchNum,
             })),
@@ -509,7 +631,7 @@ export const AccountsManager: React.FC = () => {
 
       toast({
         title: "Реестр успешно загружен!",
-        description: `Загружено ${parsedRows.length} счетов (Реестр № ${batchNum}, период ${formatPeriod(period)})`,
+        description: `Загружено/обновлено ${parsedRows.length} счетов (Реестр № ${batchNum}, период ${formatPeriod(period)})`,
       });
 
       setIsUploadOpen(false);
@@ -594,6 +716,10 @@ export const AccountsManager: React.FC = () => {
         // Гибкое определение наличия трубки: "Да", "да", "1", "+", "true", "есть"
         const rawHandset = p[3]?.trim().toLowerCase() || "";
         const hasHandset = rawHandset === "да" || rawHandset === "1" || rawHandset === "+" || rawHandset === "true" || rawHandset === "есть" || rawHandset.includes("да");
+
+        // Определение наличия ЛК (колонка 4 «Есть ЛК»): "Да", "да", "1", "+", "true", "есть"
+        const rawLk = p[4]?.trim().toLowerCase() || "";
+        const hasLk = rawLk === "да" || rawLk === "1" || rawLk === "+" || rawLk === "true" || rawLk === "есть" || rawLk.includes("да");
         
         const street = p[5]?.trim() || "";
         const house = p[6]?.trim() || "";
@@ -613,6 +739,7 @@ export const AccountsManager: React.FC = () => {
           full_name: fullName,
           phone: phone,
           has_handset: hasHandset,
+          has_lk: hasLk,
           street: street,
           house: house,
           housing: housing,
@@ -636,7 +763,8 @@ export const AccountsManager: React.FC = () => {
 
       const parsed = Array.from(recordsMap.values());
       const handsetsCount = parsed.filter(s => s.has_handset).length;
-      console.log(`[AccountsManager: Абоненты] Распознано уникальных счетов: ${parsed.length}, с трубками: ${handsetsCount}`);
+      const lkCount = parsed.filter(s => s.has_lk).length;
+      console.log(`[AccountsManager: Абоненты] Распознано уникальных счетов: ${parsed.length}, с трубками: ${handsetsCount}, с ЛК: ${lkCount}`);
       setParsedSubscribers(parsed);
 
       if (parsed.length === 0) {
@@ -681,6 +809,7 @@ export const AccountsManager: React.FC = () => {
               full_name: c.full_name,
               phone: c.phone,
               has_handset: c.has_handset,
+              has_lk: c.has_lk,
               street: c.street,
               house: c.house,
               housing: c.housing,
@@ -693,6 +822,23 @@ export const AccountsManager: React.FC = () => {
           );
 
         if (upsertErr) throw upsertErr;
+
+        // Для абонентов с подключенным ЛК обновляем статус доступа в intercom_credentials
+        const lkAccounts = chunk.filter(c => c.has_lk).map(c => c.account_number);
+        if (lkAccounts.length > 0) {
+          try {
+            await supabase
+              .from("intercom_credentials" as any)
+              .update({
+                has_lk: true,
+                is_purchased: true,
+                updated_at: new Date().toISOString(),
+              })
+              .in("account_number", lkAccounts);
+          } catch (credErr) {
+            console.warn("[AccountsManager: Абоненты] Предупреждение обновления intercom_credentials:", credErr);
+          }
+        }
 
         setSubscribersProgress(Math.round(((i + chunk.length) / parsedSubscribers.length) * 100));
       }
@@ -1288,6 +1434,11 @@ export const AccountsManager: React.FC = () => {
                                     )}
                                   </span>
                                 )}
+                                {acc.has_lk && (
+                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-300 bg-amber-50/50 dark:bg-amber-950/30 font-semibold">
+                                    ЛК активен
+                                  </Badge>
+                                )}
                               </div>
                               {acc.payment_type && (
                                 <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
@@ -1392,44 +1543,99 @@ export const AccountsManager: React.FC = () => {
             )}
 
             {/* Предпросмотр распознанных данных реестра */}
-            {parsedRows.length > 0 && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-xs bg-slate-50 dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800">
-                  <div>
-                    Реестр №: <strong className="text-emerald-600 font-mono text-sm">{parsedBatchNum || "—"}</strong> • Период: <strong className="text-foreground">{formatPeriod(parsedPeriod)}</strong>
-                  </div>
-                  <div>
-                    Всего счетов: <strong className="text-foreground font-mono">{parsedRows.length}</strong>
-                  </div>
-                </div>
+            {parsedRows.length > 0 && (() => {
+              const regDebts = parsedRows.filter(r => r.debt_amount > 0);
+              const regOverpayments = parsedRows.filter(r => r.debt_amount < 0);
+              const regZeros = parsedRows.filter(r => r.debt_amount === 0);
+              const totalDebtsSum = regDebts.reduce((s, r) => s + r.debt_amount, 0);
+              const totalOverpaymentsSum = regOverpayments.reduce((s, r) => s + Math.abs(r.debt_amount), 0);
 
-                <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden max-h-[260px] overflow-y-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-100 dark:bg-slate-800 text-muted-foreground sticky top-0">
-                      <tr>
-                        <th className="p-2">Лицевой счет</th>
-                        <th className="p-2">Адрес</th>
-                        <th className="p-2">Сумма</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono">
-                      {parsedRows.slice(0, 15).map((row, idx) => (
-                        <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-900/50">
-                          <td className="p-2 font-bold text-foreground">{row.account_number}</td>
-                          <td className="p-2 font-sans truncate max-w-[280px]">{row.address}</td>
-                          <td className="p-2 text-right font-bold text-destructive">{row.debt_amount.toFixed(2)} ₽</td>
+              return (
+                <div className="space-y-3">
+                  {/* Информация о реестре и периоде */}
+                  <div className="flex items-center justify-between text-xs bg-slate-50 dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800">
+                    <div>
+                      Реестр №: <strong className="text-emerald-600 font-mono text-sm">{parsedBatchNum || "—"}</strong> • Период: <strong className="text-foreground">{formatPeriod(parsedPeriod)}</strong>
+                    </div>
+                    <div>
+                      Всего счетов: <strong className="text-foreground font-mono">{parsedRows.length}</strong>
+                    </div>
+                  </div>
+
+                  {/* Карточки детальной статистики долгов и переплат */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                    <div className="p-2.5 rounded-xl bg-red-50/60 dark:bg-red-950/20 border border-red-200/80 dark:border-red-900/50">
+                      <span className="text-[10px] text-muted-foreground block">Должники</span>
+                      <div className="flex items-baseline justify-between mt-0.5">
+                        <strong className="text-sm font-mono text-destructive">{regDebts.length}</strong>
+                        <span className="text-[11px] font-bold text-destructive">−{totalDebtsSum.toFixed(2)} ₽</span>
+                      </div>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-green-50/60 dark:bg-green-950/20 border border-green-200/80 dark:border-green-900/50">
+                      <span className="text-[10px] text-muted-foreground block">Переплата</span>
+                      <div className="flex items-baseline justify-between mt-0.5">
+                        <strong className="text-sm font-mono text-emerald-600">{regOverpayments.length}</strong>
+                        <span className="text-[11px] font-bold text-emerald-600">+{totalOverpaymentsSum.toFixed(2)} ₽</span>
+                      </div>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-slate-50/80 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 col-span-2 sm:col-span-1">
+                      <span className="text-[10px] text-muted-foreground block">Баланс 0.00 ₽</span>
+                      <div className="mt-0.5">
+                        <strong className="text-sm font-mono text-foreground">{regZeros.length}</strong>
+                        <span className="text-[10px] text-muted-foreground ml-1.5">без задолженности</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Таблица с первыми записями */}
+                  <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden max-h-[240px] overflow-y-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-100 dark:bg-slate-800 text-muted-foreground sticky top-0">
+                        <tr>
+                          <th className="p-2">Лицевой счет</th>
+                          <th className="p-2">Адрес / Абонент</th>
+                          <th className="p-2 text-right">Сальдо</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono">
+                        {parsedRows.slice(0, 20).map((row, idx) => {
+                          const isDebt = row.debt_amount > 0;
+                          const isOver = row.debt_amount < 0;
+
+                          return (
+                            <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-900/50">
+                              <td className="p-2 font-bold text-foreground">{row.account_number}</td>
+                              <td className="p-2 font-sans truncate max-w-[280px]">
+                                <div>{row.address}</div>
+                                {row.full_name && (
+                                  <div className="text-[10px] text-muted-foreground truncate">{row.full_name}</div>
+                                )}
+                              </td>
+                              <td className="p-2 text-right font-bold">
+                                {isDebt ? (
+                                  <span className="text-destructive">−{row.debt_amount.toFixed(2)} ₽</span>
+                                ) : isOver ? (
+                                  <span className="text-emerald-600">+{Math.abs(row.debt_amount).toFixed(2)} ₽</span>
+                                ) : (
+                                  <span className="text-slate-400">0.00 ₽</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  {parsedRows.length > 20 && (
+                    <p className="text-[11px] text-center text-muted-foreground">
+                      Показаны первые 20 счетов из {parsedRows.length} распознанных.
+                    </p>
+                  )}
                 </div>
-                {parsedRows.length > 15 && (
-                  <p className="text-[11px] text-center text-muted-foreground">
-                    Показаны первые 15 счетов из {parsedRows.length} распознанных.
-                  </p>
-                )}
-              </div>
-            )}
+              );
+            })()}
 
             {/* Индикатор сохранения */}
             {isSavingBatch && (
@@ -1579,7 +1785,7 @@ export const AccountsManager: React.FC = () => {
                     <Check className="h-4 w-4 text-emerald-600" />
                     Файл успешно распознан!
                   </div>
-                  <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
                     <div className="p-2 rounded-xl bg-white/70 dark:bg-slate-900/70 border border-emerald-100 dark:border-slate-800">
                       <span className="text-[10px] text-muted-foreground block">Всего абонентов</span>
                       <strong className="text-sm font-mono text-foreground">{parsedSubscribers.length}</strong>
@@ -1597,6 +1803,12 @@ export const AccountsManager: React.FC = () => {
                       </strong>
                     </div>
                     <div className="p-2 rounded-xl bg-white/70 dark:bg-slate-900/70 border border-emerald-100 dark:border-slate-800">
+                      <span className="text-[10px] text-muted-foreground block">С доступом в ЛК</span>
+                      <strong className="text-sm font-mono text-amber-600">
+                        {parsedSubscribers.filter(s => s.has_lk).length}
+                      </strong>
+                    </div>
+                    <div className="p-2 rounded-xl bg-white/70 dark:bg-slate-900/70 border border-emerald-100 dark:border-slate-800 col-span-2 sm:col-span-1">
                       <span className="text-[10px] text-muted-foreground block">С тарифом</span>
                       <strong className="text-sm font-mono text-foreground">
                         {parsedSubscribers.filter(s => !!s.payment_type).length}

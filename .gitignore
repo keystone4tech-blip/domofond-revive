@@ -46,6 +46,7 @@ backups/
 # Sensitive subscriber registries and temporary office locks
 ~$*
 Список всех абонентов*.txt
+Взаиморасчеты общие*.txt
 2311283958*.txt
 Лист_монтажника*.xlsx
 *.xlsx

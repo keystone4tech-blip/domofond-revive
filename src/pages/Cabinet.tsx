@@ -786,6 +786,7 @@ const RemoteAccessCard = ({
   accountNumber, 
   userId,
   profile,
+  hasLk = false,
   onOpenVerification
 }: { 
   address: string; 
@@ -793,6 +794,7 @@ const RemoteAccessCard = ({
   accountNumber?: string; 
   userId?: string; 
   profile?: any;
+  hasLk?: boolean;
   onOpenVerification?: () => void;
 }) => {
   const { toast } = useToast();
@@ -897,20 +899,32 @@ const RemoteAccessCard = ({
         p_amount: 300.00,
       });
 
-      if (error) {
-        // Запасной прямой update, если RPC недоступен
-        const { error: updErr } = await supabase
-          .from("intercom_credentials" as any)
-          .update({
-            is_purchased: true,
-            purchased_at: new Date().toISOString(),
-            purchased_by_user_id: userId || null,
-            payment_amount: 300.00,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", cred.id);
+      // Обновляем статус в intercom_credentials (is_purchased и has_lk)
+      const { error: updErr } = await supabase
+        .from("intercom_credentials" as any)
+        .update({
+          is_purchased: true,
+          has_lk: true,
+          purchased_at: new Date().toISOString(),
+          purchased_by_user_id: userId || null,
+          payment_amount: 300.00,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", cred.id);
 
-        if (updErr) throw updErr;
+      if (updErr && error) throw updErr;
+
+      // Также синхронизируем флаг has_lk в accounts
+      const targetAcc = cred.account_number || accountNumber;
+      if (targetAcc) {
+        try {
+          await supabase
+            .from("accounts")
+            .update({ has_lk: true, updated_at: new Date().toISOString() })
+            .eq("account_number", targetAcc);
+        } catch (accErr) {
+          console.warn("[Умный домофон] Не удалось обновить has_lk в accounts:", accErr);
+        }
       }
 
       // Создаем запись заявки / чека в таблице requests
@@ -936,7 +950,7 @@ const RemoteAccessCard = ({
 
       setIsPaymentOpen(false);
       // Обновляем локальное состояние
-      setCred((prev: any) => (prev ? { ...prev, is_purchased: true } : prev));
+      setCred((prev: any) => (prev ? { ...prev, is_purchased: true, has_lk: true } : prev));
     } catch (err: any) {
       console.error("[Умный домофон] Ошибка при проведении оплаты:", err);
       toast({
@@ -980,8 +994,11 @@ const RemoteAccessCard = ({
     );
   }
 
-  // СЛУЧАЙ 2: Услуга ОПЛАЧЕНА (is_purchased = true)
-  if (cred.is_purchased) {
+  // СЛУЧАЙ 2: Услуга ОПЛАЧЕНА или ВКЛЮЧЕНА В ТАРИФ (is_purchased = true или has_lk = true)
+  const isUnlocked = !!(cred.is_purchased || cred.has_lk || hasLk);
+  const isFromTariff = !!(cred.has_lk || hasLk);
+
+  if (isUnlocked) {
     const isVerified = !!profile?.is_verified;
     const vStatus = profile?.verification_status || (isVerified ? "verified" : "unverified");
 
@@ -996,12 +1013,19 @@ const RemoteAccessCard = ({
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <p className="font-bold text-sm text-foreground">
-                  {isVerified ? "Удалённый доступ активен" : "Удалённый доступ оплачен"}
+                  {isVerified ? "Удалённый доступ активен" : isFromTariff ? "Удалённый доступ включен в тариф" : "Удалённый доступ оплачен"}
                 </p>
-                <Badge className="bg-emerald-600 text-white text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1">
-                  <CheckCircle2 className="h-3 w-3" />
-                  Оплата подтверждена
-                </Badge>
+                {isFromTariff ? (
+                  <Badge className="bg-emerald-600 text-white text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Подключено (по тарифу)
+                  </Badge>
+                ) : (
+                  <Badge className="bg-emerald-600 text-white text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Оплата подтверждена
+                  </Badge>
+                )}
                 {isVerified ? (
                   <Badge className="bg-emerald-600 text-white text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1">
                     <CheckCircle className="h-3 w-3" />
@@ -3563,6 +3587,7 @@ const Cabinet = () => {
                     accountNumber={userAccount?.account_number} 
                     userId={userId || undefined} 
                     profile={profile}
+                    hasLk={userAccount?.has_lk || false}
                     onOpenVerification={() => setIsVerificationDialogOpen(true)}
                   />
 
