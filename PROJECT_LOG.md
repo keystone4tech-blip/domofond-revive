@@ -1,5 +1,33 @@
 # PROJECT_LOG.md
 
+## Дата: 2026-09-23 (Hotfix: Исправление ошибки отправки документов на верификацию жильцов — добавление колонок верификации в profiles и нарядов в requests)
+### Изменения:
+- **База данных PostgreSQL на боевом сервере `45.8.99.238`** [MODIFY]:
+  * **Таблица `public.profiles`**:
+    - Добавлены недостающие колонки верификации:
+      * `verification_document_type character varying(100)` (тип документа: выписка ЕГРН, паспорт, договор аренды и др.)
+      * `verification_submitted_at timestamp with time zone` (дата и время подачи заявки на верификацию)
+      * `verification_reviewed_at timestamp with time zone` (дата и время проверки диспетчером)
+      * `verification_reject_reason text` (причина отклонения документа)
+    - Создан индекс `idx_profiles_verification_status` по статусу верификации.
+  * **Таблица `public.requests`**:
+    - Добавлены недостающие колонки для формирования нарядов верификации:
+      * `client_id uuid` с индексом `idx_requests_client_id`
+      * `apartment character varying(50)`
+      * `order_type character varying(100)` с индексом `idx_requests_order_type`
+      * `document_url text`
+  * Выданы полные права `GRANT ALL` ролям `anon`, `authenticated`, `domofondar`.
+  * Перезагружена схема PostgREST (`NOTIFY pgrst, 'reload schema'`).
+- **Компонент загрузки документов (`src/components/VerificationUploadDialog.tsx`)** [MODIFY]:
+  * Смягчена валидация адреса: снято строгое требование обязательного наличия номера квартиры для частных домовладений (теперь проверяется факт заполнения адреса проживания).
+  * Протестировано взаимодействие через API PostgREST: успешно выполняется `PATCH /profiles` со статусом `"pending"` и `INSERT /requests` с типом `"verification_request"`.
+- **Сборка и развертывание на сервере `45.8.99.238`**:
+  * Сборка `npm run build` выполнена успешно (28.59s).
+  * Дистрибутив задеплоен в Docker-контейнер `domofondar_frontend`, Nginx перезагружен.
+### Структура:
+- `/src/components/VerificationUploadDialog.tsx` — Диалог загрузки и отправки документов на верификацию
+- База данных: таблицы `profiles` и `requests` расширены полями верификации и прикрепленных документов
+
 ## Дата: 2026-09-23 (Hotfix: Устранение ошибки сохранения реестра на 100% — исправление ReferenceError batchNum, дедупликация лицевых счетов и адаптация схем account_registry_uploads / account_history)
 ### Изменения:
 - **База данных PostgreSQL на боевом сервере `45.8.99.238`** [MODIFY]:

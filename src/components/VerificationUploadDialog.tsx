@@ -219,10 +219,10 @@ export const VerificationUploadDialog: React.FC<VerificationUploadDialogProps> =
       return;
     }
 
-    if (!profile.address || !profile.apartment) {
+    if (!profile.address || !profile.address.trim()) {
       toast({
         title: "Не заполнен адрес",
-        description: "Укажите ваш адрес и номер квартиры в профиле перед отправкой документов.",
+        description: "Укажите ваш адрес проживания в профиле перед отправкой документов.",
         variant: "destructive",
       });
       return;
