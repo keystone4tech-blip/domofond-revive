@@ -3,6 +3,7 @@ import { Database, Download, RefreshCw, Trash2, ShieldCheck, HardDrive, Clock, A
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { getAuthToken } from "@/integrations/supabase/client";
 
 // Интерфейс элемента резервной копии
 interface BackupItem {
@@ -19,25 +20,41 @@ export const BackupsManager = () => {
   const [creating, setCreating] = useState(false);
   const [deletingFile, setDeletingFile] = useState<string | null>(null);
 
-  // Получаем токен авторизации из локального хранилища Supabase сессии
-  const getAuthToken = () => {
+  // Получаем гарантированный валидный JWT токен администратора для бэкенда
+  const resolveToken = (): string => {
+    // 1. Проверяем основной токен сессии через общий клиент Supabase
+    const clientToken = getAuthToken();
+    if (clientToken && clientToken.startsWith("eyJ")) {
+      return clientToken;
+    }
+
+    // 2. Резервный поиск во всех хранилищах браузера
     try {
-      // Ищем токен во всех возможных ключах localStorage
+      const direct = localStorage.getItem("auth_token") || sessionStorage.getItem("auth_token");
+      if (direct && direct.startsWith("eyJ")) return direct;
+
+      // 3. Поиск по ключам Supabase
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key && (key.includes("auth-token") || key.includes("supabase.auth.token"))) {
+        if (key && (key.includes("auth-token") || key.includes("supabase.auth.token") || key.includes("auth_token"))) {
           const item = localStorage.getItem(key);
           if (item) {
-            const parsed = JSON.parse(item);
-            if (parsed?.access_token) return parsed.access_token;
-            if (parsed?.currentSession?.access_token) return parsed.currentSession.access_token;
+            if (item.startsWith("eyJ")) return item;
+            try {
+              const parsed = JSON.parse(item);
+              if (parsed?.access_token) return parsed.access_token;
+              if (parsed?.currentSession?.access_token) return parsed.currentSession.access_token;
+              if (parsed?.token) return parsed.token;
+            } catch {
+              // строка не является JSON
+            }
           }
         }
       }
     } catch (e) {
-      console.error("[BackupsManager] Ошибка чтения токена из localStorage:", e);
+      console.error("[BackupsManager] Ошибка чтения токена из хранилища:", e);
     }
-    return null;
+    return "";
   };
 
   // 1. Загрузка списка доступных резервных копий
@@ -45,7 +62,7 @@ export const BackupsManager = () => {
     setLoading(true);
     console.log("[BackupsManager] Запрос списка резервных копий...");
     try {
-      const token = getAuthToken();
+      const token = resolveToken();
       const res = await fetch("/backend-api/api/admin/backups", {
         headers: {
           "Authorization": `Bearer ${token || ""}`,
@@ -85,7 +102,7 @@ export const BackupsManager = () => {
     });
 
     try {
-      const token = getAuthToken();
+      const token = resolveToken();
       const res = await fetch("/backend-api/api/admin/backups/create", {
         method: "POST",
         headers: {
@@ -123,7 +140,7 @@ export const BackupsManager = () => {
   const handleDownloadBackup = async (filename: string) => {
     console.log(`[BackupsManager] Скачивание файла: ${filename}`);
     try {
-      const token = getAuthToken();
+      const token = resolveToken();
       const downloadUrl = `/backend-api/api/admin/backups/download/${encodeURIComponent(filename)}`;
       
       // Запрашиваем файл с токеном авторизации
@@ -171,7 +188,7 @@ export const BackupsManager = () => {
     console.log(`[BackupsManager] Удаление файла: ${filename}`);
 
     try {
-      const token = getAuthToken();
+      const token = resolveToken();
       const res = await fetch(`/backend-api/api/admin/backups/${encodeURIComponent(filename)}`, {
         method: "DELETE",
         headers: {

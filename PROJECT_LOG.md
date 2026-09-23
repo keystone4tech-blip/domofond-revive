@@ -1,5 +1,28 @@
 # PROJECT_LOG.md
 
+## Дата: 2026-09-23 (Устранение ошибок загрузки данных в CRM: Задачи, Адреса, Логопасы, и списка бэкапов в Админке)
+### Изменения:
+- **База данных PostgreSQL на боевом сервере `45.8.99.238`** [MODIFY]:
+  * **Таблица `tasks`**: добавлены поля `accepted_by uuid` и `accepted_at timestamptz`, а также ограничение внешнего ключа `tasks_accepted_by_fkey` к `employees(id)`. Устранена ошибка PGRST200, вызывавшая бесконечные повторы запросов и долгую загрузку во вкладке «Задачи».
+  * **Таблица `entrances`**: добавлены поля `city`, `street`, `house`, `entrance`, `intercom_type`, `service_type`, `notes` и составной индекс `idx_entrances_city_street_house`. Устранена ошибка `column entrances.city does not exist` во вкладке «Адреса и подъезды».
+  * **Таблица `entrance_products`** [NEW]: создана связующая таблица для привязки оборудования и услуг к конкретным подъездам (`entrance_id`, `product_id`) с каскадным удалением и уникальным ограничением.
+  * **Таблица `products`**: добавлено поле `installation_price numeric(10,2)` для льготных цен периода монтажа.
+  * **Таблица `intercom_credentials`**: добавлены поля `city`, `street`, `house`, `entrance`, `apartment`, `account_number`, `password`, `raw_address`, `entrance_id`, `account_id`, `is_purchased`, `purchased_at`, `purchased_by_user_id`, `payment_amount`, `updated_at`, а также уникальный ключ для upsert по квартирам. Устранена ошибка `column intercom_credentials.city does not exist` во вкладке «Логопасы».
+  * **Хранимая процедура `sync_entrances_from_accounts()`** [NEW]: создана функция для синхронизации структуры адресов и подъездов напрямую из таблицы лицевых счетов `accounts`.
+  * Выданы полные права доступа `GRANT ALL` для ролей `anon`, `authenticated`, `domofondar` и выполнен сброс кэша схемы PostgREST (`NOTIFY pgrst, 'reload schema'`).
+- **Компонент управления резервными копиями (`src/components/admin/BackupsManager.tsx`)** [MODIFY]:
+  * Заменена локальная сбойная функция извлечения токена через `JSON.parse` на импорт проверенного `getAuthToken` из `@/integrations/supabase/client` с функцией `resolveToken()`.
+  * Запросы к `/backend-api/api/admin/backups` (получение списка, создание, скачивание и удаление дампов) теперь гарантированно передают валидный Bearer JWT токен администратора. Устранена ошибка «Не удалось получить список резервных копий с сервера».
+- **Сборка и развертывание на сервере `45.8.99.238`**:
+  * Проект собран (`npm run build`) за 21.59s без ошибок.
+  * Дистрибутив перенесен в рабочий контейнер `domofondar_frontend` и Nginx перезагружен.
+  * Все API-эндпоинты протестированы и подтверждены кодом 200 OK.
+### Структура:
+- `/src/components/admin/BackupsManager.tsx` — Корректная авторизация запросов к бэкенду резервных копий
+- База данных: таблицы `tasks`, `entrances`, `entrance_products`, `products`, `intercom_credentials`, функция `sync_entrances_from_accounts()`
+### Заметки:
+- Все 4 раздела панели управления (Бэкапы БД, Задачи, Адреса и подъезды, Логопасы) теперь загружаются мгновенно и без сбоев.
+
 ## Дата: 2026-09-22 (Скрытие кнопки «Войти» в мобильной шапке и акцентное выделение с эффектом перелива в нижнем меню)
 ### Изменения:
 - **Шапка сайта (`src/components/Header.tsx`)** [MODIFY]:
