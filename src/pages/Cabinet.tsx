@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo, Component, ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { ShinyButton } from "@/components/ui/shiny-button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1806,6 +1806,7 @@ const Cabinet = () => {
 
   // Глобальные переменные и утилиты, вынесенные ниже объявлений всех стейтов для предотвращения ReferenceError (temporal dead zone)
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
 
   const hasAdminConsoleAccess = userRoles.some((role) => ["admin", "director"].includes(role));
@@ -3338,33 +3339,43 @@ const Cabinet = () => {
     enabled: !!(userAccountNum || userId),
     queryFn: async () => {
       console.log(`[История: Оплата ТО] Запрос оплат ТО для л/с "${userAccountNum}", userId: "${userId}"`);
+      let allPayments: any[] = [];
+
       // 1. Синхронизация и получение через эндпоинт бэкенда по лицевому счету
       if (userAccountNum) {
         try {
           const res = await fetch(`/backend-api/api/payments/yookassa/sync/${userAccountNum}`);
           const data = await res.json();
           if (data.success && Array.isArray(data.payments)) {
-            return data.payments;
+            allPayments = data.payments;
           }
         } catch (err) {
           console.warn("[История: Оплата ТО] Ошибка sync через бэкенд:", err);
         }
       }
 
-      // 2. Если бэкенд недоступен, получаем напрямую из БД Supabase
-      try {
-        let query = supabase.from("payments").select("*").order("created_at", { ascending: false });
-        if (userAccountNum) {
-          query = query.eq("account_number", userAccountNum);
-        } else if (userId) {
-          query = query.eq("user_id", userId);
+      // 2. Если бэкенд вернул пустой список, получаем напрямую из БД Supabase
+      if (allPayments.length === 0) {
+        try {
+          let query = supabase.from("payments").select("*").order("created_at", { ascending: false });
+          if (userAccountNum) {
+            query = query.eq("account_number", userAccountNum);
+          } else if (userId) {
+            query = query.eq("user_id", userId);
+          }
+          const { data, error } = await query;
+          if (!error && data) allPayments = data;
+        } catch (e) {
+          console.warn("[История: Оплата ТО] Ошибка выборки из БД Supabase:", e);
         }
-        const { data, error } = await query;
-        if (!error && data) return data;
-      } catch (e) {
-        console.warn("[История: Оплата ТО] Ошибка выборки из БД Supabase:", e);
       }
-      return [];
+
+      // RULE 2: Изоляция истории — новому владельцу с тем же л/с показываем только его собственные платежи
+      // Все транзакции остаются в БД, но в кабинете отображаются только платежи текущего авторизованного пользователя
+      return allPayments.filter((p: any) => {
+        if (!p.user_id) return true; // Платёж без привязки к конкретному пользователю
+        return p.user_id === userId; // Платёж текущего пользователя
+      });
     },
   });
 
@@ -3560,10 +3571,11 @@ const Cabinet = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
       
-      // Сохраняем текущую почту пользователя из сессии входа!
       const userEmail = session.user.email || "";
-      console.log(`[Сброс данных] Очистка данных профиля, email сохраняется: ${userEmail}`); // Логирование
+      console.log(`[Сброс данных] Очистка профиля для пользователя ID: ${session.user.id}, email: ${userEmail}`);
       
+      // RULE 2: Очищаем только персональные данные профиля пользователя в таблице profiles.
+      // Все транзакции (payments), наряды (requests) и архивные документы сохраняются в БД.
       const { error } = await supabase
         .from("profiles")
         .update({ 
@@ -3572,14 +3584,22 @@ const Cabinet = () => {
           address: "", 
           apartment: "", 
           floor: "", 
-          email: userEmail, // Записываем email из сессии обратно
-          email_verified: true, // Он остается верифицированным
-          is_verified: false 
+          email: userEmail, 
+          email_verified: true, 
+          is_verified: false,
+          verification_status: "unverified",
+          verification_document_url: null,
+          verification_document_type: null,
+          verification_reject_reason: null,
+          verification_submitted_at: null,
+          verified_at: null,
+          verified_by: null,
         })
         .eq("id", session.user.id);
         
       if (error) throw error;
       
+      // Обновляем локальный стейт профиля
       setProfile((prev: any) => prev ? { 
         ...prev, 
         full_name: "", 
@@ -3589,9 +3609,17 @@ const Cabinet = () => {
         floor: "", 
         email: userEmail, 
         email_verified: true, 
-        is_verified: false 
+        is_verified: false,
+        verification_status: "unverified",
+        verification_document_url: null,
+        verification_document_type: null,
+        verification_reject_reason: null,
+        verification_submitted_at: null,
+        verified_at: null,
+        verified_by: null,
       } : prev);
       
+      // Сбрасываем поля формы
       setFullName(""); 
       setPhone(""); 
       setAddress(""); 
@@ -3603,12 +3631,30 @@ const Cabinet = () => {
       setEntranceSuggestions([]);
       setHouseAccounts([]);
       setEmail(userEmail); 
-      setEmailInput(userEmail); // Сохраняем в стейте ввода почты
+      setEmailInput(userEmail); 
       setEmailVerified(true);
       setEditing(false);
-      toast({ title: "Данные удалены", description: "Заполните форму заново для верификации" });
+
+      // Сбрасываем привязанный лицевой счет и локальные списки оплат
+      setUserAccount(null);
+      setAccountSearchInput("");
+      setAccountSearchFound(false);
+      setAccountSearchError(null);
+      setOnlinePayments([]);
+
+      // Очищаем кэш запросов истории, чтобы новый профиль отображался с чистого листа
+      queryClient.removeQueries({ queryKey: ["user-requests"] });
+      queryClient.removeQueries({ queryKey: ["user-to-payments"] });
+      queryClient.invalidateQueries({ queryKey: ["user-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["user-to-payments"] });
+
+      toast({ 
+        title: "Данные профиля очищены", 
+        description: "Ваш личный кабинет сброшен. Вы можете заполнить данные заново с чистого листа." 
+      });
     } catch (e: any) {
-      toast({ title: "Ошибка", description: e.message, variant: "destructive" });
+      console.error("[Сброс данных] Ошибка:", e);
+      toast({ title: "Ошибка сброса данных", description: e.message, variant: "destructive" });
     }
   };
 
@@ -3869,58 +3915,6 @@ const Cabinet = () => {
               </Card>
             )}
 
-            <Card className="glass-premium rounded-[24px] border-none shadow-lg">
-              <CardHeader className="pb-3">
-                <CardTitle className="font-display text-lg font-bold">Статус верификации</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {profile?.is_verified ? (
-                      <>
-                        <CheckCircle className="h-5 w-5 text-green-500 animate-bounce" />
-                        <span className="text-green-500 font-semibold text-sm">Профиль подтверждён</span>
-                      </>
-                    ) : profile?.verification_status === "pending" ? (
-                      <>
-                        <Clock className="h-5 w-5 text-amber-500 animate-pulse" />
-                        <span className="text-amber-500 font-semibold text-sm">Документы на проверке</span>
-                      </>
-                    ) : profile?.verification_status === "rejected" ? (
-                      <>
-                        <XCircle className="h-5 w-5 text-destructive animate-pulse" />
-                        <span className="text-destructive font-semibold text-sm">Верификация отклонена</span>
-                      </>
-                    ) : (
-                      <>
-                        <AlertCircle className="h-5 w-5 text-amber-500 animate-pulse" />
-                        <span className="text-amber-500 font-semibold text-sm">Не верифицирован</span>
-                      </>
-                    )}
-                  </div>
-                  {!profile?.is_verified && (
-                    <div className="space-y-2.5">
-                      <p className="text-xs text-muted-foreground leading-relaxed">
-                        {profile?.verification_status === "pending"
-                          ? "Ваши документы находятся на проверке у диспетчера. Обычно это занимает не более 1 рабочего дня."
-                          : profile?.verification_status === "rejected"
-                          ? `Причина отклонения: ${profile?.verification_reject_reason || "Документ не соответствует требованиям"}. Пожалуйста, загрузите подтверждающий документ повторно.`
-                          : "Для получения пароля от умного домофона подтвердите проживание (выписка ЕГРН, паспорт с регистрацией или договор найма)."}
-                      </p>
-                      {profile?.address && !editing && profile?.verification_status !== "pending" && (
-                        <ShinyButton
-                          onClick={() => setIsVerificationDialogOpen(true)}
-                          className="px-4 py-1.5 text-xs rounded-xl h-8 inline-flex items-center gap-1.5 font-semibold"
-                        >
-                          <ShieldCheck className="h-4 w-4" />
-                          {profile?.verification_status === "rejected" ? "Загрузить повторно" : "Подтвердить данные"}
-                        </ShinyButton>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
 
             {/* Доступ к системе - в верху страницы */}
             <Card className="glass-premium rounded-[24px] border-none shadow-lg">
@@ -3993,11 +3987,41 @@ const Cabinet = () => {
             <Card className="glass-premium rounded-[24px] border-none shadow-xl">
               <CardHeader className="pb-4 border-b border-slate-100 dark:border-slate-800">
                 <div className="flex items-start justify-between gap-3 flex-wrap">
-                  <div>
-                    <CardTitle className="text-xl font-bold text-foreground font-display">Личная информация</CardTitle>
-                    <CardDescription className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <CardTitle className="text-xl font-bold text-foreground font-display">Личная информация</CardTitle>
+                      
+                      {/* RULE 2: Статус верификации профиля жильца */}
+                      {profile?.is_verified ? (
+                        <Badge className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 text-xs px-2.5 py-0.5 font-semibold flex items-center gap-1.5 shadow-xs">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                          <span>Информация подтверждена</span>
+                        </Badge>
+                      ) : profile?.verification_status === "pending" ? (
+                        <Badge className="bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 text-xs px-2.5 py-0.5 font-semibold flex items-center gap-1.5 animate-pulse shadow-xs">
+                          <Clock className="h-3.5 w-3.5 text-amber-600" />
+                          <span>Документы на проверке</span>
+                        </Badge>
+                      ) : profile?.verification_status === "rejected" ? (
+                        <Badge variant="destructive" className="text-xs px-2.5 py-0.5 font-semibold flex items-center gap-1.5 shadow-xs">
+                          <XCircle className="h-3.5 w-3.5" />
+                          <span>Верификация отклонена</span>
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 text-xs px-2.5 py-0.5 font-semibold flex items-center gap-1.5 shadow-xs">
+                          <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
+                          <span>Информация не подтверждена</span>
+                        </Badge>
+                      )}
+                    </div>
+
+                    <CardDescription className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
                       {isLocked
                         ? "Данные профиля верифицированы. Чтобы внести изменения — нажмите «Изменить»."
+                        : profile?.verification_status === "pending"
+                        ? "Ваши документы проверяются диспетчером. Доступ к услугам откроется сразу после проверки."
+                        : profile?.verification_status === "rejected"
+                        ? `Причина отклонения: ${profile?.verification_reject_reason || "Документ не соответствует требованиям"}. Пожалуйста, загрузите подтверждающий документ повторно.`
                         : "Пожалуйста, заполните обязательные графы для отправки профиля на верификацию."}
                     </CardDescription>
                   </div>
@@ -4274,8 +4298,8 @@ const Cabinet = () => {
                   </div>
                 </div>
 
-                {/* Информационная подсказка о важности полных данных */}
-                {((displayStreet?.trim() && displayHouse?.trim()) || entrance || apartment || floor) && (
+                {/* RULE 2: Информационная подсказка скрывается, как только указаны все данные (подъезд, квартира, этаж) */}
+                {!isLocked && (displayStreet?.trim() && displayHouse?.trim()) && (!entrance?.trim() || !apartment?.trim() || !floor?.trim()) && (
                   <div className="flex items-start gap-2.5 text-[11px] text-blue-700 dark:text-blue-300 bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200/50 dark:border-blue-800/30 px-3.5 py-3 rounded-xl animate-in fade-in duration-300 text-left my-2">
                     <Info className="h-4 w-4 shrink-0 mt-0.5 text-blue-500" />
                     <div>
@@ -4429,11 +4453,9 @@ const Cabinet = () => {
                   </div>
                 )}
 
-                {/* 9. Кнопки сохранения/отмены */}
+                {/* 9. Кнопки сохранения / отмены данных профиля */}
                 {!isLocked && (() => {
-                  // Валидируем форму перед активацией кнопки отправки.
-                  // Кнопка станет активной, только если заполнены ФИО, телефон, улица, дом, почта, 
-                  // дано согласие ФЗ-152, а также заполнен этаж ЕСЛИ адрес на обслуживании (isFloorRequired === true).
+                  // Валидируем форму перед активацией кнопки сохранения.
                   const isFormValid = !!(
                     fullName?.trim() &&
                     phone?.trim() &&
@@ -4488,30 +4510,92 @@ const Cabinet = () => {
                   );
                 })()}
 
-                {/* 10. Кнопка удаления верификации */}
-                {(profile?.is_verified || profile?.full_name) && (
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="ghost" size="sm" className="w-full text-red-500 hover:text-red-600 hover:bg-red-500/10 whitespace-normal h-auto py-2 flex items-center justify-center gap-1 font-semibold rounded-xl">
-                        <Trash2 className="h-4 w-4 shrink-0" />
-                        <span className="text-center">Удалить данные верификации</span>
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent className="glass-premium border-none rounded-3xl shadow-2xl p-6">
-                      <AlertDialogHeader>
-                        <AlertDialogTitle className="text-lg font-bold text-foreground font-display">Удалить данные профиля?</AlertDialogTitle>
-                        <AlertDialogDescription className="text-xs text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
-                          Все заполненные вами данные профиля (ФИО, адрес, телефон, помещение) будут безвозвратно удалены из базы, а статус верификации аннулирован.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter className="mt-4 gap-2">
-                        <AlertDialogCancel className="font-semibold rounded-xl h-10 border border-slate-200 hover:bg-slate-50 dark:hover:bg-slate-900">Отмена</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleClearData} className="bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl h-10">
-                          Удалить данные
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                {/* 10. Кнопка подтверждения данных для не верифицированного профиля */}
+                {!profile?.is_verified && (
+                  <div className="pt-2">
+                    {profile?.verification_status === "pending" ? (
+                      <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs flex items-center gap-2.5 text-amber-800 dark:text-amber-300 animate-in fade-in duration-300">
+                        <Clock className="h-4 w-4 shrink-0 text-amber-600 animate-pulse" />
+                        <span>Документы находятся на проверке у диспетчера. Обычно это занимает до 1 рабочего дня.</span>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-50/50 dark:bg-slate-900/50 border border-slate-200/60 dark:border-slate-800/60">
+                        <div className="text-left space-y-0.5">
+                          <p className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                            <ShieldCheck className="h-4 w-4 text-primary" />
+                            <span>Подтверждение проживания</span>
+                          </p>
+                          <p className="text-[11px] text-muted-foreground">
+                            {profile?.verification_status === "rejected"
+                              ? `Верификация отклонена: ${profile?.verification_reject_reason || "документ не принят"}. Прикрепите новый документ.`
+                              : "Загрузите фото паспорта с регистрацией, выписку ЕГРН или договор найма."}
+                          </p>
+                        </div>
+                        <ShinyButton
+                          type="button"
+                          onClick={() => {
+                            if (!profile?.address && (!displayStreet?.trim() || !displayHouse?.trim())) {
+                              toast({
+                                title: "Укажите адрес проживания",
+                                description: "Перед отправкой документов заполните ваш адрес в форме выше и нажмите «Сохранить данные профиля».",
+                                variant: "destructive",
+                              });
+                              return;
+                            }
+                            setIsVerificationDialogOpen(true);
+                          }}
+                          className="px-5 py-2 rounded-xl h-10 flex items-center justify-center gap-1.5 font-bold shrink-0 text-xs shadow-md"
+                        >
+                          <ShieldCheck className="h-4 w-4" />
+                          <span>{profile?.verification_status === "rejected" ? "Загрузить повторно" : "Подтвердить данные"}</span>
+                        </ShinyButton>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 11. Маленькая неброская кнопка сброса профиля */}
+                {(profile?.is_verified || profile?.full_name || profile?.address) && (
+                  <div className="pt-3 border-t border-slate-100 dark:border-slate-800/60 flex justify-center">
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <button
+                          type="button"
+                          className="text-[11px] text-muted-foreground/50 hover:text-destructive/80 transition-colors inline-flex items-center gap-1 cursor-pointer py-1 px-2.5 rounded-lg hover:bg-slate-100/60 dark:hover:bg-slate-800/60 select-none font-normal"
+                        >
+                          <Trash2 className="h-3 w-3 opacity-60" />
+                          <span>Сбросить данные профиля</span>
+                        </button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="glass-premium border-none rounded-3xl shadow-2xl p-6">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle className="text-lg font-bold text-foreground font-display flex items-center gap-2">
+                            <AlertTriangle className="h-5 w-5 text-destructive shrink-0" />
+                            <span>Удалить данные из личного кабинета?</span>
+                          </AlertDialogTitle>
+                          <AlertDialogDescription className="text-xs text-slate-500 dark:text-slate-400 mt-2 leading-relaxed space-y-2 text-left">
+                            <p>
+                              Внимание! Все привязанные данные профиля (ФИО, адрес, телефон, помещение) будут безвозвратно удалены из вашего личного кабинета, а статус верификации аннулирован.
+                            </p>
+                            <p className="text-[11px] text-muted-foreground">
+                              Все ранее проведённые транзакции, наряды и документы сохраняются в архиве системы «Домофондар».
+                            </p>
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter className="mt-4 gap-2">
+                          <AlertDialogCancel className="font-semibold rounded-xl h-10 border border-slate-200 hover:bg-slate-50 dark:hover:bg-slate-900">
+                            Отмена
+                          </AlertDialogCancel>
+                          <AlertDialogAction 
+                            onClick={handleClearData} 
+                            className="bg-destructive hover:bg-destructive/90 text-destructive-foreground font-semibold rounded-xl h-10"
+                          >
+                            Да, удалить данные
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
                 )}
               </CardContent>
             </Card>
