@@ -4,6 +4,11 @@ on:
   push:
     branches:
       - main # Срабатывает при каждом пуше в основную ветку main
+    paths-ignore:
+      - 'mobile/**'
+      - '.github/workflows/build-apk.yml'
+      - 'PROJECT_LOG.md'
+      - 'README.md'
 
 jobs:
   deploy:
@@ -11,6 +16,9 @@ jobs:
     steps:
       - name: 🚚 Checkout кодовой базы
         uses: actions/checkout@v4
+
+      - name: 🧹 Исключение мобильного приложения из серверного деплоя
+        run: rm -rf mobile .git
 
       - name: 📂 Копирование файлов на сервер по SSH
         uses: appleboy/scp-action@master

@@ -5,112 +5,111 @@
 name: 📱 Сборка Android APK (Домофондар)
 
 on:
-  # Возможность запускать сборку вручную в 1 клик во вкладке Actions на GitHub
+  # Возможность запускать сборку вручную во вкладке Actions
   workflow_dispatch:
     inputs:
       build_type:
-        description: 'Тип сборки (release - оптимизированный / debug - тестовый)'
+        description: 'Тип сборки (debug - для прямого тестирования на любых телефонах / release - релиз)'
         required: true
-        default: 'release'
+        default: 'debug'
         type: choice
         options:
-          - release
           - debug
+          - release
 
-  # Автоматическая сборка при пуше изменений в папку mobile
+  # Автоматическая сборка при изменении файлов мобильного приложения
   push:
     branches:
       - main
-      - master
     paths:
       - 'mobile/**'
+      - '.github/workflows/build-apk.yml'
 
-# Ограничение параллельных сборок для экономии минут
 concurrency:
   group: android-build-${{ github.ref }}
   cancel-in-progress: true
+
+env:
+  ANDROID_HOME: /usr/local/lib/android/sdk
+  ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
 
 jobs:
   build-apk:
     name: Сборка установочного APK
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 30
 
     steps:
       # 1. Клонирование репозитория
       - name: 📥 Получение исходного кода
         uses: actions/checkout@v4
 
-      # 2. Установка Node.js версии 20
-      - name: 🟢 Настройка Node.js (v20)
+      # 2. Настройка Node.js (современная стабильная версия 22)
+      - name: 🟢 Настройка Node.js (v22)
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: 'npm'
-          cache-dependency-path: mobile/package-lock.json
+          node-version: 22
 
-      # 3. Настройка Java JDK 17 (необходима для сборщика Gradle и Android SDK)
+      # 3. Настройка Java JDK 17
       - name: ☕ Настройка Java JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      # 4. Настройка инструментов Android SDK
-      - name: 🤖 Настройка Android SDK
-        uses: android-actions/setup-android@v3
-
-      # 5. Установка npm зависимостей мобильного приложения
+      # 4. Установка npm зависимостей мобильного приложения
       - name: 📦 Установка зависимостей мобильного приложения
         run: |
-          echo "Переход в директорию mobile..."
+          echo "[CI/CD] Переход в директорию mobile..."
           cd mobile
-          npm ci --legacy-peer-deps
+          npm install --legacy-peer-deps
 
-      # 6. Нативная генерация проекта Android (Expo Prebuild)
+      # 5. Генерация нативного проекта Android через Expo
       - name: ⚙️ Генерация нативного Android проекта (Expo Prebuild)
         run: |
+          echo "[CI/CD] Запуск Expo Prebuild..."
           cd mobile
           npx expo prebuild --platform android --clean
 
-      # 7. Выдача прав на выполнение скрипта сборки Gradle
+      # 6. Выдача прав на выполнение скрипта сборки Gradle
       - name: 🔑 Выдача прав на gradlew
         run: |
           cd mobile/android
           chmod +x gradlew
 
-      # 8. Компиляция установочного APK (Release или Debug)
+      # 7. Компиляция установочного APK файла
       - name: 🔨 Компиляция APK через Gradle
         run: |
           cd mobile/android
-          BUILD_TYPE="${{ github.event.inputs.build_type || 'release' }}"
-          echo "Запуск компиляции APK (тип: $BUILD_TYPE)..."
+          BUILD_TYPE="${{ github.event.inputs.build_type || 'debug' }}"
+          echo "[CI/CD] Запуск компиляции APK (тип сборки: $BUILD_TYPE)..."
           
-          if [ "$BUILD_TYPE" = "debug" ]; then
-            ./gradlew assembleDebug --no-daemon --stacktrace
+          if [ "$BUILD_TYPE" = "release" ]; then
+            ./gradlew assembleRelease --no-daemon
           else
-            # Сборка release APK с автоматической самоподписью дебаг-ключом для свободного тестирования на любых смартфонах
-            ./gradlew assembleRelease --no-daemon --stacktrace
+            ./gradlew assembleDebug --no-daemon
           fi
 
-      # 9. Поиск и переименование скомпилированного файла APK
-      - name: 🔍 Поиск и подготовка APK файла
+      # 8. Поиск и сохранение готового APK
+      - name: 🔍 Поиск скомпилированного APK файла
         run: |
           mkdir -p mobile-artifacts
-          # Ищем скомпилированный APK в папке outputs
-          APK_PATH=$(find mobile/android/app/build/outputs/apk -name "*.apk" | head -n 1)
+          echo "[CI/CD] Поиск всех сгенерированных .apk файлов:"
+          find mobile/android/app/build/outputs/apk -name "*.apk"
           
-          if [ -n "$APK_PATH" ]; then
-            echo "Найден APK файл: $APK_PATH"
-            cp "$APK_PATH" mobile-artifacts/domofondar-app.apk
+          # Копируем найденный APK файл
+          APK_FILE=$(find mobile/android/app/build/outputs/apk -name "*.apk" | head -n 1)
+          if [ -n "$APK_FILE" ]; then
+            echo "[CI/CD] Скопирован файл: $APK_FILE"
+            cp "$APK_FILE" mobile-artifacts/domofondar-app.apk
             ls -lh mobile-artifacts/
           else
-            echo "ОШИБКА: Файл APK не найден после компиляции!"
+            echo "[CI/CD] ОШИБКА: Файл APK не найден!"
             exit 1
           fi
 
-      # 10. Загрузка готового APK файла в артефакты сборки GitHub
-      - name: 🚀 Сохранение готового APK в артефакты сборки
+      # 9. Загрузка готового APK в артефакты сборки GitHub для прямого скачивания
+      - name: 🚀 Сохранение APK в артефакты GitHub
         uses: actions/upload-artifact@v4
         with:
           name: domofondar-android-apk
