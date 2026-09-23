@@ -196,10 +196,10 @@ app.post('/api/auth/register', async (req, res) => {
     const user = newUser.rows[0];
     console.log(`[Бэкенд: Регистрация] Создана запись в users для ID: ${user.id}`);
 
-    // 4. Создаем профиль пользователя
+    // 4. Создаем профиль пользователя с сохранением email и подтвержденного статуса почты
     await pool.query(
-      'INSERT INTO profiles (id, full_name, phone) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET full_name = COALESCE(EXCLUDED.full_name, profiles.full_name), phone = COALESCE(EXCLUDED.phone, profiles.phone)',
-      [user.id, full_name || '', cleanPhone]
+      'INSERT INTO profiles (id, full_name, phone, email, email_verified) VALUES ($1, $2, $3, $4, true) ON CONFLICT (id) DO UPDATE SET full_name = COALESCE(EXCLUDED.full_name, profiles.full_name), phone = COALESCE(EXCLUDED.phone, profiles.phone), email = COALESCE(EXCLUDED.email, profiles.email), email_verified = true',
+      [user.id, full_name || '', cleanPhone, cleanEmail]
     );
 
     // 5. Назначаем базовую роль 'user' в user_roles

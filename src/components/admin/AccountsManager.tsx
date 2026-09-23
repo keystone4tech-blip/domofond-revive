@@ -413,7 +413,9 @@ export const AccountsManager: React.FC = () => {
         text = await file.text();
       }
 
-      const lines = text.trim().split("\n").filter(l => l.trim());
+      // Разбиваем на строки, удаляя только хвостовые символы перевода строк \r и \n,
+      // сохраняя концевые разделители табуляции \t для точного определения пустых колонок
+      const rawLines = text.split("\n");
       const records: ParsedRegistryRow[] = [];
       let detectedPeriod = "";
 
@@ -421,7 +423,7 @@ export const AccountsManager: React.FC = () => {
       const cleanAmountStr = (s: string) => (s || "").replace(/\xa0/g, "").replace(/\s/g, "").replace(",", ".");
 
       // Определяем формат файла: если есть разделитель табуляция \t, это формат TSV (Взаиморасчеты общие 1С)
-      const isTsvFormat = lines.some(l => l.includes("\t"));
+      const isTsvFormat = rawLines.some(l => l.includes("\t"));
 
       console.log(`[AccountsManager: Реестр] Формат файла: ${isTsvFormat ? "TSV (Взаиморасчеты общие 1С)" : "Разделитель ';'"}`);
 
@@ -435,9 +437,11 @@ export const AccountsManager: React.FC = () => {
         // Данные: 0000000001 \t Иванов И.И. \t Краснодар, Душистая (ул), 50, , 1, 1 \t 150,00 \t 0,00
         detectedPeriod = defaultPer;
 
-        for (const line of lines) {
-          const cleanLine = line.trim().replace(/\r$/, "");
-          if (!cleanLine) continue;
+        for (const line of rawLines) {
+          // Удаляем ТОЛЬКО переводы строк (\r, \n), НЕ обрезая хвостовые знаки табуляции (\t)
+          const cleanLine = line.replace(/[\r\n]+$/, "");
+          if (!cleanLine.trim()) continue;
+
           // Пропускаем строки заголовков
           if (cleanLine.includes("Лицевой счет") || cleanLine.includes("Город, Улица") || cleanLine.includes("Долг абонента") || cleanLine.includes("Наш долг")) {
             continue;
@@ -451,20 +455,24 @@ export const AccountsManager: React.FC = () => {
           const accNum = rawAcc.padStart(10, "0");
           if (accNum === "0000000000") continue;
 
-          // Колонка [длина - 2] = Долг абонента (положительный долг)
-          // Колонка [длина - 1] = Наш долг (переплата абонента со знаком минус)
-          const subDebt = parseFloat(cleanAmountStr(parts[parts.length - 2])) || 0;
-          const ourDebt = parseFloat(cleanAmountStr(parts[parts.length - 1])) || 0;
+          // Правое позиционирование в TSV:
+          // Последняя колонка [length - 1] = Наш долг (переплата абонента со знаком минус)
+          // Предпоследняя колонка [length - 2] = Долг абонента (положительный долг)
+          // Колонка [length - 3] = Адрес (Город, Улица, Дом, Корпус, Подъезд, Квартира)
+          const debtOurRaw = parts[parts.length - 1]?.trim() || "";
+          const debtSubRaw = parts[parts.length - 2]?.trim() || "";
+          const rawAddr = parts[parts.length - 3]?.trim() || "";
+
+          const subDebt = parseFloat(cleanAmountStr(debtSubRaw)) || 0;
+          const ourDebt = parseFloat(cleanAmountStr(debtOurRaw)) || 0;
 
           let debtAmount = 0;
           if (subDebt > 0) {
-            debtAmount = subDebt;
+            debtAmount = subDebt; // Долг абонента (положительное число)
           } else if (ourDebt > 0) {
-            debtAmount = -ourDebt; // Отрицательная сумма = переплата
+            debtAmount = -ourDebt; // Наш долг = переплата абонента (отрицательное число)
           }
 
-          // Колонка [длина - 3] = Адрес
-          const rawAddr = parts[parts.length - 3]?.trim() || "";
           const addrParts = rawAddr.split(",").map(s => s.trim());
           const city = addrParts[0] || "Краснодар";
           const street = addrParts[1] || "";
@@ -480,7 +488,7 @@ export const AccountsManager: React.FC = () => {
           if (apartment) fullAddr += `, кв. ${apartment}`;
 
           // ФИО абонента: все колонки между лицевым счетом и адресом
-          const fullName = parts.slice(1, parts.length - 3).join(" ").trim() || null;
+          const fullName = parts.slice(1, parts.length - 3).map(p => p.trim()).filter(Boolean).join(" ") || null;
 
           records.push({
             account_number: accNum,
@@ -498,7 +506,7 @@ export const AccountsManager: React.FC = () => {
       } else {
         // Классический формат с разделителем ';'
         // счет;флаг;адрес;период;сумма
-        for (const line of lines) {
+        for (const line of rawLines) {
           const parts = line.trim().replace(/\r$/, "").split(";");
           if (parts.length < 5) continue;
 

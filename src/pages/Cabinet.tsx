@@ -2469,11 +2469,15 @@ const Cabinet = () => {
           
           setFloor(data.floor || ""); // Инициализируем этаж
           
-          // Инициализируем Email из профиля, а если там пусто — подставляем из сессии
-          const defaultEmail = data.email || "";
-          setEmail(defaultEmail);
-          setEmailInput(defaultEmail);
-          setEmailVerified(!!data.email_verified);
+          // Инициализируем Email из профиля или сохраненной сессии
+          const storedUser = localStorage.getItem("user") || sessionStorage.getItem("user");
+          const parsedUser = storedUser ? JSON.parse(storedUser) : null;
+          const defaultEmail = data.email || parsedUser?.email || "";
+          if (defaultEmail) {
+            setEmail(defaultEmail);
+            setEmailInput((prev) => (prev && prev.trim() ? prev : defaultEmail));
+          }
+          setEmailVerified(!!data.email_verified || !!defaultEmail);
         }
       } catch (err) {
         console.error("[Кабинет] Ошибка polling профиля:", err); // Логирование
@@ -2623,12 +2627,16 @@ const Cabinet = () => {
       
       setFloor(data.floor || ""); // Инициализируем этаж
       
-      // Автоподстановка Email из сессии регистрации, если в профиле пусто
-      const defaultEmail = data.email || session.user.email || "";
-      setEmail(defaultEmail);
-      setEmailInput(defaultEmail);
-      setEmailVerified(!!data.email_verified || !!session.user.email);
-      console.log(`[Cabinet Auth] Почта инициализирована: "${defaultEmail}" (верифицирована: ${!!data.email_verified || !!session.user.email})`);
+      // Автоподстановка Email из профиля, сессии регистрации или localStorage
+      const storedUser = localStorage.getItem("user") || sessionStorage.getItem("user");
+      const parsedUser = storedUser ? JSON.parse(storedUser) : null;
+      const defaultEmail = data.email || session.user?.email || parsedUser?.email || "";
+      if (defaultEmail) {
+        setEmail(defaultEmail);
+        setEmailInput((prev) => (prev && prev.trim() ? prev : defaultEmail));
+      }
+      setEmailVerified(!!data.email_verified || !!defaultEmail);
+      console.log(`[Cabinet Auth] Почта инициализирована: "${defaultEmail}" (верифицирована: ${!!data.email_verified || !!defaultEmail})`);
 
       // Автоматический поиск адреса по номеру телефона, если адрес еще не заполнен
       if (!data.address && data.phone && !hasSearchedPhoneOnce) {
@@ -3101,7 +3109,21 @@ const Cabinet = () => {
       missingFields.push("Этаж");
     }
     
-    if (!emailInput || !emailInput.trim()) missingFields.push("Электронная почта (Email)");
+    // Проверка email: если emailInput в стейте пуст, проверяем стейт email или сохраненного пользователя в браузере
+    let finalEmail = (emailInput || "").trim();
+    if (!finalEmail) {
+      const storedUser = localStorage.getItem("user") || sessionStorage.getItem("user");
+      const parsedUser = storedUser ? JSON.parse(storedUser) : null;
+      finalEmail = (email || parsedUser?.email || "").trim();
+      if (finalEmail) {
+        setEmailInput(finalEmail);
+        setEmail(finalEmail);
+      }
+    }
+
+    if (!finalEmail) {
+      missingFields.push("Электронная почта (Email)");
+    }
     
     // Проверка согласия с обработкой персональных данных
     if (!agreedToTerms) {
@@ -3122,7 +3144,7 @@ const Cabinet = () => {
         throw new Error("Сессия пользователя не найдена. Пожалуйста, авторизуйтесь заново.");
       }
 
-      console.log(`[Верификация] Запись данных профиля в БД для ID: ${session.user.id}`); // Логирование
+      console.log(`[Верификация] Запись данных профиля в БД для ID: ${session.user.id}, Email: ${finalEmail}`); // Логирование
       // 2. Записываем данные в базу данных (статус верификации не проставляется автоматически)
       const currentIsVerified = profile?.is_verified ?? false;
       const { error } = await supabase
@@ -3133,7 +3155,7 @@ const Cabinet = () => {
           address: currentAddress, // Полный эталонный адрес (улица + дом)
           apartment: premiseType === "private" ? "" : apartment.trim(),
           floor: premiseType === "private" ? "" : floor.trim(),
-          email: emailInput.trim(),
+          email: finalEmail,
           email_verified: true, // Автоматически подтверждаем email
           is_verified: currentIsVerified, // Сохраняем текущий статус верификации
         })
@@ -3149,13 +3171,13 @@ const Cabinet = () => {
         address: currentAddress, 
         apartment: premiseType === "private" ? "" : apartment.trim(), 
         floor: premiseType === "private" ? "" : floor.trim(),
-        email: emailInput.trim(),
+        email: finalEmail,
         email_verified: true,
         is_verified: currentIsVerified 
       } : prev);
 
       // Синхронизируем Email и Address в стейтах
-      setEmail(emailInput.trim());
+      setEmail(finalEmail);
       setEmailVerified(true);
       setAddress(currentAddress);
 
