@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useUserRole } from "@/hooks/useUserRole";
-import { Loader2, LogOut, CheckCircle, AlertCircle, AlertTriangle, ClipboardList, Calendar, Shield, CreditCard, Wallet, Pencil, Trash2, UserCheck, Plus, Minus, Clock, Wrench, CheckCircle2, XCircle, Send, Smartphone, KeyRound, PhoneCall, DoorOpen, DoorClosed, Info, User, Phone, Mail, Lock, Lightbulb, Hash, MapPin, Building, Home, Building2, History, FileSpreadsheet, Copy, Eye, EyeOff, ShieldCheck, Sparkles, LayoutDashboard, Zap, Printer, Receipt, FileText, ShoppingBag } from "lucide-react";
+import { Loader2, LogOut, CheckCircle, AlertCircle, AlertTriangle, ClipboardList, Calendar, Shield, CreditCard, Wallet, Pencil, Trash2, UserCheck, Plus, Minus, Clock, Wrench, CheckCircle2, XCircle, Send, Smartphone, KeyRound, PhoneCall, DoorOpen, DoorClosed, Info, User, Phone, Mail, Lock, Lightbulb, Hash, MapPin, Building, Home, Building2, History, FileSpreadsheet, Copy, Eye, EyeOff, ShieldCheck, Sparkles, LayoutDashboard, Zap, Printer, Receipt, FileText, ShoppingBag, RefreshCw, X } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -207,6 +207,10 @@ const DebtCard = ({
   useEffect(() => {
     const loadDebt = async () => {
       setLoading(true);
+      // RULE 2: Запоминаем факт возврата со шлюза ЮKassa до любых асинхронных операций
+      const initialParams = new URLSearchParams(window.location.search);
+      const isReturningFromPayment = initialParams.get("check_payment") === "1" || initialParams.get("payment") === "success";
+
       const { street, house } = parseAddressParts(address);
       const cleanStreetQuery = street.replace(/(?:\b(?:ул\.?|улица)\b|\(ул\))\s*/gi, "").trim();
       
@@ -264,6 +268,7 @@ const DebtCard = ({
           console.log(`[Баланс] Лицевой счет найден: ${best.account_number}, сумма в БД: ${best.debt_amount} ₽`);
 
           // Фоновая синхронизация платежей ЮKassa с бэкендом
+          let syncedPayments: any[] = [];
           try {
             const syncRes = await fetch(`/backend-api/api/payments/yookassa/sync/${best.account_number}`);
             const syncData = await syncRes.json();
@@ -271,6 +276,7 @@ const DebtCard = ({
               best.debt_amount = Number(syncData.account.debt_amount);
               console.log(`[Баланс: ЮKassa Синхронизация] Актуализирован долг счета ${best.account_number}: ${best.debt_amount} ₽`);
               if (syncData.payments) {
+                syncedPayments = syncData.payments;
                 setOnlinePayments(syncData.payments);
               }
             }
@@ -280,6 +286,33 @@ const DebtCard = ({
 
           const currentDebt = Number(best.debt_amount) || 0;
           setPayAmount(currentDebt > 0 ? currentDebt.toFixed(2) : "300");
+
+          // Проверка возврата после платежа в системе ЮKassa (проверяем РЕАЛЬНЫЙ статус транзакции)
+          if (isReturningFromPayment) {
+            console.log("[ЮKassa] Пользователь вернулся со страницы платежа. Проверка фактического статуса...");
+            window.history.replaceState({}, document.title, window.location.pathname);
+
+            const lastP = syncedPayments[0];
+            if (lastP) {
+              if (lastP.status === "succeeded") {
+                toast({
+                  title: "✅ Оплата успешно зачислена!",
+                  description: `Платёж на сумму ${Number(lastP.amount).toFixed(2)} ₽ успешно проведён через ЮKassa, баланс обновлён. Электронный чек доступен в истории платежей.`,
+                });
+              } else if (lastP.status === "canceled") {
+                toast({
+                  title: "Платёж отменён",
+                  description: "Оплата не была завершена. Средства с вашей карты не списывались.",
+                  variant: "destructive",
+                });
+              } else {
+                toast({
+                  title: "⏳ Платёж ожидает оплаты",
+                  description: "Платёж не был завершён или ожидает подтверждения банка. Средства не списаны.",
+                });
+              }
+            }
+          }
         } else {
           console.log(`[Баланс] Адрес совпал по улице и дому, но квартира ${apartment} не найдена в обслуживаемых лицевых счетах`);
         }
@@ -289,17 +322,6 @@ const DebtCard = ({
         setParentAccount(best);
       }
       setLoading(false);
-
-      // Проверка возврата после платежа в системе ЮKassa
-      const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get("payment") === "success") {
-        console.log("[ЮKassa] Пользователь вернулся после успешного платежа!");
-        window.history.replaceState({}, document.title, window.location.pathname);
-        toast({
-          title: "✅ Оплата успешно зачислена!",
-          description: "Платеж проведён через ЮKassa, баланс обновлён. Электронный чек доступен в истории платежей.",
-        });
-      }
     };
     loadDebt();
   }, [address, apartment, setParentAccount]);
@@ -337,8 +359,8 @@ const DebtCard = ({
           accountNumber: account.account_number,
           user_id: userId || undefined,
           userId: userId || undefined,
-          return_url: `${window.location.origin}/cabinet?payment=success&account=${account.account_number}`,
-          returnUrl: `${window.location.origin}/cabinet?payment=success&account=${account.account_number}`,
+          return_url: `${window.location.origin}/cabinet?check_payment=1&account=${account.account_number}`,
+          returnUrl: `${window.location.origin}/cabinet?check_payment=1&account=${account.account_number}`,
         }),
       });
 
@@ -784,15 +806,35 @@ const DebtCard = ({
                           </div>
 
                           <div className="flex items-center gap-2 shrink-0">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setSelectedReceipt(p)}
-                              className="h-8 px-2.5 text-xs rounded-xl flex items-center gap-1.5 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 font-medium"
-                            >
-                              <Receipt className="h-3.5 w-3.5 text-emerald-600" />
-                              <span>Электронный чек</span>
-                            </Button>
+                            {isSucceeded && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setSelectedReceipt(p)}
+                                className="h-8 px-2.5 text-xs rounded-xl flex items-center gap-1.5 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 font-medium"
+                              >
+                                <Receipt className="h-3.5 w-3.5 text-emerald-600" />
+                                <span>Электронный чек</span>
+                              </Button>
+                            )}
+                            {isPending && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={async () => {
+                                  try {
+                                    await fetch(`/backend-api/api/payments/yookassa/cancel/${p.yookassa_payment_id || p.id}`, { method: "POST" });
+                                    setOnlinePayments(prev => prev.map(item => (item.id === p.id || item.yookassa_payment_id === p.yookassa_payment_id) ? { ...item, status: 'canceled' } : item));
+                                    toast({ title: "Платёж отменён", description: "Зависшая попытка оплаты отменена" });
+                                  } catch (e) {
+                                    console.error(e);
+                                  }
+                                }}
+                                className="h-8 px-2 text-xs rounded-xl text-slate-400 hover:text-destructive hover:bg-destructive/10"
+                              >
+                                Отменить
+                              </Button>
+                            )}
                           </div>
                         </div>
                       );
@@ -836,10 +878,22 @@ const DebtCard = ({
                     <div className="font-extrabold text-sm uppercase tracking-wider text-foreground">ООО «ДОМОФОНДАР»</div>
                     <div className="text-[11px] text-muted-foreground mt-0.5">ИНН: 2311311000 • ОГРН: 1202300063250</div>
                     <div className="text-[10px] text-muted-foreground">г. Краснодар • Тел.: +7 (861) 205-00-55</div>
-                    <div className="mt-2.5 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-semibold text-[11px] border border-emerald-500/20">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                      ОПЛАЧЕНО ОНЛАЙН • ЧЕК ПРОВЕДЁН
-                    </div>
+                    {selectedReceipt.status === "succeeded" ? (
+                      <div className="mt-2.5 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-semibold text-[11px] border border-emerald-500/20">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                        ОПЛАЧЕНО ОНЛАЙН • ЧЕК ПРОВЕДЁН
+                      </div>
+                    ) : selectedReceipt.status === "pending" ? (
+                      <div className="mt-2.5 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 font-semibold text-[11px] border border-amber-500/20">
+                        <Clock className="h-3.5 w-3.5 text-amber-600" />
+                        ПЛАТЁЖ В ОБРАБОТКЕ • НЕ ОПЛАЧЕНО
+                      </div>
+                    ) : (
+                      <div className="mt-2.5 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-red-500/10 text-red-700 dark:text-red-400 font-semibold text-[11px] border border-red-500/20">
+                        <XCircle className="h-3.5 w-3.5 text-red-600" />
+                        ПЛАТЁЖ ОТМЕНЁН • СРЕДСТВА НЕ СПИСАНЫ
+                      </div>
+                    )}
                   </div>
 
                   {/* Детали платежа */}
@@ -890,7 +944,11 @@ const DebtCard = ({
                   {/* Подвал чека с защитной отметкой */}
                   <div className="pt-2 text-center text-[10px] text-muted-foreground space-y-1">
                     <p>Платежный оператор: ООО НКО «ЮМани» (лицензия ЦБ РФ № 3510-К)</p>
-                    <p>Квитанция сформирована автоматически в ЛК «Домофондар» и подтверждает зачисление средств.</p>
+                    <p>
+                      {selectedReceipt.status === "succeeded" 
+                        ? "Квитанция сформирована автоматически в ЛК «Домофондар» и подтверждает зачисление средств."
+                        : "Данная транзакция не завершена. Официальный чек формируется только после зачисления средств."}
+                    </p>
                   </div>
                 </div>
               )}
@@ -905,7 +963,8 @@ const DebtCard = ({
                 </Button>
                 <Button
                   onClick={() => window.print()}
-                  className="rounded-xl bg-primary text-primary-foreground font-semibold flex items-center gap-1.5"
+                  disabled={selectedReceipt?.status !== "succeeded"}
+                  className="rounded-xl bg-primary text-primary-foreground font-semibold flex items-center gap-1.5 disabled:opacity-50"
                 >
                   <Printer className="h-4 w-4" />
                   Распечатать чек
@@ -1748,21 +1807,7 @@ const Cabinet = () => {
   // Глобальные переменные и утилиты, вынесенные ниже объявлений всех стейтов для предотвращения ReferenceError (temporal dead zone)
   const { toast } = useToast();
 
-  // Логика обработки успешного платежа через ЮKassa при возврате пользователя
-  useEffect(() => {
-    const paymentStatus = searchParams.get("payment");
-    if (paymentStatus === "success") {
-      const accountNum = searchParams.get("account");
-      const reqId = searchParams.get("request_id");
-      console.log(`[Cabinet: ЮKassa] Платёж успешно завершён! Л/С: ${accountNum || "—"}, ID заявки: ${reqId || "—"}`);
-      toast({
-        title: "Оплата принята!",
-        description: "Ваш платёж через ЮKassa успешно совершён и принят в обработку.",
-      });
-      // Очищаем адресную строку от технических query-параметров оплаты
-      navigate("/cabinet", { replace: true });
-    }
-  }, [searchParams, navigate, toast]);
+
   const hasAdminConsoleAccess = userRoles.some((role) => ["admin", "director"].includes(role));
   const isLocked = !!profile?.is_verified && !editing;
 
@@ -3323,14 +3368,47 @@ const Cabinet = () => {
     },
   });
 
-  // Автоматический рефетч заявок и оплат при возврате со шлюза оплаты
+  // RULE 2: Автоматический рефетч заявок и оплат при возврате со шлюза оплаты ЮKassa
   useEffect(() => {
-    const paymentStatus = searchParams.get("payment");
-    if (paymentStatus === "success") {
-      if (refetchUserRequests) refetchUserRequests();
-      if (refetchTOPayments) refetchTOPayments();
-    }
-  }, [searchParams, refetchUserRequests, refetchTOPayments]);
+    const isCheckPayment = searchParams.get("check_payment") === "1" || searchParams.get("payment") === "success";
+    if (!isCheckPayment) return;
+
+    const reqId = searchParams.get("request_id");
+    const accountNum = searchParams.get("account");
+
+    console.log(`[Cabinet: ЮKassa] Возврат со шлюза оплаты. Л/С: ${accountNum || "—"}, ID заявки: ${reqId || "—"}`);
+
+    (async () => {
+      // 1. Всегда актуализируем заявки и платежи в ЛК
+      if (refetchUserRequests) await refetchUserRequests();
+      if (refetchTOPayments) await refetchTOPayments();
+
+      // 2. Если оплачивался конкретный заказ оборудования / монтажа
+      if (reqId) {
+        try {
+          if (accountNum) {
+            await fetch(`/backend-api/api/payments/yookassa/sync/${accountNum}`);
+          }
+          const { data: updatedReq } = await supabase.from("requests").select("payment_status").eq("id", reqId).single();
+          if (updatedReq?.payment_status === "paid") {
+            toast({
+              title: "✅ Заказ успешно оплачен!",
+              description: `Оплата по заказу #${reqId} успешно зачислена. Электронный чек доступен во вкладке «Заказы».`,
+            });
+          } else {
+            toast({
+              title: "Статус оплаты заказа",
+              description: "Платёж по заказу не был завершён или ожидает подтверждения банка. Средства с карты не списывались.",
+            });
+          }
+        } catch (e) {
+          console.warn("[Cabinet: ЮKassa] Ошибка проверки статуса заказа:", e);
+        } finally {
+          navigate("/cabinet", { replace: true });
+        }
+      }
+    })();
+  }, [searchParams, navigate, refetchUserRequests, refetchTOPayments]);
 
   // Стейт для просмотра и печати официального электронного чека из нижней истории (ТО или Заказы)
   const [cabinetReceipt, setCabinetReceipt] = useState<any | null>(null);
@@ -4690,8 +4768,8 @@ const Cabinet = () => {
                                                 requestId: req.id,
                                                 user_id: userId || undefined,
                                                 userId: userId || undefined,
-                                                return_url: `${window.location.origin}/cabinet?payment=success&request_id=${req.id}`,
-                                                returnUrl: `${window.location.origin}/cabinet?payment=success&request_id=${req.id}`,
+                                                return_url: `${window.location.origin}/cabinet?check_payment=1&request_id=${req.id}${userAccount?.account_number ? `&account=${userAccount.account_number}` : ''}`,
+                                                returnUrl: `${window.location.origin}/cabinet?check_payment=1&request_id=${req.id}${userAccount?.account_number ? `&account=${userAccount.account_number}` : ''}`,
                                               }),
                                             });
 
@@ -4791,19 +4869,66 @@ const Cabinet = () => {
                                     )}
                                   </div>
 
+                                  {/* RULE 2: Кнопка чека доступна ТОЛЬКО для успешно завершённых и зачисленных оплат */}
                                   <div className="flex items-center gap-2 shrink-0">
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => {
-                                        console.log("[ЛК Кабинет: ТО] Открытие электронного чека ТО для платежа:", p.id || p.yookassa_payment_id);
-                                        setCabinetReceipt(p);
-                                      }}
-                                      className="h-8 px-3 text-xs rounded-xl flex items-center gap-1.5 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 font-medium shadow-xs"
-                                    >
-                                      <Receipt className="h-3.5 w-3.5 text-emerald-600" />
-                                      <span>Электронный чек</span>
-                                    </Button>
+                                    {isSucceeded && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                          console.log("[ЛК Кабинет: ТО] Открытие электронного чека ТО для платежа:", p.id || p.yookassa_payment_id);
+                                          setCabinetReceipt(p);
+                                        }}
+                                        className="h-8 px-3 text-xs rounded-xl flex items-center gap-1.5 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 font-medium shadow-xs"
+                                      >
+                                        <Receipt className="h-3.5 w-3.5 text-emerald-600" />
+                                        <span>Электронный чек</span>
+                                      </Button>
+                                    )}
+
+                                    {/* Для платежей в обработке даем возможность проверить статус в ЮKassa или закрыть сессию */}
+                                    {isPending && (
+                                      <div className="flex items-center gap-1.5">
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={async () => {
+                                            console.log("[ЛК Кабинет: ТО] Ручная проверка статуса платежа:", p.yookassa_payment_id || p.id);
+                                            toast({
+                                              title: "Проверка платежа...",
+                                              description: "Опрашиваем платежный шлюз ЮKassa...",
+                                            });
+                                            await refetchTOPayments();
+                                          }}
+                                          className="h-8 px-2.5 text-xs rounded-xl flex items-center gap-1 border-amber-500/30 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/30 font-medium"
+                                        >
+                                          <RefreshCw className="h-3.5 w-3.5 text-amber-600" />
+                                          <span>Проверить</span>
+                                        </Button>
+
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={async () => {
+                                            console.log("[ЛК Кабинет: ТО] Отмена незавершенного платежа:", p.yookassa_payment_id || p.id);
+                                            try {
+                                              await fetch(`/backend-api/api/payments/yookassa/cancel/${p.yookassa_payment_id || p.id}`, { method: "POST" });
+                                              toast({
+                                                title: "Платёж отменён",
+                                                description: "Сессия оплаты закрыта, статус обновлён.",
+                                              });
+                                              await refetchTOPayments();
+                                            } catch (cErr) {
+                                              console.error("[ЛК Кабинет: ТО] Ошибка отмены платежа:", cErr);
+                                            }
+                                          }}
+                                          className="h-8 px-2 text-xs rounded-xl text-muted-foreground hover:text-destructive hover:bg-rose-50 dark:hover:bg-rose-950/20"
+                                        >
+                                          <X className="h-3.5 w-3.5 mr-0.5" />
+                                          <span>Отменить</span>
+                                        </Button>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               );
@@ -4837,10 +4962,23 @@ const Cabinet = () => {
                       <div className="font-extrabold text-sm uppercase tracking-wider text-foreground">ООО «ДОМОФОНДАР»</div>
                       <div className="text-[11px] text-muted-foreground mt-0.5">ИНН: 2311311000 • ОГРН: 1202300063250</div>
                       <div className="text-[10px] text-muted-foreground">г. Краснодар • Тел.: +7 (861) 205-00-55</div>
-                      <div className="mt-2.5 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-semibold text-[11px] border border-emerald-500/20">
-                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                        ОПЛАЧЕНО ОНЛАЙН • ЧЕК ПРОВЕДЁН
-                      </div>
+                      {/* RULE 2: Динамический статус проведения платежа в чеке */}
+                      {cabinetReceipt.status === "succeeded" ? (
+                        <div className="mt-2.5 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-semibold text-[11px] border border-emerald-500/20">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                          ОПЛАЧЕНО ОНЛАЙН • ЧЕК ПРОВЕДЁН
+                        </div>
+                      ) : cabinetReceipt.status === "canceled" ? (
+                        <div className="mt-2.5 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-rose-500/10 text-rose-700 dark:text-rose-400 font-semibold text-[11px] border border-rose-500/20">
+                          <AlertCircle className="h-3.5 w-3.5 text-rose-600" />
+                          ПЛАТЁЖ ОТМЕНЁН • СРЕДСТВА НЕ СПИСАНЫ
+                        </div>
+                      ) : (
+                        <div className="mt-2.5 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 font-semibold text-[11px] border border-amber-500/20">
+                          <Clock className="h-3.5 w-3.5 text-amber-600" />
+                          В ОБРАБОТКЕ • ОЖИДАЕТ ОПЛАТЫ
+                        </div>
+                      )}
                     </div>
 
                     {/* Детали платежа */}
@@ -4906,6 +5044,7 @@ const Cabinet = () => {
                   </Button>
                   <Button
                     onClick={() => window.print()}
+                    disabled={cabinetReceipt?.status !== "succeeded"}
                     className="rounded-xl bg-primary text-primary-foreground font-semibold flex items-center gap-1.5"
                   >
                     <Printer className="h-4 w-4" />
@@ -5613,8 +5752,8 @@ const Cabinet = () => {
                               requestId: lastCreatedRequestId || undefined,
                               user_id: userId || undefined,
                               userId: userId || undefined,
-                              return_url: `${window.location.origin}/cabinet?payment=success&request_id=${lastCreatedRequestId || ""}`,
-                              returnUrl: `${window.location.origin}/cabinet?payment=success&request_id=${lastCreatedRequestId || ""}`,
+                              return_url: `${window.location.origin}/cabinet?check_payment=1&request_id=${lastCreatedRequestId || ""}${userAccount?.account_number ? `&account=${userAccount.account_number}` : ''}`,
+                              returnUrl: `${window.location.origin}/cabinet?check_payment=1&request_id=${lastCreatedRequestId || ""}${userAccount?.account_number ? `&account=${userAccount.account_number}` : ''}`,
                             }),
                           });
 

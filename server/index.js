@@ -731,6 +731,13 @@ app.get('/api/payments/yookassa/status/:paymentId', async (req, res) => {
           [creditAmount, accNum]
         );
       }
+    } else if (yooData.status === 'canceled') {
+      // RULE 2: Логируем и фиксируем статус отмены платежа в БД
+      await pool.query(
+        "UPDATE payments SET status = 'canceled', updated_at = CURRENT_TIMESTAMP WHERE yookassa_payment_id = $1",
+        [paymentId]
+      );
+      console.log(`[Бэкенд: ЮKassa Статус] Платёж ${paymentId} отмечен как отменённый в БД`);
     }
 
     res.json({
@@ -925,6 +932,33 @@ app.get('/api/payments/yookassa/history/:accountNumber', async (req, res) => {
   } catch (err) {
     console.error('[Бэкенд: ЮKassa История] Ошибка:', err.message);
     res.status(500).json({ error: 'Ошибка получения истории платежей' });
+  }
+});
+
+/**
+ * Отмена зависшего платежа пользователем
+ */
+app.post('/api/payments/yookassa/cancel/:paymentId', async (req, res) => {
+  try {
+    const { paymentId } = req.params;
+    console.log(`[Бэкенд: ЮKassa Отмена] Запрос на отмену платежа ${paymentId}`);
+
+    const result = await pool.query(
+      `UPDATE payments 
+       SET status = 'canceled', updated_at = CURRENT_TIMESTAMP 
+       WHERE (yookassa_payment_id = $1 OR id::text = $1) AND status = 'pending'
+       RETURNING *`,
+      [paymentId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Платёж не найден или уже не находится в ожидании' });
+    }
+
+    res.json({ success: true, payment: result.rows[0] });
+  } catch (err) {
+    console.error('[Бэкенд: ЮKassa Отмена] Ошибка:', err.message);
+    res.status(500).json({ error: 'Ошибка отмены платежа' });
   }
 });
 
