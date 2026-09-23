@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -419,23 +420,26 @@ export const AccountsManager: React.FC = () => {
       // Вспомогательная функция очистки денежной суммы (удаление неразрывных пробелов \xa0 и пробелов)
       const cleanAmountStr = (s: string) => (s || "").replace(/\xa0/g, "").replace(/\s/g, "").replace(",", ".");
 
-      // Определяем формат файла: TSV (табуляция, как во Взаиморасчетах) или точка с запятой ';'
-      const isTsvFormat = lines.some(l => l.includes("\t") && (l.includes("Взаиморасчеты") || l.includes("Лицевой счет") || l.includes("Долг абонента")));
+      // Определяем формат файла: если есть разделитель табуляция \t, это формат TSV (Взаиморасчеты общие 1С)
+      const isTsvFormat = lines.some(l => l.includes("\t"));
 
       console.log(`[AccountsManager: Реестр] Формат файла: ${isTsvFormat ? "TSV (Взаиморасчеты общие 1С)" : "Разделитель ';'"}`);
+
+      const now = new Date();
+      const defaultPer = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
       if (isTsvFormat) {
         // Формат «Взаиморасчеты общие.txt»:
         // Строка 0: Лицевой счет \t Абонент \t Адрес \t Долг абонента \t Наш долг
         // Строка 1: \t \t Город, Улица, Дом, Корпус, Подъезд, Квартира \t \t
-        // Данные: 4000000001 \t Иванов И.И. \t Краснодар, Душистая (ул), 50, , 1, 1 \t 150,00 \t 0,00
-        const defaultPer = format(new Date(), "yyyy-MM");
+        // Данные: 0000000001 \t Иванов И.И. \t Краснодар, Душистая (ул), 50, , 1, 1 \t 150,00 \t 0,00
         detectedPeriod = defaultPer;
 
         for (const line of lines) {
           const cleanLine = line.trim().replace(/\r$/, "");
+          if (!cleanLine) continue;
           // Пропускаем строки заголовков
-          if (cleanLine.includes("Лицевой счет") || cleanLine.includes("Город, Улица") || cleanLine.includes("Долг абонента")) {
+          if (cleanLine.includes("Лицевой счет") || cleanLine.includes("Город, Улица") || cleanLine.includes("Долг абонента") || cleanLine.includes("Наш долг")) {
             continue;
           }
 
@@ -555,8 +559,9 @@ export const AccountsManager: React.FC = () => {
     console.log(`[AccountsManager] Старт сохранения ${parsedRows.length} записей реестра...`);
 
     try {
-      const batchNum = parsedBatchNum || (lastRegistry ? lastRegistry.batch_number + 1 : 1);
-      const period = parsedPeriod || format(new Date(), "yyyy-MM");
+      const now = new Date();
+      const defaultPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+      const period = parsedPeriod || defaultPeriod;
       const totalAmount = parsedRows.reduce((sum, r) => sum + r.debt_amount, 0);
 
       // 1. Фиксируем запись о загрузке реестра в account_registry_uploads
