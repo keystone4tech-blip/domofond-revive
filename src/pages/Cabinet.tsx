@@ -301,8 +301,11 @@ const DebtCard = ({
         body: JSON.stringify({
           amount: numAmount,
           description: `Оплата ТО домофона, л/с ${account.account_number}, ${address}${apartment ? `, кв. ${apartment}` : ""}`,
+          account_number: account.account_number,
           accountNumber: account.account_number,
+          user_id: userId || undefined,
           userId: userId || undefined,
+          return_url: `${window.location.origin}/cabinet?payment=success&account=${account.account_number}`,
           returnUrl: `${window.location.origin}/cabinet?payment=success&account=${account.account_number}`,
         }),
       });
@@ -314,9 +317,12 @@ const DebtCard = ({
         throw new Error(data.error || "Не удалось инициализировать оплату ЮKassa");
       }
 
-      if (data.confirmationUrl) {
-        console.log(`[ЮKassa] Переход по платежной ссылке: ${data.confirmationUrl}`);
-        window.location.href = data.confirmationUrl;
+      // Поддерживаем как camelCase (confirmationUrl), так и snake_case (confirmation_url)
+      const confirmationRedirectUrl = data.confirmationUrl || data.confirmation_url;
+
+      if (confirmationRedirectUrl) {
+        console.log(`[ЮKassa] Переход по платежной ссылке: ${confirmationRedirectUrl}`);
+        window.location.href = confirmationRedirectUrl;
       } else {
         throw new Error("Не получен URL подтверждения оплаты");
       }
@@ -582,9 +588,13 @@ const DebtCard = ({
                       1800 ₽
                     </Button>
                   </div>
-                  <p className="text-[11px] text-muted-foreground">
-                    💡 300 ₽ — ~1 мес. обслуживания, 900 ₽ — квартал, 1800 ₽ — полгода.
-                  </p>
+                  {/* Подсказка о возможности внесения авансового платежа */}
+                  <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[12px] text-emerald-800 dark:text-emerald-300 flex items-start gap-2">
+                    <span className="text-base leading-none select-none">💡</span>
+                    <p className="leading-snug">
+                      Вы можете оплатить любую большую сумму (например, на несколько месяцев или год вперёд). Она зачислится как переплата на ваш лицевой счёт и будет автоматически списываться каждый месяц в счёт абонентской платы.
+                    </p>
+                  </div>
                 </div>
 
                 {/* Преимущества и безопасность */}
@@ -4957,11 +4967,15 @@ const Cabinet = () => {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({
-                              amount: lastOrderTotals.total,
+                               amount: lastOrderTotals.total,
                               description: `Оплата заказа по заявке №${lastCreatedRequestId || "б/н"}, адрес: ${orderStreet || address} ${orderHouse || ""}${orderApartment ? `, кв. ${orderApartment}` : ""}`,
+                              account_number: userAccount?.account_number || undefined,
                               accountNumber: userAccount?.account_number || undefined,
+                              request_id: lastCreatedRequestId || undefined,
                               requestId: lastCreatedRequestId || undefined,
+                              user_id: userId || undefined,
                               userId: userId || undefined,
+                              return_url: `${window.location.origin}/cabinet?payment=success&request_id=${lastCreatedRequestId || ""}`,
                               returnUrl: `${window.location.origin}/cabinet?payment=success&request_id=${lastCreatedRequestId || ""}`,
                             }),
                           });
@@ -4973,8 +4987,11 @@ const Cabinet = () => {
                             throw new Error(pData.error || "Ошибка инициализации оплаты в ЮKassa");
                           }
 
-                          if (pData.confirmationUrl) {
-                            window.location.href = pData.confirmationUrl;
+                          // Поддерживаем как camelCase (confirmationUrl), так и snake_case (confirmation_url)
+                          const orderConfirmUrl = pData.confirmationUrl || pData.confirmation_url;
+                          if (orderConfirmUrl) {
+                            console.log(`[Заявка: ЮKassa] Переход по платежной ссылке: ${orderConfirmUrl}`);
+                            window.location.href = orderConfirmUrl;
                           } else {
                             throw new Error("Не получен URL подтверждения оплаты от ЮKassa");
                           }

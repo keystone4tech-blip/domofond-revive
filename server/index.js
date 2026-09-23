@@ -577,7 +577,13 @@ app.post('/api/requests', authenticateToken, async (req, res) => {
  */
 app.post('/api/payments/yookassa/create', async (req, res) => {
   try {
-    const { amount, description, account_number, user_id, request_id, return_url } = req.body;
+    // Считываем параметры платежа с поддержкой как snake_case, так и camelCase из фронтенда
+    const amount = req.body.amount;
+    const description = req.body.description;
+    const account_number = req.body.account_number || req.body.accountNumber || '';
+    const user_id = req.body.user_id || req.body.userId || null;
+    const request_id = req.body.request_id || req.body.requestId || null;
+    const return_url = req.body.return_url || req.body.returnUrl;
     const numAmount = parseFloat(amount);
 
     if (isNaN(numAmount) || numAmount <= 0) {
@@ -636,7 +642,8 @@ app.post('/api/payments/yookassa/create', async (req, res) => {
       });
     }
 
-    console.log(`[Бэкенд: ЮKassa] Платеж успешно зарегистрирован! ID: ${yooData.id}, статус: ${yooData.status}`);
+    const confirmationUrl = yooData.confirmation?.confirmation_url;
+    console.log(`[Бэкенд: ЮKassa] Платеж успешно зарегистрирован! ID: ${yooData.id}, статус: ${yooData.status}, confirmationUrl: ${confirmationUrl || 'отсутствует'}`);
 
     // Сохраняем информацию о начатом платеже в базу данных PostgreSQL
     try {
@@ -659,11 +666,13 @@ app.post('/api/payments/yookassa/create', async (req, res) => {
       console.error('[Бэкенд: ЮKassa] Предупреждение при сохранении платежа в БД:', dbErr.message);
     }
 
+    // Возвращаем клиенту ID платежа, статус и URL подтверждения (в snake_case и camelCase)
     res.json({
       success: true,
       id: yooData.id,
       status: yooData.status,
-      confirmation_url: yooData.confirmation?.confirmation_url,
+      confirmation_url: confirmationUrl,
+      confirmationUrl: confirmationUrl, // Поле для фронтенда React
     });
   } catch (err) {
     console.error('[Бэкенд: ЮKassa] Критическое исключение:', err.message);
