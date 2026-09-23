@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useUserRole } from "@/hooks/useUserRole";
-import { Loader2, LogOut, CheckCircle, AlertCircle, AlertTriangle, ClipboardList, Calendar, Shield, CreditCard, Wallet, Pencil, Trash2, UserCheck, Plus, Minus, Clock, Wrench, CheckCircle2, XCircle, Send, Smartphone, KeyRound, PhoneCall, DoorOpen, DoorClosed, Info, User, Phone, Mail, Lock, Lightbulb, Hash, MapPin, Building, Home, Building2, History, FileSpreadsheet, Copy, Eye, EyeOff, ShieldCheck, Sparkles, LayoutDashboard, Zap, Printer, Receipt, FileText } from "lucide-react";
+import { Loader2, LogOut, CheckCircle, AlertCircle, AlertTriangle, ClipboardList, Calendar, Shield, CreditCard, Wallet, Pencil, Trash2, UserCheck, Plus, Minus, Clock, Wrench, CheckCircle2, XCircle, Send, Smartphone, KeyRound, PhoneCall, DoorOpen, DoorClosed, Info, User, Phone, Mail, Lock, Lightbulb, Hash, MapPin, Building, Home, Building2, History, FileSpreadsheet, Copy, Eye, EyeOff, ShieldCheck, Sparkles, LayoutDashboard, Zap, Printer, Receipt, FileText, ShoppingBag } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -304,11 +304,11 @@ const DebtCard = ({
     loadDebt();
   }, [address, apartment, setParentAccount]);
 
-  // Обработчик создания платежа через шлюз ЮKassa
+  // Обработчик создания платежа через шлюз ЮKassa с комиссией эквайринга 5%
   const handleYooKassaPay = async () => {
     if (!account) return;
-    const numAmount = parseFloat(payAmount);
-    if (isNaN(numAmount) || numAmount < 10) {
+    const baseAmount = parseFloat(payAmount);
+    if (isNaN(baseAmount) || baseAmount < 10) {
       toast({
         title: "Некорректная сумма",
         description: "Минимальная сумма для онлайн-оплаты через ЮKassa — 10 ₽",
@@ -317,15 +317,21 @@ const DebtCard = ({
       return;
     }
 
+    // Расчет 5% комиссии эквайринга
+    const feeAmount = Math.round(baseAmount * 0.05 * 100) / 100;
+    const totalAmountWithFee = Math.round((baseAmount + feeAmount) * 100) / 100;
+
     setIsPayingYooKassa(true);
-    console.log(`[ЮKassa: Оплата] Создание платежной сессии: сумма ${numAmount} ₽, л/с ${account.account_number}, userId ${userId || "нет"}`);
+    console.log(`[ЮKassa: Оплата] Создание платежной сессии: базовая сумма ${baseAmount} ₽, комиссия 5% ${feeAmount} ₽, итого к списанию ${totalAmountWithFee} ₽, л/с ${account.account_number}`);
 
     try {
       const resp = await fetch("/backend-api/api/payments/yookassa/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          amount: numAmount,
+          amount: totalAmountWithFee, // Сумма с учетом комиссии 5%
+          credit_amount: baseAmount,  // Базовая сумма к зачислению на лицевой счет без комиссии
+          fee_amount: feeAmount,      // Комиссия эквайринга
           description: `Оплата ТО домофона, л/с ${account.account_number}, ${address}${apartment ? `, кв. ${apartment}` : ""}`,
           account_number: account.account_number,
           accountNumber: account.account_number,
@@ -630,6 +636,32 @@ const DebtCard = ({
                   </div>
                 </div>
 
+                {/* Детализация суммы и комиссии за эквайринг 5% */}
+                {(() => {
+                  const base = parseFloat(payAmount) || 0;
+                  const fee = Math.round(base * 0.05 * 100) / 100;
+                  const total = Math.round((base + fee) * 100) / 100;
+                  return (
+                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs space-y-1.5 text-left">
+                      <div className="flex justify-between items-center text-slate-600 dark:text-slate-300">
+                        <span>Зачисление на лицевой счёт:</span>
+                        <span className="font-mono font-bold text-foreground">{base.toFixed(2)} ₽</span>
+                      </div>
+                      <div className="flex justify-between items-center text-slate-600 dark:text-slate-300">
+                        <span>Комиссия за эквайринг (5%):</span>
+                        <span className="font-mono font-medium text-amber-700 dark:text-amber-400">+{fee.toFixed(2)} ₽</span>
+                      </div>
+                      <div className="flex justify-between items-center font-bold pt-1.5 border-t border-amber-500/20 text-foreground text-sm">
+                        <span>Итого к списанию с карты / СБП:</span>
+                        <span className="font-mono font-extrabold text-amber-600 dark:text-amber-400 text-base">{total.toFixed(2)} ₽</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 pt-1 leading-snug">
+                        💡 Взимается 5% за интернет-эквайринг (возможна минимальная комиссия за транзакцию от банка-эмитента). На ваш лицевой счёт поступит полная сумма {base.toFixed(2)} ₽.
+                      </p>
+                    </div>
+                  );
+                })()}
+
                 {/* Преимущества и безопасность */}
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border text-[11px] text-muted-foreground space-y-1">
                   <div className="flex items-center gap-1.5 text-foreground font-medium">
@@ -662,7 +694,13 @@ const DebtCard = ({
                   ) : (
                     <>
                       <Zap className="h-4 w-4 fill-current" />
-                      <span>Оплатить {payAmount ? `${parseFloat(payAmount) || 0} ₽` : ""}</span>
+                      <span>
+                        Оплатить {(() => {
+                          const base = parseFloat(payAmount) || 0;
+                          const fee = Math.round(base * 0.05 * 100) / 100;
+                          return `${(base + fee).toFixed(2)} ₽`;
+                        })()}
+                      </span>
                     </>
                   )}
                 </Button>
@@ -670,155 +708,105 @@ const DebtCard = ({
             </DialogContent>
           </Dialog>
 
-          {/* Диалог истории начислений и оплат для жильца */}
+          {/* Диалог истории онлайн-оплат и чеков для жильца (без лишних реестров) */}
           <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
             <DialogContent className="max-w-lg">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2 text-base font-bold">
                   <Receipt className="h-5 w-5 text-emerald-600" />
-                  История начислений и онлайн-чеки
+                  История платежей и электронные чеки
                 </DialogTitle>
                 <DialogDescription>
                   Лицевой счёт: <strong className="font-mono text-foreground">{account.account_number}</strong>
                 </DialogDescription>
               </DialogHeader>
 
-              <Tabs defaultValue="payments" className="w-full">
-                <TabsList className="grid grid-cols-2 mb-3">
-                  <TabsTrigger value="payments" className="text-xs flex items-center gap-1.5">
-                    <Receipt className="h-3.5 w-3.5 text-emerald-600" />
-                    <span>Онлайн-платежи ({onlinePayments.length})</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="registry" className="text-xs flex items-center gap-1.5">
-                    <FileSpreadsheet className="h-3.5 w-3.5 text-blue-600" />
-                    <span>Реестры ({accountHistory.length})</span>
-                  </TabsTrigger>
-                </TabsList>
-
-                {/* Вкладка 1: Онлайн-платежи ЮKassa и просмотр чеков */}
-                <TabsContent value="payments" className="space-y-3">
-                  {loadingHistory ? (
-                    <div className="py-8 text-center text-xs text-muted-foreground">
-                      <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2 text-primary" />
-                      Синхронизация и загрузка платежей...
-                    </div>
-                  ) : onlinePayments.length === 0 ? (
-                    <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-900 border text-center space-y-1.5">
-                      <Receipt className="h-8 w-8 text-muted-foreground mx-auto mb-1 opacity-40" />
-                      <p className="text-xs font-semibold text-foreground">Онлайн-платежей пока не зафиксировано</p>
-                      <p className="text-[11px] text-muted-foreground max-w-xs mx-auto">
-                        После оплаты через кнопку «Быстрая оплата ЮKassa» платежи и официальные электронные чеки сразу отобразятся здесь.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2 max-h-[340px] overflow-y-auto pr-1">
-                      {onlinePayments.map((p: any) => {
-                        const isSucceeded = p.status === "succeeded";
-                        const isPending = p.status === "pending";
-                        return (
-                          <div
-                            key={p.id || p.yookassa_payment_id}
-                            className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:border-emerald-500/40 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-2"
-                          >
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-sm text-foreground font-mono">
-                                  {Number(p.amount).toFixed(2)} ₽
-                                </span>
-                                {isSucceeded ? (
-                                  <Badge className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 text-[10px] py-0 font-medium">
-                                    <CheckCircle2 className="h-3 w-3 mr-1 text-emerald-600 inline" />
-                                    Зачислен
-                                  </Badge>
-                                ) : isPending ? (
-                                  <Badge className="bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 text-[10px] py-0 font-medium">
-                                    <Clock className="h-3 w-3 mr-1 text-amber-600 inline" />
-                                    В обработке
-                                  </Badge>
-                                ) : (
-                                  <Badge variant="destructive" className="text-[10px] py-0 font-medium">
-                                    Отменён
-                                  </Badge>
-                                )}
-                              </div>
-                              <p className="text-[11px] text-muted-foreground">
-                                {new Date(p.created_at).toLocaleString("ru-RU", {
-                                  day: "2-digit",
-                                  month: "2-digit",
-                                  year: "numeric",
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                })} • ЮKassa (СБП/Карта)
-                              </p>
-                              {p.yookassa_payment_id && (
-                                <p className="text-[10px] font-mono text-muted-foreground/80 truncate max-w-[260px]">
-                                  № {p.yookassa_payment_id}
-                                </p>
+              {/* Список онлайн-платежей ЮKassa и просмотр чеков */}
+              <div className="space-y-3">
+                {loadingHistory ? (
+                  <div className="py-8 text-center text-xs text-muted-foreground">
+                    <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2 text-primary" />
+                    Синхронизация и загрузка платежей...
+                  </div>
+                ) : onlinePayments.length === 0 ? (
+                  <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-900 border text-center space-y-1.5">
+                    <Receipt className="h-8 w-8 text-muted-foreground mx-auto mb-1 opacity-40" />
+                    <p className="text-xs font-semibold text-foreground">Онлайн-платежей пока не зафиксировано</p>
+                    <p className="text-[11px] text-muted-foreground max-w-xs mx-auto">
+                      После оплаты через кнопку «Быстрая оплата ЮKassa» платежи и официальные электронные чеки сразу отобразятся здесь.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
+                    {onlinePayments.map((p: any) => {
+                      const isSucceeded = p.status === "succeeded";
+                      const isPending = p.status === "pending";
+                      return (
+                        <div
+                          key={p.id || p.yookassa_payment_id}
+                          className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:border-emerald-500/40 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                        >
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-sm text-foreground font-mono">
+                                {Number(p.amount).toFixed(2)} ₽
+                              </span>
+                              {isSucceeded ? (
+                                <Badge className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 text-[10px] py-0 font-medium">
+                                  <CheckCircle2 className="h-3 w-3 mr-1 text-emerald-600 inline" />
+                                  Зачислен
+                                </Badge>
+                              ) : isPending ? (
+                                <Badge className="bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 text-[10px] py-0 font-medium">
+                                  <Clock className="h-3 w-3 mr-1 text-amber-600 inline" />
+                                  В обработке
+                                </Badge>
+                              ) : (
+                                <Badge variant="destructive" className="text-[10px] py-0 font-medium">
+                                  Отменён
+                                </Badge>
                               )}
                             </div>
-
-                            <div className="flex items-center gap-2 shrink-0">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setSelectedReceipt(p)}
-                                className="h-8 px-2.5 text-xs rounded-xl flex items-center gap-1.5 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 font-medium"
-                              >
-                                <Receipt className="h-3.5 w-3.5 text-emerald-600" />
-                                <span>Электронный чек</span>
-                              </Button>
-                            </div>
+                            <p className="text-[11px] text-muted-foreground">
+                              {new Date(p.created_at).toLocaleString("ru-RU", {
+                                day: "2-digit",
+                                month: "2-digit",
+                                year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })} • ЮKassa (СБП/Карта)
+                            </p>
+                            {p.yookassa_payment_id && (
+                              <p className="text-[10px] font-mono text-muted-foreground/80 truncate max-w-[260px]">
+                                № {p.yookassa_payment_id}
+                              </p>
+                            )}
                           </div>
-                        );
-                      })}
-                    </div>
-                  )}
 
-                  <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-800 dark:text-emerald-300 leading-relaxed flex items-start gap-2">
-                    <span className="text-sm leading-none select-none">💡</span>
-                    <span>
-                      Оплаты через защищенный шлюз ЮKassa зачисляются мгновенно. Электронный чек подтверждает успешное списание и зачисление средств на ваш лицевой счёт.
-                    </span>
-                  </div>
-                </TabsContent>
-
-                {/* Вкладка 2: Реестры начислений */}
-                <TabsContent value="registry" className="space-y-3">
-                  {loadingHistory ? (
-                    <div className="py-8 text-center text-xs text-muted-foreground">
-                      <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2 text-primary" />
-                      Загрузка реестров...
-                    </div>
-                  ) : accountHistory.length === 0 ? (
-                    <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border text-xs text-muted-foreground">
-                      Текущее сальдо по последнему реестру ({formatPeriod(account.period)}): <strong className="text-foreground">{account.debt_amount.toFixed(2)} ₽</strong>.
-                    </div>
-                  ) : (
-                    <div className="space-y-1.5 font-mono text-xs max-h-[340px] overflow-y-auto pr-1">
-                      {accountHistory.map((h: any) => (
-                        <div key={h.id} className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/60 flex items-center justify-between">
-                          <div>
-                            <span className="font-semibold text-foreground font-sans block">
-                              {formatPeriod(h.period)} (Реестр №{h.batch_number})
-                            </span>
-                            <span className="text-[10px] text-muted-foreground font-sans">
-                              {new Date(h.created_at).toLocaleDateString("ru-RU")}
-                            </span>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setSelectedReceipt(p)}
+                              className="h-8 px-2.5 text-xs rounded-xl flex items-center gap-1.5 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 font-medium"
+                            >
+                              <Receipt className="h-3.5 w-3.5 text-emerald-600" />
+                              <span>Электронный чек</span>
+                            </Button>
                           </div>
-                          <span className={`font-bold ${Number(h.debt_amount) > 0 ? "text-destructive" : "text-green-600"}`}>
-                            {Number(h.debt_amount) > 0 ? `−${Number(h.debt_amount).toFixed(2)} ₽` : `+${Math.abs(Number(h.debt_amount)).toFixed(2)} ₽`}
-                          </span>
                         </div>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-[11px] text-muted-foreground leading-relaxed">
-                    💡 <strong>Как учитываются оплаты:</strong><br />
-                    Сумма в личном кабинете отражает официальное состояние счёта по последнему загруженному расчётному реестру. Онлайн-оплаты сразу уменьшают задолженность в системе.
+                      );
+                    })}
                   </div>
-                </TabsContent>
-              </Tabs>
+                )}
+
+                <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-800 dark:text-emerald-300 leading-relaxed flex items-start gap-2">
+                  <span className="text-sm leading-none select-none">💡</span>
+                  <span>
+                    Оплаты через защищенный шлюз ЮKassa зачисляются мгновенно. Электронный чек подтверждает успешное списание и зачисление средств на ваш лицевой счёт.
+                  </span>
+                </div>
+              </div>
 
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsHistoryOpen(false)} className="rounded-xl">
@@ -3298,6 +3286,55 @@ const Cabinet = () => {
     },
   });
 
+  // Получаем историю платежей за ТО (ЮKassa) для отображения чеков и оплат ТО
+  const userAccountNum = userAccount?.account_number;
+  const { data: toPayments = [], refetch: refetchTOPayments } = useQuery({
+    queryKey: ["user-to-payments", userAccountNum, userId],
+    enabled: !!(userAccountNum || userId),
+    queryFn: async () => {
+      console.log(`[История: Оплата ТО] Запрос оплат ТО для л/с "${userAccountNum}", userId: "${userId}"`);
+      // 1. Синхронизация и получение через эндпоинт бэкенда по лицевому счету
+      if (userAccountNum) {
+        try {
+          const res = await fetch(`/backend-api/api/payments/yookassa/sync/${userAccountNum}`);
+          const data = await res.json();
+          if (data.success && Array.isArray(data.payments)) {
+            return data.payments;
+          }
+        } catch (err) {
+          console.warn("[История: Оплата ТО] Ошибка sync через бэкенд:", err);
+        }
+      }
+
+      // 2. Если бэкенд недоступен, получаем напрямую из БД Supabase
+      try {
+        let query = supabase.from("payments").select("*").order("created_at", { ascending: false });
+        if (userAccountNum) {
+          query = query.eq("account_number", userAccountNum);
+        } else if (userId) {
+          query = query.eq("user_id", userId);
+        }
+        const { data, error } = await query;
+        if (!error && data) return data;
+      } catch (e) {
+        console.warn("[История: Оплата ТО] Ошибка выборки из БД Supabase:", e);
+      }
+      return [];
+    },
+  });
+
+  // Автоматический рефетч заявок и оплат при возврате со шлюза оплаты
+  useEffect(() => {
+    const paymentStatus = searchParams.get("payment");
+    if (paymentStatus === "success") {
+      if (refetchUserRequests) refetchUserRequests();
+      if (refetchTOPayments) refetchTOPayments();
+    }
+  }, [searchParams, refetchUserRequests, refetchTOPayments]);
+
+  // Стейт для просмотра и печати официального электронного чека из нижней истории (ТО или Заказы)
+  const [cabinetReceipt, setCabinetReceipt] = useState<any | null>(null);
+
   // Вычисляем, обязателен ли этаж для ввода.
   // Обязателен, если:
   // 1. Успешно найден лицевой счет (accountSearchFound === true)
@@ -4402,11 +4439,67 @@ const Cabinet = () => {
             </Card>
 
 
-            {/* --- РАЗДЕЛ: ИСТОРИЯ ЗАЯВОК И ОПЛАТ (в самом низу страницы) --- */}
-            {userRequests && userRequests.length > 0 && (() => {
-              // RULE 2: Логируем отрисовку блока истории обращений в Личном Кабинете
-              console.log("[ЛК Кабинет] Отрисовка карточки истории обращений и оплат абонента, найдено записей:", userRequests.length);
-              
+            {/* --- РАЗДЕЛ: ИСТОРИЯ ВАШИХ ОБРАЩЕНИЙ И ОПЛАТ (в самом низу страницы) --- */}
+            {(() => {
+              // Фильтруем заявки на 2 категории:
+              // 1. Обычные заявки (ремонт, диагностика, бесплатные)
+              const regularRequests = (userRequests || []).filter((r: any) => 
+                r.order_type !== "equipment_order" && (!Number(r.payment_amount) || Number(r.payment_amount) === 0)
+              );
+              // 2. Заказы оборудования / платных услуг
+              const orderRequests = (userRequests || []).filter((r: any) => 
+                r.order_type === "equipment_order" || Number(r.payment_amount) > 0
+              );
+              // 3. Платежи за техническое обслуживание (ТО)
+              const maintenancePayments = toPayments || [];
+
+              const totalItems = regularRequests.length + orderRequests.length + maintenancePayments.length;
+
+              // Если данных совсем нет и профиль не верифицирован, скрываем блок
+              if (totalItems === 0 && !profile?.is_verified && !userAccount) {
+                return null;
+              }
+
+              console.log("[ЛК Кабинет: История] Отрисовка блока с 3 вкладками:", {
+                regular: regularRequests.length,
+                orders: orderRequests.length,
+                to: maintenancePayments.length,
+              });
+
+              // Форматируем статус заявки
+              const getStatusBadge = (status: string) => {
+                switch (status) {
+                  case "pending":
+                    return <Badge className="bg-orange-500/10 text-orange-600 dark:text-orange-400 hover:bg-orange-500/10 border-orange-200/50 rounded-lg">Новая</Badge>;
+                  case "in_progress":
+                    return <Badge className="bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 border-blue-200/50 rounded-lg">В работе</Badge>;
+                  case "completed":
+                    return <Badge className="bg-green-500/10 text-green-600 dark:text-green-400 hover:bg-green-500/10 border-green-200/50 rounded-lg">Выполнена</Badge>;
+                  case "cancelled":
+                    return <Badge className="bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/10 border-red-200/50 rounded-lg">Отклонена</Badge>;
+                  default:
+                    return <Badge variant="outline" className="rounded-lg">{status}</Badge>;
+                }
+              };
+
+              // Форматируем статус оплаты для заказов
+              const getPaymentBadge = (req: any) => {
+                const isPaid = req.payment_status === "paid";
+                const isOnSite = req.payment_status === "on_site";
+                const isPending = req.payment_status === "pending";
+
+                if (isPaid) {
+                  return <Badge className="bg-green-600 text-white dark:bg-green-700 hover:bg-green-600 border-none rounded-lg font-bold">✓ Оплачено онлайн</Badge>;
+                }
+                if (isOnSite) {
+                  return <Badge className="bg-blue-600 text-white dark:bg-blue-700 hover:bg-blue-600 border-none rounded-lg font-bold">💵 Оплата на месте</Badge>;
+                }
+                if (isPending) {
+                  return <Badge className="bg-orange-500 text-white dark:bg-orange-600 hover:bg-orange-500 border-none rounded-lg font-bold">⏳ Ожидает оплаты</Badge>;
+                }
+                return null;
+              };
+
               return (
                 <Card className="glass-premium border-none rounded-[24px] shadow-2xl animate-in fade-in-50 duration-300">
                   <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
@@ -4415,123 +4508,412 @@ const Cabinet = () => {
                       История ваших обращений и оплат
                     </CardTitle>
                     <CardDescription className="text-xs text-slate-500 dark:text-slate-400">
-                      Список всех ваших заявок, их статус выполнения в службе FSM и статус оплаты
+                      Отслеживайте статус обращений, заказов оборудования и квитанции об оплате ТО
                     </CardDescription>
                   </CardHeader>
+
                   <CardContent className="pt-4 px-3 sm:px-6">
-                    <div className="space-y-4 max-h-[480px] overflow-y-auto pr-1">
-                      {userRequests.map((req: any) => {
-                        const isPaid = req.payment_status === "paid";
-                        const isOnSite = req.payment_status === "on_site";
-                        const isPending = req.payment_status === "pending";
-                        const isOrder = Number(req.payment_amount) > 0;
-                        
-                        // Форматируем статус заявки
-                        const getStatusBadge = (status: string) => {
-                          switch (status) {
-                            case "pending":
-                              return <Badge className="bg-orange-500/10 text-orange-600 dark:text-orange-400 hover:bg-orange-500/10 border-orange-200/50 rounded-lg">Новая</Badge>;
-                            case "in_progress":
-                              return <Badge className="bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 border-blue-200/50 rounded-lg">В работе</Badge>;
-                            case "completed":
-                              return <Badge className="bg-green-500/10 text-green-600 dark:text-green-400 hover:bg-green-500/10 border-green-200/50 rounded-lg">Выполнена</Badge>;
-                            case "cancelled":
-                              return <Badge className="bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/10 border-red-200/50 rounded-lg">Отклонена</Badge>;
-                            default:
-                              return <Badge variant="outline" className="rounded-lg">{status}</Badge>;
-                          }
-                        };
-
-                        // Форматируем статус оплаты
-                        const getPaymentBadge = () => {
-                          if (!isOrder) return null;
-                          if (isPaid) {
-                            return <Badge className="bg-green-600 text-white dark:bg-green-700 hover:bg-green-600 border-none rounded-lg font-bold">✓ Оплачено онлайн</Badge>;
-                          }
-                          if (isOnSite) {
-                            return <Badge className="bg-blue-600 text-white dark:bg-blue-700 hover:bg-blue-600 border-none rounded-lg font-bold">💵 Оплата на месте</Badge>;
-                          }
-                          if (isPending) {
-                            return <Badge className="bg-orange-500 text-white dark:bg-orange-600 hover:bg-orange-500 border-none rounded-lg font-bold">⏳ Ожидает оплаты</Badge>;
-                          }
-                          return null;
-                        };
-
-                        return (
-                          <div key={req.id} className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800/80 bg-white/40 dark:bg-slate-900/40 hover:bg-white/60 dark:hover:bg-slate-900/60 transition-all shadow-sm hover:shadow-md flex flex-col md:flex-row justify-between gap-4">
-                            <div className="space-y-2 flex-1 text-left">
-                              <div className="flex items-center justify-between sm:justify-start gap-3 flex-wrap">
-                                <span className="text-xs font-mono text-slate-500 dark:text-slate-400 font-semibold">
-                                  {format(new Date(req.created_at), "dd MMMM yyyy, HH:mm", { locale: ru })}
-                                </span>
-                                <div className="flex gap-1.5 items-center">
-                                  {getStatusBadge(req.status)}
-                                  {getPaymentBadge()}
-                                </div>
-                              </div>
-                              
-                              <p className="text-sm font-semibold text-foreground border-b border-slate-100 dark:border-slate-800 pb-1">
-                                {req.address}
-                              </p>
-                              
-                              <p className="text-xs text-slate-600 dark:text-slate-300 whitespace-pre-line leading-relaxed">
-                                {req.message}
-                              </p>
-                            </div>
-
-                            {/* Кнопка "Оплатить сейчас" для неоплаченных онлайн-заявок */}
-                            {isOrder && isPending && (
-                              <div className="flex items-center justify-end shrink-0 pt-2 md:pt-0 md:pl-4 border-t md:border-t-0 md:border-l border-slate-100 dark:border-slate-800/80">
-                                <Button
-                                  size="sm"
-                                  onClick={() => {
-                                    // RULE 2: Логируем инициацию оплаты заявки из истории обращений
-                                    console.log("[ЛК Кабинет] Абонент инициировал оплату заявки ID:", req.id, "сумма:", req.payment_amount);
-                                    
-                                    // Парсим суммы из сообщения или берем payment_amount
-                                    const totalAmount = Number(req.payment_amount) || 0;
-                                    
-                                    // Парсим адрес на улицу, дом, корпус, подъезд и квартиру
-                                    const street = address ? address.split(",")[1]?.replace(/(?:\b(?:ул\.?|улица)\b)\s*/gi, "").trim() || address : "";
-                                    const house = address ? address.split(",")[2]?.replace(/(?:д\.?|дом)\s*/gi, "").trim() || "" : "";
-                                    const entranceMatch = address ? address.match(/(?:^|,|\s)(?:подъезд|п\.?)\s*(\d+)/i) : null;
-                                    const entrance = entranceMatch ? entranceMatch[1] : "1";
-
-                                    // Передаем всю сумму в SUMMA_OPL2 (услуги)
-                                    const payUrl = `https://pay.kk.ru/services/117425?` +
-                                      `&ACCOUNTNUMBER=${encodeURIComponent(userAccount?.account_number || "000000")}` +
-                                      `&FIO=${encodeURIComponent(fullName || profile?.full_name || "")}` +
-                                      `&ADDRESS=${encodeURIComponent(street)}` +
-                                      `&HOUSE=${encodeURIComponent(house)}` +
-                                      `&FLAT=${encodeURIComponent(apartment || profile?.apartment || "")}` +
-                                      `&ENTRANCE=${encodeURIComponent(entrance)}` +
-                                      `&FLOOR=${encodeURIComponent(floor || profile?.floor || "")}` +
-                                      `&EMAIL=${encodeURIComponent(email || profile?.email || "")}` +
-                                      `&PHONE=${encodeURIComponent(phone || profile?.phone || "")}` +
-                                      `&SUMMA_OPL1=0.00` +
-                                      `&SUMMA_OPL2=${totalAmount.toFixed(2)}` +
-                                      `&SUMMA_OPL3=0.00` +
-                                      `&DENGI_F=${totalAmount.toFixed(2)}` +
-                                      `&INFO=${encodeURIComponent(`Оплата услуг по заявке #${req.id}`)}` +
-                                      `&SuccessURL=${encodeURIComponent(`https://domofondar.ru/cabinet?payment_success=true&request_id=${req.id}`)}`;
-
-                                    window.open(payUrl, "_blank");
-                                  }}
-                                  className="w-full md:w-auto flex items-center justify-center gap-1.5 btn-premium-gold px-4 py-2 hover:shadow-gold-glow text-xs shrink-0 font-bold"
-                                >
-                                  <CreditCard className="h-3.5 w-3.5" />
-                                  Оплатить сейчас
-                                </Button>
-                              </div>
+                    {/* Переключатель вкладок в стиле страницы Kontakty.tsx */}
+                    <Tabs defaultValue={orderRequests.length > 0 && regularRequests.length === 0 ? "orders" : maintenancePayments.length > 0 && regularRequests.length === 0 ? "to" : "requests"} className="w-full space-y-4">
+                      <div className="flex justify-center">
+                        <TabsList className="glass-premium border border-slate-200/50 dark:border-slate-800/50 p-1.5 rounded-2xl grid grid-cols-3 gap-2 w-full max-w-2xl shadow-lg h-auto">
+                          <TabsTrigger 
+                            value="requests" 
+                            className="flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 px-2 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all data-[state=active]:bg-amber-500 data-[state=active]:text-white data-[state=active]:shadow-md text-slate-500 dark:text-slate-400"
+                          >
+                            <ClipboardList className="h-4 w-4 shrink-0" />
+                            <span>Заявки</span>
+                            {regularRequests.length > 0 && (
+                              <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200/70 dark:bg-slate-700 font-mono">
+                                {regularRequests.length}
+                              </span>
                             )}
+                          </TabsTrigger>
+
+                          <TabsTrigger 
+                            value="orders" 
+                            className="flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 px-2 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all data-[state=active]:bg-amber-500 data-[state=active]:text-white data-[state=active]:shadow-md text-slate-500 dark:text-slate-400"
+                          >
+                            <ShoppingBag className="h-4 w-4 shrink-0" />
+                            <span>Заказы</span>
+                            {orderRequests.length > 0 && (
+                              <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200/70 dark:bg-slate-700 font-mono">
+                                {orderRequests.length}
+                              </span>
+                            )}
+                          </TabsTrigger>
+
+                          <TabsTrigger 
+                            value="to" 
+                            className="flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 px-2 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all data-[state=active]:bg-amber-500 data-[state=active]:text-white data-[state=active]:shadow-md text-slate-500 dark:text-slate-400"
+                          >
+                            <Receipt className="h-4 w-4 shrink-0" />
+                            <span>Оплата ТО</span>
+                            {maintenancePayments.length > 0 && (
+                              <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200/70 dark:bg-slate-700 font-mono">
+                                {maintenancePayments.length}
+                              </span>
+                            )}
+                          </TabsTrigger>
+                        </TabsList>
+                      </div>
+
+                      {/* ВКЛАДКА 1: ЗАЯВКИ (обычные без оплат) */}
+                      <TabsContent value="requests" className="mt-2 focus:outline-none">
+                        {regularRequests.length === 0 ? (
+                          <div className="p-8 rounded-2xl bg-white/40 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800 text-center space-y-2">
+                            <ClipboardList className="h-8 w-8 text-muted-foreground mx-auto opacity-40" />
+                            <p className="text-xs font-semibold text-foreground">Заявок на обслуживание пока нет</p>
+                            <p className="text-[11px] text-muted-foreground max-w-sm mx-auto">
+                              Если возникла неисправность с домофоном или дверью, нажмите «Подать заявку» выше, чтобы вызвать специалиста.
+                            </p>
                           </div>
-                        );
-                      })}
-                    </div>
+                        ) : (
+                          <div className="space-y-3 max-h-[480px] overflow-y-auto pr-1">
+                            {regularRequests.map((req: any) => (
+                              <div key={req.id} className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800/80 bg-white/40 dark:bg-slate-900/40 hover:bg-white/60 dark:hover:bg-slate-900/60 transition-all shadow-sm hover:shadow-md flex flex-col justify-between gap-3 text-left">
+                                <div className="flex items-center justify-between sm:justify-start gap-3 flex-wrap">
+                                  <span className="text-xs font-mono text-slate-500 dark:text-slate-400 font-semibold">
+                                    {format(new Date(req.created_at), "dd MMMM yyyy, HH:mm", { locale: ru })}
+                                  </span>
+                                  {getStatusBadge(req.status)}
+                                </div>
+                                <p className="text-sm font-semibold text-foreground border-b border-slate-100 dark:border-slate-800 pb-1">
+                                  {req.address}
+                                </p>
+                                <p className="text-xs text-slate-600 dark:text-slate-300 whitespace-pre-line leading-relaxed">
+                                  {req.message}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </TabsContent>
+
+                      {/* ВКЛАДКА 2: ЗАКАЗЫ (с оборудованием и оплатой) */}
+                      <TabsContent value="orders" className="mt-2 focus:outline-none">
+                        {orderRequests.length === 0 ? (
+                          <div className="p-8 rounded-2xl bg-white/40 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800 text-center space-y-2">
+                            <ShoppingBag className="h-8 w-8 text-muted-foreground mx-auto opacity-40" />
+                            <p className="text-xs font-semibold text-foreground">Заказов оборудования или ключей пока нет</p>
+                            <p className="text-[11px] text-muted-foreground max-w-sm mx-auto">
+                              Вы можете заказать дополнительные ключи, аудиотрубку или настройку личного кабинета через кнопку «Подать заявку / Заказ».
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="space-y-3 max-h-[480px] overflow-y-auto pr-1">
+                            {orderRequests.map((req: any) => {
+                              const isPaid = req.payment_status === "paid";
+                              const isPending = req.payment_status === "pending";
+                              const orderSum = Number(req.payment_amount) || 0;
+
+                              return (
+                                <div key={req.id} className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800/80 bg-white/40 dark:bg-slate-900/40 hover:bg-white/60 dark:hover:bg-slate-900/60 transition-all shadow-sm hover:shadow-md flex flex-col md:flex-row justify-between gap-4">
+                                  <div className="space-y-2 flex-1 text-left">
+                                    <div className="flex items-center justify-between sm:justify-start gap-3 flex-wrap">
+                                      <span className="text-xs font-mono text-slate-500 dark:text-slate-400 font-semibold">
+                                        {format(new Date(req.created_at), "dd MMMM yyyy, HH:mm", { locale: ru })}
+                                      </span>
+                                      <div className="flex gap-1.5 items-center">
+                                        {getStatusBadge(req.status)}
+                                        {getPaymentBadge(req)}
+                                      </div>
+                                    </div>
+                                    
+                                    <div className="text-sm font-semibold text-foreground border-b border-slate-100 dark:border-slate-800 pb-1 flex justify-between items-center">
+                                      <span>{req.address}</span>
+                                      {orderSum > 0 && (
+                                        <span className="font-mono font-bold text-amber-600 dark:text-amber-400">
+                                          {orderSum.toFixed(2)} ₽
+                                        </span>
+                                      )}
+                                    </div>
+                                    
+                                    <p className="text-xs text-slate-600 dark:text-slate-300 whitespace-pre-line leading-relaxed">
+                                      {req.message}
+                                    </p>
+                                  </div>
+
+                                  {/* Действия: Электронный чек для оплаченных, либо оплата для ожидающих */}
+                                  <div className="flex md:flex-col items-center justify-end md:justify-center shrink-0 pt-2 md:pt-0 md:pl-4 border-t md:border-t-0 md:border-l border-slate-100 dark:border-slate-800/80 gap-2">
+                                    {isPaid && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                          console.log("[ЛК Кабинет: Заказы] Просмотр электронного чека по заказу ID:", req.id);
+                                          // Ищем платёж в базе либо генерируем объект чека
+                                          const matchedPayment = maintenancePayments.find((p: any) => p.request_id === req.id || String(p.request_id) === String(req.id));
+                                          setCabinetReceipt(matchedPayment || {
+                                            id: `REQ-${req.id}`,
+                                            yookassa_payment_id: req.payment_id || `REQ-${req.id}`,
+                                            account_number: userAccount?.account_number || "—",
+                                            amount: orderSum,
+                                            created_at: req.updated_at || req.created_at,
+                                            description: `Оплата заказа по заявке #${req.id}`,
+                                            status: "succeeded",
+                                          });
+                                        }}
+                                        className="h-8 px-3 text-xs rounded-xl flex items-center gap-1.5 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 font-medium"
+                                      >
+                                        <Receipt className="h-3.5 w-3.5 text-emerald-600" />
+                                        <span>Электронный чек</span>
+                                      </Button>
+                                    )}
+
+                                    {isPending && (
+                                      <Button
+                                        size="sm"
+                                        onClick={async () => {
+                                          const baseAmount = orderSum;
+                                          const feeAmount = Math.round(baseAmount * 0.05 * 100) / 100;
+                                          const totalAmountWithFee = Math.round((baseAmount + feeAmount) * 100) / 100;
+
+                                          console.log(`[ЛК Кабинет: Оплата Заказа] Инициация оплаты заказа #${req.id}: база ${baseAmount} ₽, комиссия 5% ${feeAmount} ₽, итог ${totalAmountWithFee} ₽`);
+                                          toast({
+                                            title: "Переход к оплате",
+                                            description: `Сумма к оплате: ${totalAmountWithFee.toFixed(2)} ₽ (с учетом эквайринга 5%). Перенаправляем на шлюз ЮKassa...`,
+                                          });
+
+                                          try {
+                                            const resp = await fetch("/backend-api/api/payments/yookassa/create", {
+                                              method: "POST",
+                                              headers: { "Content-Type": "application/json" },
+                                              body: JSON.stringify({
+                                                amount: totalAmountWithFee,
+                                                credit_amount: baseAmount,
+                                                fee_amount: feeAmount,
+                                                description: `Оплата заказа по заявке #${req.id}, адрес: ${req.address}`,
+                                                account_number: userAccount?.account_number || undefined,
+                                                accountNumber: userAccount?.account_number || undefined,
+                                                request_id: req.id,
+                                                requestId: req.id,
+                                                user_id: userId || undefined,
+                                                userId: userId || undefined,
+                                                return_url: `${window.location.origin}/cabinet?payment=success&request_id=${req.id}`,
+                                                returnUrl: `${window.location.origin}/cabinet?payment=success&request_id=${req.id}`,
+                                              }),
+                                            });
+
+                                            const pData = await resp.json();
+                                            if (!resp.ok || !pData.success) {
+                                              throw new Error(pData.error || "Ошибка инициализации оплаты");
+                                            }
+                                            const redirectUrl = pData.confirmationUrl || pData.confirmation_url;
+                                            if (redirectUrl) {
+                                              window.location.href = redirectUrl;
+                                            } else {
+                                              throw new Error("Не получен URL подтверждения от ЮKassa");
+                                            }
+                                          } catch (err: any) {
+                                            console.error("[Оплата заказа]", err);
+                                            toast({
+                                              title: "Ошибка оплаты",
+                                              description: err.message || "Не удалось связаться со шлюзом оплаты ЮKassa",
+                                              variant: "destructive",
+                                            });
+                                          }
+                                        }}
+                                        className="w-full md:w-auto flex items-center justify-center gap-1.5 btn-premium-gold px-3.5 py-1.5 hover:shadow-gold-glow text-xs shrink-0 font-bold rounded-xl"
+                                      >
+                                        <CreditCard className="h-3.5 w-3.5" />
+                                        <span>
+                                          Оплатить сейчас ({(() => {
+                                            const f = Math.round(orderSum * 0.05 * 100) / 100;
+                                            return (orderSum + f).toFixed(2);
+                                          })()} ₽)
+                                        </span>
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </TabsContent>
+
+                      {/* ВКЛАДКА 3: ОПЛАТА ТО (история оплат технического обслуживания и электронные чеки) */}
+                      <TabsContent value="to" className="mt-2 focus:outline-none">
+                        {maintenancePayments.length === 0 ? (
+                          <div className="p-8 rounded-2xl bg-white/40 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800 text-center space-y-2">
+                            <Receipt className="h-8 w-8 text-muted-foreground mx-auto opacity-40" />
+                            <p className="text-xs font-semibold text-foreground">Онлайн-платежей за ТО пока нет</p>
+                            <p className="text-[11px] text-muted-foreground max-w-sm mx-auto">
+                              После быстрой оплаты технического обслуживания через ЮKassa в блоке «Баланс и абонентская плата» все электронные чеки появятся здесь.
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="space-y-2.5 max-h-[480px] overflow-y-auto pr-1">
+                            {maintenancePayments.map((p: any) => {
+                              const isSucceeded = p.status === "succeeded";
+                              const isPending = p.status === "pending";
+
+                              return (
+                                <div
+                                  key={p.id || p.yookassa_payment_id}
+                                  className="p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800/80 bg-white/40 dark:bg-slate-900/40 hover:bg-white/60 dark:hover:bg-slate-900/60 transition-all shadow-sm hover:shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-left"
+                                >
+                                  <div className="space-y-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-bold text-sm text-foreground font-mono">
+                                        {Number(p.amount).toFixed(2)} ₽
+                                      </span>
+                                      {isSucceeded ? (
+                                        <Badge className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 text-[10px] py-0 font-medium">
+                                          <CheckCircle2 className="h-3 w-3 mr-1 text-emerald-600 inline" />
+                                          Зачислен
+                                        </Badge>
+                                      ) : isPending ? (
+                                        <Badge className="bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 text-[10px] py-0 font-medium">
+                                          <Clock className="h-3 w-3 mr-1 text-amber-600 inline" />
+                                          В обработке
+                                        </Badge>
+                                      ) : (
+                                        <Badge variant="destructive" className="text-[10px] py-0 font-medium">
+                                          Отменён
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    <p className="text-[11px] text-muted-foreground">
+                                      {new Date(p.created_at).toLocaleString("ru-RU", {
+                                        day: "2-digit",
+                                        month: "2-digit",
+                                        year: "numeric",
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                      })} • {p.description || "Оплата ТО домофона (ЮKassa)"}
+                                    </p>
+                                    {p.yookassa_payment_id && (
+                                      <p className="text-[10px] font-mono text-muted-foreground/80 truncate max-w-[280px]">
+                                        Транзакция: {p.yookassa_payment_id}
+                                      </p>
+                                    )}
+                                  </div>
+
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => {
+                                        console.log("[ЛК Кабинет: ТО] Открытие электронного чека ТО для платежа:", p.id || p.yookassa_payment_id);
+                                        setCabinetReceipt(p);
+                                      }}
+                                      className="h-8 px-3 text-xs rounded-xl flex items-center gap-1.5 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 font-medium shadow-xs"
+                                    >
+                                      <Receipt className="h-3.5 w-3.5 text-emerald-600" />
+                                      <span>Электронный чек</span>
+                                    </Button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </TabsContent>
+                    </Tabs>
                   </CardContent>
                 </Card>
               );
             })()}
+
+            {/* Диалог просмотра и печати официального электронного чека из нижней истории */}
+            <Dialog open={!!cabinetReceipt} onOpenChange={(open) => !open && setCabinetReceipt(null)}>
+              <DialogContent className="max-w-md print:p-0 print:border-none print:shadow-none">
+                <DialogHeader className="print:hidden">
+                  <DialogTitle className="flex items-center gap-2 text-base font-bold">
+                    <Receipt className="h-5 w-5 text-emerald-600" />
+                    Электронный чек оплаты
+                  </DialogTitle>
+                  <DialogDescription>
+                    Официальная квитанция через платёжный шлюз ЮKassa
+                  </DialogDescription>
+                </DialogHeader>
+
+                {cabinetReceipt && (
+                  <div id="cabinet-payment-receipt" className="space-y-4 py-2 text-xs">
+                    {/* Шапка чека */}
+                    <div className="text-center pb-3 border-b border-dashed border-slate-300 dark:border-slate-700">
+                      <div className="font-extrabold text-sm uppercase tracking-wider text-foreground">ООО «ДОМОФОНДАР»</div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5">ИНН: 2311311000 • ОГРН: 1202300063250</div>
+                      <div className="text-[10px] text-muted-foreground">г. Краснодар • Тел.: +7 (861) 205-00-55</div>
+                      <div className="mt-2.5 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-semibold text-[11px] border border-emerald-500/20">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                        ОПЛАЧЕНО ОНЛАЙН • ЧЕК ПРОВЕДЁН
+                      </div>
+                    </div>
+
+                    {/* Детали платежа */}
+                    <div className="space-y-2 py-1">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Номер транзакции:</span>
+                        <span className="font-mono font-medium text-foreground select-all text-right text-[11px]">
+                          {cabinetReceipt.yookassa_payment_id || cabinetReceipt.id}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Лицевой счёт:</span>
+                        <span className="font-mono font-bold text-foreground">
+                          {cabinetReceipt.account_number || userAccount?.account_number || "—"}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Дата и время:</span>
+                        <span className="font-medium text-foreground">
+                          {new Date(cabinetReceipt.created_at).toLocaleString("ru-RU")}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Способ оплаты:</span>
+                        <span className="font-medium text-foreground">
+                          ЮKassa (Карта / СБП / SberPay)
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-start">
+                        <span className="text-muted-foreground shrink-0">Назначение:</span>
+                        <span className="font-medium text-foreground text-right max-w-[240px]">
+                          {cabinetReceipt.description || "Оплата ТО домофона"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Итоговая сумма */}
+                    <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex justify-between items-center">
+                      <div>
+                        <span className="text-[11px] text-muted-foreground block">Сумма платежа:</span>
+                        <span className="text-[10px] text-muted-foreground">НДС не облагается (УСН)</span>
+                      </div>
+                      <span className="text-lg font-black font-mono text-emerald-600 dark:text-emerald-400">
+                        {Number(cabinetReceipt.amount).toFixed(2)} ₽
+                      </span>
+                    </div>
+
+                    {/* Подвал чека с защитной отметкой */}
+                    <div className="pt-2 text-center text-[10px] text-muted-foreground space-y-1">
+                      <p>Платежный оператор: ООО НКО «ЮМани» (лицензия ЦБ РФ № 3510-К)</p>
+                      <p>Квитанция сформирована автоматически в ЛК «Домофондар» и подтверждает зачисление средств.</p>
+                    </div>
+                  </div>
+                )}
+
+                <DialogFooter className="flex-col sm:flex-row gap-2 pt-2 print:hidden">
+                  <Button
+                    variant="outline"
+                    onClick={() => setCabinetReceipt(null)}
+                    className="rounded-xl"
+                  >
+                    Закрыть
+                  </Button>
+                  <Button
+                    onClick={() => window.print()}
+                    className="rounded-xl bg-primary text-primary-foreground font-semibold flex items-center gap-1.5"
+                  >
+                    <Printer className="h-4 w-4" />
+                    Распечатать чек
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
 
             {/* --- ДИАЛОГ ПОДАЧИ ЗАЯВКИ / ЗАКАЗА УСЛУГ --- */}
             <Dialog open={isOrderDialogOpen} onOpenChange={(openState) => {
@@ -5169,9 +5551,35 @@ const Cabinet = () => {
                       )}
 
                       <div className="flex justify-between font-bold text-sm text-foreground pt-1.5 border-t border-slate-100 dark:border-slate-800">
-                        <span>Итого к оплате (DENGI_F):</span>
-                        <span className="text-amber-500 text-base">{lastOrderTotals.total.toFixed(2)} ₽</span>
+                        <span>Стоимость оборудования/услуг:</span>
+                        <span className="text-foreground text-base">{lastOrderTotals.total.toFixed(2)} ₽</span>
                       </div>
+
+                      {/* Детализация комиссии за эквайринг 5% */}
+                      {(() => {
+                        const base = lastOrderTotals.total || 0;
+                        const fee = Math.round(base * 0.05 * 100) / 100;
+                        const total = Math.round((base + fee) * 100) / 100;
+                        return (
+                          <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs space-y-1 text-left mt-2">
+                            <div className="flex justify-between items-center text-slate-600 dark:text-slate-300">
+                              <span>Сумма к зачислению:</span>
+                              <span className="font-mono font-bold text-foreground">{base.toFixed(2)} ₽</span>
+                            </div>
+                            <div className="flex justify-between items-center text-slate-600 dark:text-slate-300">
+                              <span>Комиссия за эквайринг (5%):</span>
+                              <span className="font-mono font-medium text-amber-700 dark:text-amber-400">+{fee.toFixed(2)} ₽</span>
+                            </div>
+                            <div className="flex justify-between items-center font-bold pt-1 border-t border-amber-500/20 text-foreground text-sm">
+                              <span>Итого к списанию:</span>
+                              <span className="font-mono font-extrabold text-amber-600 dark:text-amber-400 text-base">{total.toFixed(2)} ₽</span>
+                            </div>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400 pt-0.5 leading-snug">
+                              💡 Взимается 5% за интернет-эквайринг (возможна минимальная комиссия за транзакцию от банка).
+                            </p>
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
 
@@ -5180,10 +5588,14 @@ const Cabinet = () => {
                       onClick={async () => {
                         if (!lastOrderTotals || lastOrderTotals.total <= 0) return;
                         
-                        console.log("[Заявка: ЮKassa] Создание платежа на сумму:", lastOrderTotals.total);
+                        const baseAmount = lastOrderTotals.total;
+                        const feeAmount = Math.round(baseAmount * 0.05 * 100) / 100;
+                        const totalAmountWithFee = Math.round((baseAmount + feeAmount) * 100) / 100;
+
+                        console.log(`[Заявка: ЮKassa] Создание платежа: база ${baseAmount} ₽, комиссия 5% ${feeAmount} ₽, всего ${totalAmountWithFee} ₽`);
                         toast({
                           title: "Переход к оплате",
-                          description: `Сумма к оплате: ${lastOrderTotals.total.toFixed(2)} ₽. Перенаправляем на защищенный шлюз ЮKassa...`,
+                          description: `Сумма к оплате: ${totalAmountWithFee.toFixed(2)} ₽ (с учетом эквайринга 5%). Перенаправляем на защищенный шлюз ЮKassa...`,
                         });
                         
                         try {
@@ -5191,7 +5603,9 @@ const Cabinet = () => {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({
-                               amount: lastOrderTotals.total,
+                              amount: totalAmountWithFee,
+                              credit_amount: baseAmount,
+                              fee_amount: feeAmount,
                               description: `Оплата заказа по заявке №${lastCreatedRequestId || "б/н"}, адрес: ${orderStreet || address} ${orderHouse || ""}${orderApartment ? `, кв. ${orderApartment}` : ""}`,
                               account_number: userAccount?.account_number || undefined,
                               accountNumber: userAccount?.account_number || undefined,
@@ -5232,7 +5646,13 @@ const Cabinet = () => {
                       size="lg"
                     >
                       <CreditCard className="h-5 w-5 shrink-0" />
-                      Оплатить сейчас (ЮKassa)
+                      <span>
+                        Оплатить сейчас ({(() => {
+                          const b = lastOrderTotals?.total || 0;
+                          const f = Math.round(b * 0.05 * 100) / 100;
+                          return (b + f).toFixed(2);
+                        })()} ₽) (ЮKassa)
+                      </span>
                     </Button>
                   </div>
                 </div>

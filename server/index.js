@@ -584,6 +584,8 @@ app.post('/api/payments/yookassa/create', async (req, res) => {
     const user_id = req.body.user_id || req.body.userId || null;
     const request_id = req.body.request_id || req.body.requestId || null;
     const return_url = req.body.return_url || req.body.returnUrl;
+    const credit_amount = req.body.credit_amount || req.body.creditAmount || null; // Базовая сумма к зачислению на л/с без комиссии
+    const fee_amount = req.body.fee_amount || req.body.feeAmount || null; // Комиссия за эквайринг (5%)
     const numAmount = parseFloat(amount);
 
     if (isNaN(numAmount) || numAmount <= 0) {
@@ -618,6 +620,8 @@ app.post('/api/payments/yookassa/create', async (req, res) => {
         account_number: account_number || '',
         user_id: user_id || '',
         request_id: request_id || '',
+        credit_amount: credit_amount ? String(credit_amount) : '',
+        fee_amount: fee_amount ? String(fee_amount) : '',
       },
     };
 
@@ -716,11 +720,15 @@ app.get('/api/payments/yookassa/status/:paymentId', async (req, res) => {
         );
       }
 
-      // Обновляем долг в таблице лицевых счетов (уменьшаем задолженность на сумму оплаты)
-      if (accNum && paidAmount > 0) {
+      // Обновляем долг в таблице лицевых счетов (уменьшаем задолженность на базовую сумму без комиссии 5%)
+      const creditAmount = yooData.metadata?.credit_amount 
+        ? parseFloat(yooData.metadata.credit_amount) 
+        : paidAmount;
+
+      if (accNum && creditAmount > 0) {
         await pool.query(
           "UPDATE accounts SET debt_amount = debt_amount - $1, updated_at = CURRENT_TIMESTAMP WHERE account_number = $2",
-          [paidAmount, accNum]
+          [creditAmount, accNum]
         );
       }
     }
@@ -768,13 +776,17 @@ app.post('/api/payments/yookassa/webhook', async (req, res) => {
         console.log(`[Бэкенд: ЮKassa Вебхук] Заявка ${reqId} помечена как оплаченная`);
       }
 
-      // Если указан лицевой счет, уменьшаем задолженность
-      if (accNum && paidAmount > 0) {
+      // Если указан лицевой счет, уменьшаем задолженность на базовую сумму без комиссии 5%
+      const creditAmount = paymentObj.metadata?.credit_amount 
+        ? parseFloat(paymentObj.metadata.credit_amount) 
+        : paidAmount;
+
+      if (accNum && creditAmount > 0) {
         await pool.query(
           "UPDATE accounts SET debt_amount = debt_amount - $1, updated_at = CURRENT_TIMESTAMP WHERE account_number = $2",
-          [paidAmount, accNum]
+          [creditAmount, accNum]
         );
-        console.log(`[Бэкенд: ЮKassa Вебхук] Задолженность по л/с ${accNum} уменьшена на ${paidAmount} ₽`);
+        console.log(`[Бэкенд: ЮKassa Вебхук] Задолженность по л/с ${accNum} уменьшена на ${creditAmount} ₽ (списано у плательщика: ${paidAmount} ₽)`);
       }
     }
 
@@ -822,6 +834,9 @@ app.get('/api/payments/yookassa/sync/:accountNumber', async (req, res) => {
           const paidAmount = parseFloat(yooData.amount?.value || payment.amount || 0);
           const reqId = yooData.metadata?.request_id || payment.request_id;
           const paymentMethod = yooData.payment_method?.type || 'bank_card';
+          const creditAmount = yooData.metadata?.credit_amount 
+            ? parseFloat(yooData.metadata.credit_amount) 
+            : paidAmount;
 
           // Обновляем статус платежа в таблице payments
           await pool.query(
@@ -829,13 +844,13 @@ app.get('/api/payments/yookassa/sync/:accountNumber', async (req, res) => {
             [paymentMethod, payment.id]
           );
 
-          // Обновляем долг в accounts (уменьшаем сумму задолженности)
-          if (paidAmount > 0) {
+          // Обновляем долг в accounts (уменьшаем сумму задолженности на базовую сумму без комиссии 5%)
+          if (creditAmount > 0) {
             await pool.query(
               `UPDATE accounts SET debt_amount = debt_amount - $1, updated_at = CURRENT_TIMESTAMP WHERE account_number = $2`,
-              [paidAmount, accountNumber]
+              [creditAmount, accountNumber]
             );
-            console.log(`[Бэкенд: ЮKassa Синхронизация] Зачислен платеж ${paidAmount} ₽ по л/с ${accountNumber}, баланс обновлен!`);
+            console.log(`[Бэкенд: ЮKassa Синхронизация] Зачислен платеж ${creditAmount} ₽ на баланс л/с ${accountNumber} (списано: ${paidAmount} ₽)`);
           }
 
           // Обновляем заявку, если привязана
