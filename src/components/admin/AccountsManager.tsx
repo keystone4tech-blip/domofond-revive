@@ -592,6 +592,7 @@ export const AccountsManager: React.FC = () => {
       const defaultPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
       const period = parsedPeriod || defaultPeriod;
       const totalAmount = parsedRows.reduce((sum, r) => sum + r.debt_amount, 0);
+      const batchNum = parsedBatchNum || (lastRegistry?.batch_number ? lastRegistry.batch_number + 1 : 1);
 
       // 1. Фиксируем запись о загрузке реестра в account_registry_uploads
       try {
@@ -692,7 +693,12 @@ export const AccountsManager: React.FC = () => {
       setUploadFile(null);
       setParsedRows([]);
       setShowVersionWarning(false);
-      await loadData();
+
+      try {
+        await loadData();
+      } catch (loadErr) {
+        console.warn("[AccountsManager] Предупреждение обновления списка счетов после загрузки:", loadErr);
+      }
     } catch (err: any) {
       console.error("[AccountsManager] Ошибка при сохранении реестра:", err);
       toast({

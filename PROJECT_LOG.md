@@ -1,6 +1,6 @@
 # PROJECT_LOG.md
 
-## Дата: 2026-09-23 (Hotfix: Устранение ошибки сохранения реестра «Взаиморасчеты общие» — дедупликация лицевых счетов и адаптация схем account_registry_uploads / account_history)
+## Дата: 2026-09-23 (Hotfix: Устранение ошибки сохранения реестра на 100% — исправление ReferenceError batchNum, дедупликация лицевых счетов и адаптация схем account_registry_uploads / account_history)
 ### Изменения:
 - **База данных PostgreSQL на боевом сервере `45.8.99.238`** [MODIFY]:
   * **Таблица `public.account_registry_uploads`**:
@@ -13,6 +13,10 @@
   * Выданы полные права `GRANT ALL` ролям `anon`, `authenticated`, `domofondar`.
   * Перезагружена схема PostgREST (`NOTIFY pgrst, 'reload schema'`).
 - **Компонент управления счетами (`src/components/admin/AccountsManager.tsx`)** [MODIFY]:
+  * **Исправление ошибки на 100% загрузки (`ReferenceError: batchNum is not defined`)**:
+    - В функции `handleSaveRegistry` переменная `batchNum` не была определена в локальной области видимости, что вызывало `ReferenceError` при формировании текста всплывающего уведомления (`toast: Реестр № ${batchNum}`) сразу после завершения цикла вставки (при 100% прогрессе), перехватывалось блоком `catch` и ошибочно рапортовало об ошибке сохранения, хотя все счета уже были успешно сохранены в базе.
+    - Добавлено явное вычисление `const batchNum = parsedBatchNum || (lastRegistry?.batch_number ? lastRegistry.batch_number + 1 : 1)`.
+    - Вызов `loadData()` обернут в изолированный блок `try-catch`, предотвращающий ложные срабатывания при обновлении списка.
   * **Устранение ошибки PostgreSQL 21000 («ON CONFLICT DO UPDATE command cannot affect row a second time»)**:
     - Обнаружено, что в файле «Взаиморасчеты общие.txt» 13 лицевых счетов дублируются (встречаются по 2 раза, в том числе подряд на строках 11211-11212). При пакетном `upsert` по 200 записей наличие двух одинаковых `account_number` в одном запросе вызывало исключение PostgreSQL.
     - Внедрена предварительная дедупликация счетов через `Map`: если счет встречается повторно, отдается приоритет записи с ненулевым сальдо или заполненным адресом/ФИО.
@@ -21,7 +25,7 @@
     - Запись метаданных в `account_registry_uploads` и срезов в `account_history` обернута в изолированные блоки `try-catch`, что гарантирует бесперебойный импорт всех 11 244 лицевых счетов даже при сбое вспомогательных журналов.
     - В `account_registry_uploads` передаются оба набора полей (`filename` и `file_name`, `total_debt_amount` и `total_debt`).
 - **Сборка и развертывание на сервере `45.8.99.238`**:
-  * Сборка `npm run build` выполнена успешно за 26.16s.
+  * Сборка `npm run build` выполнена успешно (19.62s).
   * Дистрибутив задеплоен в Docker-контейнер `domofondar_frontend`, Nginx перезагружен.
 ### Структура:
 - `/src/components/admin/AccountsManager.tsx` — Дедупликация счетов и безопасный upsert реестра
