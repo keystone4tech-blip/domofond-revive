@@ -44,12 +44,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ token, isAuthenticated: true });
   },
 
-  // Авторизация
-  login: async (phone, password) => {
+  // Авторизация (по номеру телефона или Email)
+  login: async (identifier, password) => {
     set({ isLoading: true });
     try {
-      console.log(`[AUTH] Попытка входа для телефона: ${phone}`);
-      const response = await apiClient.post('/api/auth/login', { phone, password });
+      console.log(`[AUTH] Попытка входа для пользователя: ${identifier}`);
+      const response = await apiClient.post('/api/auth/login', { login: identifier, password });
       
       const { token } = response.data;
       if (token) {

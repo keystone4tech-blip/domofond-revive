@@ -228,22 +228,41 @@ app.post('/api/auth/register', async (req, res) => {
 
 // Авторизация (вход) пользователя
 app.post('/api/auth/login', async (req, res) => {
-  const { email, password } = req.body;
+  const { email, phone, login, password } = req.body;
+  const loginInput = email || phone || login;
 
-  if (!email || !password) {
-    console.warn('[Бэкенд: Вход] Попытка входа с пустым email или паролем');
-    return res.status(400).json({ error: 'Электронная почта и пароль обязательны для заполнения' });
+  if (!loginInput || !password) {
+    console.warn('[Бэкенд: Вход] Попытка входа с пустым логином или паролем');
+    return res.status(400).json({ error: 'Логин (Email или номер телефона) и пароль обязательны' });
   }
 
-  const cleanEmail = String(email).toLowerCase().trim();
-  console.log(`[Бэкенд: Вход] Попытка входа для Email: "${cleanEmail}"`);
+  const cleanInput = String(loginInput).trim();
+  const cleanEmail = cleanInput.toLowerCase();
+  const digitsOnly = cleanInput.replace(/\D/g, ''); // Извлекаем только цифры для проверки телефона
+  console.log(`[Бэкенд: Вход] Попытка входа для: "${cleanInput}" (цифры: "${digitsOnly}")`);
 
   try {
-    // 1. Ищем пользователя в таблице users
-    const result = await pool.query('SELECT * FROM users WHERE LOWER(email) = LOWER($1)', [cleanEmail]);
+    // 1. Ищем пользователя в таблице users по Email либо по номеру телефона в profiles
+    let result;
+    if (digitsOnly.length >= 10) {
+      // Если ввод похож на номер телефона (10+ цифр), ищем по профилю и по email
+      const last10Digits = digitsOnly.slice(-10);
+      result = await pool.query(
+        `SELECT u.* FROM users u 
+         LEFT JOIN profiles p ON p.id = u.id 
+         WHERE LOWER(u.email) = LOWER($1) 
+            OR REGEXP_REPLACE(COALESCE(p.phone, ''), '[^0-9]', '', 'g') LIKE '%' || $2
+         LIMIT 1`,
+        [cleanEmail, last10Digits]
+      );
+    } else {
+      // Ищем строго по Email
+      result = await pool.query('SELECT * FROM users WHERE LOWER(email) = LOWER($1)', [cleanEmail]);
+    }
+
     if (result.rows.length === 0) {
-      console.warn(`[Бэкенд: Вход] Отклонено: пользователь "${cleanEmail}" не найден`);
-      return res.status(401).json({ error: 'Неверный адрес электронной почты или пароль' });
+      console.warn(`[Бэкенд: Вход] Отклонено: пользователь "${cleanInput}" не найден`);
+      return res.status(401).json({ error: 'Неверный логин (Email/телефон) или пароль' });
     }
 
     const user = result.rows[0];

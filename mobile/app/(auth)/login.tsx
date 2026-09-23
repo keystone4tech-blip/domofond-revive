@@ -1,95 +1,236 @@
+// mobile/app/(auth)/login.tsx — Экран авторизации абонента в мобильном приложении «Домофондар»
+// Поддерживает вход как по номеру телефона, так и по Email с проверкой в базе данных сайта
+
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+} from 'react-native';
 import { useRouter } from 'expo-router';
-// import { useForm, Controller } from 'react-hook-form';
-// import { zodResolver } from '@hookform/resolvers/zod';
-// import * as z from 'zod';
+import { useAuthStore } from '@/store/auth.store';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const [phone, setPhone] = useState('');
-  const [password, setPassword] = useState('');
+  const [identifier, setIdentifier] = useState(''); // Email или номер телефона
+  const [password, setPassword] = useState('');     // Пароль от личного кабинета
   const [showPassword, setShowPassword] = useState(false);
 
+  // Достаем функцию реальной авторизации и флаг загрузки из стора
+  const { login, isLoading } = useAuthStore();
+
   const handleLogin = async () => {
-    console.log('Попытка входа с телефоном:', phone);
+    if (!identifier.trim() || !password.trim()) {
+      Alert.alert('Внимание', 'Пожалуйста, введите ваш Email или номер телефона и пароль');
+      return;
+    }
+
+    console.log(`[UI Login] Запуск входа для: ${identifier.trim()}`);
+
     try {
-      // POST /api/auth/login
-      console.log('Успешный вход, перенаправление...');
+      // Реальный сетевой запрос через Axios к серверу https://домофондар.рф/backend-api/api/auth/login
+      await login(identifier.trim(), password.trim());
+      console.log('[UI Login] Авторизация успешна!');
+      // Переход на главный экран
       router.replace('/(tabs)/home');
-    } catch (error) {
-      console.error('Ошибка входа:', error);
-      Alert.alert('Ошибка', 'Неверный телефон или пароль');
+    } catch (error: any) {
+      console.error('[UI Login] Ошибка входа:', error);
+      const serverMessage = error.response?.data?.error || error.message || 'Неверный логин или пароль. Проверьте введенные данные.';
+      Alert.alert('Ошибка авторизации', serverMessage);
     }
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Домофондар</Text>
-      
-      <View style={styles.card}>
-        <TextInput
-          style={styles.input}
-          placeholder="+7 (___) ___-__-__"
-          placeholderTextColor="#94A3B8"
-          value={phone}
-          onChangeText={setPhone}
-          keyboardType="phone-pad"
-        />
-        
-        <View style={styles.passwordContainer}>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={{ flex: 1, backgroundColor: '#0F172A' }}
+    >
+      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+        {/* Логотип и заголовок */}
+        <View style={styles.header}>
+          <Text style={styles.logoTitle}>Домофондар</Text>
+          <Text style={styles.subtitle}>Вход в личный кабинет абонента</Text>
+        </View>
+
+        {/* Форма авторизации */}
+        <View style={styles.card}>
+          <Text style={styles.label}>Телефон или Email</Text>
           <TextInput
-            style={styles.passwordInput}
-            placeholder="Пароль"
-            placeholderTextColor="#94A3B8"
-            secureTextEntry={!showPassword}
-            value={password}
-            onChangeText={setPassword}
+            style={styles.input}
+            placeholder="например: +79991234567 или mail@example.ru"
+            placeholderTextColor="#64748B"
+            value={identifier}
+            onChangeText={setIdentifier}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="email-address"
           />
-          <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-            <Text style={styles.showHide}>{showPassword ? 'Скрыть' : 'Показать'}</Text>
+
+          <Text style={styles.label}>Пароль</Text>
+          <View style={styles.passwordContainer}>
+            <TextInput
+              style={styles.passwordInput}
+              placeholder="Введите ваш пароль"
+              placeholderTextColor="#64748B"
+              secureTextEntry={!showPassword}
+              value={password}
+              onChangeText={setPassword}
+              autoCapitalize="none"
+            />
+            <TouchableOpacity
+              onPress={() => setShowPassword(!showPassword)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Text style={styles.showHideText}>{showPassword ? 'Скрыть' : 'Показать'}</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Кнопка входа с индикатором загрузки */}
+          <TouchableOpacity
+            style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
+            onPress={handleLogin}
+            disabled={isLoading}
+            activeOpacity={0.8}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <Text style={styles.loginButtonText}>Войти в аккаунт</Text>
+            )}
+          </TouchableOpacity>
+
+          {/* Переход к регистрации */}
+          <TouchableOpacity
+            style={styles.registerLink}
+            onPress={() => router.push('/(auth)/register')}
+          >
+            <Text style={styles.registerLinkText}>
+              Ещё нет аккаунта? <Text style={styles.registerLinkAccent}>Зарегистрироваться</Text>
+            </Text>
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-          <Text style={styles.loginButtonText}>Войти</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
-          <Text style={styles.linkText}>Нет аккаунта? Зарегистрируйтесь</Text>
-        </TouchableOpacity>
-
-        <View style={styles.dividerContainer}>
-          <View style={styles.divider} />
-          <Text style={styles.dividerText}>или</Text>
-          <View style={styles.divider} />
-        </View>
-
-        <TouchableOpacity style={styles.secondaryButton}>
-          <Text style={styles.secondaryButtonText}>Войти по лицевому счёту</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.secondaryButton}>
-          <Text style={styles.secondaryButtonText}>Войти по биометрии</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+        {/* Поясняющая подсказка */}
+        <Text style={styles.footerNote}>
+          Используйте тот же логин и пароль, с которыми вы заходите на официальный сайт домофондар.рф
+        </Text>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0F172A', justifyContent: 'center', padding: 20 },
-  title: { fontSize: 36, fontWeight: 'bold', color: '#10B981', textAlign: 'center', marginBottom: 40 },
-  card: { backgroundColor: 'rgba(30, 41, 59, 0.7)', borderRadius: 16, padding: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
-  input: { backgroundColor: '#1E293B', color: '#F8FAFC', borderRadius: 8, padding: 15, marginBottom: 15, fontSize: 16 },
-  passwordContainer: { flexDirection: 'row', backgroundColor: '#1E293B', borderRadius: 8, marginBottom: 20, alignItems: 'center', paddingRight: 15 },
-  passwordInput: { flex: 1, color: '#F8FAFC', padding: 15, fontSize: 16 },
-  showHide: { color: '#10B981', fontSize: 14 },
-  loginButton: { backgroundColor: '#10B981', padding: 15, borderRadius: 8, alignItems: 'center', marginBottom: 15 },
-  loginButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
-  linkText: { color: '#94A3B8', textAlign: 'center', marginBottom: 20 },
-  dividerContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
-  divider: { flex: 1, height: 1, backgroundColor: '#334155' },
-  dividerText: { color: '#94A3B8', paddingHorizontal: 10 },
-  secondaryButton: { backgroundColor: '#1E293B', padding: 15, borderRadius: 8, alignItems: 'center', marginBottom: 10, borderWidth: 1, borderColor: '#334155' },
-  secondaryButtonText: { color: '#F8FAFC', fontSize: 14 }
+  container: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    padding: 24,
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  logoTitle: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#10B981',
+    letterSpacing: 1,
+  },
+  subtitle: {
+    fontSize: 15,
+    color: '#94A3B8',
+    marginTop: 8,
+  },
+  card: {
+    backgroundColor: 'rgba(30, 41, 59, 0.75)',
+    borderRadius: 20,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.15)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 5,
+  },
+  label: {
+    color: '#E2E8F0',
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  input: {
+    backgroundColor: '#1E293B',
+    color: '#F8FAFC',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 15,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1E293B',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#334155',
+    marginBottom: 24,
+    paddingRight: 16,
+  },
+  passwordInput: {
+    flex: 1,
+    color: '#F8FAFC',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 15,
+  },
+  showHideText: {
+    color: '#10B981',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  loginButton: {
+    backgroundColor: '#10B981',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loginButtonDisabled: {
+    opacity: 0.6,
+  },
+  loginButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  registerLink: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  registerLinkText: {
+    color: '#94A3B8',
+    fontSize: 14,
+  },
+  registerLinkAccent: {
+    color: '#10B981',
+    fontWeight: '600',
+  },
+  footerNote: {
+    color: '#64748B',
+    fontSize: 13,
+    textAlign: 'center',
+    marginTop: 24,
+    paddingHorizontal: 16,
+    lineHeight: 18,
+  },
 });
