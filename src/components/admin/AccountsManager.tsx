@@ -535,11 +535,32 @@ export const AccountsManager: React.FC = () => {
         }
       }
 
-      console.log(`[AccountsManager] Успешно распознано записей в реестре: ${records.length}, период: ${detectedPeriod}`);
-      setParsedRows(records);
+      // Дедупликация записей по номеру лицевого счета:
+      // В файлах 1С могут встречаться повторные строки с одним номером счета.
+      // Дедуплицируем, отдавая приоритет записи с ненулевым сальдо или заполненным адресом.
+      const uniqueRecordsMap = new Map<string, ParsedRegistryRow>();
+      for (const rec of records) {
+        const existing = uniqueRecordsMap.get(rec.account_number);
+        if (!existing) {
+          uniqueRecordsMap.set(rec.account_number, rec);
+        } else {
+          // Если новая запись содержит сумму долга/переплаты, а предыдущая была пустой — обновляем
+          if (rec.debt_amount !== 0 && existing.debt_amount === 0) {
+            uniqueRecordsMap.set(rec.account_number, rec);
+          } else if (rec.full_name && !existing.full_name) {
+            uniqueRecordsMap.set(rec.account_number, rec);
+          } else {
+            uniqueRecordsMap.set(rec.account_number, rec);
+          }
+        }
+      }
+
+      const uniqueRecords = Array.from(uniqueRecordsMap.values());
+      console.log(`[AccountsManager] Успешно распознано записей в реестре: ${uniqueRecords.length} (уникальных счетов, период: ${detectedPeriod})`);
+      setParsedRows(uniqueRecords);
       setParsedPeriod(detectedPeriod);
 
-      if (records.length === 0) {
+      if (uniqueRecords.length === 0) {
         toast({
           title: "Ошибка формата",
           description: "Не удалось распознать записи в файле реестра. Проверьте разделитель (табуляция или ';').",
@@ -573,13 +594,20 @@ export const AccountsManager: React.FC = () => {
       const totalAmount = parsedRows.reduce((sum, r) => sum + r.debt_amount, 0);
 
       // 1. Фиксируем запись о загрузке реестра в account_registry_uploads
-      await supabase.from("account_registry_uploads" as any).insert({
-        filename: uploadFile.name,
-        batch_number: batchNum,
-        period: period,
-        total_records: parsedRows.length,
-        total_debt_amount: totalAmount,
-      });
+      try {
+        await supabase.from("account_registry_uploads" as any).insert({
+          filename: uploadFile.name,
+          file_name: uploadFile.name,
+          batch_number: batchNum,
+          period: period,
+          total_records: parsedRows.length,
+          total_debt_amount: totalAmount,
+          total_debt: totalAmount,
+        });
+        console.log(`[AccountsManager] Метаданные реестра № ${batchNum} успешно записаны в account_registry_uploads`);
+      } catch (uploadLogErr) {
+        console.warn("[AccountsManager] Предупреждение записи метаданных реестра в журнал:", uploadLogErr);
+      }
 
       // 2. Пакетная вставка/обновление в accounts (батчами по 200 записей)
       // При этом новые лицевые счета автоматически создаются с адресом, подъездом, квартирой и ФИО!
@@ -587,8 +615,10 @@ export const AccountsManager: React.FC = () => {
       for (let i = 0; i < parsedRows.length; i += batchSize) {
         const chunk = parsedRows.slice(i, i + batchSize);
 
-        // Готовим записи для accounts
-        const accountsToUpsert = chunk.map(c => {
+        // Гарантируем строгую уникальность account_number внутри одного чанка,
+        // чтобы исключить ошибку PostgreSQL 21000 (ON CONFLICT DO UPDATE cannot affect row a second time)
+        const accountsMap = new Map<string, any>();
+        chunk.forEach(c => {
           const item: any = {
             account_number: c.account_number,
             address: c.address,
@@ -605,8 +635,10 @@ export const AccountsManager: React.FC = () => {
           if (c.housing) item.housing = c.housing;
           if (c.entrance) item.entrance = c.entrance;
 
-          return item;
+          accountsMap.set(c.account_number, item);
         });
+
+        const accountsToUpsert = Array.from(accountsMap.values());
 
         // Upsert в accounts
         const { error: accErr } = await supabase
@@ -619,17 +651,26 @@ export const AccountsManager: React.FC = () => {
         }
 
         // Фиксация в account_history (срезы начислений)
-        await supabase
-          .from("account_history" as any)
-          .upsert(
-            chunk.map(c => ({
+        try {
+          const historyMap = new Map<string, any>();
+          chunk.forEach(c => {
+            historyMap.set(`${c.account_number}_${batchNum}`, {
               account_number: c.account_number,
               period: c.period || period,
               debt_amount: c.debt_amount,
               batch_number: batchNum,
-            })),
-            { onConflict: "account_number,batch_number" }
-          );
+            });
+          });
+
+          await supabase
+            .from("account_history" as any)
+            .upsert(
+              Array.from(historyMap.values()),
+              { onConflict: "account_number,batch_number" }
+            );
+        } catch (histErr) {
+          console.warn("[AccountsManager] Предупреждение upsert в account_history:", histErr);
+        }
 
         setUploadProgress(Math.round(((i + chunk.length) / parsedRows.length) * 100));
       }

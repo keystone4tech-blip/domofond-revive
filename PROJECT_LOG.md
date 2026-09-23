@@ -1,5 +1,32 @@
 # PROJECT_LOG.md
 
+## Дата: 2026-09-23 (Hotfix: Устранение ошибки сохранения реестра «Взаиморасчеты общие» — дедупликация лицевых счетов и адаптация схем account_registry_uploads / account_history)
+### Изменения:
+- **База данных PostgreSQL на боевом сервере `45.8.99.238`** [MODIFY]:
+  * **Таблица `public.account_registry_uploads`**:
+    - Снято ограничение `NOT NULL` с `file_name`.
+    - Добавлены недостающие колонки: `filename text`, `batch_number integer`, `total_debt_amount numeric(12,2) DEFAULT 0.00`, `uploaded_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP`.
+    - Создан триггер `trg_sync_account_registry_uploads` для автоматической двусторонней синхронизации `filename` <-> `file_name` и `total_debt_amount` <-> `total_debt`.
+  * **Таблица `public.account_history`**:
+    - Добавлены недостающие колонки: `account_number text`, `batch_number integer DEFAULT 1`.
+    - Создан уникальный ключ `CONSTRAINT uq_account_history_acc_batch UNIQUE (account_number, batch_number)` и индексы `idx_account_history_account_number`, `idx_account_history_batch_number` для поддержки безопасного `upsert`.
+  * Выданы полные права `GRANT ALL` ролям `anon`, `authenticated`, `domofondar`.
+  * Перезагружена схема PostgREST (`NOTIFY pgrst, 'reload schema'`).
+- **Компонент управления счетами (`src/components/admin/AccountsManager.tsx`)** [MODIFY]:
+  * **Устранение ошибки PostgreSQL 21000 («ON CONFLICT DO UPDATE command cannot affect row a second time»)**:
+    - Обнаружено, что в файле «Взаиморасчеты общие.txt» 13 лицевых счетов дублируются (встречаются по 2 раза, в том числе подряд на строках 11211-11212). При пакетном `upsert` по 200 записей наличие двух одинаковых `account_number` в одном запросе вызывало исключение PostgreSQL.
+    - Внедрена предварительная дедупликация счетов через `Map`: если счет встречается повторно, отдается приоритет записи с ненулевым сальдо или заполненным адресом/ФИО.
+    - Дополнительно внутри каждого чанка вставки гарантируется уникальность `account_number` перед отправкой в PostgREST.
+  * **Безопасная фиксация журнала загрузок и срезов начислений**:
+    - Запись метаданных в `account_registry_uploads` и срезов в `account_history` обернута в изолированные блоки `try-catch`, что гарантирует бесперебойный импорт всех 11 244 лицевых счетов даже при сбое вспомогательных журналов.
+    - В `account_registry_uploads` передаются оба набора полей (`filename` и `file_name`, `total_debt_amount` и `total_debt`).
+- **Сборка и развертывание на сервере `45.8.99.238`**:
+  * Сборка `npm run build` выполнена успешно за 26.16s.
+  * Дистрибутив задеплоен в Docker-контейнер `domofondar_frontend`, Nginx перезагружен.
+### Структура:
+- `/src/components/admin/AccountsManager.tsx` — Дедупликация счетов и безопасный upsert реестра
+- База данных: таблицы `account_registry_uploads` и `account_history` расширены необходимыми полями и ограничениями уникальности
+
 ## Дата: 2026-09-23 (Hotfix: Исправление сохранения профиля жильца и парсинга реестра «Взаиморасчеты общие» — корректное разделение долгов/переплат и учет баланса 0.00 ₽)
 ### Изменения:
 - **База данных PostgreSQL на боевом сервере `45.8.99.238`** [MODIFY]:
