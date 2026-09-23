@@ -1,0 +1,13 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    // Настройка базового пути для абсолютных импортов
+    "baseUrl": ".",
+    // Настройка алиасов, чтобы можно было импортировать через @/ (например: @/components/...)
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"]
+}

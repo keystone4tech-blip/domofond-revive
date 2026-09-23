@@ -1,0 +1,118 @@
+# .github/workflows/build-apk.yml
+# Автоматическая сборка APK файла мобильного приложения «Домофондар» для Android
+# Сборка выполняется на облачных серверах GitHub Actions с сохранением готового .apk в артефактах
+
+name: 📱 Сборка Android APK (Домофондар)
+
+on:
+  # Возможность запускать сборку вручную в 1 клик во вкладке Actions на GitHub
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Тип сборки (release - оптимизированный / debug - тестовый)'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+          - release
+          - debug
+
+  # Автоматическая сборка при пуше изменений в папку mobile
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'mobile/**'
+
+# Ограничение параллельных сборок для экономии минут
+concurrency:
+  group: android-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-apk:
+    name: Сборка установочного APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      # 1. Клонирование репозитория
+      - name: 📥 Получение исходного кода
+        uses: actions/checkout@v4
+
+      # 2. Установка Node.js версии 20
+      - name: 🟢 Настройка Node.js (v20)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: mobile/package-lock.json
+
+      # 3. Настройка Java JDK 17 (необходима для сборщика Gradle и Android SDK)
+      - name: ☕ Настройка Java JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      # 4. Настройка инструментов Android SDK
+      - name: 🤖 Настройка Android SDK
+        uses: android-actions/setup-android@v3
+
+      # 5. Установка npm зависимостей мобильного приложения
+      - name: 📦 Установка зависимостей мобильного приложения
+        run: |
+          echo "Переход в директорию mobile..."
+          cd mobile
+          npm ci --legacy-peer-deps
+
+      # 6. Нативная генерация проекта Android (Expo Prebuild)
+      - name: ⚙️ Генерация нативного Android проекта (Expo Prebuild)
+        run: |
+          cd mobile
+          npx expo prebuild --platform android --clean
+
+      # 7. Выдача прав на выполнение скрипта сборки Gradle
+      - name: 🔑 Выдача прав на gradlew
+        run: |
+          cd mobile/android
+          chmod +x gradlew
+
+      # 8. Компиляция установочного APK (Release или Debug)
+      - name: 🔨 Компиляция APK через Gradle
+        run: |
+          cd mobile/android
+          BUILD_TYPE="${{ github.event.inputs.build_type || 'release' }}"
+          echo "Запуск компиляции APK (тип: $BUILD_TYPE)..."
+          
+          if [ "$BUILD_TYPE" = "debug" ]; then
+            ./gradlew assembleDebug --no-daemon --stacktrace
+          else
+            # Сборка release APK с автоматической самоподписью дебаг-ключом для свободного тестирования на любых смартфонах
+            ./gradlew assembleRelease --no-daemon --stacktrace
+          fi
+
+      # 9. Поиск и переименование скомпилированного файла APK
+      - name: 🔍 Поиск и подготовка APK файла
+        run: |
+          mkdir -p mobile-artifacts
+          # Ищем скомпилированный APK в папке outputs
+          APK_PATH=$(find mobile/android/app/build/outputs/apk -name "*.apk" | head -n 1)
+          
+          if [ -n "$APK_PATH" ]; then
+            echo "Найден APK файл: $APK_PATH"
+            cp "$APK_PATH" mobile-artifacts/domofondar-app.apk
+            ls -lh mobile-artifacts/
+          else
+            echo "ОШИБКА: Файл APK не найден после компиляции!"
+            exit 1
+          fi
+
+      # 10. Загрузка готового APK файла в артефакты сборки GitHub
+      - name: 🚀 Сохранение готового APK в артефакты сборки
+        uses: actions/upload-artifact@v4
+        with:
+          name: domofondar-android-apk
+          path: mobile-artifacts/domofondar-app.apk
+          retention-days: 30

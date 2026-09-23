@@ -54,3 +54,13 @@ backups/
 scratch_*.*
 *.sql
 !init-scripts/*.sql
+
+# Mobile App (React Native / Expo / Android Build)
+mobile/node_modules/
+mobile/.expo/
+mobile/android/.gradle/
+mobile/android/app/build/
+mobile/android/build/
+mobile/android/.idea/
+*.apk
+*.aab

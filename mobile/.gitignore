@@ -1,0 +1,34 @@
+# expo
+.expo/
+dist/
+web-build/
+
+# node_modules
+node_modules/
+
+# macOS
+.DS_Store
+
+# environment variables
+.env
+.env.local
+.env.*.local
+
+# Android
+android/
+.gradle/
+local.properties
+*.apk
+*.aab
+
+# iOS
+ios/
+*.ipa
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.xcuserstate
+xcuserdata/
+*.xccheckout
+*.xcscmblueprint
