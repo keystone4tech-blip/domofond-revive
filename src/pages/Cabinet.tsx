@@ -175,6 +175,7 @@ const DebtCard = ({
   setParentAccount,
   isVerified = false,
   userId = null,
+  onOpenOrderDialog,
 }: { 
   address: string; 
   apartment: string; 
@@ -184,6 +185,7 @@ const DebtCard = ({
   setParentAccount?: (acc: any) => void;
   isVerified?: boolean;
   userId?: string | null;
+  onOpenOrderDialog?: (type?: "repair" | "order") => void;
 }) => {
   const [account, setAccount] = useState<{ account_number: string; period: string; debt_amount: number; address: string } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -516,7 +518,18 @@ const DebtCard = ({
               </div>
             )}
 
-            <div className="flex justify-end">
+            <div className="flex items-center justify-between pt-1 gap-2">
+              {onOpenOrderDialog && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onOpenOrderDialog("repair")}
+                  className="rounded-xl text-xs flex items-center justify-center gap-1.5 h-8 text-amber-700 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/10 font-semibold"
+                >
+                  <Wrench className="h-3.5 w-3.5 text-amber-500" />
+                  <span>Оставить заявку</span>
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="sm"
@@ -552,7 +565,7 @@ const DebtCard = ({
                     setLoadingHistory(false);
                   }
                 }}
-                className="rounded-xl text-xs flex items-center justify-center gap-1.5 h-8 text-muted-foreground hover:text-foreground"
+                className="rounded-xl text-xs flex items-center justify-center gap-1.5 h-8 text-muted-foreground hover:text-foreground ml-auto"
               >
                 <Receipt className="h-3.5 w-3.5 text-emerald-600" />
                 <span>История и чеки</span>
@@ -3147,35 +3160,60 @@ const Cabinet = () => {
 
       console.log(`[Заказ] Запись в БД по адресу: "${orderFullAddress}", телефон: "${orderPhone}"`);
 
-      // 3. Вставляем запись в таблицу requests с параметрами оплаты и структурированным адресом
-      const isPaidOrder = orderType === "order";
-      const { data: requestData, error: requestError } = await supabase
-        .from("requests")
-        .insert({
-          name: orderName.trim() || "Абонент ЛК",
-          phone: orderPhone.trim(),
-          address: orderFullAddress,
-          message: messageText,
-          status: "pending",
-          priority: orderType === "repair" ? "medium" : "low",
-          order_type: isPaidOrder ? "equipment_order" : "repair",
-          street: cleanOrderStreet || null,
-          house: cleanOrderHouse || null,
-          entrance: orderEntrance ? String(orderEntrance).trim() : null,
-          apartment: cleanOrderApartment ? String(cleanOrderApartment).trim() : null,
-          payment_status: isPaidOrder ? "pending" : null,
-          payment_amount: isPaidOrder ? totals.total : 0,
-          payment_method: isPaidOrder ? "online" : null,
-        })
-        .select("id")
-        .single();
+      // 3. Обработка обращения в зависимости от типа (бесплатный ремонт или платный заказ)
+      if (orderType === "repair") {
+        // Бесплатная заявка по ТО — сразу создаем наряд в таблице requests
+        console.log(`[Заявка: Ремонт] Создание бесплатной заявки в БД по адресу: "${orderFullAddress}"`);
+        const { data: requestData, error: requestError } = await supabase
+          .from("requests")
+          .insert({
+            name: orderName.trim() || fullName || profile?.full_name || "Абонент ЛК",
+            phone: orderPhone.trim() || phone || profile?.phone || "не указан",
+            address: orderFullAddress,
+            message: messageText,
+            status: "pending",
+            priority: "medium",
+            order_type: "repair",
+            street: cleanOrderStreet || null,
+            house: cleanOrderHouse || null,
+            entrance: orderEntrance ? String(orderEntrance).trim() : null,
+            apartment: cleanOrderApartment ? String(cleanOrderApartment).trim() : null,
+            payment_status: null,
+            payment_amount: 0,
+            payment_method: null,
+            client_id: userId || undefined,
+          })
+          .select("id")
+          .single();
 
-      if (requestError) throw requestError;
+        if (requestError) throw requestError;
 
-      console.log(`[Заказ] Успешно создано обращение с ID: ${requestData.id}`);
+        console.log(`[Заявка: Ремонт] Успешно создан наряд с ID: ${requestData?.id}`);
 
-      // 3. Если это платный заказ, вставляем позиции в request_items для детального учета товаров
-      if (orderType === "order" && requestData?.id) {
+        // Отправка уведомления диспетчерам в Telegram
+        try {
+          await supabase.functions.invoke("notify", {
+            body: {
+              event: "request_created",
+              data: { name: fullName || orderName, phone: orderPhone, address: orderFullAddress, message: messageText },
+            },
+          });
+        } catch (e) {
+          console.error("[Заявка: Ремонт] Ошибка отправки уведомления в Telegram:", e);
+        }
+
+        if (refetchUserRequests) {
+          refetchUserRequests();
+        }
+
+        toast({
+          title: "Заявка отправлена мастерам",
+          description: "Наши специалисты свяжутся с вами в ближайшее время.",
+        });
+        setIsOrderDialogOpen(false);
+        setRepairProblem("");
+      } else {
+        // Платный заказ оборудования/ключей — заявка составляется СТРОГО ПОСЛЕ успешной оплаты через ЮKassa!
         const itemsToInsert: any[] = [];
         
         // Вставка выбранной услуги
@@ -3183,10 +3221,10 @@ const Cabinet = () => {
           const prod = products.find(p => p.id === selectedServiceId);
           if (prod) {
             itemsToInsert.push({
-              request_id: requestData.id,
               product_id: selectedServiceId,
               quantity: 1,
               price: getEffectiveProductPrice(prod),
+              name: prod.name,
             });
           }
         }
@@ -3196,10 +3234,10 @@ const Cabinet = () => {
           const prod = products.find(p => p.id === id);
           if (prod && qty > 0) {
             itemsToInsert.push({
-              request_id: requestData.id,
               product_id: id,
               quantity: qty,
               price: getEffectiveProductPrice(prod),
+              name: prod.name,
             });
           }
         });
@@ -3209,10 +3247,10 @@ const Cabinet = () => {
           const keyProduct = products.find(p => p.name.toLowerCase().includes("ключ"));
           if (keyProduct) {
             itemsToInsert.push({
-              request_id: requestData.id,
               product_id: keyProduct.id,
               quantity: keysQuantity,
               price: getEffectiveProductPrice(keyProduct),
+              name: keyProduct.name,
             });
           }
         }
@@ -3222,61 +3260,79 @@ const Cabinet = () => {
           const cabinetProduct = products.find(p => p.name.toLowerCase().includes("кабинет"));
           if (cabinetProduct) {
             itemsToInsert.push({
-              request_id: requestData.id,
               product_id: cabinetProduct.id,
               quantity: 1,
               price: Number(cabinetProduct.price),
+              name: cabinetProduct.name,
             });
           }
         }
-        
-        if (itemsToInsert.length > 0) {
-          console.log(`[Заказ] Запись позиций заказа (всего: ${itemsToInsert.length} шт.) в request_items...`);
-          const { error: itemsError } = await supabase
-            .from("request_items")
-            .insert(itemsToInsert);
-          
-          if (itemsError) throw itemsError;
-        }
-      }
 
-      // 4. Отправляем уведомление в Telegram-бота
-      try {
-        await supabase.functions.invoke("notify", {
-          body: {
-            event: "request_created",
-            data: { name: fullName, phone, address: orderFullAddress, message: messageText },
-          },
+        // Расчет 5% комиссии эквайринга
+        const baseAmount = totals.total;
+        const feeAmount = Math.round(baseAmount * 0.05 * 100) / 100;
+        const totalAmountWithFee = Math.round((baseAmount + feeAmount) * 100) / 100;
+
+        const orderPayload = {
+          name: orderName.trim() || fullName || profile?.full_name || "Абонент ЛК",
+          phone: orderPhone.trim() || phone || profile?.phone || "не указан",
+          address: orderFullAddress,
+          street: cleanOrderStreet,
+          house: cleanOrderHouse,
+          entrance: orderEntrance ? String(orderEntrance).trim() : null,
+          apartment: cleanOrderApartment ? String(cleanOrderApartment).trim() : null,
+          message: messageText,
+          amount: baseAmount,
+          user_id: userId || undefined,
+          items: itemsToInsert,
+        };
+
+        console.log("[Заказ: ЮKassa] Инициализация оплаты (заявка будет создана после успеха):", {
+          baseAmount,
+          feeAmount,
+          totalAmountWithFee,
+          orderPayload,
         });
-      } catch (e) {
-        console.error("[Заказ] Ошибка отправки уведомления в Telegram:", e);
-      }
 
-      // 5. Обрабатываем успешное завершение
-      if (refetchUserRequests) {
-        refetchUserRequests();
-      }
-      
-      if (orderType === "repair") {
         toast({
-          title: "Заявка отправлена",
-          description: "Наши мастера свяжутся с вами в ближайшее время.",
+          title: "Переход к оплате заказа",
+          description: `Сумма: ${totalAmountWithFee.toFixed(2)} ₽ (с учетом комиссии 5%). Перенаправляем на платежный шлюз ЮKassa...`,
         });
-        setIsOrderDialogOpen(false);
-        setRepairProblem("");
-      } else {
-        // Для платного заказа закрываем форму оформления и открываем окно оплаты банка
-        setIsOrderDialogOpen(false);
-        setLastCreatedRequestId(requestData.id);
-        setLastOrderTotals(totals);
-        setIsSuccessPaymentOpen(true);
-        
-        // Сбрасываем выбранные стейты заказа
-        setSelectedServiceId(null);
-        setSelectedEquipments({});
-        setKeysQuantity(0);
-        setIsCabinetSetupChecked(false);
-        setOrderComment("");
+
+        const resp = await fetch("/backend-api/api/payments/yookassa/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            amount: totalAmountWithFee,
+            credit_amount: baseAmount,
+            fee_amount: feeAmount,
+            description: `Оплата заказа оборудования и услуг, ${orderFullAddress}`,
+            account_number: userAccount?.account_number || undefined,
+            accountNumber: userAccount?.account_number || undefined,
+            user_id: userId || undefined,
+            userId: userId || undefined,
+            return_url: `${window.location.origin}/cabinet?check_payment=1&account=${encodeURIComponent(userAccount?.account_number || "")}`,
+            returnUrl: `${window.location.origin}/cabinet?check_payment=1&account=${encodeURIComponent(userAccount?.account_number || "")}`,
+            order_data: orderPayload,
+            orderData: orderPayload,
+            is_order: true,
+            isOrder: true,
+          }),
+        });
+
+        const data = await resp.json();
+        if (!resp.ok || !data.success) {
+          throw new Error(data.error || "Не удалось инициализировать оплату ЮKassa");
+        }
+
+        const redirectUrl = data.confirmationUrl || data.confirmation_url;
+        if (redirectUrl) {
+          console.log(`[Заказ: ЮKassa] Переход по платежной ссылке: ${redirectUrl}`);
+          window.location.href = redirectUrl;
+          return;
+        } else {
+          throw new Error("Не получен URL подтверждения оплаты от платёжного шлюза");
+        }
       }
     } catch (err: any) {
       console.error("[Заказ] Ошибка создания заказа:", err);
@@ -4036,14 +4092,32 @@ const Cabinet = () => {
                       setParentAccount={setUserAccount}
                       isVerified={profile?.is_verified === true || profile?.verification_status === "verified"}
                       userId={userId}
+                      onOpenOrderDialog={(type) => {
+                        setOrderType(type || "repair");
+                        setIsOrderDialogOpen(true);
+                      }}
                     />
                   </div>
                 ) : (
-                  <div className="p-3.5 mb-2 rounded-2xl border border-dashed border-amber-500/30 bg-amber-50/40 dark:bg-amber-950/20 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2.5 text-left">
-                    <CreditCard className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />
-                    <div>
-                      <span className="font-bold">Состояние лицевого счёта и оплата:</span> Баланс, начисления за техническое обслуживание и онлайн-оплата отобразятся здесь сразу после заполнения и сохранения данных адреса.
+                  <div className="p-3.5 mb-2 rounded-2xl border border-dashed border-amber-500/30 bg-amber-50/40 dark:bg-amber-950/20 text-xs text-amber-800 dark:text-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-left">
+                    <div className="flex items-start gap-2.5">
+                      <CreditCard className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />
+                      <div>
+                        <span className="font-bold">Состояние лицевого счёта и оплата:</span> Баланс, начисления за техническое обслуживание и онлайн-оплата отобразятся здесь сразу после заполнения и сохранения данных адреса.
+                      </div>
                     </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setOrderType("repair");
+                        setIsOrderDialogOpen(true);
+                      }}
+                      className="rounded-xl text-xs font-semibold shrink-0 text-amber-700 dark:text-amber-300 border-amber-500/30 hover:bg-amber-500/10"
+                    >
+                      <Wrench className="h-3.5 w-3.5 mr-1" />
+                      Оставить заявку
+                    </Button>
                   </div>
                 )}
 
@@ -4655,21 +4729,14 @@ const Cabinet = () => {
               // Фильтруем заявки на 2 категории:
               // 1. Обычные заявки (ремонт, диагностика, бесплатные)
               const regularRequests = (userRequests || []).filter((r: any) => 
-                r.order_type !== "equipment_order" && (!Number(r.payment_amount) || Number(r.payment_amount) === 0)
+                r.status !== "draft" && r.order_type !== "equipment_order" && (!Number(r.payment_amount) || Number(r.payment_amount) === 0)
               );
               // 2. Заказы оборудования / платных услуг
               const orderRequests = (userRequests || []).filter((r: any) => 
-                r.order_type === "equipment_order" || Number(r.payment_amount) > 0
+                r.status !== "draft" && (r.order_type === "equipment_order" || Number(r.payment_amount) > 0)
               );
               // 3. Платежи за техническое обслуживание (ТО)
               const maintenancePayments = toPayments || [];
-
-              const totalItems = regularRequests.length + orderRequests.length + maintenancePayments.length;
-
-              // Если данных совсем нет и профиль не верифицирован, скрываем блок
-              if (totalItems === 0 && !profile?.is_verified && !userAccount) {
-                return null;
-              }
 
               console.log("[ЛК Кабинет: История] Отрисовка блока с 3 вкладками:", {
                 regular: regularRequests.length,
@@ -4714,13 +4781,27 @@ const Cabinet = () => {
               return (
                 <Card className="glass-premium border-none rounded-[24px] shadow-2xl animate-in fade-in-50 duration-300">
                   <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
-                    <CardTitle className="text-lg font-bold flex items-center gap-2 text-foreground font-display">
-                      <ClipboardList className="h-5 w-5 text-amber-500" />
-                      История ваших обращений и оплат
-                    </CardTitle>
-                    <CardDescription className="text-xs text-slate-500 dark:text-slate-400">
-                      Отслеживайте статус обращений, заказов оборудования и квитанции об оплате ТО
-                    </CardDescription>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-left">
+                      <div>
+                        <CardTitle className="text-lg font-bold flex items-center gap-2 text-foreground font-display">
+                          <ClipboardList className="h-5 w-5 text-amber-500" />
+                          История ваших обращений и оплат
+                        </CardTitle>
+                        <CardDescription className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                          Отслеживайте статус обращений, заказов оборудования и квитанции об оплате ТО
+                        </CardDescription>
+                      </div>
+                      <Button
+                        onClick={() => {
+                          setOrderType("repair");
+                          setIsOrderDialogOpen(true);
+                        }}
+                        className="rounded-xl px-4 h-9 font-semibold text-xs bg-amber-500 hover:bg-amber-600 text-white flex items-center gap-1.5 shadow-md shadow-amber-500/20 shrink-0 self-start sm:self-auto"
+                      >
+                        <Plus className="h-4 w-4" />
+                        <span>Оставить заявку</span>
+                      </Button>
+                    </div>
                   </CardHeader>
 
                   <CardContent className="pt-4 px-3 sm:px-6">
@@ -4772,12 +4853,24 @@ const Cabinet = () => {
                       {/* ВКЛАДКА 1: ЗАЯВКИ (обычные без оплат) */}
                       <TabsContent value="requests" className="mt-2 focus:outline-none">
                         {regularRequests.length === 0 ? (
-                          <div className="p-8 rounded-2xl bg-white/40 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800 text-center space-y-2">
+                          <div className="p-8 rounded-2xl bg-white/40 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800 text-center space-y-3">
                             <ClipboardList className="h-8 w-8 text-muted-foreground mx-auto opacity-40" />
                             <p className="text-xs font-semibold text-foreground">Заявок на обслуживание пока нет</p>
                             <p className="text-[11px] text-muted-foreground max-w-sm mx-auto">
-                              Если возникла неисправность с домофоном или дверью, нажмите «Подать заявку» выше, чтобы вызвать специалиста.
+                              Если возникла неисправность с домофоном или дверью, оставьте заявку — мастер выполнит ремонт бесплатно по договору ТО.
                             </p>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setOrderType("repair");
+                                setIsOrderDialogOpen(true);
+                              }}
+                              className="rounded-xl text-xs font-semibold text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10"
+                            >
+                              <Wrench className="h-3.5 w-3.5 mr-1" />
+                              Сообщить о неисправности (бесплатно)
+                            </Button>
                           </div>
                         ) : (
                           <div className="space-y-3 max-h-[480px] overflow-y-auto pr-1">
@@ -4804,12 +4897,24 @@ const Cabinet = () => {
                       {/* ВКЛАДКА 2: ЗАКАЗЫ (с оборудованием и оплатой) */}
                       <TabsContent value="orders" className="mt-2 focus:outline-none">
                         {orderRequests.length === 0 ? (
-                          <div className="p-8 rounded-2xl bg-white/40 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800 text-center space-y-2">
+                          <div className="p-8 rounded-2xl bg-white/40 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800 text-center space-y-3">
                             <ShoppingBag className="h-8 w-8 text-muted-foreground mx-auto opacity-40" />
                             <p className="text-xs font-semibold text-foreground">Заказов оборудования или ключей пока нет</p>
                             <p className="text-[11px] text-muted-foreground max-w-sm mx-auto">
-                              Вы можете заказать дополнительные ключи, аудиотрубку или настройку личного кабинета через кнопку «Подать заявку / Заказ».
+                              Вы можете заказать дополнительные ключи, аудиотрубку или настройку личного кабинета с безопасной онлайн-оплатой через ЮKassa.
                             </p>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setOrderType("order");
+                                setIsOrderDialogOpen(true);
+                              }}
+                              className="rounded-xl text-xs font-semibold text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/10"
+                            >
+                              <Plus className="h-3.5 w-3.5 mr-1" />
+                              Заказать оборудование или ключи
+                            </Button>
                           </div>
                         ) : (
                           <div className="space-y-3 max-h-[480px] overflow-y-auto pr-1">
@@ -5298,21 +5403,49 @@ const Cabinet = () => {
 
                 {/* СОДЕРЖИМОЕ ТАБА: НЕИСПРАВНОСТЬ */}
                 {orderType === "repair" && (
-                  <div className="space-y-4 py-2">
+                  <div className="space-y-4 py-2 text-left">
+                    {/* Зеленый инфоблок: ремонт бесплатно */}
+                    <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-800 dark:text-emerald-300 flex items-center gap-2 font-medium">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                      <span>Вызов мастера, диагностика и ремонт домофона выполняются <strong>бесплатно</strong> в рамках абонентской платы ТО.</span>
+                    </div>
+
+                    {/* Быстрые кнопки частых поломок */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Быстрый выбор проблемы в 1 клик:</Label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[
+                          "Не открывает дверь с трубки",
+                          "Нет звука / вызова в квартире",
+                          "Сломан доводчик входной двери",
+                          "Не срабатывает электронный ключ",
+                          "Повреждена вызывная панель",
+                        ].map((chip, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => {
+                              setRepairProblem(prev => prev ? `${prev}, ${chip.toLowerCase()}` : chip);
+                            }}
+                            className="px-2.5 py-1 rounded-lg text-xs border border-slate-200 dark:border-slate-800 bg-white/40 dark:bg-slate-900/40 hover:border-amber-500/50 hover:bg-amber-500/10 text-slate-700 dark:text-slate-300 transition-all font-medium active:scale-95"
+                          >
+                            + {chip}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
                     <div className="space-y-2">
-                      <Label htmlFor="problemText" className="text-sm font-semibold text-foreground">Что случилось?</Label>
+                      <Label htmlFor="problemText" className="text-sm font-semibold text-foreground">Подробное описание неисправности</Label>
                       <Textarea
                         id="problemText"
-                        placeholder="Подробно опишите неисправность (например: не работает звук на трубке, сломался доводчик на двери, не реагирует на ключи...)"
+                        placeholder="Опишите, что произошло (или выберите варианты выше)..."
                         value={repairProblem}
                         onChange={(e) => setRepairProblem(e.target.value)}
                         rows={4}
                         className="bg-white/50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 text-sm font-medium rounded-xl transition-all placeholder-slate-400"
                       />
                     </div>
-                    <p className="text-xs text-slate-400 dark:text-slate-500">
-                      * Заявки по неисправностям и техническому обслуживанию в рамках абонентской платы выполняются **бесплатно**.
-                    </p>
                   </div>
                 )}
 
@@ -5667,11 +5800,31 @@ const Cabinet = () => {
                         ) : null;
                       })()}
 
-                      {/* Итого */}
-                      <div className="flex justify-between font-bold text-base text-foreground pt-2 border-t border-slate-100 dark:border-slate-800">
-                        <span>Итого к оплате:</span>
-                        <span className="text-amber-500">{calculateTotals().total.toFixed(0)} ₽</span>
-                      </div>
+                      {/* Детализация эквайринга 5% */}
+                      {(() => {
+                        const base = calculateTotals().total || 0;
+                        const fee = Math.round(base * 0.05 * 100) / 100;
+                        const total = Math.round((base + fee) * 100) / 100;
+                        return (
+                          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5 text-left">
+                            <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
+                              <span>Стоимость оборудования/услуг:</span>
+                              <span className="font-semibold text-foreground font-mono">{base.toFixed(2)} ₽</span>
+                            </div>
+                            <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
+                              <span>Комиссия за эквайринг (5%):</span>
+                              <span className="font-medium text-amber-600 dark:text-amber-400 font-mono">+{fee.toFixed(2)} ₽</span>
+                            </div>
+                            <div className="flex justify-between font-bold text-base text-foreground pt-1 border-t border-slate-100 dark:border-slate-800">
+                              <span>Итого к списанию с карты / СБП:</span>
+                              <span className="text-amber-500 font-mono text-lg font-black">{total.toFixed(2)} ₽</span>
+                            </div>
+                            <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-snug">
+                              💡 Оплата производится онлайн через ЮKassa. Заявка на монтаж/доставку регистрируется сразу после подтверждения оплаты.
+                            </p>
+                          </div>
+                        );
+                      })()}
                     </div>
 
                   </div>
@@ -5701,10 +5854,14 @@ const Cabinet = () => {
                       <CreditCard className="h-4 w-4 shrink-0" />
                     )}
                     {orderType === "repair"
-                      ? "Отправить заявку"
+                      ? "Отправить заявку мастеру (бесплатно)"
                       : calculateTotals().total === 0
                       ? "Оформить заявку"
-                      : `Оплатить заказ (${calculateTotals().total.toFixed(0)} ₽)`}
+                      : `Оплатить заказ (${(() => {
+                          const b = calculateTotals().total || 0;
+                          const f = Math.round(b * 0.05 * 100) / 100;
+                          return (b + f).toFixed(2);
+                        })()} ₽) через ЮKassa`}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -5737,157 +5894,6 @@ const Cabinet = () => {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-
-            {/* --- ДИАЛОГ ПОДТВЕРЖДЕНИЯ УСПЕШНОГО ОФОРМЛЕНИЯ И ОПЛАТЫ БАНКА --- */}
-            <Dialog open={isSuccessPaymentOpen} onOpenChange={setIsSuccessPaymentOpen}>
-              <DialogContent className="max-w-md p-6 glass-premium border-none rounded-[24px] shadow-2xl text-center animate-in fade-in-50 zoom-in-95 duration-200">
-                <div className="flex flex-col items-center justify-center space-y-4">
-                  <div className="p-3 rounded-full bg-green-500/10 text-green-600 animate-bounce">
-                    <CheckCircle2 className="h-12 w-12" />
-                  </div>
-                  <DialogTitle className="text-xl font-bold text-foreground font-display">Заказ успешно оформлен!</DialogTitle>
-                  <DialogDescription className="text-sm text-slate-500 dark:text-slate-400">
-                    Заявка на подключение и доставку оборудования успешно зарегистрирована в нашей системе. 
-                    Для завершения подачи заявки необходимо оплатить заказ через безопасный платежный шлюз **ЮKassa**.
-                  </DialogDescription>
-
-                  {/* Детализация для проверки */}
-                  {lastOrderTotals && (
-                    <div className="w-full p-4 rounded-xl bg-white/40 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800/80 text-left text-xs space-y-2 font-medium">
-                      <div className="text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800 pb-1 flex justify-between">
-                        <span>Лицевой счет:</span>
-                        <span className="font-semibold text-foreground">{userAccount?.account_number || "000000"}</span>
-                      </div>
-                      
-                      {lastOrderTotals.sum1 > 0 && (
-                        <div className="flex justify-between text-slate-500 dark:text-slate-400">
-                          <span>Кодировка доп.ключа (сумма):</span>
-                          <span className="font-semibold text-foreground">{lastOrderTotals.sum1.toFixed(2)} ₽</span>
-                        </div>
-                      )}
-                      
-                      {lastOrderTotals.sum2 > 0 && (
-                        <div className="flex justify-between text-slate-500 dark:text-slate-400">
-                          <span>Установка трубки (сумма):</span>
-                          <span className="font-semibold text-foreground">{lastOrderTotals.sum2.toFixed(2)} ₽</span>
-                        </div>
-                      )}
-                      
-                      {lastOrderTotals.sum3 > 0 && (
-                        <div className="flex justify-between text-slate-500 dark:text-slate-400">
-                          <span>Настройка ЛК (сумма):</span>
-                          <span className="font-semibold text-foreground">{lastOrderTotals.sum3.toFixed(2)} ₽</span>
-                        </div>
-                      )}
-
-                      <div className="flex justify-between font-bold text-sm text-foreground pt-1.5 border-t border-slate-100 dark:border-slate-800">
-                        <span>Стоимость оборудования/услуг:</span>
-                        <span className="text-foreground text-base">{lastOrderTotals.total.toFixed(2)} ₽</span>
-                      </div>
-
-                      {/* Детализация комиссии за эквайринг 5% */}
-                      {(() => {
-                        const base = lastOrderTotals.total || 0;
-                        const fee = Math.round(base * 0.05 * 100) / 100;
-                        const total = Math.round((base + fee) * 100) / 100;
-                        return (
-                          <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs space-y-1 text-left mt-2">
-                            <div className="flex justify-between items-center text-slate-600 dark:text-slate-300">
-                              <span>Сумма к зачислению:</span>
-                              <span className="font-mono font-bold text-foreground">{base.toFixed(2)} ₽</span>
-                            </div>
-                            <div className="flex justify-between items-center text-slate-600 dark:text-slate-300">
-                              <span>Комиссия за эквайринг (5%):</span>
-                              <span className="font-mono font-medium text-amber-700 dark:text-amber-400">+{fee.toFixed(2)} ₽</span>
-                            </div>
-                            <div className="flex justify-between items-center font-bold pt-1 border-t border-amber-500/20 text-foreground text-sm">
-                              <span>Итого к списанию:</span>
-                              <span className="font-mono font-extrabold text-amber-600 dark:text-amber-400 text-base">{total.toFixed(2)} ₽</span>
-                            </div>
-                            <p className="text-[10px] text-slate-500 dark:text-slate-400 pt-0.5 leading-snug">
-                              💡 Взимается 5% за интернет-эквайринг (возможна минимальная комиссия за транзакцию от банка).
-                            </p>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  )}
-
-                  <div className="flex flex-col gap-2 w-full pt-2">
-                    <Button
-                      onClick={async () => {
-                        if (!lastOrderTotals || lastOrderTotals.total <= 0) return;
-                        
-                        const baseAmount = lastOrderTotals.total;
-                        const feeAmount = Math.round(baseAmount * 0.05 * 100) / 100;
-                        const totalAmountWithFee = Math.round((baseAmount + feeAmount) * 100) / 100;
-
-                        console.log(`[Заявка: ЮKassa] Создание платежа: база ${baseAmount} ₽, комиссия 5% ${feeAmount} ₽, всего ${totalAmountWithFee} ₽`);
-                        toast({
-                          title: "Переход к оплате",
-                          description: `Сумма к оплате: ${totalAmountWithFee.toFixed(2)} ₽ (с учетом эквайринга 5%). Перенаправляем на защищенный шлюз ЮKassa...`,
-                        });
-                        
-                        try {
-                          const resp = await fetch("/backend-api/api/payments/yookassa/create", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                              amount: totalAmountWithFee,
-                              credit_amount: baseAmount,
-                              fee_amount: feeAmount,
-                              description: `Оплата заказа по заявке №${lastCreatedRequestId || "б/н"}, адрес: ${orderStreet || address} ${orderHouse || ""}${orderApartment ? `, кв. ${orderApartment}` : ""}`,
-                              account_number: userAccount?.account_number || undefined,
-                              accountNumber: userAccount?.account_number || undefined,
-                              request_id: lastCreatedRequestId || undefined,
-                              requestId: lastCreatedRequestId || undefined,
-                              user_id: userId || undefined,
-                              userId: userId || undefined,
-                              return_url: `${window.location.origin}/cabinet?check_payment=1&request_id=${lastCreatedRequestId || ""}${userAccount?.account_number ? `&account=${userAccount.account_number}` : ''}`,
-                              returnUrl: `${window.location.origin}/cabinet?check_payment=1&request_id=${lastCreatedRequestId || ""}${userAccount?.account_number ? `&account=${userAccount.account_number}` : ''}`,
-                            }),
-                          });
-
-                          const pData = await resp.json();
-                          console.log("[Заявка: Ответ ЮKassa]", pData);
-
-                          if (!resp.ok || !pData.success) {
-                            throw new Error(pData.error || "Ошибка инициализации оплаты в ЮKassa");
-                          }
-
-                          // Поддерживаем как camelCase (confirmationUrl), так и snake_case (confirmation_url)
-                          const orderConfirmUrl = pData.confirmationUrl || pData.confirmation_url;
-                          if (orderConfirmUrl) {
-                            console.log(`[Заявка: ЮKassa] Переход по платежной ссылке: ${orderConfirmUrl}`);
-                            window.location.href = orderConfirmUrl;
-                          } else {
-                            throw new Error("Не получен URL подтверждения оплаты от ЮKassa");
-                          }
-                        } catch (err: any) {
-                          console.error("[Заявка: Ошибка ЮKassa]", err);
-                          toast({
-                            title: "Ошибка оплаты",
-                            description: err.message || "Не удалось связаться со шлюзом оплаты ЮKassa",
-                            variant: "destructive",
-                          });
-                        }
-                      }}
-                      className="w-full py-2.5 flex items-center justify-center gap-2 hover:scale-105 transition-transform btn-premium-gold hover:shadow-gold-glow rounded-xl h-11 font-bold"
-                      size="lg"
-                    >
-                      <CreditCard className="h-5 w-5 shrink-0" />
-                      <span>
-                        Оплатить сейчас ({(() => {
-                          const b = lastOrderTotals?.total || 0;
-                          const f = Math.round(b * 0.05 * 100) / 100;
-                          return (b + f).toFixed(2);
-                        })()} ₽) (ЮKassa)
-                      </span>
-                    </Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
           </div>
         </div>
       </main>

@@ -633,6 +633,133 @@ app.post('/api/requests', authenticateToken, async (req, res) => {
 // ------------------------------------------------------------------------------
 
 /**
+ * Централизованная обработка успешно завершенного платежа ЮKassa.
+ * - Фиксирует статус 'succeeded' в таблице payments
+ * - Если платеж содержал order_data (заказ оборудования/ключей) и заявка еще не создана:
+ *   создает официальную заявку в таблице requests, вставляет позиции в request_items и привязывает request_id к платежу.
+ * - Если заявка уже существовала, переводит ее в payment_status = 'paid' и status = 'pending'.
+ * - Если это оплата ТО (не заказ оборудования), уменьшает сальдо долга в таблице accounts.
+ */
+async function processSuccessfulPayment(yooData, fallbackPayment = null) {
+  const paymentId = yooData.id || fallbackPayment?.yookassa_payment_id;
+  if (!paymentId) return;
+
+  const paidAmount = parseFloat(yooData.amount?.value || fallbackPayment?.amount || 0);
+  const paymentMethod = yooData.payment_method?.type || fallbackPayment?.payment_method || 'bank_card';
+
+  // Получаем текущую запись из локальной БД для доступа к полному metadata (включая сохраненный order_data)
+  const pRes = await pool.query(
+    'SELECT * FROM payments WHERE yookassa_payment_id = $1 LIMIT 1',
+    [paymentId]
+  );
+  const paymentRecord = pRes.rows[0] || fallbackPayment;
+
+  // Парсим локальный metadata
+  let localMeta = {};
+  if (paymentRecord?.metadata) {
+    localMeta = typeof paymentRecord.metadata === 'string'
+      ? JSON.parse(paymentRecord.metadata)
+      : paymentRecord.metadata;
+  }
+
+  // Объединяем с metadata ответа ЮKassa
+  const combinedMeta = {
+    ...localMeta,
+    ...(yooData.metadata || {})
+  };
+
+  // 1. Обновляем статус платежа в таблице payments
+  await pool.query(
+    'UPDATE payments SET status = $1, payment_method = $2, metadata = $3, updated_at = CURRENT_TIMESTAMP WHERE yookassa_payment_id = $4',
+    ['succeeded', paymentMethod, JSON.stringify(combinedMeta), paymentId]
+  );
+  console.log(`[Бэкенд: ЮKassa Успех] Платёж ${paymentId} на сумму ${paidAmount} ₽ успешно подтверждён (метод: ${paymentMethod})`);
+
+  let reqId = combinedMeta?.request_id || paymentRecord?.request_id;
+  const isOrder = combinedMeta?.is_order === 'true' || combinedMeta?.is_order === true || !!combinedMeta?.order_data;
+
+  // 2. Если это заказ оборудования/услуг и заявка ещё не была создана, СОЗДАЕМ ЕЁ СЕЙЧАС (строго после оплаты!)
+  if (!reqId && combinedMeta?.order_data) {
+    try {
+      const order = typeof combinedMeta.order_data === 'string'
+        ? JSON.parse(combinedMeta.order_data)
+        : combinedMeta.order_data;
+
+      console.log(`[Бэкенд: ЮKassa Заказ] Оплата получена! Создание официальной заявки наряда в БД для абонента: ${order.name || 'Абонент'}, адрес: ${order.address}`);
+
+      const reqInsert = await pool.query(
+        `INSERT INTO requests (
+          name, phone, address, street, house, entrance, apartment,
+          message, status, priority, order_type,
+          payment_status, payment_amount, payment_method, client_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', 'medium', 'equipment_order', 'paid', $9, 'online', $10)
+        RETURNING id`,
+        [
+          order.name || 'Абонент ЛК',
+          order.phone || 'не указан',
+          order.address || '',
+          order.street || null,
+          order.house || null,
+          order.entrance || null,
+          order.apartment || null,
+          order.message || 'Заказ оборудования и услуг (оплачено онлайн через ЮKassa)',
+          order.amount || paidAmount,
+          order.user_id || paymentRecord?.user_id || null
+        ]
+      );
+
+      reqId = reqInsert.rows[0]?.id;
+      console.log(`[Бэкенд: ЮKassa Заказ] ✅ Официальная заявка наряда создана с ID: ${reqId}`);
+
+      // Сохраняем детальные позиции товаров в request_items
+      if (reqId && Array.isArray(order.items) && order.items.length > 0) {
+        for (const item of order.items) {
+          if (!item.product_id) continue;
+          await pool.query(
+            `INSERT INTO request_items (request_id, product_id, quantity, price)
+             VALUES ($1, $2, $3, $4)`,
+            [reqId, item.product_id, item.quantity || 1, item.price || 0]
+          );
+        }
+        console.log(`[Бэкенд: ЮKassa Заказ] Добавлено ${order.items.length} позиций товаров в таблицу request_items`);
+      }
+
+      // Привязываем созданную заявку к платежу
+      if (reqId) {
+        combinedMeta.request_id = reqId;
+        await pool.query(
+          'UPDATE payments SET request_id = $1, metadata = $2 WHERE yookassa_payment_id = $3',
+          [reqId, JSON.stringify(combinedMeta), paymentId]
+        );
+      }
+    } catch (orderErr) {
+      console.error('[Бэкенд: ЮKassa Заказ] Ошибка создания заявки из order_data:', orderErr.message);
+    }
+  } else if (reqId) {
+    // Если заявка уже существовала, переводим её в статус 'paid' и 'pending'
+    await pool.query(
+      "UPDATE requests SET payment_status = 'paid', status = 'pending', updated_at = CURRENT_TIMESTAMP WHERE id = $1",
+      [reqId]
+    );
+    console.log(`[Бэкенд: ЮKassa] Существующая заявка ${reqId} переведена в статус 'paid'`);
+  }
+
+  // 3. Если это обычная оплата ТО лицевого счета (не покупка оборудования/ключей)
+  const accNum = combinedMeta?.account_number || paymentRecord?.account_number;
+  const creditAmount = combinedMeta?.credit_amount 
+    ? parseFloat(combinedMeta.credit_amount) 
+    : paidAmount;
+
+  if (accNum && creditAmount > 0 && !isOrder) {
+    await pool.query(
+      "UPDATE accounts SET debt_amount = debt_amount - $1, updated_at = CURRENT_TIMESTAMP WHERE account_number = $2",
+      [creditAmount, accNum]
+    );
+    console.log(`[Бэкенд: ЮKassa ТО] Баланс лицевого счёта ${accNum} уменьшен на сумму ${creditAmount} ₽`);
+  }
+}
+
+/**
  * Создание платежа в ЮKassa (с поддержкой СБП, банковских карт, SberPay, T-Pay)
  */
 app.post('/api/payments/yookassa/create', async (req, res) => {
@@ -646,6 +773,8 @@ app.post('/api/payments/yookassa/create', async (req, res) => {
     const return_url = req.body.return_url || req.body.returnUrl;
     const credit_amount = req.body.credit_amount || req.body.creditAmount || null; // Базовая сумма к зачислению на л/с без комиссии
     const fee_amount = req.body.fee_amount || req.body.feeAmount || null; // Комиссия за эквайринг (5%)
+    const order_data = req.body.order_data || req.body.orderData || null; // Данные заказа для создания заявки строго после оплаты
+    const is_order = req.body.is_order || req.body.isOrder || (order_data ? true : false);
     const numAmount = parseFloat(amount);
 
     if (isNaN(numAmount) || numAmount <= 0) {
@@ -659,11 +788,21 @@ app.post('/api/payments/yookassa/create', async (req, res) => {
 
     // Формируем URL возврата абонента после завершения оплаты
     const origin = req.headers.origin || 'https://45.8.99.238.sslip.io';
-    const redirectUrl = return_url || `${origin}/cabinet?payment=success&account=${encodeURIComponent(account_number || '')}&amount=${formattedAmount}`;
+    const redirectUrl = return_url || `${origin}/cabinet?check_payment=1&account=${encodeURIComponent(account_number || '')}&amount=${formattedAmount}`;
 
     const desc = description || (account_number 
       ? `Оплата ТО домофона по л/с ${account_number}` 
       : 'Оплата услуг компании Домофондар');
+
+    // Метаданные для внешнего шлюза ЮKassa (компактные поля)
+    const yooMetadata = {
+      account_number: account_number || '',
+      user_id: user_id || '',
+      request_id: request_id || '',
+      credit_amount: credit_amount ? String(credit_amount) : '',
+      fee_amount: fee_amount ? String(fee_amount) : '',
+      is_order: is_order ? 'true' : 'false',
+    };
 
     const payload = {
       amount: {
@@ -676,16 +815,10 @@ app.post('/api/payments/yookassa/create', async (req, res) => {
         return_url: redirectUrl,
       },
       description: desc,
-      metadata: {
-        account_number: account_number || '',
-        user_id: user_id || '',
-        request_id: request_id || '',
-        credit_amount: credit_amount ? String(credit_amount) : '',
-        fee_amount: fee_amount ? String(fee_amount) : '',
-      },
+      metadata: yooMetadata,
     };
 
-    console.log(`[Бэкенд: ЮKassa] Запрос создания платежа на ${formattedAmount} ₽ для л/с "${account_number || 'н/д'}"...`);
+    console.log(`[Бэкенд: ЮKassa] Запрос создания платежа на ${formattedAmount} ₽ (заказ: ${is_order ? 'ДА' : 'НЕТ'})...`);
 
     const yooRes = await fetch('https://api.yookassa.ru/v3/payments', {
       method: 'POST',
@@ -709,12 +842,17 @@ app.post('/api/payments/yookassa/create', async (req, res) => {
     const confirmationUrl = yooData.confirmation?.confirmation_url;
     console.log(`[Бэкенд: ЮKassa] Платеж успешно зарегистрирован! ID: ${yooData.id}, статус: ${yooData.status}, confirmationUrl: ${confirmationUrl || 'отсутствует'}`);
 
-    // Сохраняем информацию о начатом платеже в базу данных PostgreSQL
+    // Сохраняем информацию о начатом платеже в базу данных PostgreSQL вместе с полным order_data
     try {
+      const combinedLocalMeta = {
+        ...yooMetadata,
+        order_data: order_data || null,
+      };
+
       await pool.query(
         `INSERT INTO payments (yookassa_payment_id, account_number, user_id, request_id, amount, status, description, metadata)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-         ON CONFLICT (yookassa_payment_id) DO UPDATE SET status = EXCLUDED.status, updated_at = CURRENT_TIMESTAMP`,
+         ON CONFLICT (yookassa_payment_id) DO UPDATE SET status = EXCLUDED.status, metadata = EXCLUDED.metadata, updated_at = CURRENT_TIMESTAMP`,
         [
           yooData.id,
           account_number || null,
@@ -723,7 +861,7 @@ app.post('/api/payments/yookassa/create', async (req, res) => {
           numAmount,
           yooData.status,
           desc,
-          JSON.stringify(yooData.metadata || {})
+          JSON.stringify(combinedLocalMeta)
         ]
       );
     } catch (dbErr) {
@@ -761,38 +899,11 @@ app.get('/api/payments/yookassa/status/:paymentId', async (req, res) => {
       return res.status(yooRes.status).json({ error: yooData.description || 'Платеж не найден' });
     }
 
-    // Если статус платежа стал 'succeeded', обновляем баланс лицевого счета и статус заявки
+    // Если статус платежа стал 'succeeded', запускаем централизованную обработку
     if (yooData.status === 'succeeded' || yooData.paid === true) {
-      const paidAmount = parseFloat(yooData.amount?.value || 0);
-      const accNum = yooData.metadata?.account_number;
-      const reqId = yooData.metadata?.request_id;
-
-      await pool.query(
-        'UPDATE payments SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE yookassa_payment_id = $2',
-        ['succeeded', paymentId]
-      );
-
-      // Обновляем заявку, если оплачивался заказ
-      if (reqId) {
-        await pool.query(
-          "UPDATE requests SET payment_status = 'paid', updated_at = CURRENT_TIMESTAMP WHERE id = $1",
-          [reqId]
-        );
-      }
-
-      // Обновляем долг в таблице лицевых счетов (уменьшаем задолженность на базовую сумму без комиссии 5%)
-      const creditAmount = yooData.metadata?.credit_amount 
-        ? parseFloat(yooData.metadata.credit_amount) 
-        : paidAmount;
-
-      if (accNum && creditAmount > 0) {
-        await pool.query(
-          "UPDATE accounts SET debt_amount = debt_amount - $1, updated_at = CURRENT_TIMESTAMP WHERE account_number = $2",
-          [creditAmount, accNum]
-        );
-      }
+      await processSuccessfulPayment(yooData);
     } else if (yooData.status === 'canceled') {
-      // RULE 2: Логируем и фиксируем статус отмены платежа в БД
+      // Логируем и фиксируем статус отмены платежа в БД
       await pool.query(
         "UPDATE payments SET status = 'canceled', updated_at = CURRENT_TIMESTAMP WHERE yookassa_payment_id = $1",
         [paymentId]
@@ -822,39 +933,7 @@ app.post('/api/payments/yookassa/webhook', async (req, res) => {
     console.log('[Бэкенд: ЮKassa Вебхук] Получено событие:', event?.event, 'для объекта:', event?.object?.id);
 
     if (event?.event === 'payment.succeeded' && event?.object) {
-      const paymentObj = event.object;
-      const paymentId = paymentObj.id;
-      const paidAmount = parseFloat(paymentObj.amount?.value || 0);
-      const accNum = paymentObj.metadata?.account_number;
-      const reqId = paymentObj.metadata?.request_id;
-
-      // Обновляем статус в нашей таблице payments
-      await pool.query(
-        'UPDATE payments SET status = $1, payment_method = $2, updated_at = CURRENT_TIMESTAMP WHERE yookassa_payment_id = $3',
-        ['succeeded', paymentObj.payment_method?.type || 'bank_card', paymentId]
-      );
-
-      // Если привязана заявка на услуги / материалы
-      if (reqId) {
-        await pool.query(
-          "UPDATE requests SET payment_status = 'paid', updated_at = CURRENT_TIMESTAMP WHERE id = $1",
-          [reqId]
-        );
-        console.log(`[Бэкенд: ЮKassa Вебхук] Заявка ${reqId} помечена как оплаченная`);
-      }
-
-      // Если указан лицевой счет, уменьшаем задолженность на базовую сумму без комиссии 5%
-      const creditAmount = paymentObj.metadata?.credit_amount 
-        ? parseFloat(paymentObj.metadata.credit_amount) 
-        : paidAmount;
-
-      if (accNum && creditAmount > 0) {
-        await pool.query(
-          "UPDATE accounts SET debt_amount = debt_amount - $1, updated_at = CURRENT_TIMESTAMP WHERE account_number = $2",
-          [creditAmount, accNum]
-        );
-        console.log(`[Бэкенд: ЮKassa Вебхук] Задолженность по л/с ${accNum} уменьшена на ${creditAmount} ₽ (списано у плательщика: ${paidAmount} ₽)`);
-      }
+      await processSuccessfulPayment(event.object);
     } else if (event?.event === 'payment.canceled' && event?.object) {
       // Автоматическое событие отмены платежа (таймаут 15-60 минут или отмена пользователем в шлюзе)
       const paymentObj = event.object;
@@ -869,13 +948,13 @@ app.post('/api/payments/yookassa/webhook', async (req, res) => {
       );
       console.log(`[Бэкенд: ЮKassa Вебхук] Платёж ${paymentId} отменён шлюзом ЮKassa (причина: ${cancelReason})`);
 
-      // Если платёж был привязан к заявке на услуги, возвращаем заявку в неоплаченный статус
+      // Если платёж был привязан к существующей заявке, переводим её в статус 'cancelled'
       if (reqId) {
         await pool.query(
-          "UPDATE requests SET payment_status = 'unpaid', updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND payment_status != 'paid'",
+          "UPDATE requests SET payment_status = 'canceled', status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND payment_status != 'paid'",
           [reqId]
         );
-        console.log(`[Бэкенд: ЮKassa Вебхук] Заявка ${reqId} возвращена в статус unpaid из-за отмены платежа`);
+        console.log(`[Бэкенд: ЮKassa Вебхук] Заявка ${reqId} отменена из-за отмены платежа`);
       }
     }
 
@@ -920,36 +999,7 @@ app.get('/api/payments/yookassa/sync/:accountNumber', async (req, res) => {
         const yooData = await yooRes.json();
 
         if (yooData.status === 'succeeded' || yooData.paid === true) {
-          const paidAmount = parseFloat(yooData.amount?.value || payment.amount || 0);
-          const reqId = yooData.metadata?.request_id || payment.request_id;
-          const paymentMethod = yooData.payment_method?.type || 'bank_card';
-          const creditAmount = yooData.metadata?.credit_amount 
-            ? parseFloat(yooData.metadata.credit_amount) 
-            : paidAmount;
-
-          // Обновляем статус платежа в таблице payments
-          await pool.query(
-            `UPDATE payments SET status = 'succeeded', payment_method = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
-            [paymentMethod, payment.id]
-          );
-
-          // Обновляем долг в accounts (уменьшаем сумму задолженности на базовую сумму без комиссии 5%)
-          if (creditAmount > 0) {
-            await pool.query(
-              `UPDATE accounts SET debt_amount = debt_amount - $1, updated_at = CURRENT_TIMESTAMP WHERE account_number = $2`,
-              [creditAmount, accountNumber]
-            );
-            console.log(`[Бэкенд: ЮKassa Синхронизация] Зачислен платеж ${creditAmount} ₽ на баланс л/с ${accountNumber} (списано: ${paidAmount} ₽)`);
-          }
-
-          // Обновляем заявку, если привязана
-          if (reqId) {
-            await pool.query(
-              `UPDATE requests SET payment_status = 'paid', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
-              [reqId]
-            );
-          }
-
+          await processSuccessfulPayment(yooData, payment);
           updatedCount++;
         } else if (yooData.status === 'canceled') {
           await pool.query(
