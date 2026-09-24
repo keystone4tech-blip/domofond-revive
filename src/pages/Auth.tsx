@@ -332,10 +332,7 @@ const Auth = () => {
                 <form onSubmit={handleSignUp} className="space-y-4">
                   {/* Единое поле: Email или Номер телефона */}
                   <div className="space-y-2 text-left">
-                    <div className="flex justify-between items-center">
-                      <Label htmlFor="signup-login">Почта или номер телефона</Label>
-                      <span className="text-[11px] text-primary font-medium">Автопоиск адреса ⚡</span>
-                    </div>
+                    <Label htmlFor="signup-login">Почта или номер телефона</Label>
                     <Input
                       id="signup-login"
                       type="text"
@@ -345,9 +342,6 @@ const Auth = () => {
                       required
                       className="bg-background/50 border-border/80 focus:border-primary/50 transition-all font-medium"
                     />
-                    <p className="text-[11px] text-muted-foreground leading-tight">
-                      При указании номера телефона ваш адрес и лицевой счёт найдутся автоматически по базе договоров!
-                    </p>
                   </div>
 
                   {/* Поле первого ввода Пароля */}

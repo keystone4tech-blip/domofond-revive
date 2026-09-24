@@ -77,8 +77,6 @@ export const VerificationUploadDialog: React.FC<VerificationUploadDialogProps> =
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Выбранный тип документа
-  const [selectedDocType, setSelectedDocType] = useState<string>("egrn");
   // Загруженный файл и его Data URL
   const [fileDataUrl, setFileDataUrl] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string>("");
@@ -87,6 +85,19 @@ export const VerificationUploadDialog: React.FC<VerificationUploadDialogProps> =
   // Состояние процесса сжатия и отправки
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+
+  // RULE 2: Вычисляем недостающие обязательные поля профиля для строгой валидации
+  const missingProfileFields: string[] = [];
+  if (!profile?.full_name?.trim()) {
+    missingProfileFields.push("Фамилия, Имя и Отчество (ФИО)");
+  }
+  if (!profile?.phone?.trim()) {
+    missingProfileFields.push("Номер телефона");
+  }
+  if (!profile?.address?.trim()) {
+    missingProfileFields.push("Адрес проживания (улица и номер дома)");
+  }
+  const isProfileComplete = missingProfileFields.length === 0;
 
   // Сжатие изображения через HTML5 Canvas для быстрой передачи и надежного хранения
   const compressImage = (file: File): Promise<string> => {
@@ -210,6 +221,9 @@ export const VerificationUploadDialog: React.FC<VerificationUploadDialogProps> =
 
   // Отправка документа диспетчеру на проверку
   const handleSubmit = async () => {
+    // RULE 2: Логируем попытку отправки верификации
+    console.log("[Верификация] Инициализация отправки верификационного документа...");
+
     if (!profile?.id) {
       toast({
         title: "Ошибка",
@@ -219,30 +233,31 @@ export const VerificationUploadDialog: React.FC<VerificationUploadDialogProps> =
       return;
     }
 
-    if (!profile.address || !profile.address.trim()) {
+    // 1. Строгая проверка заполнения обязательных данных профиля
+    if (!isProfileComplete) {
+      console.warn("[Верификация] Отклонено: не заполнены обязательные поля профиля:", missingProfileFields);
       toast({
-        title: "Не заполнен адрес",
-        description: "Укажите ваш адрес проживания в профиле перед отправкой документов.",
+        title: "Не заполнены данные профиля",
+        description: `Для отправки верификации сначала укажите и сохраните в профиле: ${missingProfileFields.join(", ")}.`,
         variant: "destructive",
       });
       return;
     }
 
+    // 2. Строгая проверка прикрепления файла
     if (!fileDataUrl) {
+      console.warn("[Верификация] Отклонено: файл документа не прикреплен");
       toast({
-        title: "Документ не прикреплен",
-        description: "Пожалуйста, выберите фото или скан документа для отправки.",
+        title: "Файл не прикреплен",
+        description: "Пожалуйста, прикрепите фото или скан документа, подтверждающего ваше проживание или собственность.",
         variant: "destructive",
       });
       return;
     }
-
-    const docMeta = VERIFICATION_DOCUMENT_TYPES.find((d) => d.id === selectedDocType);
-    const docLabel = docMeta?.label || "Подтверждающий документ";
 
     try {
       setIsSubmitting(true);
-      console.log(`[Верификация] Отправка документа "${selectedDocType}" для профиля ID: ${profile.id}`);
+      console.log(`[Верификация] Отправка документа на проверку для профиля ID: ${profile.id}, адрес: ${profile.address}`);
 
       const submittedAt = new Date().toISOString();
 
@@ -252,7 +267,7 @@ export const VerificationUploadDialog: React.FC<VerificationUploadDialogProps> =
         .update({
           verification_status: "pending",
           verification_document_url: fileDataUrl,
-          verification_document_type: selectedDocType,
+          verification_document_type: "residence_document",
           verification_submitted_at: submittedAt,
           verification_reject_reason: null, // Сбрасываем старую причину отклонения, если была
         })
@@ -272,7 +287,7 @@ export const VerificationUploadDialog: React.FC<VerificationUploadDialogProps> =
           address: fullAddr,
           apartment: profile.apartment || "",
           order_type: "verification_request",
-          message: `🛡️ Заявка на верификацию жильца (подтверждение права проживания) по адресу: ${fullAddr}. Тип документа: ${docLabel}.`,
+          message: `🛡️ Заявка на подтверждение проживания/собственности по адресу: ${fullAddr}. Жилец: ${profile.full_name || "Не указан"}, телефон: ${profile.phone || "Не указан"}.`,
           status: "pending",
           priority: "medium",
           document_url: fileDataUrl,
@@ -329,60 +344,67 @@ export const VerificationUploadDialog: React.FC<VerificationUploadDialogProps> =
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          {/* Адрес квартиры */}
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-xs space-y-1">
+          {/* Адрес квартиры и данные пользователя */}
+          <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-xs space-y-1.5 text-left">
             <span className="text-muted-foreground font-semibold block uppercase tracking-wider text-[10px]">
-              Проверяемый адрес
+              Проверяемые данные жильца
             </span>
-            <p className="font-bold text-sm text-foreground">
-              {profile?.address || "Адрес не указан"}
-              {profile?.apartment ? `, кв. ${profile.apartment}` : ""}
-            </p>
-            {profile?.full_name && (
-              <p className="text-muted-foreground">Жилец: <strong className="text-foreground">{profile.full_name}</strong></p>
-            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              <div>
+                <span className="text-muted-foreground block text-[11px]">ФИО:</span>
+                <span className="font-semibold text-foreground text-sm">
+                  {profile?.full_name || <span className="text-destructive font-bold">Не заполнено</span>}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground block text-[11px]">Телефон:</span>
+                <span className="font-semibold text-foreground text-sm font-mono">
+                  {profile?.phone || <span className="text-destructive font-bold">Не заполнено</span>}
+                </span>
+              </div>
+            </div>
+            <div className="pt-1 border-t border-slate-200 dark:border-slate-800">
+              <span className="text-muted-foreground block text-[11px]">Адрес:</span>
+              <span className="font-bold text-foreground text-sm">
+                {profile?.address ? (
+                  `${profile.address}${profile?.apartment ? `, кв. ${profile.apartment}` : ""}`
+                ) : (
+                  <span className="text-destructive font-bold">Адрес не указан</span>
+                )}
+              </span>
+            </div>
           </div>
 
-          {/* Выбор типа документа */}
-          <div className="space-y-2">
-            <Label className="text-xs font-semibold">Выберите тип подтверждающего документа:</Label>
-            <div className="space-y-1.5">
-              {VERIFICATION_DOCUMENT_TYPES.map((doc) => {
-                const isSelected = selectedDocType === doc.id;
-                return (
-                  <div
-                    key={doc.id}
-                    onClick={() => setSelectedDocType(doc.id)}
-                    className={cn(
-                      "p-2.5 rounded-xl border text-left cursor-pointer transition-all flex items-start justify-between gap-2",
-                      isSelected
-                        ? "border-amber-500/60 bg-amber-500/10 shadow-xs"
-                        : "border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900/40"
-                    )}
-                  >
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-2">
-                        <span className={cn("text-xs font-bold", isSelected ? "text-foreground" : "text-slate-700 dark:text-slate-300")}>
-                          {doc.label}
-                        </span>
-                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                          {doc.badge}
-                        </Badge>
-                      </div>
-                      <p className="text-[11px] text-muted-foreground leading-tight">
-                        {doc.description}
-                      </p>
-                    </div>
-                    <div className={cn(
-                      "w-4 h-4 rounded-full border flex items-center justify-center shrink-0 mt-0.5",
-                      isSelected ? "border-amber-500 bg-amber-500 text-white" : "border-slate-300 dark:border-slate-700"
-                    )}>
-                      {isSelected && <CheckCircle2 className="h-3 w-3" />}
-                    </div>
-                  </div>
-                );
-              })}
+          {/* Плашка предупреждения, если профиль не заполнен */}
+          {!isProfileComplete && (
+            <div className="p-3.5 rounded-2xl bg-destructive/10 border border-destructive/30 text-xs space-y-1.5 text-left">
+              <div className="flex items-center gap-1.5 font-bold text-destructive">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>Не все обязательные данные заполнены!</span>
+              </div>
+              <p className="text-slate-600 dark:text-slate-400 text-[11px] leading-tight">
+                Для отправки верификации необходимо заполнить и сохранить в вашем профиле:
+              </p>
+              <ul className="list-disc list-inside text-destructive font-medium text-[11px] space-y-0.5">
+                {missingProfileFields.map((field, idx) => (
+                  <li key={idx}>{field}</li>
+                ))}
+              </ul>
+              <p className="text-[11px] text-muted-foreground pt-0.5">
+                Пожалуйста, закройте это окно, заполните графы выше и нажмите «Сохранить данные профиля».
+              </p>
             </div>
+          )}
+
+          {/* Единое понятное пояснение: какой документ требуется предоставить */}
+          <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs space-y-1 text-left">
+            <div className="flex items-center gap-1.5 font-bold text-amber-800 dark:text-amber-300">
+              <FileCheck className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+              <span>Требования к документу</span>
+            </div>
+            <p className="text-slate-700 dark:text-slate-300 leading-relaxed text-[12px]">
+              Предоставьте подтверждение любого документа, подтверждающего вашу собственность или проживание по данному адресу (выписка из ЕГРН, страница паспорта с постоянной или временной регистрацией, официальный договор найма/аренды жилья или акт приема-передачи от застройщика).
+            </p>
           </div>
 
           {/* Область прикрепления файла */}
@@ -483,7 +505,7 @@ export const VerificationUploadDialog: React.FC<VerificationUploadDialogProps> =
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={!fileDataUrl || isSubmitting || isProcessing}
+            disabled={!fileDataUrl || !isProfileComplete || isSubmitting || isProcessing}
             className="bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold flex items-center gap-1.5"
           >
             {isSubmitting ? (

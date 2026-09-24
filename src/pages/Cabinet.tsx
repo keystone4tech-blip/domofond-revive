@@ -4572,16 +4572,23 @@ const Cabinet = () => {
                           <p className="text-[11px] text-muted-foreground">
                             {profile?.verification_status === "rejected"
                               ? `Верификация отклонена: ${profile?.verification_reject_reason || "документ не принят"}. Прикрепите новый документ.`
-                              : "Загрузите фото паспорта с регистрацией, выписку ЕГРН или договор найма."}
+                              : "Загрузите фото или скан документа, подтверждающего проживание или собственность."}
                           </p>
                         </div>
                         <ShinyButton
                           type="button"
                           onClick={() => {
-                            if (!profile?.address && (!displayStreet?.trim() || !displayHouse?.trim())) {
+                            // RULE 2: Строгая проверка заполнения профиля перед открытием окна верификации
+                            const missing: string[] = [];
+                            if (!profile?.full_name?.trim() && !fullName?.trim()) missing.push("ФИО");
+                            if (!profile?.phone?.trim() && !phone?.trim()) missing.push("Телефон");
+                            if (!profile?.address?.trim() && (!displayStreet?.trim() || !displayHouse?.trim())) missing.push("Адрес проживания");
+
+                            if (missing.length > 0) {
+                              console.warn("[Верификация] Попытка открыть диалог с незаполненными данными:", missing);
                               toast({
-                                title: "Укажите адрес проживания",
-                                description: "Перед отправкой документов заполните ваш адрес в форме выше и нажмите «Сохранить данные профиля».",
+                                title: "Заполните данные профиля",
+                                description: `Перед отправкой документов заполните и сохраните в профиле: ${missing.join(", ")}.`,
                                 variant: "destructive",
                               });
                               return;
@@ -4666,8 +4673,24 @@ const Cabinet = () => {
                     accountNumber={userAccount?.account_number} 
                     userId={userId || undefined} 
                     profile={profile}
+                    onOpenVerification={() => {
+                      const missing: string[] = [];
+                      if (!profile?.full_name?.trim() && !fullName?.trim()) missing.push("ФИО");
+                      if (!profile?.phone?.trim() && !phone?.trim()) missing.push("Телефон");
+                      if (!profile?.address?.trim() && (!displayStreet?.trim() || !displayHouse?.trim())) missing.push("Адрес проживания");
+
+                      if (missing.length > 0) {
+                        console.warn("[Верификация: RemoteAccess] Незаполненные поля:", missing);
+                        toast({
+                          title: "Заполните данные профиля",
+                          description: `Перед отправкой документов заполните и сохраните в профиле: ${missing.join(", ")}.`,
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+                      setIsVerificationDialogOpen(true);
+                    }}
                     hasLk={userAccount?.has_lk || false}
-                    onOpenVerification={() => setIsVerificationDialogOpen(true)}
                   />
                 </CardContent>
               ) : (
