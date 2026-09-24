@@ -1,4 +1,17 @@
-import { useState } from "react";
+// ============================================================================
+// Компонент: ProductsManager
+// Назначение: Управление каталогом товаров и услуг в CRM-панели (FSM).
+// Функционал:
+//   1. Иерархическое дерево папок и подпапок (создание, переименование, удаление).
+//   2. Фильтрация товаров по папкам ("Все товары", "Без папки", конкретная папка/подпапка).
+//   3. Поиск позиций по наименованию и фильтрация по категории.
+//   4. Массовое перемещение выбранных чекбоксами позиций в любую папку или подпапку.
+//   5. Создание и редактирование товара с привязкой к розничной и акционной цене, а также к папке.
+//   6. Импорт номенклатуры из файлов прайс-листов (.txt/.tsv/.csv) с ценами.
+//   7. Пагинация для быстрой и комфортной работы с большими каталогами (700+ позиций).
+// ============================================================================
+
+import React, { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -8,19 +21,21 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger
+  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue
+  SelectValue,
 } from "@/components/ui/select";
 import {
   Table,
@@ -28,23 +43,49 @@ import {
   TableCell,
   TableHead,
   TableHeader,
-  TableRow
+  TableRow,
 } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Edit, Trash2, Loader2, Package } from "lucide-react";
+import {
+  Plus,
+  Edit,
+  Trash2,
+  Loader2,
+  Package,
+  Folder,
+  FolderPlus,
+  ChevronRight,
+  Upload,
+  Search,
+  ArrowRightLeft,
+  FolderTree,
+  MoreVertical,
+} from "lucide-react";
+import { ImportNomenclatureDialog } from "./ImportNomenclatureDialog";
 
+// Интерфейс для товара/услуги
 interface Product {
   id: string;
   name: string;
   description: string | null;
   price: number;
-  installation_price?: number | null; // Льготная сниженная цена на этапе ввода дома на монтаже
+  installation_price?: number | null; // Льготная акционная цена на монтаже
   unit: string;
   category: string | null;
+  folder_id: string | null; // ID родительской папки
   is_active: boolean;
   created_at: string;
 }
 
+// Интерфейс для папки номенклатуры
+interface ProductFolder {
+  id: string;
+  name: string;
+  parent_id: string | null;
+  created_at?: string;
+}
+
+// Предопределенные категории
 const categories = [
   { value: "service", label: "Услуга" },
   { value: "material", label: "Материал" },
@@ -52,53 +93,215 @@ const categories = [
   { value: "other", label: "Прочее" },
 ];
 
+// Единицы измерения
 const units = [
   { value: "шт", label: "шт" },
   { value: "м", label: "метр" },
   { value: "м²", label: "м²" },
+  { value: "компл", label: "комплект" },
   { value: "час", label: "час" },
   { value: "услуга", label: "услуга" },
 ];
 
-const ProductsManager = () => {
+export const ProductsManager: React.FC = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { isManager } = useUserRole();
-  
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+
+  // Состояние выбранной папки для фильтрации: "all" | "none" | UUID папки
+  const [selectedFolderId, setSelectedFolderId] = useState<string>("all");
+  // Поисковый запрос
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  // Фильтр по категории
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+
+  // Пагинация
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 50;
+
+  // Выбранные чекбоксами товары для массовых действий
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+  // Папка назначения для массового перемещения
+  const [bulkTargetFolderId, setBulkTargetFolderId] = useState<string>("none");
+
+  // Модальные окна
+  const [isProductDialogOpen, setIsProductDialogOpen] = useState<boolean>(false);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState<boolean>(false);
+  const [isFolderDialogOpen, setIsFolderDialogOpen] = useState<boolean>(false);
   
-  const [formData, setFormData] = useState({
+  // Редактируемый товар
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+
+  // Состояние создания/редактирования папки
+  const [editingFolder, setEditingFolder] = useState<ProductFolder | null>(null);
+  const [folderForm, setFolderForm] = useState<{ name: string; parent_id: string | null }>({
+    name: "",
+    parent_id: null,
+  });
+
+  // Форма товара
+  const [productForm, setProductForm] = useState({
     name: "",
     description: "",
     price: "",
-    installation_price: "", // Льготная цена на период монтажа
+    installation_price: "",
     unit: "шт",
-    category: "service",
+    category: "equipment",
+    folder_id: "none",
     is_active: true,
   });
 
-  const { data: products, isLoading } = useQuery({
-    queryKey: ["products", categoryFilter],
+  // ============================================================================
+  // Запрос списка папок
+  // ============================================================================
+  const {
+    data: folders = [],
+    isLoading: isFoldersLoading,
+    refetch: refetchFolders,
+  } = useQuery({
+    queryKey: ["product_folders"],
     queryFn: async () => {
-      let query = supabase
+      console.log("[ProductsManager] Загрузка списка папок...");
+      const { data, error } = await supabase
+        .from("product_folders")
+        .select("*")
+        .order("name");
+
+      if (error) {
+        console.error("[ProductsManager] Ошибка при загрузке папок:", error);
+        throw error;
+      }
+      return (data || []) as ProductFolder[];
+    },
+  });
+
+  // ============================================================================
+  // Запрос списка товаров
+  // ============================================================================
+  const {
+    data: products = [],
+    isLoading: isProductsLoading,
+    refetch: refetchProducts,
+  } = useQuery({
+    queryKey: ["products"],
+    queryFn: async () => {
+      console.log("[ProductsManager] Загрузка списка товаров...");
+      const { data, error } = await supabase
         .from("products")
         .select("*")
         .order("name");
 
-      if (categoryFilter !== "all") {
-        query = query.eq("category", categoryFilter);
+      if (error) {
+        console.error("[ProductsManager] Ошибка при загрузке товаров:", error);
+        throw error;
       }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      return data as Product[];
+      return (data || []) as Product[];
     },
   });
 
-  const createMutation = useMutation({
-    mutationFn: async (data: typeof formData) => {
+  // ============================================================================
+  // Построение плоского дерева папок с уровнями вложенности (для селектов и списка)
+  // ============================================================================
+  const folderTreeFlat = useMemo(() => {
+    const result: { folder: ProductFolder; level: number; displayName: string }[] = [];
+
+    // Рекурсивный обход дерева
+    const traverse = (parentId: string | null, level: number) => {
+      const children = folders.filter((f) => f.parent_id === parentId);
+      for (const child of children) {
+        const indent = "— ".repeat(level);
+        result.push({
+          folder: child,
+          level,
+          displayName: `${indent}${child.name}`,
+        });
+        traverse(child.id, level + 1);
+      }
+    };
+
+    traverse(null, 0);
+
+    // Добавляем папки, у которых parent_id ссылается на несуществующую папку
+    const visitedIds = new Set(result.map((r) => r.folder.id));
+    const orphans = folders.filter((f) => !visitedIds.has(f.id));
+    for (const orphan of orphans) {
+      result.push({
+        folder: orphan,
+        level: 0,
+        displayName: orphan.name,
+      });
+    }
+
+    return result;
+  }, [folders]);
+
+  // Подсчет товаров по папкам
+  const countsByFolder = useMemo(() => {
+    const counts: Record<string, number> = {
+      all: products.length,
+      none: 0,
+    };
+
+    for (const p of products) {
+      if (!p.folder_id) {
+        counts.none = (counts.none || 0) + 1;
+      } else {
+        counts[p.folder_id] = (counts[p.folder_id] || 0) + 1;
+      }
+    }
+
+    return counts;
+  }, [products]);
+
+  // ============================================================================
+  // Фильтрация товаров по поиску, категории и выбранной папке
+  // ============================================================================
+  const filteredProducts = useMemo(() => {
+    return products.filter((p) => {
+      // 1. Фильтр по папке
+      if (selectedFolderId === "none") {
+        if (p.folder_id !== null) return false;
+      } else if (selectedFolderId !== "all") {
+        if (p.folder_id !== selectedFolderId) return false;
+      }
+
+      // 2. Фильтр по категории
+      if (categoryFilter !== "all" && p.category !== categoryFilter) {
+        return false;
+      }
+
+      // 3. Поиск по строке
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchName = p.name?.toLowerCase().includes(q);
+        const matchDesc = p.description?.toLowerCase().includes(q);
+        if (!matchName && !matchDesc) return false;
+      }
+
+      return true;
+    });
+  }, [products, selectedFolderId, categoryFilter, searchQuery]);
+
+  // Пагинация отфильтрованных товаров
+  const totalPages = Math.ceil(filteredProducts.length / pageSize) || 1;
+  const paginatedProducts = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredProducts.slice(start, start + pageSize);
+  }, [filteredProducts, currentPage, pageSize]);
+
+  // Сброс страницы при смене фильтров
+  const handleFolderSelect = (folderId: string) => {
+    setSelectedFolderId(folderId);
+    setCurrentPage(1);
+    setSelectedProductIds([]);
+  };
+
+  // ============================================================================
+  // Мутации: Создание / Обновление / Удаление товаров
+  // ============================================================================
+  const createProductMutation = useMutation({
+    mutationFn: async (data: typeof productForm) => {
+      console.log("[ProductsManager] Создание нового товара:", data.name);
       const { error } = await supabase.from("products").insert({
         name: data.name,
         description: data.description || null,
@@ -106,23 +309,25 @@ const ProductsManager = () => {
         installation_price: data.installation_price.trim() ? parseFloat(data.installation_price) : null,
         unit: data.unit,
         category: data.category,
+        folder_id: data.folder_id === "none" ? null : data.folder_id,
         is_active: data.is_active,
       });
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
-      toast({ title: "Товар добавлен" });
-      setIsDialogOpen(false);
-      resetForm();
+      toast({ title: "Успешно", description: "Товар успешно добавлен в каталог" });
+      setIsProductDialogOpen(false);
+      resetProductForm();
     },
     onError: (error: Error) => {
-      toast({ title: "Ошибка", description: error.message, variant: "destructive" });
+      toast({ title: "Ошибка создания", description: error.message, variant: "destructive" });
     },
   });
 
-  const updateMutation = useMutation({
+  const updateProductMutation = useMutation({
     mutationFn: async ({ id, ...data }: Partial<Product> & { id: string }) => {
+      console.log("[ProductsManager] Обновление товара id:", id);
       const { error } = await supabase
         .from("products")
         .update(data)
@@ -131,20 +336,27 @@ const ProductsManager = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
-      toast({ title: "Товар обновлен" });
+      toast({ title: "Успешно", description: "Данные товара обновлены" });
       setEditingProduct(null);
-      setIsDialogOpen(false);
+      setIsProductDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Ошибка обновления", description: error.message, variant: "destructive" });
     },
   });
 
-  const deleteMutation = useMutation({
+  const deleteProductMutation = useMutation({
     mutationFn: async (id: string) => {
+      console.log("[ProductsManager] Удаление товара id:", id);
       const { error } = await supabase.from("products").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
-      toast({ title: "Товар удален" });
+      toast({ title: "Удалено", description: "Товар удален из каталога" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Ошибка удаления", description: error.message, variant: "destructive" });
     },
   });
 
@@ -161,56 +373,191 @@ const ProductsManager = () => {
     },
   });
 
-  const resetForm = () => {
-    setFormData({
+  // ============================================================================
+  // Мутации: Создание / Обновление / Удаление папок
+  // ============================================================================
+  const saveFolderMutation = useMutation({
+    mutationFn: async () => {
+      if (!folderForm.name.trim()) {
+        throw new Error("Введите название папки");
+      }
+
+      if (editingFolder) {
+        console.log("[ProductsManager] Редактирование папки:", editingFolder.id, folderForm);
+        const { error } = await supabase
+          .from("product_folders")
+          .update({
+            name: folderForm.name.trim(),
+            parent_id: folderForm.parent_id,
+          })
+          .eq("id", editingFolder.id);
+        if (error) throw error;
+      } else {
+        console.log("[ProductsManager] Создание новой папки:", folderForm);
+        const { error } = await supabase.from("product_folders").insert({
+          name: folderForm.name.trim(),
+          parent_id: folderForm.parent_id,
+        });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["product_folders"] });
+      toast({
+        title: "Успешно",
+        description: editingFolder ? "Папка переименована" : "Новая папка создана",
+      });
+      setIsFolderDialogOpen(false);
+      setEditingFolder(null);
+      setFolderForm({ name: "", parent_id: null });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Ошибка папки", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteFolderMutation = useMutation({
+    mutationFn: async (folderId: string) => {
+      console.log("[ProductsManager] Удаление папки id:", folderId);
+      const { error } = await supabase.from("product_folders").delete().eq("id", folderId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["product_folders"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      if (selectedFolderId === editingFolder?.id) {
+        setSelectedFolderId("all");
+      }
+      toast({ title: "Папка удалена", description: "Товары из папки перемещены в 'Без папки'" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Ошибка при удалении", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // ============================================================================
+  // Массовое перемещение товаров по папкам
+  // ============================================================================
+  const bulkMoveMutation = useMutation({
+    mutationFn: async () => {
+      if (selectedProductIds.length === 0) return;
+      const targetFolder = bulkTargetFolderId === "none" ? null : bulkTargetFolderId;
+      console.log(
+        `[ProductsManager] Массовое перемещение ${selectedProductIds.length} позиций в папку: ${targetFolder}`
+      );
+
+      const { error } = await supabase
+        .from("products")
+        .update({ folder_id: targetFolder })
+        .in("id", selectedProductIds);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      toast({
+        title: "Перемещение выполнено",
+        description: `Перемещено позиций: ${selectedProductIds.length}`,
+      });
+      setSelectedProductIds([]);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Ошибка перемещения", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Вспомогательные функции
+  const resetProductForm = () => {
+    setProductForm({
       name: "",
       description: "",
       price: "",
       installation_price: "",
       unit: "шт",
-      category: "service",
+      category: "equipment",
+      folder_id: selectedFolderId !== "all" ? selectedFolderId : "none",
       is_active: true,
     });
     setEditingProduct(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (editingProduct) {
-      updateMutation.mutate({
-        id: editingProduct.id,
-        name: formData.name,
-        description: formData.description || null,
-        price: parseFloat(formData.price),
-        installation_price: formData.installation_price.trim() ? parseFloat(formData.installation_price) : null,
-        unit: formData.unit,
-        category: formData.category,
-        is_active: formData.is_active,
-      });
-    } else {
-      createMutation.mutate(formData);
-    }
-  };
-
-  const startEdit = (product: Product) => {
+  const startEditProduct = (product: Product) => {
     setEditingProduct(product);
-    setFormData({
+    setProductForm({
       name: product.name,
       description: product.description || "",
       price: product.price.toString(),
       installation_price: product.installation_price != null ? product.installation_price.toString() : "",
       unit: product.unit,
-      category: product.category || "service",
+      category: product.category || "equipment",
+      folder_id: product.folder_id || "none",
       is_active: product.is_active,
     });
-    setIsDialogOpen(true);
+    setIsProductDialogOpen(true);
+  };
+
+  const handleProductSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingProduct) {
+      updateProductMutation.mutate({
+        id: editingProduct.id,
+        name: productForm.name,
+        description: productForm.description || null,
+        price: parseFloat(productForm.price),
+        installation_price: productForm.installation_price.trim() ? parseFloat(productForm.installation_price) : null,
+        unit: productForm.unit,
+        category: productForm.category,
+        folder_id: productForm.folder_id === "none" ? null : productForm.folder_id,
+        is_active: productForm.is_active,
+      });
+    } else {
+      createProductMutation.mutate(productForm);
+    }
+  };
+
+  const openCreateFolderDialog = (parentId: string | null = null) => {
+    setEditingFolder(null);
+    setFolderForm({ name: "", parent_id: parentId });
+    setIsFolderDialogOpen(true);
+  };
+
+  const openEditFolderDialog = (folder: ProductFolder, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingFolder(folder);
+    setFolderForm({ name: folder.name, parent_id: folder.parent_id });
+    setIsFolderDialogOpen(true);
+  };
+
+  const toggleSelectAllPage = () => {
+    const pageIds = paginatedProducts.map((p) => p.id);
+    const allSelected = pageIds.every((id) => selectedProductIds.includes(id));
+    if (allSelected) {
+      setSelectedProductIds(selectedProductIds.filter((id) => !pageIds.includes(id)));
+    } else {
+      const merged = Array.from(new Set([...selectedProductIds, ...pageIds]));
+      setSelectedProductIds(merged);
+    }
+  };
+
+  const toggleSelectOne = (id: string) => {
+    if (selectedProductIds.includes(id)) {
+      setSelectedProductIds(selectedProductIds.filter((item) => item !== id));
+    } else {
+      setSelectedProductIds([...selectedProductIds, id]);
+    }
+  };
+
+  const getFolderName = (folderId: string | null) => {
+    if (!folderId) return "—";
+    const found = folders.find((f) => f.id === folderId);
+    return found ? found.name : "—";
   };
 
   const getCategoryLabel = (category: string | null) => {
-    return categories.find(c => c.value === category)?.label || "Прочее";
+    return categories.find((c) => c.value === category)?.label || "Прочее";
   };
 
-  if (isLoading) {
+  if (isProductsLoading && isFoldersLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -219,223 +566,740 @@ const ProductsManager = () => {
   }
 
   return (
-    <Card>
-      <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <CardTitle className="flex items-center gap-2">
-          <Package className="h-5 w-5" />
-          Товары и услуги
-        </CardTitle>
-        <div className="flex gap-2 flex-wrap">
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Категория" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Все категории</SelectItem>
-              {categories.map(cat => (
-                <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={resetForm}>
-                <Plus className="h-4 w-4 mr-2" />
-                Добавить
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{editingProduct ? "Редактировать" : "Новый товар"}</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Название *</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description">Описание</Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    rows={2}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="price" className="text-xs font-semibold">Розничная цена (₽) *</Label>
-                    <Input
-                      id="price"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={formData.price}
-                      onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                      required
-                      placeholder="1500.00"
-                    />
-                    <p className="text-[10px] text-muted-foreground">Для домов на ТО и Аренде</p>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="installation_price" className="text-xs font-semibold text-amber-600 dark:text-amber-400 flex items-center justify-between">
-                      <span>На монтаже (₽)</span>
-                      <span className="text-[9px] px-1 py-0.5 rounded bg-amber-100 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-300 font-medium">Льготная</span>
-                    </Label>
-                    <Input
-                      id="installation_price"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={formData.installation_price}
-                      onChange={(e) => setFormData({ ...formData, installation_price: e.target.value })}
-                      placeholder="Оставьте пустым, если = розничной"
-                      className="border-amber-200 dark:border-amber-900/60"
-                    />
-                    <p className="text-[10px] text-muted-foreground">Сниженная цена для жильцов в период монтажа</p>
-                  </div>
-                </div>
-                  <div className="space-y-2">
-                    <Label>Единица измерения</Label>
-                    <Select
-                      value={formData.unit}
-                      onValueChange={(v) => setFormData({ ...formData, unit: v })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {units.map(u => (
-                          <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                <div className="space-y-2">
-                  <Label>Категория</Label>
-                  <Select
-                    value={formData.category}
-                    onValueChange={(v) => setFormData({ ...formData, category: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map(cat => (
-                        <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Switch
-                    checked={formData.is_active}
-                    onCheckedChange={(v) => setFormData({ ...formData, is_active: v })}
-                  />
-                  <Label>Активен</Label>
-                </div>
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={createMutation.isPending || updateMutation.isPending}
-                >
-                  {(createMutation.isPending || updateMutation.isPending) && (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  )}
-                  {editingProduct ? "Сохранить" : "Добавить"}
-                </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
+    <div className="space-y-6">
+      {/* Верхняя шапка действий */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-card p-4 rounded-xl border shadow-sm">
+        <div>
+          <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
+            <Package className="h-6 w-6 text-primary" />
+            Каталог товаров, услуг и оборудования
+          </h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Всего позиций в базе: <strong className="text-foreground">{products.length}</strong> | Папок:{" "}
+            <strong className="text-foreground">{folders.length}</strong>
+          </p>
         </div>
-      </CardHeader>
-      <CardContent>
-        {!products || products.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            Нет товаров. Добавьте первый товар или услугу.
-          </div>
-        ) : (
-          <div className="w-full overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Название</TableHead>
-                  <TableHead>Категория</TableHead>
-                  <TableHead className="text-right">Розница (ТО/Аренда)</TableHead>
-                  <TableHead className="text-right">На монтаже</TableHead>
-                  <TableHead>Ед.</TableHead>
-                  <TableHead>Активен</TableHead>
-                  <TableHead className="text-right">Действия</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {products.map((product) => (
-                  <TableRow key={product.id} className={!product.is_active ? "opacity-50" : ""}>
-                    <TableCell className="font-medium">
-                      <div>
-                        {product.name}
-                        {product.description && (
-                          <p className="text-xs text-muted-foreground line-clamp-1">
-                            {product.description}
-                          </p>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>{getCategoryLabel(product.category)}</TableCell>
-                    <TableCell className="text-right font-semibold text-foreground">
-                      {product.price.toFixed(0)} ₽
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {product.installation_price != null ? (
-                        <span className="font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 px-2 py-0.5 rounded-lg text-xs">
-                          {product.installation_price.toFixed(0)} ₽
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell>{product.unit}</TableCell>
-                    <TableCell>
-                      <Switch
-                        checked={product.is_active}
-                        onCheckedChange={(v) => toggleActiveMutation.mutate({ id: product.id, is_active: v })}
+
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Кнопка импорта номенклатуры из файла */}
+          <Button
+            variant="outline"
+            className="border-primary/30 hover:bg-primary/5 text-primary font-medium"
+            onClick={() => setIsImportDialogOpen(true)}
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            Загрузить номенклатуру
+          </Button>
+
+          {/* Кнопка добавления новой папки */}
+          <Button
+            variant="outline"
+            onClick={() => openCreateFolderDialog(null)}
+          >
+            <FolderPlus className="h-4 w-4 mr-2 text-amber-500" />
+            Новая папка
+          </Button>
+
+          {/* Кнопка создания единичного товара */}
+          <Button
+            onClick={() => {
+              resetProductForm();
+              setIsProductDialogOpen(true);
+            }}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Добавить позицию
+          </Button>
+        </div>
+      </div>
+
+      {/* Основной макет: Дерево папок слева + Таблица товаров справа */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
+        {/* ================================================================== */}
+        {/* ЛЕВАЯ КОЛОНКА: Дерево папок и подпапок */}
+        {/* ================================================================== */}
+        <Card className="lg:col-span-1 shadow-sm">
+          <CardHeader className="py-3 px-4 border-b flex flex-row items-center justify-between">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <FolderTree className="h-4 w-4 text-primary" />
+              Папки и структура
+            </CardTitle>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+              title="Создать папку в корне"
+              onClick={() => openCreateFolderDialog(null)}
+            >
+              <FolderPlus className="h-4 w-4" />
+            </Button>
+          </CardHeader>
+          <CardContent className="p-2 space-y-1">
+            {/* Папка "Все товары" */}
+            <div
+              onClick={() => handleFolderSelect("all")}
+              className={`flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer text-sm font-medium transition-colors ${
+                selectedFolderId === "all"
+                  ? "bg-primary text-primary-foreground font-semibold shadow-xs"
+                  : "hover:bg-muted text-foreground"
+              }`}
+            >
+              <div className="flex items-center gap-2 truncate">
+                <Package className="h-4 w-4 shrink-0" />
+                <span className="truncate">Все товары</span>
+              </div>
+              <Badge
+                variant={selectedFolderId === "all" ? "outline" : "secondary"}
+                className={`ml-1 text-xs shrink-0 ${
+                  selectedFolderId === "all" ? "text-primary-foreground border-primary-foreground/30" : ""
+                }`}
+              >
+                {countsByFolder.all || 0}
+              </Badge>
+            </div>
+
+            {/* Папка "Без папки" */}
+            <div
+              onClick={() => handleFolderSelect("none")}
+              className={`flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer text-sm font-medium transition-colors ${
+                selectedFolderId === "none"
+                  ? "bg-primary text-primary-foreground font-semibold shadow-xs"
+                  : "hover:bg-muted text-foreground"
+              }`}
+            >
+              <div className="flex items-center gap-2 truncate">
+                <Folder className="h-4 w-4 shrink-0 text-amber-500/70" />
+                <span className="truncate">Без папки</span>
+              </div>
+              <Badge
+                variant={selectedFolderId === "none" ? "outline" : "secondary"}
+                className={`ml-1 text-xs shrink-0 ${
+                  selectedFolderId === "none" ? "text-primary-foreground border-primary-foreground/30" : ""
+                }`}
+              >
+                {countsByFolder.none || 0}
+              </Badge>
+            </div>
+
+            <div className="border-t my-2 pt-1">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground px-3">
+                Созданные папки
+              </span>
+            </div>
+
+            {/* Список папок и подпапок */}
+            {folderTreeFlat.length === 0 ? (
+              <div className="p-3 text-center text-xs text-muted-foreground">
+                Папки пока не созданы. Нажмите «Новая папка», чтобы упорядочить товары.
+              </div>
+            ) : (
+              folderTreeFlat.map(({ folder, level }) => {
+                const count = countsByFolder[folder.id] || 0;
+                const isSelected = selectedFolderId === folder.id;
+
+                return (
+                  <div
+                    key={folder.id}
+                    onClick={() => handleFolderSelect(folder.id)}
+                    style={{ paddingLeft: `${Math.max(12, level * 16 + 12)}px` }}
+                    className={`group flex items-center justify-between pr-2 py-1.5 rounded-lg cursor-pointer text-sm transition-colors ${
+                      isSelected
+                        ? "bg-primary text-primary-foreground font-semibold shadow-xs"
+                        : "hover:bg-muted text-foreground"
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 truncate">
+                      {level > 0 && <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground/60" />}
+                      <Folder
+                        className={`h-4 w-4 shrink-0 ${
+                          isSelected ? "text-primary-foreground" : "text-amber-500"
+                        }`}
                       />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
+                      <span className="truncate" title={folder.name}>
+                        {folder.name}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0 ml-1">
+                      <Badge
+                        variant={isSelected ? "outline" : "secondary"}
+                        className={`text-[10px] px-1.5 py-0 ${
+                          isSelected ? "text-primary-foreground border-primary-foreground/30" : ""
+                        }`}
+                      >
+                        {count}
+                      </Badge>
+
+                      {/* Кнопка создания подпапки */}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={`h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity ${
+                          isSelected ? "text-primary-foreground hover:bg-primary-foreground/20" : "hover:bg-muted"
+                        }`}
+                        title="Создать подпапку"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openCreateFolderDialog(folder.id);
+                        }}
+                      >
+                        <FolderPlus className="h-3 w-3" />
+                      </Button>
+
+                      {/* Кнопка редактирования папки */}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={`h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity ${
+                          isSelected ? "text-primary-foreground hover:bg-primary-foreground/20" : "hover:bg-muted"
+                        }`}
+                        title="Переименовать"
+                        onClick={(e) => openEditFolderDialog(folder, e)}
+                      >
+                        <Edit className="h-3 w-3" />
+                      </Button>
+
+                      {/* Кнопка удаления папки */}
+                      {isManager && (
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => startEdit(product)}
+                          className={`h-6 w-6 text-destructive opacity-0 group-hover:opacity-100 transition-opacity ${
+                            isSelected ? "hover:bg-destructive/20" : "hover:bg-destructive/10"
+                          }`}
+                          title="Удалить папку"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (confirm(`Удалить папку "${folder.name}"? Товары останутся без папки.`)) {
+                              deleteFolderMutation.mutate(folder.id);
+                            }
+                          }}
                         >
-                          <Edit className="h-4 w-4" />
+                          <Trash2 className="h-3 w-3" />
                         </Button>
-                        {isManager && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-destructive hover:text-destructive"
-                            onClick={() => deleteMutation.mutate(product.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </CardContent>
+        </Card>
+
+        {/* ================================================================== */}
+        {/* ПРАВАЯ КОЛОНКА: Таблица товаров, фильтрация, поиск, пагинация */}
+        {/* ================================================================== */}
+        <div className="lg:col-span-3 space-y-4">
+          {/* Панель фильтров и поиска */}
+          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between bg-card p-3 rounded-xl border">
+            {/* Поиск */}
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Поиск по названию или описанию..."
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="pl-9 h-9"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {/* Фильтр категории */}
+            <div className="flex items-center gap-2">
+              <Select
+                value={categoryFilter}
+                onValueChange={(val) => {
+                  setCategoryFilter(val);
+                  setCurrentPage(1);
+                }}
+              >
+                <SelectTrigger className="w-[160px] h-9">
+                  <SelectValue placeholder="Категория" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Все категории</SelectItem>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.value} value={cat.value}>
+                      {cat.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-        )}
-      </CardContent>
-    </Card>
+
+          {/* Панель массовых действий (если выбраны позиции чекбоксами) */}
+          {selectedProductIds.length > 0 && (
+            <div className="bg-primary/10 border border-primary/30 p-3 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3 animate-in fade-in duration-200">
+              <div className="flex items-center gap-2 text-sm font-medium text-primary">
+                <ArrowRightLeft className="h-4 w-4 shrink-0" />
+                <span>
+                  Выбрано позиций: <strong>{selectedProductIds.length}</strong>
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+                <span className="text-xs text-muted-foreground">Переместить в:</span>
+                <Select value={bulkTargetFolderId} onValueChange={setBulkTargetFolderId}>
+                  <SelectTrigger className="w-[200px] h-8 text-xs bg-background">
+                    <SelectValue placeholder="Выберите папку" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">📂 Без папки (в корень)</SelectItem>
+                    {folderTreeFlat.map(({ folder, displayName }) => (
+                      <SelectItem key={folder.id} value={folder.id}>
+                        {displayName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Button
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={() => bulkMoveMutation.mutate()}
+                  disabled={bulkMoveMutation.isPending}
+                >
+                  {bulkMoveMutation.isPending && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+                  Переместить
+                </Button>
+
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => setSelectedProductIds([])}
+                >
+                  Снять выбор
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Таблица товаров */}
+          <Card className="shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/40">
+                    <TableHead className="w-[40px] text-center">
+                      <Checkbox
+                        checked={
+                          paginatedProducts.length > 0 &&
+                          paginatedProducts.every((p) => selectedProductIds.includes(p.id))
+                        }
+                        onCheckedChange={toggleSelectAllPage}
+                        aria-label="Выбрать все на странице"
+                      />
+                    </TableHead>
+                    <TableHead>Наименование</TableHead>
+                    <TableHead className="w-[130px]">Папка</TableHead>
+                    <TableHead className="w-[110px]">Категория</TableHead>
+                    <TableHead className="text-right w-[110px]">Розница</TableHead>
+                    <TableHead className="text-right w-[110px]">На монтаже</TableHead>
+                    <TableHead className="w-[60px]">Ед.</TableHead>
+                    <TableHead className="w-[70px] text-center">Статус</TableHead>
+                    <TableHead className="text-right w-[90px]">Действия</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedProducts.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center py-12 text-muted-foreground">
+                        {searchQuery ? "По запросу ничего не найдено." : "В данной папке нет товаров."}
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    paginatedProducts.map((product) => {
+                      const isSelected = selectedProductIds.includes(product.id);
+                      return (
+                        <TableRow
+                          key={product.id}
+                          className={`${!product.is_active ? "opacity-50" : ""} ${
+                            isSelected ? "bg-primary/5" : ""
+                          }`}
+                        >
+                          <TableCell className="text-center">
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => toggleSelectOne(product.id)}
+                            />
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            <div>
+                              <span className="text-foreground hover:text-primary transition-colors">
+                                {product.name}
+                              </span>
+                              {product.description && (
+                                <p className="text-xs text-muted-foreground line-clamp-1">
+                                  {product.description}
+                                </p>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-xs text-muted-foreground flex items-center gap-1 truncate max-w-[120px]">
+                              <Folder className="h-3 w-3 text-amber-500/70 shrink-0" />
+                              <span className="truncate">{getFolderName(product.folder_id)}</span>
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            {getCategoryLabel(product.category)}
+                          </TableCell>
+                          <TableCell className="text-right font-semibold text-foreground">
+                            {product.price.toFixed(0)} ₽
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {product.installation_price != null ? (
+                              <span className="font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 px-2 py-0.5 rounded-lg text-xs">
+                                {product.installation_price.toFixed(0)} ₽
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{product.unit}</TableCell>
+                          <TableCell className="text-center">
+                            <Switch
+                              checked={product.is_active}
+                              onCheckedChange={(v) =>
+                                toggleActiveMutation.mutate({ id: product.id, is_active: v })
+                              }
+                            />
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                onClick={() => startEditProduct(product)}
+                                title="Редактировать"
+                              >
+                                <Edit className="h-3.5 w-3.5" />
+                              </Button>
+                              {isManager && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  onClick={() => {
+                                    if (confirm(`Удалить "${product.name}"?`)) {
+                                      deleteProductMutation.mutate(product.id);
+                                    }
+                                  }}
+                                  title="Удалить"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Пагинация в подвале таблицы */}
+            <div className="p-3 border-t bg-muted/20 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
+              <div>
+                Показано {paginatedProducts.length} из {filteredProducts.length} позиций
+                {filteredProducts.length !== products.length && ` (отфильтровано из ${products.length})`}
+              </div>
+
+              {totalPages > 1 && (
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    disabled={currentPage <= 1}
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  >
+                    Назад
+                  </Button>
+                  <span className="px-2 font-medium text-foreground">
+                    Стр. {currentPage} из {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    disabled={currentPage >= totalPages}
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  >
+                    Вперед
+                  </Button>
+                </div>
+              )}
+            </div>
+          </Card>
+        </div>
+      </div>
+
+      {/* ================================================================== */}
+      {/* ДИАЛОГ: Создание / Редактирование товара */}
+      {/* ================================================================== */}
+      <Dialog open={isProductDialogOpen} onOpenChange={setIsProductDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {editingProduct ? "Редактировать позицию" : "Новая позиция в каталог"}
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleProductSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="prod-name">Наименование *</Label>
+              <Input
+                id="prod-name"
+                value={productForm.name}
+                onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
+                required
+                placeholder="Например: Ключ бесконтактный RFID"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="prod-desc">Описание</Label>
+              <Textarea
+                id="prod-desc"
+                value={productForm.description}
+                onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
+                rows={2}
+                placeholder="Краткое описание характеристик или области применения"
+              />
+            </div>
+
+            {/* Выбор папки */}
+            <div className="space-y-2">
+              <Label>Папка каталога</Label>
+              <Select
+                value={productForm.folder_id}
+                onValueChange={(v) => setProductForm({ ...productForm, folder_id: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Выберите папку" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">📂 Без папки (в корне)</SelectItem>
+                  {folderTreeFlat.map(({ folder, displayName }) => (
+                    <SelectItem key={folder.id} value={folder.id}>
+                      {displayName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Цены */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="prod-price" className="text-xs font-semibold">
+                  Розничная цена (₽) *
+                </Label>
+                <Input
+                  id="prod-price"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={productForm.price}
+                  onChange={(e) => setProductForm({ ...productForm, price: e.target.value })}
+                  required
+                  placeholder="1500.00"
+                />
+                <p className="text-[10px] text-muted-foreground">Базовая цена по прайсу</p>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor="prod-install-price"
+                  className="text-xs font-semibold text-amber-600 dark:text-amber-400 flex items-center justify-between"
+                >
+                  <span>На монтаже (₽)</span>
+                  <span className="text-[9px] px-1 py-0.5 rounded bg-amber-100 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-300 font-medium">
+                    Акция
+                  </span>
+                </Label>
+                <Input
+                  id="prod-install-price"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={productForm.installation_price}
+                  onChange={(e) =>
+                    setProductForm({ ...productForm, installation_price: e.target.value })
+                  }
+                  placeholder="Оставьте пустым, если = розничной"
+                  className="border-amber-200 dark:border-amber-900/60"
+                />
+                <p className="text-[10px] text-muted-foreground">Льготная цена в период монтажа</p>
+              </div>
+            </div>
+
+            {/* Категория и единица измерения */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Категория</Label>
+                <Select
+                  value={productForm.category}
+                  onValueChange={(v) => setProductForm({ ...productForm, category: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((c) => (
+                      <SelectItem key={c.value} value={c.value}>
+                        {c.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Единица измерения</Label>
+                <Select
+                  value={productForm.unit}
+                  onValueChange={(v) => setProductForm({ ...productForm, unit: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {units.map((u) => (
+                      <SelectItem key={u.value} value={u.value}>
+                        {u.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pt-2">
+              <Switch
+                checked={productForm.is_active}
+                onCheckedChange={(v) => setProductForm({ ...productForm, is_active: v })}
+              />
+              <Label>Активен (доступен для заказов и в сметах)</Label>
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsProductDialogOpen(false)}
+              >
+                Отмена
+              </Button>
+              <Button
+                type="submit"
+                disabled={createProductMutation.isPending || updateProductMutation.isPending}
+              >
+                {(createProductMutation.isPending || updateProductMutation.isPending) && (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                )}
+                {editingProduct ? "Сохранить" : "Добавить"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ================================================================== */}
+      {/* ДИАЛОГ: Создание / Редактирование папки */}
+      {/* ================================================================== */}
+      <Dialog open={isFolderDialogOpen} onOpenChange={setIsFolderDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {editingFolder ? "Редактировать папку" : "Новая папка каталога"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="folder-name">Название папки *</Label>
+              <Input
+                id="folder-name"
+                value={folderForm.name}
+                onChange={(e) => setFolderForm({ ...folderForm, name: e.target.value })}
+                placeholder="Например: Домофония, Видеонаблюдение..."
+                autoFocus
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Родительская папка (для создания подпапки)</Label>
+              <Select
+                value={folderForm.parent_id || "root"}
+                onValueChange={(v) =>
+                  setFolderForm({ ...folderForm, parent_id: v === "root" ? null : v })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Корневая папка (без родителя)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="root">📁 Корневой уровень (основная папка)</SelectItem>
+                  {folderTreeFlat
+                    // Исключаем саму редактируемую папку, чтобы не создать цикличность
+                    .filter(({ folder }) => folder.id !== editingFolder?.id)
+                    .map(({ folder, displayName }) => (
+                      <SelectItem key={folder.id} value={folder.id}>
+                        {displayName}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsFolderDialogOpen(false)}
+            >
+              Отмена
+            </Button>
+            <Button
+              onClick={() => saveFolderMutation.mutate()}
+              disabled={saveFolderMutation.isPending || !folderForm.name.trim()}
+            >
+              {saveFolderMutation.isPending && (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              )}
+              {editingFolder ? "Сохранить" : "Создать"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ================================================================== */}
+      {/* ДИАЛОГ: Загрузка номенклатуры из файла прайс-листа */}
+      {/* ================================================================== */}
+      <ImportNomenclatureDialog
+        isOpen={isImportDialogOpen}
+        onClose={() => setIsImportDialogOpen(false)}
+        onSuccess={() => {
+          refetchProducts();
+          refetchFolders();
+        }}
+      />
+    </div>
   );
 };
 
