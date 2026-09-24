@@ -689,10 +689,10 @@ async function processSuccessfulPayment(yooData, fallbackPayment = null) {
 
       const reqInsert = await pool.query(
         `INSERT INTO requests (
-          name, phone, address, street, house, entrance, apartment,
+          name, phone, address, street, house, entrance, floor, apartment,
           message, status, priority, order_type,
           payment_status, payment_amount, payment_method, client_id
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', 'medium', 'equipment_order', 'paid', $9, 'online', $10)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending', 'medium', 'equipment_order', 'paid', $10, 'online', $11)
         RETURNING id`,
         [
           order.name || 'Абонент ЛК',
@@ -701,6 +701,7 @@ async function processSuccessfulPayment(yooData, fallbackPayment = null) {
           order.street || null,
           order.house || null,
           order.entrance || null,
+          order.floor || null,
           order.apartment || null,
           order.message || 'Заказ оборудования и услуг (оплачено онлайн через ЮKassa)',
           order.amount || paidAmount,

@@ -3137,6 +3137,7 @@ const Cabinet = () => {
             street: cleanOrderStreet || null,
             house: cleanOrderHouse || null,
             entrance: orderEntrance ? String(orderEntrance).trim() : null,
+            floor: floor ? String(floor).trim() : null,
             apartment: cleanOrderApartment ? String(cleanOrderApartment).trim() : null,
             payment_status: null,
             payment_amount: 0,
@@ -3240,6 +3241,7 @@ const Cabinet = () => {
           street: cleanOrderStreet,
           house: cleanOrderHouse,
           entrance: orderEntrance ? String(orderEntrance).trim() : null,
+          floor: floor ? String(floor).trim() : null,
           apartment: cleanOrderApartment ? String(cleanOrderApartment).trim() : null,
           message: messageText,
           amount: baseAmount,
@@ -5402,21 +5404,46 @@ const Cabinet = () => {
                         {[
                           "Не открывает дверь с трубки",
                           "Нет звука / вызова в квартире",
+                          "Хлопает дверь",
                           "Сломан доводчик входной двери",
                           "Не срабатывает электронный ключ",
                           "Повреждена вызывная панель",
-                        ].map((chip, idx) => (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => {
-                              setRepairProblem(prev => prev ? `${prev}, ${chip.toLowerCase()}` : chip);
-                            }}
-                            className="px-2.5 py-1 rounded-lg text-xs border border-slate-200 dark:border-slate-800 bg-white/40 dark:bg-slate-900/40 hover:border-amber-500/50 hover:bg-amber-500/10 text-slate-700 dark:text-slate-300 transition-all font-medium active:scale-95"
-                          >
-                            + {chip}
-                          </button>
-                        ))}
+                        ].map((chip, idx) => {
+                          // RULE 2: Проверяем, выбран ли чип в текущем тексте для подсветки и предотвращения дублирования
+                          const isSelected = repairProblem.toLowerCase().includes(chip.toLowerCase());
+                          return (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => {
+                                setRepairProblem(prev => {
+                                  const trimmed = prev.trim();
+                                  if (!trimmed) return chip;
+                                  
+                                  const lowerChip = chip.toLowerCase();
+                                  // Если чип уже есть в тексте - аккуратно удаляем его при повторном клике (умный toggle)
+                                  if (trimmed.toLowerCase().includes(lowerChip)) {
+                                    const filtered = trimmed
+                                      .split(/,\s*/)
+                                      .filter(part => part.trim().toLowerCase() !== lowerChip);
+                                    return filtered.join(", ");
+                                  }
+                                  
+                                  // Иначе добавляем к описанию через запятую
+                                  return `${trimmed}, ${chip}`;
+                                });
+                              }}
+                              className={`px-2.5 py-1 rounded-lg text-xs border transition-all font-medium active:scale-95 flex items-center gap-1 ${
+                                isSelected
+                                  ? "border-amber-500 bg-amber-500/20 text-amber-800 dark:text-amber-200 font-bold shadow-xs"
+                                  : "border-slate-200 dark:border-slate-800 bg-white/40 dark:bg-slate-900/40 hover:border-amber-500/50 hover:bg-amber-500/10 text-slate-700 dark:text-slate-300"
+                              }`}
+                            >
+                              <span>{isSelected ? "✓" : "+"}</span>
+                              <span>{chip}</span>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
 
