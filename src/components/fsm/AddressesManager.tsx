@@ -91,7 +91,7 @@ export const AddressesManager: React.FC = () => {
     street: "",
     house: "",
     entrance: "1",
-    intercom_type: "Vizit",
+    intercom_type: "",
     notes: ""
   });
 
@@ -224,7 +224,7 @@ export const AddressesManager: React.FC = () => {
         street: "",
         house: "",
         entrance: "1",
-        intercom_type: "Vizit",
+        intercom_type: "",
         notes: ""
       });
 
@@ -365,18 +365,19 @@ export const AddressesManager: React.FC = () => {
   const handleUpdateEntranceInfo = async (intercomType: string, notes: string) => {
     if (!selectedEntrance) return;
     try {
-      console.log(`[AddressesManager] Обновление информации подъезда ID ${selectedEntrance.id}`);
+      const cleanType = intercomType.trim() ? intercomType.trim() : null;
+      console.log(`[AddressesManager] Обновление информации подъезда ID ${selectedEntrance.id}:`, cleanType);
       const { error } = await supabase
         .from("entrances" as any)
-        .update({ intercom_type: intercomType, notes: notes } as any)
+        .update({ intercom_type: cleanType, notes: notes } as any)
         .eq("id", selectedEntrance.id);
 
       if (error) throw error;
 
       toast({ title: "Сохранено", description: "Данные подъезда обновлены" });
-      setSelectedEntrance(prev => prev ? { ...prev, intercom_type: intercomType, notes: notes } : null);
+      setSelectedEntrance(prev => prev ? { ...prev, intercom_type: cleanType, notes: notes } : null);
       
-      setEntrances(prev => prev.map(e => e.id === selectedEntrance.id ? { ...e, intercom_type: intercomType, notes: notes } : e));
+      setEntrances(prev => prev.map(e => e.id === selectedEntrance.id ? { ...e, intercom_type: cleanType, notes: notes } : e));
     } catch (err: any) {
       console.error("[AddressesManager] Ошибка обновления информации:", err);
       toast({ title: "Ошибка", description: err.message, variant: "destructive" });
@@ -763,9 +764,13 @@ export const AddressesManager: React.FC = () => {
                                         </div>
 
                                         <div className="flex items-center gap-1.5 shrink-0">
-                                          {ent.intercom_type && (
-                                            <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 font-normal bg-slate-100 dark:bg-slate-800">
-                                              {ent.intercom_type.split(" ")[0]}
+                                          {ent.intercom_type && ent.intercom_type.trim() && (
+                                            <Badge
+                                              variant="outline"
+                                              className="text-[9px] px-1.5 py-0 h-4 font-normal bg-slate-100 dark:bg-slate-800 truncate max-w-[90px]"
+                                              title={ent.intercom_type}
+                                            >
+                                              {ent.intercom_type}
                                             </Badge>
                                           )}
                                           {linkedCount > 0 ? (
