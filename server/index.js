@@ -162,32 +162,73 @@ app.get('/api/health', (req, res) => {
 // МАРШРУТЫ АВТОРИЗАЦИИ И РЕГИСТРАЦИИ
 // ------------------------------------------------------------------------------
 
-// Регистрация нового жильца
+// Регистрация нового жильца (поддерживает как Email, так и Номер телефона)
 app.post('/api/auth/register', async (req, res) => {
-  const { email, password, full_name, phone } = req.body;
+  const { email, phone, login, password, full_name } = req.body;
+  const rawInput = (email || phone || login || '').trim();
 
-  if (!email || !password) {
-    console.warn('[Бэкенд: Регистрация] Попытка регистрации с пустым email или паролем');
-    return res.status(400).json({ error: 'Электронная почта и пароль обязательны для заполнения' });
+  if (!rawInput || !password) {
+    console.warn('[Бэкенд: Регистрация] Попытка регистрации с пустым логином или паролем');
+    return res.status(400).json({ error: 'Почта или номер телефона и пароль обязательны для заполнения' });
   }
 
-  const cleanEmail = String(email).toLowerCase().trim();
-  const cleanPhone = phone ? String(phone).trim() : null;
-  console.log(`[Бэкенд: Регистрация] Старт регистрации для Email: "${cleanEmail}", Телефон: "${cleanPhone || 'не указан'}"`);
+  // Определяем, что ввёл пользователь: email или номер телефона
+  const isEmail = rawInput.includes('@');
+  const digitsOnly = rawInput.replace(/\D/g, '');
+
+  let cleanEmail = null;
+  let cleanPhone = null;
+
+  if (isEmail) {
+    cleanEmail = rawInput.toLowerCase();
+    // Если дополнительно был передан телефон
+    if (phone) {
+      cleanPhone = String(phone).trim();
+    }
+    console.log(`[Бэкенд: Регистрация] Регистрация по Email: "${cleanEmail}"`);
+  } else {
+    // Ввод распознан как номер телефона
+    if (digitsOnly.length < 10) {
+      return res.status(400).json({ error: 'Пожалуйста, введите корректный номер телефона (не менее 10 цифр) или адрес электронной почты' });
+    }
+    // Сохраняем номер телефона в стандартном формате
+    cleanPhone = rawInput;
+    // Для системной совместимости с полем users.email (NOT NULL) формируем системный email
+    const last10 = digitsOnly.slice(-10);
+    cleanEmail = `phone_${last10}@domofondar.ru`;
+    console.log(`[Бэкенд: Регистрация] Регистрация по номеру телефона: "${cleanPhone}" (системный email: "${cleanEmail}")`);
+  }
 
   try {
-    // 1. Проверяем, существует ли пользователь (параметризованный запрос)
+    // 1. Проверяем, существует ли пользователь с таким Email в users
     const userCheck = await pool.query('SELECT id FROM users WHERE LOWER(email) = LOWER($1)', [cleanEmail]);
     if (userCheck.rows.length > 0) {
-      console.warn(`[Бэкенд: Регистрация] Отклонено: пользователь с Email "${cleanEmail}" уже существует`);
-      return res.status(400).json({ error: 'Этот Email-адрес уже зарегистрирован. Пожалуйста, укажите другую почту или войдите в аккаунт.' });
+      console.warn(`[Бэкенд: Регистрация] Отклонено: пользователь с Email/логином "${cleanEmail}" уже существует`);
+      return res.status(400).json({ 
+        error: isEmail 
+          ? 'Этот Email-адрес уже зарегистрирован. Пожалуйста, укажите другую почту или войдите в аккаунт.' 
+          : 'Этот номер телефона уже зарегистрирован. Пожалуйста, войдите в личный кабинет.'
+      });
     }
 
-    // 2. Хэшируем пароль пользователя с солью 10 раундов
+    // 2. Если регистрация по телефону, дополнительно проверяем profiles на наличие такого номера
+    if (!isEmail && digitsOnly.length >= 10) {
+      const last10 = digitsOnly.slice(-10);
+      const phoneCheck = await pool.query(
+        "SELECT id FROM profiles WHERE REGEXP_REPLACE(COALESCE(phone, ''), '[^0-9]', '', 'g') LIKE '%' || $1",
+        [last10]
+      );
+      if (phoneCheck.rows.length > 0) {
+        console.warn(`[Бэкенд: Регистрация] Отклонено: номер телефона "${last10}" уже привязан к существующему профилю`);
+        return res.status(400).json({ error: 'Пользователь с таким номером телефона уже зарегистрирован. Пожалуйста, войдите в личный кабинет.' });
+      }
+    }
+
+    // 3. Хэшируем пароль пользователя с солью 10 раундов
     const salt = await bcrypt.genSalt(10);
     const password_hash = await bcrypt.hash(password, salt);
 
-    // 3. Вставляем запись нового пользователя в таблицу users
+    // 4. Вставляем запись нового пользователя в таблицу users
     const newUser = await pool.query(
       'INSERT INTO users (email, password_hash, role) VALUES ($1, $2, $3) RETURNING id, email, role',
       [cleanEmail, password_hash, 'user']
@@ -196,31 +237,31 @@ app.post('/api/auth/register', async (req, res) => {
     const user = newUser.rows[0];
     console.log(`[Бэкенд: Регистрация] Создана запись в users для ID: ${user.id}`);
 
-    // 4. Создаем профиль пользователя с сохранением email и подтвержденного статуса почты
+    // 5. Создаем профиль пользователя с сохранением телефона и email
     await pool.query(
       'INSERT INTO profiles (id, full_name, phone, email, email_verified) VALUES ($1, $2, $3, $4, true) ON CONFLICT (id) DO UPDATE SET full_name = COALESCE(EXCLUDED.full_name, profiles.full_name), phone = COALESCE(EXCLUDED.phone, profiles.phone), email = COALESCE(EXCLUDED.email, profiles.email), email_verified = true',
-      [user.id, full_name || '', cleanPhone, cleanEmail]
+      [user.id, full_name || '', cleanPhone, isEmail ? cleanEmail : null]
     );
 
-    // 5. Назначаем базовую роль 'user' в user_roles
+    // 6. Назначаем базовую роль 'user' в user_roles
     await pool.query(
       'INSERT INTO user_roles (user_id, role) VALUES ($1, $2) ON CONFLICT DO NOTHING',
       [user.id, 'user']
     );
 
-    // 6. Генерируем JWT-токен сессии на 7 дней
+    // 7. Генерируем JWT-токен сессии на 7 дней
     const token = jwt.sign(
       { id: user.id, email: user.email, role: 'authenticated', sub: user.id },
       ACTIVE_JWT_SECRET,
       { expiresIn: '7d' }
     );
 
-    console.log(`[Бэкенд: Регистрация] Успешно завершена для Email: "${cleanEmail}"`);
+    console.log(`[Бэкенд: Регистрация] Успешно завершена для ID: "${user.id}" (логин: "${cleanEmail}")`);
     res.status(201).json({ user, token, session: { access_token: token, user } });
   } catch (err) {
     console.error('[Бэкенд: Регистрация] Критическая ошибка во время регистрации:', err);
     if (err.code === '23505') {
-      return res.status(400).json({ error: 'Этот Email-адрес уже зарегистрирован' });
+      return res.status(400).json({ error: 'Пользователь с такими данными уже зарегистрирован' });
     }
     res.status(500).json({ error: 'Критическая ошибка сервера при регистрации. Повторите попытку позже.' });
   }

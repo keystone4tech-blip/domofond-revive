@@ -1777,6 +1777,8 @@ const Cabinet = () => {
   // --- СТЕЙТЫ ДЛЯ АВТОПОИСКА АБОНЕНТА ПО НОМЕРУ ТЕЛЕФОНА И ПРИВЕТСТВИЯ ---
   const [showPhoneWelcomeDialog, setShowPhoneWelcomeDialog] = useState(false); // Флаг показа приветственного окна
   const [matchedSubscriberData, setMatchedSubscriberData] = useState<any>(null); // Данные найденного по телефону абонента
+  const [welcomeFullName, setWelcomeFullName] = useState(""); // ФИО для подтверждения в диалоговом окне
+  const [savingWelcomeData, setSavingWelcomeData] = useState(false); // Индикатор сохранения данных из всплывающего окна
   const [hasSearchedPhoneOnce, setHasSearchedPhoneOnce] = useState(false); // Флаг однократного поиска при загрузке
 
   const [isVisible, setIsVisible] = useState({
@@ -2101,10 +2103,8 @@ const Cabinet = () => {
         setAccountSearchInput(found.account_number);
         setAccountSearchFound(true);
 
-        // ВАЖНО: Фамилия (fullName), Email (email), Этаж (floor)
-        // остаются пустыми или теми, что ввел сам пользователь!
-        
-        // Показываем приветственное всплывающее окно
+        // Предзаполняем ФИО найденного абонента для модального окна подтверждения
+        setWelcomeFullName(found.full_name || fullName || "");
         setMatchedSubscriberData(found);
         setShowPhoneWelcomeDialog(true);
       } else {
@@ -2113,6 +2113,79 @@ const Cabinet = () => {
     } catch (err) {
       console.error("[ЛК: Поиск по телефону] Ошибка выполнения поиска:", err);
     }
+  };
+
+  // Обработчик подтверждения данных найденного по номеру телефона договора
+  const handleConfirmFoundSubscriber = async () => {
+    if (!matchedSubscriberData || !userId) {
+      setShowPhoneWelcomeDialog(false);
+      return;
+    }
+
+    const finalName = welcomeFullName.trim() || matchedSubscriberData.full_name || fullName || "";
+    if (!finalName) {
+      toast({
+        title: "Введите ФИО",
+        description: "Пожалуйста, введите ваше ФИО для сохранения и привязки данных договора.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setSavingWelcomeData(true);
+      console.log(`[ЛК: Договор по телефону] Сохраняем: ФИО "${finalName}", адрес "${matchedSubscriberData.address}", л/с "${matchedSubscriberData.account_number}"`);
+      
+      const apt = matchedSubscriberData.apartment?.trim() || extractApartmentFromAddress(matchedSubscriberData.address || "");
+      
+      const { error: updErr } = await supabase
+        .from("profiles")
+        .update({
+          full_name: finalName,
+          address: matchedSubscriberData.address,
+          apartment: apt,
+          phone: phone || matchedSubscriberData.phone,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", userId);
+
+      if (updErr) throw updErr;
+
+      setFullName(finalName);
+      setAddress(matchedSubscriberData.address);
+      setApartment(apt);
+      setProfile((prev: any) => ({
+        ...prev,
+        full_name: finalName,
+        address: matchedSubscriberData.address,
+        apartment: apt,
+        phone: phone || matchedSubscriberData.phone,
+      }));
+
+      setShowPhoneWelcomeDialog(false);
+      toast({
+        title: "Данные успешно привязаны!",
+        description: `Адрес ${matchedSubscriberData.address} и лицевой счёт ${matchedSubscriberData.account_number} сохранены в профиле.`,
+      });
+    } catch (err: any) {
+      console.error("[ЛК: Договор по телефону] Ошибка сохранения данных:", err);
+      toast({
+        title: "Ошибка сохранения",
+        description: err.message || "Не удалось сохранить данные профиля",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingWelcomeData(false);
+    }
+  };
+
+  // Обработчик отмены сохранения найденных данных договора
+  const handleCancelFoundSubscriber = () => {
+    setShowPhoneWelcomeDialog(false);
+    toast({
+      title: "Сохранение отменено",
+      description: "Вы можете ввести адрес и данные вручную в карточке профиля.",
+    });
   };
 
   // Загрузка кэша уникальных домов из БД
@@ -2889,10 +2962,11 @@ const Cabinet = () => {
       console.log(`[Cabinet Auth] Почта инициализирована: "${defaultEmail}" (верифицирована: ${!!data.email_verified || !!defaultEmail})`);
 
       // Автоматический поиск адреса по номеру телефона, если адрес еще не заполнен
-      if (!data.address && data.phone && !hasSearchedPhoneOnce) {
+      const targetPhone = data.phone || parsedUser?.phone || "";
+      if (!data.address && targetPhone && !hasSearchedPhoneOnce) {
         setHasSearchedPhoneOnce(true);
-        console.log(`[Cabinet Auth] Адрес не заполнен, запускаем автопоиск по номеру телефона: ${data.phone}...`);
-        searchSubscriberByPhone(data.phone);
+        console.log(`[Cabinet Auth] Адрес не заполнен, запускаем автопоиск договора по номеру телефона: "${targetPhone}"...`);
+        searchSubscriberByPhone(targetPhone);
       }
     } catch (error: any) {
       console.error("[Cabinet Auth] Критическая ошибка при инициализации пользователя в кабинете:", error);
@@ -3443,15 +3517,8 @@ const Cabinet = () => {
     if (!displayStreet || !displayStreet.trim()) missingFields.push("Улица");
     if (!displayHouse || !displayHouse.trim()) missingFields.push("Номер дома");
     
-    // Номер квартиры, подъезд и этаж больше не обязательны безусловно.
-    // Однако, если адрес находится на обслуживании (isFloorRequired === true), 
-    // то ввод этажа является строго обязательным для сохранения.
-    if (isFloorRequired && (!floor || !floor.trim())) {
-      console.log("[Верификация] Отклонено: этаж обязателен для обслуживаемого адреса, но не указан");
-      missingFields.push("Этаж");
-    }
-    
-    // Проверка email: если emailInput в стейте пуст, проверяем стейт email или сохраненного пользователя в браузере
+    // Номер квартиры, подъезд, этаж и email не являются обязательными полями.
+    // Если пользователь указал email, сохраняем его в стейте
     let finalEmail = (emailInput || "").trim();
     if (!finalEmail) {
       const storedUser = localStorage.getItem("user") || sessionStorage.getItem("user");
@@ -3462,12 +3529,8 @@ const Cabinet = () => {
         setEmail(finalEmail);
       }
     }
-
-    if (!finalEmail) {
-      missingFields.push("Электронная почта (Email)");
-    }
     
-    // Проверка согласия с обработкой персональных данных
+    // Проверка согласия с обработкой персональных данных (ФЗ-152 РФ)
     if (!agreedToTerms) {
       missingFields.push("Согласие на обработку персональных данных (ФЗ-152 РФ)");
     }
@@ -3898,73 +3961,6 @@ const Cabinet = () => {
             )}
 
 
-            {/* Доступ к системе - в верху страницы */}
-            <Card className="glass-premium rounded-[24px] border-none shadow-lg">
-              <CardHeader className="pb-4 border-b border-slate-100 dark:border-slate-800">
-                <CardTitle className="flex items-center gap-2 font-display text-lg font-bold text-slate-800 dark:text-slate-100">
-                  <Shield className="h-5 w-5 text-amber-500 animate-pulse" />
-                  Доступ к системе
-                </CardTitle>
-                <CardDescription className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                  {profile?.address && !editing
-                    ? (userAccount
-                        ? "Информация о ваших услугах и удалённом доступе"
-                        : "Статус обслуживания вашего адреса в компании «Домофондар»")
-                    : "Баланс, подключенные услуги и доступ к домофону отображаются после сохранения данных профиля."}
-                </CardDescription>
-              </CardHeader>
-              {profile?.address && !editing ? (
-                <CardContent className="space-y-4 pt-4">
-                  {/* Карточка задолженности/статуса. Если адреса нет в БД обслуживания, она сама выведет блок "Частный клиент" */}
-                  <DebtCard 
-                    address={profile.address} 
-                    apartment={profile.apartment || ""} 
-                    fullName={profile.full_name || fullName} 
-                    phone={profile.phone || phone} 
-                    embedded 
-                    setParentAccount={setUserAccount}
-                    isVerified={profile?.is_verified === true || profile?.verification_status === "verified"}
-                    userId={userId}
-                  />
-
-                  {/* Удаленный доступ к домофону (отображается для всех адресов, проверяет наличие логопасов по адресу и лицевому счету) */}
-                  <RemoteAccessCard 
-                    address={profile.address} 
-                    apartment={profile.apartment || ""} 
-                    accountNumber={userAccount?.account_number} 
-                    userId={userId || undefined} 
-                    profile={profile}
-                    hasLk={userAccount?.has_lk || false}
-                    onOpenVerification={() => setIsVerificationDialogOpen(true)}
-                  />
-
-                  {/* Кнопка создания заявки / заказа платных услуг */}
-                  <div className="p-4 rounded-2xl border border-slate-200/50 dark:border-slate-700/50 bg-slate-50/30 dark:bg-slate-900/30 flex flex-col sm:flex-row items-center justify-between gap-4 transition-all hover:border-primary/20">
-                    <div className="text-left w-full">
-                      <p className="font-semibold text-sm flex items-center gap-1.5"><Wrench className="h-4 w-4 text-primary shrink-0" /> Заявки и заказ услуг</p>
-                      <p className="text-xs text-muted-foreground mt-1">Нужен ремонт трубки, новые ключи или установка оборудования? Оформить заявку прямо сейчас.</p>
-                    </div>
-                    <ShinyButton onClick={() => { setOrderType("repair"); setIsOrderDialogOpen(true); }} className="w-full sm:w-auto shrink-0 flex items-center gap-1.5 px-5 py-2.5 rounded-xl h-10">
-                      <Plus className="h-4 w-4" />
-                      Создать заявку
-                    </ShinyButton>
-                  </div>
-                </CardContent>
-              ) : (
-                <CardContent className="pt-4 pb-5">
-                  <div className="p-4 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-900/30 text-center space-y-1">
-                    <p className="text-xs font-semibold text-foreground">
-                      Данные профиля ещё не сохранены
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Для отображения задолженности, начислений и статуса умного домофона заполните информацию ниже и нажмите «Сохранить данные профиля».
-                    </p>
-                  </div>
-                </CardContent>
-              )}
-            </Card>
-
-
 
             <Card className="glass-premium rounded-[24px] border-none shadow-xl">
               <CardHeader className="pb-4 border-b border-slate-100 dark:border-slate-800">
@@ -4017,6 +4013,40 @@ const Cabinet = () => {
               </CardHeader>
               <CardContent className="space-y-5 pt-5">
                 
+                {/* RULE 2: Состояние лицевого счёта и оплата ТО (в самом верху личной информации) */}
+                {profile?.address && !editing ? (
+                  <div className="space-y-2.5 pb-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <CreditCard className="h-4 w-4 text-emerald-600" />
+                        Лицевой счёт и оплата ТО
+                      </span>
+                      {userAccount?.account_number && (
+                        <Badge variant="outline" className="font-mono text-xs border-emerald-500/30 text-emerald-700 dark:text-emerald-300 font-bold">
+                          л/с {userAccount.account_number}
+                        </Badge>
+                      )}
+                    </div>
+                    <DebtCard 
+                      address={profile.address} 
+                      apartment={profile.apartment || ""} 
+                      fullName={profile.full_name || fullName} 
+                      phone={profile.phone || phone} 
+                      embedded 
+                      setParentAccount={setUserAccount}
+                      isVerified={profile?.is_verified === true || profile?.verification_status === "verified"}
+                      userId={userId}
+                    />
+                  </div>
+                ) : (
+                  <div className="p-3.5 mb-2 rounded-2xl border border-dashed border-amber-500/30 bg-amber-50/40 dark:bg-amber-950/20 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2.5 text-left">
+                    <CreditCard className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />
+                    <div>
+                      <span className="font-bold">Состояние лицевого счёта и оплата:</span> Баланс, начисления за техническое обслуживание и онлайн-оплата отобразятся здесь сразу после заполнения и сохранения данных адреса.
+                    </div>
+                  </div>
+                )}
+
                 {/* 1. ФИО Абонента */}
                 <div className="space-y-2 text-left">
                   <Label htmlFor="fullName" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">👤 Полное имя (ФИО) *</Label>
@@ -4053,9 +4083,9 @@ const Cabinet = () => {
                   />
                 </div>
 
-                {/* 3. Электронная почта (заполнено при регистрации, только для чтения) */}
+                {/* 3. Электронная почта (необязательно) */}
                 <div className="space-y-2 text-left">
-                  <Label htmlFor="emailInput" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">📧 Электронная почта (Email) *</Label>
+                  <Label htmlFor="emailInput" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">📧 Электронная почта (Email) (необязательно)</Label>
                   <div className="relative">
                     <Input
                       id="emailInput"
@@ -4280,12 +4310,12 @@ const Cabinet = () => {
                   </div>
                 </div>
 
-                {/* RULE 2: Информационная подсказка скрывается, как только указаны все данные (подъезд, квартира, этаж) */}
-                {!isLocked && (displayStreet?.trim() && displayHouse?.trim()) && (!entrance?.trim() || !apartment?.trim() || !floor?.trim()) && (
+                {/* RULE 2: Информационная подсказка скрывается, как только указаны подъезд и квартира */}
+                {!isLocked && (displayStreet?.trim() && displayHouse?.trim()) && (!entrance?.trim() || !apartment?.trim()) && (
                   <div className="flex items-start gap-2.5 text-[11px] text-blue-700 dark:text-blue-300 bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200/50 dark:border-blue-800/30 px-3.5 py-3 rounded-xl animate-in fade-in duration-300 text-left my-2">
                     <Info className="h-4 w-4 shrink-0 mt-0.5 text-blue-500" />
                     <div>
-                      <span className="font-bold">Пожалуйста, укажите полные данные</span> (подъезд, квартира, этаж), если они у вас есть. Это позволит нам значительно быстрее реагировать на ваши заявки по ремонту и доставке ключей.
+                      <span className="font-bold">Пожалуйста, укажите полные данные</span> (подъезд и квартира), если они у вас есть. Это позволит нам значительно быстрее реагировать на ваши заявки по ремонту и доставке ключей.
                     </div>
                   </div>
                 )}
@@ -4402,11 +4432,11 @@ const Cabinet = () => {
                     )}
                   </div>
 
-                  {/* 7. Этаж */}
+                  {/* 7. Этаж (необязательно) */}
                   <div className="space-y-2 text-left">
                     <Label htmlFor="floor" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
                       <Building2 className="h-3.5 w-3.5 text-primary/70 shrink-0" />
-                      Этаж
+                      Этаж (необязательно)
                     </Label>
                     <Input
                       id="floor"
@@ -4437,15 +4467,13 @@ const Cabinet = () => {
 
                 {/* 9. Кнопки сохранения / отмены данных профиля */}
                 {!isLocked && (() => {
-                  // Валидируем форму перед активацией кнопки сохранения.
+                  // Валидируем форму перед активацией кнопки сохранения (почта и этаж не обязательны).
                   const isFormValid = !!(
                     fullName?.trim() &&
                     phone?.trim() &&
                     displayStreet?.trim() &&
                     displayHouse?.trim() &&
-                    emailInput?.trim() &&
-                    agreedToTerms &&
-                    (!isFloorRequired || floor?.trim())
+                    agreedToTerms
                   );
 
                   return (
@@ -4582,6 +4610,45 @@ const Cabinet = () => {
               </CardContent>
             </Card>
 
+            {/* Доступ к системе: только информация и оплата по личным кабинетам */}
+            <Card className="glass-premium rounded-[24px] border-none shadow-lg">
+              <CardHeader className="pb-4 border-b border-slate-100 dark:border-slate-800">
+                <CardTitle className="flex items-center gap-2 font-display text-lg font-bold text-slate-800 dark:text-slate-100">
+                  <Shield className="h-5 w-5 text-amber-500 animate-pulse" />
+                  Доступ к системе (Личный кабинет)
+                </CardTitle>
+                <CardDescription className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  {profile?.address && !editing
+                    ? "Информация о подключении к умному домофону и оплата доступа к личному кабинету"
+                    : "Доступ к домофону и оплата отображаются после сохранения данных профиля."}
+                </CardDescription>
+              </CardHeader>
+              {profile?.address && !editing ? (
+                <CardContent className="space-y-4 pt-4">
+                  {/* Удаленный доступ к домофону: статус подключения, приложение и оплата подписки на личные кабинеты */}
+                  <RemoteAccessCard 
+                    address={profile.address} 
+                    apartment={profile.apartment || ""} 
+                    accountNumber={userAccount?.account_number} 
+                    userId={userId || undefined} 
+                    profile={profile}
+                    hasLk={userAccount?.has_lk || false}
+                    onOpenVerification={() => setIsVerificationDialogOpen(true)}
+                  />
+                </CardContent>
+              ) : (
+                <CardContent className="pt-4 pb-5">
+                  <div className="p-4 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-900/30 text-center space-y-1">
+                    <p className="text-xs font-semibold text-foreground">
+                      Данные профиля ещё не сохранены
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Для доступа к умному домофону и личному кабинету заполните и сохраните данные адреса выше.
+                    </p>
+                  </div>
+                </CardContent>
+              )}
+            </Card>
 
             {/* --- РАЗДЕЛ: ИСТОРИЯ ВАШИХ ОБРАЩЕНИЙ И ОПЛАТ (в самом низу страницы) --- */}
             {(() => {
@@ -5834,34 +5901,34 @@ const Cabinet = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Приветственный диалог автоопределения адреса по номеру телефона */}
+      {/* Всплывающее окно автоподтягивания адреса и лицевого счёта по номеру телефона */}
       <Dialog open={showPhoneWelcomeDialog} onOpenChange={setShowPhoneWelcomeDialog}>
         <DialogContent className="max-w-lg p-0 overflow-hidden border-0 shadow-2xl rounded-3xl bg-white dark:bg-slate-900">
-          {/* Верхний градиентный баннер с приветствием */}
-          <div className="bg-gradient-to-br from-emerald-500 via-teal-600 to-emerald-700 p-6 text-white text-left relative overflow-hidden">
+          {/* Верхний градиентный баннер */}
+          <div className="bg-gradient-to-br from-emerald-600 via-teal-600 to-emerald-800 p-6 text-white text-left relative overflow-hidden">
             <div className="absolute -right-6 -bottom-6 opacity-15">
               <ShieldCheck className="h-36 w-36" />
             </div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-xs font-semibold mb-3">
               <Sparkles className="h-3.5 w-3.5 text-amber-300 animate-pulse" />
-              <span>Договор найден автоматически</span>
+              <span>Договор найден по номеру телефона</span>
             </div>
             <h2 className="text-xl sm:text-2xl font-bold font-display leading-tight">
-              Добро пожаловать в «Домофондар»! 👋
+              Найден договор по вашему номеру
             </h2>
-            <p className="text-white/85 text-xs sm:text-sm mt-1.5 leading-relaxed">
-              Мы автоматически определили ваш адрес и лицевой счёт по указанному номеру телефона.
+            <p className="text-white/90 text-xs sm:text-sm mt-1.5 leading-relaxed">
+              По вашему номеру найден адрес и лицевой счёт. Введите ФИО и подтвердите или отмените сохранение данных.
             </p>
           </div>
 
           <div className="p-6 space-y-4 text-left">
-            {/* Карточка найденных данных из базы 1С */}
-            <div className="p-4 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200/80 dark:border-emerald-800/50 space-y-2.5">
+            {/* Карточка найденных данных из базы договоров */}
+            <div className="p-4 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-200/80 dark:border-emerald-800/50 space-y-2.5">
               <div className="flex items-start gap-2.5">
                 <MapPin className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
                 <div>
                   <span className="text-[11px] font-semibold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider block">
-                    Ваш адрес подключения:
+                    Адрес подключения:
                   </span>
                   <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mt-0.5">
                     {matchedSubscriberData?.address}
@@ -5885,33 +5952,46 @@ const Cabinet = () => {
               </div>
             </div>
 
-            {/* Просьба ввести недостающие данные */}
-            <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-slate-700 dark:text-slate-300 space-y-1">
-              <div className="font-bold text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
-                <Info className="h-4 w-4 shrink-0" />
-                Осталось заполнить недостающие данные:
-              </div>
-              <p className="leading-relaxed">
-                Данные адреса подтянуты. Пожалуйста, укажите ваши <strong>Фамилию и Имя</strong>, <strong>этаж</strong> и <strong>email</strong>, затем нажмите кнопку <strong>«Сохранить профиль»</strong>.
+            {/* Поле ввода ФИО */}
+            <div className="space-y-1.5 text-left">
+              <Label htmlFor="welcomeFullNameInput" className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                <User className="h-4 w-4 text-emerald-600" />
+                <span>Фамилия, Имя и Отчество (ФИО) *</span>
+              </Label>
+              <Input
+                id="welcomeFullNameInput"
+                value={welcomeFullName}
+                onChange={(e) => setWelcomeFullName(e.target.value)}
+                placeholder="Например: Иванов Иван Иванович"
+                className="bg-white/80 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 font-medium h-11 transition-all rounded-xl"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Укажите полные ФИО собственника или проживающего для оформления лицевого счёта.
               </p>
             </div>
 
-            <Button
-              onClick={() => {
-                setShowPhoneWelcomeDialog(false);
-                // Плавный скролл и фокус на поле ФИО
-                setTimeout(() => {
-                  const el = document.getElementById("fullName");
-                  if (el) {
-                    el.focus();
-                    el.scrollIntoView({ behavior: "smooth", block: "center" });
-                  }
-                }, 150);
-              }}
-              className="w-full h-11 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm shadow-md"
-            >
-              Заполнить недостающие данные →
-            </Button>
+            {/* Две кнопки: «Подтвердить» и «Отменить» */}
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <Button
+                type="button"
+                onClick={handleConfirmFoundSubscriber}
+                disabled={savingWelcomeData}
+                className="w-full h-11 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm shadow-md flex items-center justify-center gap-1.5"
+              >
+                {savingWelcomeData ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                <span>Подтвердить</span>
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleCancelFoundSubscriber}
+                disabled={savingWelcomeData}
+                className="w-full h-11 rounded-2xl border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 font-semibold text-sm"
+              >
+                Отменить
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

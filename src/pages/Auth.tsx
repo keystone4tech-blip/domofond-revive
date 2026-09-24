@@ -11,28 +11,40 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 
 const Auth = () => {
-  const [email, setEmail] = useState(""); // Стейт для хранения Email адреса
-  const [phone, setPhone] = useState(""); // Стейт для хранения номера телефона пользователя
+  const [loginInput, setLoginInput] = useState(""); // Стейт для логина входа (Email или телефон)
+  const [signupLogin, setSignupLogin] = useState(""); // Стейт единого поля регистрации (Email или телефон)
   const [password, setPassword] = useState(""); // Стейт для хранения пароля
   const [confirmPassword, setConfirmPassword] = useState(""); // Стейт для подтверждения пароля (повторный ввод)
   const [fullName, setFullName] = useState(""); // Стейт для полного имени (передается пустым при регистрации)
   const [loading, setLoading] = useState(false); // Стейт процесса загрузки запроса к API
   const [agreedToTerms, setAgreedToTerms] = useState(true); // Стейт согласия на обработку персональных данных (ФЗ-152 РФ, включен по умолчанию)
 
-  // Форматирование номера телефона в формат +7 (XXX) XXX-XX-XX
-  const handlePhoneChange = (val: string) => {
-    let digits = val.replace(/\D/g, "");
-    if (digits.startsWith("8")) digits = "7" + digits.slice(1);
-    if (!digits.startsWith("7") && digits.length > 0) digits = "7" + digits;
-    digits = digits.slice(0, 11);
-    
-    let formatted = "";
-    if (digits.length > 0) formatted = "+7";
-    if (digits.length > 1) formatted += ` (${digits.slice(1, 4)}`;
-    if (digits.length >= 4) formatted += `) ${digits.slice(4, 7)}`;
-    if (digits.length >= 7) formatted += `-${digits.slice(7, 9)}`;
-    if (digits.length >= 9) formatted += `-${digits.slice(9, 11)}`;
-    setPhone(formatted);
+  // Умное форматирование для поля ввода: если вводятся цифры — форматируем как телефон +7 (XXX) XXX-XX-XX, если email — сохраняем как есть
+  const handleSmartInputChange = (val: string, setter: (v: string) => void) => {
+    // Если содержит буквы или символ @ — пользователь вводит email
+    if (/[a-zA-Z@]/.test(val)) {
+      setter(val);
+      return;
+    }
+
+    // Если введены цифры или знаки номера
+    const digits = val.replace(/\D/g, "");
+    if (digits.length === 0) {
+      setter("");
+      return;
+    }
+
+    let d = digits;
+    if (d.startsWith("8")) d = "7" + d.slice(1);
+    if (!d.startsWith("7")) d = "7" + d;
+    d = d.slice(0, 11);
+
+    let formatted = "+7";
+    if (d.length > 1) formatted += ` (${d.slice(1, 4)}`;
+    if (d.length >= 4) formatted += `) ${d.slice(4, 7)}`;
+    if (d.length >= 7) formatted += `-${d.slice(7, 9)}`;
+    if (d.length >= 9) formatted += `-${d.slice(9, 11)}`;
+    setter(formatted);
   };
 
   // Вспомогательная функция для оценки надежности пароля (возвращает оценку от 0 до 5)
@@ -74,10 +86,31 @@ const Auth = () => {
     e.preventDefault();
     setLoading(true);
 
-    // 1. Приводим email к нижнему регистру и обрезаем лишние пробелы для чистоты базы
-    const cleanEmail = email.toLowerCase().trim();
+    const rawLogin = signupLogin.trim();
+    if (!rawLogin) {
+      toast({
+        title: "Заполните поле",
+        description: "Пожалуйста, укажите адрес электронной почты или номер телефона.",
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
 
-    // 2. Проверяем обязательное согласие на обработку персональных данных (ФЗ-152 РФ)
+    const isEmail = rawLogin.includes("@");
+    const digits = rawLogin.replace(/\D/g, "");
+
+    if (!isEmail && digits.length < 10) {
+      toast({
+        title: "Некорректный номер телефона",
+        description: "Пожалуйста, укажите полный номер телефона (не менее 10 цифр) или действующий email.",
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
+
+    // Проверяем обязательное согласие на обработку персональных данных (ФЗ-152 РФ)
     if (!agreedToTerms) {
       console.warn("[Регистрация] Отклонено: пользователь не принял условия обработки персональных данных");
       toast({
@@ -89,7 +122,7 @@ const Auth = () => {
       return;
     }
 
-    // 3. Проверяем совпадение паролей перед отправкой на сервер
+    // Проверяем совпадение паролей перед отправкой на сервер
     if (password !== confirmPassword) {
       console.warn("[Регистрация] Отклонено: введенные пароли не совпадают");
       toast({
@@ -102,23 +135,28 @@ const Auth = () => {
     }
 
     try {
-      console.log(`[Регистрация] Отправка запроса на регистрацию для Email: "${cleanEmail}", Телефон: "${phone}"`); // Логирование
+      console.log(`[Регистрация] Отправка запроса на регистрацию для логина: "${rawLogin}"`); // Логирование
       const response = await fetch(`${API_URL}/api/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: cleanEmail, password, full_name: "", phone: phone.trim() }), // Передаем email, пароль и телефон
+        body: JSON.stringify({ 
+          login: rawLogin, 
+          email: isEmail ? rawLogin.toLowerCase() : undefined, 
+          phone: !isEmail ? rawLogin : undefined, 
+          password, 
+          full_name: "" 
+        }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        // Заменяем технические ошибки на понятный русский разговорный формат
         let friendlyMessage = data.error || "Не удалось завершить регистрацию.";
-        
-        // Анализируем технический текст ошибки
         const errMsg = String(friendlyMessage).toLowerCase();
         if (errMsg.includes("user already exists") || errMsg.includes("exists") || errMsg.includes("unique") || errMsg.includes("duplicate")) {
-          friendlyMessage = "Этот Email-адрес уже зарегистрирован. Возможно, вы уже создавали аккаунт ранее? Пожалуйста, перейдите на вкладку 'Вход' или укажите другую почту.";
+          friendlyMessage = isEmail
+            ? "Этот Email-адрес уже зарегистрирован. Пожалуйста, перейдите на вкладку 'Вход' или укажите другую почту."
+            : "Этот номер телефона уже зарегистрирован. Пожалуйста, перейдите на вкладку 'Вход'.";
         }
         
         throw new Error(friendlyMessage);
@@ -139,7 +177,6 @@ const Auth = () => {
         sessionStorage.setItem("user", JSON.stringify(data.user));
         localStorage.setItem("remember_me", "false");
       }
-
 
       // Генерируем событие для мгновенного реактивного обновления сессии в шапке сайта
       console.log("[Auth Page] Регистрация успешна, генерируем событие auth-change..."); // Логирование
@@ -163,25 +200,32 @@ const Auth = () => {
     e.preventDefault();
     setLoading(true);
 
-    // Приводим email к нижнему регистру и обрезаем пробелы
-    const cleanEmail = email.toLowerCase().trim();
+    const rawLogin = loginInput.trim();
+    if (!rawLogin) {
+      toast({
+        title: "Заполните логин",
+        description: "Пожалуйста, введите ваш email или номер телефона.",
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
 
     try {
-      console.log(`[Вход] Попытка авторизации пользователя: "${cleanEmail}"`); // Логирование
+      console.log(`[Вход] Попытка авторизации пользователя: "${rawLogin}"`); // Логирование
       const response = await fetch(`${API_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: cleanEmail, password }),
+        body: JSON.stringify({ login: rawLogin, password }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        // Человекопонятный перевод ошибок авторизации
         let friendlyMessage = data.error || "Не удалось войти.";
         const errMsg = String(friendlyMessage).toLowerCase();
-        if (errMsg.includes("invalid email or password") || errMsg.includes("invalid credentials") || errMsg.includes("not found") || errMsg.includes("wrong")) {
-          friendlyMessage = "Неверный адрес электронной почты или пароль. Пожалуйста, проверьте правильность ввода данных.";
+        if (errMsg.includes("invalid") || errMsg.includes("not found") || errMsg.includes("wrong")) {
+          friendlyMessage = "Неверный логин (Email/телефон) или пароль. Пожалуйста, проверьте правильность ввода данных.";
         }
         throw new Error(friendlyMessage);
       }
@@ -239,18 +283,19 @@ const Auth = () => {
 
               <TabsContent value="signin">
                 <form onSubmit={handleSignIn} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="signin-email">Email</Label>
+                  <div className="space-y-2 text-left">
+                    <Label htmlFor="signin-login">Электронная почта или телефон</Label>
                     <Input
-                      id="signin-email"
-                      type="email"
-                      placeholder="your@email.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      id="signin-login"
+                      type="text"
+                      placeholder="your@email.com или +7 (999) 000-00-00"
+                      value={loginInput}
+                      onChange={(e) => handleSmartInputChange(e.target.value, setLoginInput)}
                       required
+                      className="bg-background/50 border-border/80 focus:border-primary/50 transition-all font-medium"
                     />
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-2 text-left">
                     <Label htmlFor="signin-password">Пароль</Label>
                     <Input
                       id="signin-password"
@@ -277,7 +322,6 @@ const Auth = () => {
                   </div>
 
                   <Button type="submit" className="w-full" disabled={loading}>
-
                     {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Войти
                   </Button>
@@ -286,36 +330,23 @@ const Auth = () => {
 
               <TabsContent value="signup">
                 <form onSubmit={handleSignUp} className="space-y-4">
-                  {/* Поле Email (основной идентификатор при регистрации) */}
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-email">Электронная почта (Email)</Label>
-                    <Input
-                      id="signup-email"
-                      type="email"
-                      placeholder="your@email.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      className="bg-background/50 border-border/80 focus:border-primary/50 transition-all"
-                    />
-                  </div>
-
-                  {/* Поле Номер телефона (для мгновенного автоопределения адреса по базе абонентов) */}
-                  <div className="space-y-2">
+                  {/* Единое поле: Email или Номер телефона */}
+                  <div className="space-y-2 text-left">
                     <div className="flex justify-between items-center">
-                      <Label htmlFor="signup-phone">Номер телефона (необязательно)</Label>
+                      <Label htmlFor="signup-login">Почта или номер телефона</Label>
                       <span className="text-[11px] text-primary font-medium">Автопоиск адреса ⚡</span>
                     </div>
                     <Input
-                      id="signup-phone"
-                      type="tel"
-                      placeholder="+7 (___) ___-__-__"
-                      value={phone}
-                      onChange={(e) => handlePhoneChange(e.target.value)}
-                      className="bg-background/50 border-border/80 focus:border-primary/50 transition-all font-mono"
+                      id="signup-login"
+                      type="text"
+                      placeholder="your@email.com или +7 (999) 000-00-00"
+                      value={signupLogin}
+                      onChange={(e) => handleSmartInputChange(e.target.value, setSignupLogin)}
+                      required
+                      className="bg-background/50 border-border/80 focus:border-primary/50 transition-all font-medium"
                     />
                     <p className="text-[11px] text-muted-foreground leading-tight">
-                      Если ваш номер есть в договоре на домофон — адрес и лицевой счет подтянутся автоматически!
+                      При указании номера телефона ваш адрес и лицевой счёт найдутся автоматически по базе договоров!
                     </p>
                   </div>
 
