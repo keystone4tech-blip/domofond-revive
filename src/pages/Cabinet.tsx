@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, Component, ReactNode } from "react";
+import React, { useEffect, useState, useMemo, useRef, Component, ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -3200,11 +3200,15 @@ const Cabinet = () => {
     return { sum1, sum2, sum3, total };
   };
 
-  // Эффект инициализации полей новой заявки при открытии диалогового окна
+  // Реф для отслеживания момента открытия диалога (переход false -> true)
+  const prevIsOrderDialogOpenRef = useRef(false);
+
+  // RULE 2: Эффект инициализации полей заявки СТРОГО в момент открытия диалогового окна
   useEffect(() => {
-    if (isOrderDialogOpen) {
-      console.log("[Заявка] Инициализация формы заявки, полный сброс ранее выбранных товаров и услуг...");
-      // RULE 2: Полностью сбрасываем кэш и стейт выбора товаров и услуг
+    // Срабатываем строго один раз в момент открытия диалога (когда он был закрыт, а стал открыт)
+    if (isOrderDialogOpen && !prevIsOrderDialogOpenRef.current) {
+      console.log("[Заявка] Первоначальное открытие диалога заявки, инициализация полей...");
+      // RULE 2: Сбрасываем выбранные позиции только при НОВОМ открытии диалога
       setSelectedServiceId(null);
       setSelectedEquipmentId(null);
       setSelectedEquipments({});
@@ -3224,7 +3228,7 @@ const Cabinet = () => {
       let houseVal = displayHouse || "";
       let entVal = entrance || "";
 
-      // Если displayStreet или displayHouse пустые, попробуем извлечь из сырого адреса
+      // Если displayStreet или displayHouse пустые, пробуем извлечь из сырого адреса
       const rawAddress = userAccount?.address || profile?.address || address || "";
       if ((!streetVal || !houseVal) && rawAddress) {
         const parts = rawAddress.split(",");
@@ -3248,7 +3252,22 @@ const Cabinet = () => {
       setOrderPremiseType(premiseType || "apartment");
       console.log(`[Заявка] Поля формы инициализированы: Улица="${streetVal}", Дом="${houseVal}", Подъезд="${entVal || "1"}"`);
     }
-  }, [isOrderDialogOpen, phone, profile, displayStreet, displayHouse, entrance, apartment, fullName, premiseType, userAccount, address]);
+
+    // Сохраняем текущее состояние открытия для следующего рендера
+    prevIsOrderDialogOpenRef.current = isOrderDialogOpen;
+  }, [isOrderDialogOpen]); // ВАЖНО: Зависимость СТРОГО только от [isOrderDialogOpen], чтобы асинхронные обновления профиля, лицевого счета и DaData не сбрасывали выбранные пользователем товары!
+
+  // RULE 2: Если при первоначальном открытии диалога список availableProducts еще подгружался из сети,
+  // привязываем ключ подъезда по мере завершения загрузки БЕЗ сброса выбора оборудования абонентом
+  useEffect(() => {
+    if (isOrderDialogOpen && !selectedKeyProductId && availableProducts.length > 0) {
+      const attachedKey = availableProducts.find(p => p.category === "key") || availableProducts.find(isKeyProduct);
+      if (attachedKey) {
+        console.log(`[Заявка] Фоновая допривязка ключа подъезда: "${attachedKey.name}" (ID: ${attachedKey.id})`);
+        setSelectedKeyProductId(attachedKey.id);
+      }
+    }
+  }, [isOrderDialogOpen, selectedKeyProductId, availableProducts]);
 
   // --- ОТПРАВКА ЗАЯВКИ ИЛИ ЗАКАЗА В БД ---
   const handleCreateOrderRequest = async () => {
