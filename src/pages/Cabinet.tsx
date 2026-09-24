@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useUserRole } from "@/hooks/useUserRole";
-import { Loader2, LogOut, CheckCircle, AlertCircle, AlertTriangle, ClipboardList, Calendar, Shield, CreditCard, Wallet, Pencil, Trash2, UserCheck, Plus, Minus, Clock, Wrench, CheckCircle2, XCircle, Send, Smartphone, KeyRound, PhoneCall, DoorOpen, DoorClosed, Info, User, Phone, Mail, Lock, Lightbulb, Hash, MapPin, Building, Home, Building2, History, FileSpreadsheet, Copy, Eye, EyeOff, ShieldCheck, Sparkles, LayoutDashboard, Zap, Printer, Receipt, FileText, ShoppingBag, RefreshCw, X } from "lucide-react";
+import { Loader2, LogOut, CheckCircle, AlertCircle, AlertTriangle, ClipboardList, Calendar, Shield, CreditCard, Wallet, Pencil, Trash2, UserCheck, Plus, Minus, Clock, Wrench, CheckCircle2, XCircle, Send, Smartphone, KeyRound, PhoneCall, DoorOpen, DoorClosed, Info, User, Phone, Mail, Lock, Lightbulb, Hash, MapPin, Building, Home, Building2, History, FileSpreadsheet, Copy, Eye, EyeOff, ShieldCheck, Sparkles, LayoutDashboard, Zap, Printer, Receipt, FileText, ShoppingBag } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -815,24 +815,6 @@ const DebtCard = ({
                               >
                                 <Receipt className="h-3.5 w-3.5 text-emerald-600" />
                                 <span>Электронный чек</span>
-                              </Button>
-                            )}
-                            {isPending && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={async () => {
-                                  try {
-                                    await fetch(`/backend-api/api/payments/yookassa/cancel/${p.yookassa_payment_id || p.id}`, { method: "POST" });
-                                    setOnlinePayments(prev => prev.map(item => (item.id === p.id || item.yookassa_payment_id === p.yookassa_payment_id) ? { ...item, status: 'canceled' } : item));
-                                    toast({ title: "Платёж отменён", description: "Зависшая попытка оплаты отменена" });
-                                  } catch (e) {
-                                    console.error(e);
-                                  }
-                                }}
-                                className="h-8 px-2 text-xs rounded-xl text-slate-400 hover:text-destructive hover:bg-destructive/10"
-                              >
-                                Отменить
                               </Button>
                             )}
                           </div>
@@ -4970,49 +4952,7 @@ const Cabinet = () => {
                                       </Button>
                                     )}
 
-                                    {/* Для платежей в обработке даем возможность проверить статус в ЮKassa или закрыть сессию */}
-                                    {isPending && (
-                                      <div className="flex items-center gap-1.5">
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          onClick={async () => {
-                                            console.log("[ЛК Кабинет: ТО] Ручная проверка статуса платежа:", p.yookassa_payment_id || p.id);
-                                            toast({
-                                              title: "Проверка платежа...",
-                                              description: "Опрашиваем платежный шлюз ЮKassa...",
-                                            });
-                                            await refetchTOPayments();
-                                          }}
-                                          className="h-8 px-2.5 text-xs rounded-xl flex items-center gap-1 border-amber-500/30 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/30 font-medium"
-                                        >
-                                          <RefreshCw className="h-3.5 w-3.5 text-amber-600" />
-                                          <span>Проверить</span>
-                                        </Button>
 
-                                        <Button
-                                          size="sm"
-                                          variant="ghost"
-                                          onClick={async () => {
-                                            console.log("[ЛК Кабинет: ТО] Отмена незавершенного платежа:", p.yookassa_payment_id || p.id);
-                                            try {
-                                              await fetch(`/backend-api/api/payments/yookassa/cancel/${p.yookassa_payment_id || p.id}`, { method: "POST" });
-                                              toast({
-                                                title: "Платёж отменён",
-                                                description: "Сессия оплаты закрыта, статус обновлён.",
-                                              });
-                                              await refetchTOPayments();
-                                            } catch (cErr) {
-                                              console.error("[ЛК Кабинет: ТО] Ошибка отмены платежа:", cErr);
-                                            }
-                                          }}
-                                          className="h-8 px-2 text-xs rounded-xl text-muted-foreground hover:text-destructive hover:bg-rose-50 dark:hover:bg-rose-950/20"
-                                        >
-                                          <X className="h-3.5 w-3.5 mr-0.5" />
-                                          <span>Отменить</span>
-                                        </Button>
-                                      </div>
-                                    )}
                                   </div>
                                 </div>
                               );

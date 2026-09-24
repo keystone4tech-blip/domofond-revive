@@ -814,6 +814,28 @@ app.post('/api/payments/yookassa/webhook', async (req, res) => {
         );
         console.log(`[Бэкенд: ЮKassa Вебхук] Задолженность по л/с ${accNum} уменьшена на ${creditAmount} ₽ (списано у плательщика: ${paidAmount} ₽)`);
       }
+    } else if (event?.event === 'payment.canceled' && event?.object) {
+      // Автоматическое событие отмены платежа (таймаут 15-60 минут или отмена пользователем в шлюзе)
+      const paymentObj = event.object;
+      const paymentId = paymentObj.id;
+      const reqId = paymentObj.metadata?.request_id;
+      const cancelReason = paymentObj.cancellation_details?.reason || 'не указана';
+
+      // Обновляем статус платежа в базе данных на 'canceled'
+      await pool.query(
+        "UPDATE payments SET status = 'canceled', updated_at = CURRENT_TIMESTAMP WHERE yookassa_payment_id = $1",
+        [paymentId]
+      );
+      console.log(`[Бэкенд: ЮKassa Вебхук] Платёж ${paymentId} отменён шлюзом ЮKassa (причина: ${cancelReason})`);
+
+      // Если платёж был привязан к заявке на услуги, возвращаем заявку в неоплаченный статус
+      if (reqId) {
+        await pool.query(
+          "UPDATE requests SET payment_status = 'unpaid', updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND payment_status != 'paid'",
+          [reqId]
+        );
+        console.log(`[Бэкенд: ЮKassa Вебхук] Заявка ${reqId} возвращена в статус unpaid из-за отмены платежа`);
+      }
     }
 
     // Всегда отвечаем ЮKassa 200 OK
