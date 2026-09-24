@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useUserRole } from "@/hooks/useUserRole";
-import { Loader2, LogOut, CheckCircle, AlertCircle, AlertTriangle, ClipboardList, Calendar, Shield, CreditCard, Wallet, Pencil, Trash2, UserCheck, Plus, Minus, Clock, Wrench, CheckCircle2, XCircle, Send, Smartphone, KeyRound, PhoneCall, DoorOpen, DoorClosed, Info, User, Phone, Mail, Lock, Lightbulb, Hash, MapPin, Building, Home, Building2, History, FileSpreadsheet, Copy, Eye, EyeOff, ShieldCheck, Sparkles, LayoutDashboard, Zap, Printer, Receipt, FileText, ShoppingBag } from "lucide-react";
+import { Loader2, LogOut, CheckCircle, AlertCircle, AlertTriangle, ClipboardList, Calendar, Shield, CreditCard, Wallet, Pencil, Trash2, UserCheck, Plus, Minus, Clock, Wrench, CheckCircle2, XCircle, Send, Smartphone, KeyRound, PhoneCall, Headphones, DoorOpen, DoorClosed, Info, User, Phone, Mail, Lock, Lightbulb, Hash, MapPin, Building, Home, Building2, History, FileSpreadsheet, Copy, Eye, EyeOff, ShieldCheck, Sparkles, LayoutDashboard, Zap, Printer, Receipt, FileText, ShoppingBag } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -1903,7 +1903,7 @@ const Cabinet = () => {
     return null;
   }, [orderStreet, displayStreet, orderHouse, displayHouse, orderEntrance, entrance, userAccount, profile, address, allEntrances, productBindings]);
 
-  // Список товаров, доступных для текущего подъезда (СТРОГАЯ изоляция привязанного оборудования)
+  // Список товаров, доступных для текущего подъезда (СТРОГАЯ изоляция: ТОЛЬКО привязанные товары)
   const availableProducts = useMemo(() => {
     if (!products || products.length === 0) return [];
 
@@ -1918,49 +1918,17 @@ const Cabinet = () => {
       });
 
       // ЕСЛИ К ПОДЪЕЗДУ ПРИВЯЗАНО ОБОРУДОВАНИЕ ИЛИ УСЛУГИ:
+      // Возвращаем СТРОГО И ТОЛЬКО позиции, привязанные оператором к данному подъезду!
       if (boundToThisEntrance.size > 0) {
-        const boundProductsList = products.filter(p => boundToThisEntrance.has(p.id));
-        const hasBoundEquipment = boundProductsList.some(p => p.category !== "service");
-        const hasBoundServices = boundProductsList.some(p => p.category === "service");
-
-        console.log(`[Cabinet] Для подъезда привязано товаров: ${boundToThisEntrance.size} (оборудование: ${hasBoundEquipment}, услуги: ${hasBoundServices})`);
-
-        return products.filter(product => {
-          // 1. Если товар персонально привязан к текущему подъезду — он всегда доступен
-          if (boundToThisEntrance.has(product.id)) {
-            return true;
-          }
-
-          const boundIds = productBindings[product.id];
-          // 2. Если товар привязан к ДРУГИМ подъездам — он строго недоступен
-          if (boundIds && boundIds.length > 0) {
-            return false;
-          }
-
-          // 3. Для непривязанных (базовых) позиций каталога:
-          // Если для подъезда оператор привязал конкретное оборудование (трубки/ключи),
-          // то все остальные непривязанные модели оборудования из 700+ номенклатуры СКРЫВАЕМ!
-          if (product.category !== "service" && hasBoundEquipment) {
-            return false;
-          }
-
-          // Если оператор привязал конкретные услуги, общие услуги скрываем
-          if (product.category === "service" && hasBoundServices) {
-            return false;
-          }
-
-          // В противном случае оставляем базовую позицию
-          return true;
-        });
+        console.log(`[Cabinet] Для подъезда ${currentMatchedEntrance.street}, д. ${currentMatchedEntrance.house}, п. ${currentMatchedEntrance.entrance} найдено ${boundToThisEntrance.size} привязанных позиций.`);
+        return products.filter(product => boundToThisEntrance.has(product.id));
       }
     }
 
-    // Если подъезд не распознан или к нему ещё ничего не привязали в CRM:
-    // показываем только товары, у которых нет привязок к каким-либо подъездам
-    return products.filter(product => {
-      const boundEntranceIds = productBindings[product.id];
-      return !boundEntranceIds || boundEntranceIds.length === 0;
-    });
+    // Если к подъезду ничего не привязано или подъезд ещё не определен — возвращаем ПУСТОЙ массив!
+    // Никаких «универсальных» непривязанных товаров жильцам не показывается.
+    console.log("[Cabinet] К данному подъезду оператор пока не привязал оборудование. Выдача пуста.");
+    return [];
   }, [products, productBindings, currentMatchedEntrance]);
 
   // Функция для очистки полного адреса (убираем город "Краснодар, " или "пос. Южный, ") для отображения
@@ -5596,9 +5564,69 @@ const Cabinet = () => {
                 {/* СОДЕРЖИМОЕ ТАБА: ЗАКАЗ УСЛУГ И ОБОРУДОВАНИЯ */}
                 {orderType === "order" && (
                   <div className="space-y-5 py-1">
-                    {/* Баннер льготных цен на этапе монтажа */}
-                    {currentMatchedEntrance?.service_type === "installation" && (
-                      <div className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-transparent border border-amber-500/30 text-amber-900 dark:text-amber-200 flex items-start gap-3">
+                    {/* Если к подъезду не привязано оборудование и услуги — информационный блок связи с диспетчером */}
+                    {availableProducts.length === 0 ? (
+                      <div className="py-6 px-4 text-center space-y-4 rounded-2xl bg-amber-500/5 border border-amber-500/20 my-2">
+                        <div className="w-14 h-14 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto shadow-sm">
+                          <Headphones className="w-7 h-7" />
+                        </div>
+                        <div className="space-y-1.5 max-w-sm mx-auto">
+                          <h4 className="font-bold text-base text-foreground">
+                            Индивидуальный подбор оборудования
+                          </h4>
+                          <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                            Для заказа оборудования, ключей и получения подробной информации свяжитесь с нашим диспетчером по номеру телефона:
+                          </p>
+                        </div>
+
+                        {/* Кнопка быстрого вызова диспетчера по клику */}
+                        <div className="pt-1 flex flex-col sm:flex-row items-center justify-center gap-2 max-w-xs mx-auto">
+                          <a
+                            href="tel:+79034118393"
+                            className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm shadow-md transition-all active:scale-95"
+                          >
+                            <Phone className="w-4 h-4" />
+                            <span>+7 (903) 411-83-93</span>
+                          </a>
+                        </div>
+
+                        <p className="text-[11px] text-muted-foreground">
+                          Круглосуточная диспетчерская служба ООО «ДомофонДар»
+                        </p>
+
+                        {/* Навигационные кнопки перехода в Контакты и переключения на Ремонт */}
+                        <div className="pt-2 border-t border-amber-500/15 flex flex-col sm:flex-row items-center justify-center gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                              console.log("[Заказ] Переход на страницу контактов");
+                              setIsOrderDialogOpen(false);
+                              navigate("/kontakty");
+                            }}
+                            className="w-full sm:w-auto text-xs font-semibold rounded-xl h-9 flex items-center gap-1.5 border-amber-500/30 hover:bg-amber-500/10"
+                          >
+                            <MapPin className="w-3.5 h-3.5 text-amber-500" />
+                            <span>Страница «Контакты»</span>
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => {
+                              console.log("[Заказ] Переключение на форму бесплатного ремонта");
+                              setOrderType("repair");
+                            }}
+                            className="w-full sm:w-auto text-xs text-muted-foreground hover:text-foreground h-9"
+                          >
+                            <span>Оставить заявку на ремонт</span>
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Баннер льготных цен на этапе монтажа */}
+                        {currentMatchedEntrance?.service_type === "installation" && (
+                          <div className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-transparent border border-amber-500/30 text-amber-900 dark:text-amber-200 flex items-start gap-3">
                         <Sparkles className="h-5 w-5 text-amber-500 shrink-0 mt-0.5 animate-pulse" />
                         <div>
                           <div className="font-bold text-xs flex items-center gap-1.5">
@@ -5612,77 +5640,79 @@ const Cabinet = () => {
                       </div>
                     )}
                     
-                    {/* Выбор услуги (установка / замена) */}
-                    <div className="space-y-2">
-                      <Label className="text-sm font-semibold text-foreground flex items-center gap-1">🛠️ Выберите услугу</Label>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {availableProducts
-                          .filter(p => p.category === "service" && !p.name.toLowerCase().includes("кабинет"))
-                          .map((service) => {
-                            const effPrice = getEffectiveProductPrice(service);
-                            const hasDiscount = currentMatchedEntrance?.service_type === "installation" && 
-                              service.installation_price != null && 
-                              Number(service.installation_price) < Number(service.price);
+                    {/* Выбор услуги (установка / замена) - только если к подъезду привязаны услуги */}
+                    {availableProducts.some(p => p.category === "service" && !p.name.toLowerCase().includes("кабинет")) && (
+                      <div className="space-y-2">
+                        <Label className="text-sm font-semibold text-foreground flex items-center gap-1">🛠️ Выберите услугу</Label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {availableProducts
+                            .filter(p => p.category === "service" && !p.name.toLowerCase().includes("кабинет"))
+                            .map((service) => {
+                              const effPrice = getEffectiveProductPrice(service);
+                              const hasDiscount = currentMatchedEntrance?.service_type === "installation" && 
+                                service.installation_price != null && 
+                                Number(service.installation_price) < Number(service.price);
 
-                            return (
-                              <button
-                                key={service.id}
-                                type="button"
-                                onClick={() => {
-                                  console.log("[Заявка] Выбрана услуга ID:", service.id, "цена:", effPrice);
-                                  setSelectedServiceId(service.id);
-                                }}
-                                className={`p-3.5 text-left rounded-xl border text-sm transition-all hover:scale-[1.01] ${
-                                  selectedServiceId === service.id
-                                    ? "border-amber-500 bg-amber-500/5 text-foreground shadow-sm font-semibold"
-                                    : "border-slate-200 dark:border-slate-800 bg-white/20 dark:bg-slate-900/20 text-muted-foreground hover:text-foreground"
-                                }`}
-                              >
-                                {service.image_url && (
-                                  <img 
-                                    src={service.image_url} 
-                                    alt={service.name} 
-                                    className="w-full h-24 object-cover rounded-md mb-2 cursor-pointer hover:opacity-80 transition-opacity" 
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setPreviewImage(service.image_url);
-                                    }}
-                                  />
-                                )}
-                                <div className="font-semibold text-foreground">{service.name}</div>
-                                <div className="text-xs text-amber-500 font-bold mt-1 flex items-center gap-1">
-                                  {hasDiscount && (
-                                    <span className="line-through text-slate-400 font-normal text-[11px]">
-                                      {Number(service.price).toFixed(0)} ₽
-                                    </span>
+                              return (
+                                <button
+                                  key={service.id}
+                                  type="button"
+                                  onClick={() => {
+                                    console.log("[Заявка] Выбрана услуга ID:", service.id, "цена:", effPrice);
+                                    setSelectedServiceId(service.id);
+                                  }}
+                                  className={`p-3.5 text-left rounded-xl border text-sm transition-all hover:scale-[1.01] ${
+                                    selectedServiceId === service.id
+                                      ? "border-amber-500 bg-amber-500/5 text-foreground shadow-sm font-semibold"
+                                      : "border-slate-200 dark:border-slate-800 bg-white/20 dark:bg-slate-900/20 text-muted-foreground hover:text-foreground"
+                                  }`}
+                                >
+                                  {service.image_url && (
+                                    <img 
+                                      src={service.image_url} 
+                                      alt={service.name} 
+                                      className="w-full h-24 object-cover rounded-md mb-2 cursor-pointer hover:opacity-80 transition-opacity" 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setPreviewImage(service.image_url);
+                                      }}
+                                    />
                                   )}
-                                  <span>{effPrice === 0 ? "Бесплатно" : `${effPrice.toFixed(0)} ₽`}</span>
-                                  {hasDiscount && (
-                                    <span className="text-[9px] px-1 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 font-semibold">
-                                      Монтаж
-                                    </span>
-                                  )}
-                                </div>
-                              </button>
-                            );
-                          })}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            console.log("[Заявка] Сброс выбора услуги");
-                            setSelectedServiceId(null);
-                          }}
-                          className={`p-3.5 text-left rounded-xl border text-sm transition-all hover:scale-[1.01] ${
-                            selectedServiceId === null
-                              ? "border-amber-500 bg-amber-500/5 text-foreground shadow-sm font-semibold"
-                              : "border-slate-200 dark:border-slate-800 bg-white/20 dark:bg-slate-900/20 text-muted-foreground hover:text-foreground"
-                          }`}
-                        >
-                          <div className="font-semibold text-foreground">Без услуги</div>
-                          <div className="text-xs text-slate-400 dark:text-slate-500 mt-1">Только покупка трубки/ключей</div>
-                        </button>
+                                  <div className="font-semibold text-foreground">{service.name}</div>
+                                  <div className="text-xs text-amber-500 font-bold mt-1 flex items-center gap-1">
+                                    {hasDiscount && (
+                                      <span className="line-through text-slate-400 font-normal text-[11px]">
+                                        {Number(service.price).toFixed(0)} ₽
+                                      </span>
+                                    )}
+                                    <span>{effPrice === 0 ? "Бесплатно" : `${effPrice.toFixed(0)} ₽`}</span>
+                                    {hasDiscount && (
+                                      <span className="text-[9px] px-1 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 font-semibold">
+                                        Монтаж
+                                      </span>
+                                    )}
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              console.log("[Заявка] Сброс выбора услуги");
+                              setSelectedServiceId(null);
+                            }}
+                            className={`p-3.5 text-left rounded-xl border text-sm transition-all hover:scale-[1.01] ${
+                              selectedServiceId === null
+                                ? "border-amber-500 bg-amber-500/5 text-foreground shadow-sm font-semibold"
+                                : "border-slate-200 dark:border-slate-800 bg-white/20 dark:bg-slate-900/20 text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            <div className="font-semibold text-foreground">Без услуги</div>
+                            <div className="text-xs text-slate-400 dark:text-slate-500 mt-1">Только покупка трубки/ключей</div>
+                          </button>
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     {/* Выбор модели трубки */}
                     <div className="space-y-2">
@@ -5970,6 +6000,8 @@ const Cabinet = () => {
                         );
                       })()}
                     </div>
+                      </>
+                    )}
 
                   </div>
                 )}
@@ -5982,31 +6014,46 @@ const Cabinet = () => {
                   }} className="w-full sm:w-auto font-semibold rounded-xl h-11 border border-slate-250 hover:bg-slate-5 hover:text-foreground">
                     Отмена
                   </Button>
-                  <Button
-                    onClick={() => {
-                      console.log("[Заявка] Абонент нажал отправить/оплатить заявку, итого:", calculateTotals().total);
-                      handleCreateOrderRequest();
-                    }}
-                    disabled={saving}
-                    className="w-full sm:w-auto flex-1 flex items-center justify-center gap-1.5 btn-premium-gold hover:shadow-gold-glow rounded-xl h-11 font-bold"
-                  >
-                    {saving ? (
-                      <Loader2 className="h-4 w-4 animate-spin shrink-0" />
-                    ) : orderType === "repair" || calculateTotals().total === 0 ? (
-                      <Send className="h-4 w-4 shrink-0" />
-                    ) : (
-                      <CreditCard className="h-4 w-4 shrink-0" />
-                    )}
-                    {orderType === "repair"
-                      ? "Отправить заявку мастеру (бесплатно)"
-                      : calculateTotals().total === 0
-                      ? "Оформить заявку"
-                      : `Оплатить заказ (${(() => {
-                          const b = calculateTotals().total || 0;
-                          const f = Math.round(b * 0.05 * 100) / 100;
-                          return (b + f).toFixed(2);
-                        })()} ₽) через ЮKassa`}
-                  </Button>
+                  {orderType === "order" && availableProducts.length === 0 ? (
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        console.log("[Заказ] Переход на страницу контактов из футера диалога");
+                        setIsOrderDialogOpen(false);
+                        navigate("/kontakty");
+                      }}
+                      className="w-full sm:w-auto flex-1 flex items-center justify-center gap-1.5 btn-premium-gold hover:shadow-gold-glow rounded-xl h-11 font-bold"
+                    >
+                      <MapPin className="h-4 w-4 shrink-0" />
+                      <span>Перейти в Контакты</span>
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={() => {
+                        console.log("[Заявка] Абонент нажал отправить/оплатить заявку, итого:", calculateTotals().total);
+                        handleCreateOrderRequest();
+                      }}
+                      disabled={saving}
+                      className="w-full sm:w-auto flex-1 flex items-center justify-center gap-1.5 btn-premium-gold hover:shadow-gold-glow rounded-xl h-11 font-bold"
+                    >
+                      {saving ? (
+                        <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+                      ) : orderType === "repair" || calculateTotals().total === 0 ? (
+                        <Send className="h-4 w-4 shrink-0" />
+                      ) : (
+                        <CreditCard className="h-4 w-4 shrink-0" />
+                      )}
+                      {orderType === "repair"
+                        ? "Отправить заявку мастеру (бесплатно)"
+                        : calculateTotals().total === 0
+                        ? "Оформить заявку"
+                        : `Оплатить заказ (${(() => {
+                            const b = calculateTotals().total || 0;
+                            const f = Math.round(b * 0.05 * 100) / 100;
+                            return (b + f).toFixed(2);
+                          })()} ₽) через ЮKassa`}
+                    </Button>
+                  )}
                 </DialogFooter>
               </DialogContent>
             </Dialog>
