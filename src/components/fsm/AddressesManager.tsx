@@ -30,6 +30,7 @@ import {
   Copy,
   Info
 } from "lucide-react";
+import { BindProductsDialog } from "./BindProductsDialog";
 
 // Интерфейс подъезда из таблицы entrances
 export interface Entrance {
@@ -50,9 +51,18 @@ export interface Product {
   name: string;
   category: string;
   price: number;
+  promo_price?: number | null;
+  installation_price?: number | null;
   unit: string;
   image_url: string | null;
   is_active: boolean;
+}
+
+// Детали привязки товара к подъезду с ценой
+export interface EntranceProductBinding {
+  product_id: string;
+  price_type: string;
+  custom_price: number | null;
 }
 
 export const AddressesManager: React.FC = () => {
@@ -62,6 +72,7 @@ export const AddressesManager: React.FC = () => {
   const [entrances, setEntrances] = useState<Entrance[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [entranceProducts, setEntranceProducts] = useState<Record<string, string[]>>({}); // entrance_id -> array of product_ids
+  const [entranceProductDetails, setEntranceProductDetails] = useState<Record<string, Record<string, EntranceProductBinding>>>({}); // entrance_id -> product_id -> details
   
   // --- Состояния загрузки и поиска ---
   const [loading, setLoading] = useState(true);
@@ -112,15 +123,27 @@ export const AddressesManager: React.FC = () => {
       setEntrances((entrancesRes.data as any) || []);
       setProducts((productsRes.data as any) || []);
 
-      // Группируем связи: entrance_id -> product_id[]
+      // Группируем связи: entrance_id -> product_id[] и entrance_id -> product_id -> details
       const bindingsMap: Record<string, string[]> = {};
-      ((bindingsRes.data as any) || []).forEach((row: { entrance_id: string; product_id: string }) => {
+      const detailsMap: Record<string, Record<string, EntranceProductBinding>> = {};
+
+      ((bindingsRes.data as any) || []).forEach((row: any) => {
         if (!bindingsMap[row.entrance_id]) {
           bindingsMap[row.entrance_id] = [];
         }
         bindingsMap[row.entrance_id].push(row.product_id);
+
+        if (!detailsMap[row.entrance_id]) {
+          detailsMap[row.entrance_id] = {};
+        }
+        detailsMap[row.entrance_id][row.product_id] = {
+          product_id: row.product_id,
+          price_type: row.price_type || "retail",
+          custom_price: row.custom_price != null ? Number(row.custom_price) : null,
+        };
       });
       setEntranceProducts(bindingsMap);
+      setEntranceProductDetails(detailsMap);
 
       console.log(`[AddressesManager] Загружено подъездов: ${entrancesRes.data?.length || 0}, товаров: ${productsRes.data?.length || 0}`);
     } catch (err: any) {
@@ -309,13 +332,18 @@ export const AddressesManager: React.FC = () => {
     console.log(`[AddressesManager] Массовая привязка к дому ${selectedEntrance.street}, ${selectedEntrance.house} (${siblingEntrances.length} подъездов)`);
     try {
       const currentProducts = entranceProducts[selectedEntrance.id] || [];
+      const currentDetails = entranceProductDetails[selectedEntrance.id] || {};
 
       for (const ent of siblingEntrances) {
         await supabase.from("entrance_products" as any).delete().eq("entrance_id", ent.id);
         if (currentProducts.length > 0) {
-          await supabase.from("entrance_products" as any).insert(
-            currentProducts.map(pId => ({ entrance_id: ent.id, product_id: pId })) as any
-          );
+          const rows = currentProducts.map((pId) => ({
+            entrance_id: ent.id,
+            product_id: pId,
+            price_type: currentDetails[pId]?.price_type || "retail",
+            custom_price: currentDetails[pId]?.custom_price != null ? currentDetails[pId].custom_price : null,
+          }));
+          await supabase.from("entrance_products" as any).insert(rows as any);
         }
       }
 
@@ -906,28 +934,60 @@ export const AddressesManager: React.FC = () => {
                     </div>
                   ) : (
                     <div className="space-y-1.5 max-h-[220px] overflow-y-auto pr-1">
-                      {linkedProductsForSelected.map(prod => (
-                        <div
-                          key={prod.id}
-                          className="flex items-center justify-between p-2 rounded-lg border border-slate-100 dark:border-slate-800/80 bg-white/60 dark:bg-slate-950/60"
-                        >
-                          <div className="flex items-center gap-2 min-w-0">
-                            {prod.image_url ? (
-                              <img src={prod.image_url} alt={prod.name} className="h-7 w-7 rounded object-cover shrink-0" />
-                            ) : (
-                              <Package className="h-4 w-4 text-slate-400 shrink-0" />
-                            )}
-                            <div className="truncate">
-                              <div className="font-semibold truncate">{prod.name}</div>
-                              <div className="text-[10px] text-muted-foreground font-mono">{Number(prod.price).toFixed(0)} ₽</div>
-                            </div>
-                          </div>
+                      {linkedProductsForSelected.map((prod) => {
+                        const detail = selectedEntrance
+                          ? entranceProductDetails[selectedEntrance.id]?.[prod.id]
+                          : null;
 
-                          <Badge variant="outline" className="text-[9px] shrink-0">
-                            {prod.category === "equipment" ? "Оборудование" : prod.category === "key" ? "Ключ" : "Услуга"}
-                          </Badge>
-                        </div>
-                      ))}
+                        let priceText = `${Number(prod.price).toFixed(0)} ₽ (Розница)`;
+                        let priceClass = "text-muted-foreground";
+
+                        if (detail) {
+                          if (detail.price_type === "custom" && detail.custom_price != null) {
+                            priceText = `${Number(detail.custom_price).toFixed(0)} ₽ (Своя цена)`;
+                            priceClass = "text-primary font-bold";
+                          } else if (detail.price_type === "promo" && prod.promo_price != null) {
+                            priceText = `${Number(prod.promo_price).toFixed(0)} ₽ (Акция)`;
+                            priceClass = "text-amber-600 dark:text-amber-400 font-bold";
+                          } else if (detail.price_type === "installation" && prod.installation_price != null) {
+                            priceText = `${Number(prod.installation_price).toFixed(0)} ₽ (Монтаж)`;
+                            priceClass = "text-sky-600 dark:text-sky-400 font-bold";
+                          } else {
+                            priceText = `${Number(prod.price).toFixed(0)} ₽ (Розница)`;
+                          }
+                        }
+
+                        return (
+                          <div
+                            key={prod.id}
+                            className="flex items-center justify-between p-2 rounded-lg border border-slate-100 dark:border-slate-800/80 bg-white/60 dark:bg-slate-950/60"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              {prod.image_url ? (
+                                <img
+                                  src={prod.image_url}
+                                  alt={prod.name}
+                                  className="h-7 w-7 rounded object-cover shrink-0"
+                                />
+                              ) : (
+                                <Package className="h-4 w-4 text-slate-400 shrink-0" />
+                              )}
+                              <div className="truncate">
+                                <div className="font-semibold truncate text-xs">{prod.name}</div>
+                                <div className={`text-[10px] font-mono ${priceClass}`}>{priceText}</div>
+                              </div>
+                            </div>
+
+                            <Badge variant="outline" className="text-[9px] shrink-0">
+                              {prod.category === "equipment"
+                                ? "Оборудование"
+                                : prod.category === "key"
+                                ? "Ключ"
+                                : "Услуга"}
+                            </Badge>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
 
@@ -1055,89 +1115,15 @@ export const AddressesManager: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* ДИАЛОГ 2: Привязка товаров к подъезду */}
-      <Dialog open={isBindProductsOpen} onOpenChange={setIsBindProductsOpen}>
-        <DialogContent className="max-w-lg rounded-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5 text-primary" />
-              Привязка оборудования к подъезду
-            </DialogTitle>
-            <DialogDescription className="text-xs">
-              {selectedEntrance && (
-                <span>
-                  {selectedEntrance.city}, {selectedEntrance.street}, д. {selectedEntrance.house}, Подъезд №{selectedEntrance.entrance}
-                </span>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-3 pt-1">
-            <p className="text-xs text-muted-foreground">
-              Отметьте галочками товары (трубки, ключи, услуги), которые совместимы с этим подъездом. Жильцы увидят в каталоге только эти товары.
-            </p>
-
-            <div className="max-h-[350px] overflow-y-auto space-y-2 pr-1">
-              {products.map(prod => {
-                const isChecked = selectedProductIdsToBind.includes(prod.id);
-                return (
-                  <label
-                    key={prod.id}
-                    className={`flex items-center justify-between p-2.5 rounded-xl border cursor-pointer transition-all ${
-                      isChecked
-                        ? "border-primary bg-primary/10 shadow-xs"
-                        : "border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedProductIdsToBind(prev => [...prev, prod.id]);
-                          } else {
-                            setSelectedProductIdsToBind(prev => prev.filter(id => id !== prod.id));
-                          }
-                        }}
-                        className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary/20"
-                      />
-                      {prod.image_url ? (
-                        <img src={prod.image_url} alt={prod.name} className="h-8 w-8 rounded-md object-cover shrink-0" />
-                      ) : (
-                        <Package className="h-5 w-5 text-slate-400 shrink-0" />
-                      )}
-                      <div className="truncate">
-                        <div className="font-semibold text-xs text-foreground truncate">{prod.name}</div>
-                        <div className="text-[11px] text-muted-foreground">{Number(prod.price).toFixed(0)} ₽ / {prod.unit}</div>
-                      </div>
-                    </div>
-
-                    <Badge variant="outline" className="text-[10px] shrink-0">
-                      {prod.category === "equipment" ? "Оборудование" : prod.category === "key" ? "Ключ" : "Услуга"}
-                    </Badge>
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-
-          <DialogFooter className="pt-2">
-            <Button variant="outline" size="sm" onClick={() => setIsBindProductsOpen(false)}>
-              Отмена
-            </Button>
-            <Button
-              size="sm"
-              onClick={handleSaveProductBindings}
-              disabled={savingBinding}
-              className="btn-premium-gold font-semibold"
-            >
-              {savingBinding && <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />}
-              Сохранить ({selectedProductIdsToBind.length})
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* ДИАЛОГ 2: Интерактивная привязка товаров к подъезду с деревом папок и типами цен */}
+      <BindProductsDialog
+        isOpen={isBindProductsOpen}
+        onClose={() => setIsBindProductsOpen(false)}
+        entrance={selectedEntrance}
+        onSaved={async () => {
+          await loadAllData();
+        }}
+      />
     </div>
   );
 };

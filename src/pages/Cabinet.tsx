@@ -1722,6 +1722,7 @@ const Cabinet = () => {
   const [orderPremiseType, setOrderPremiseType] = useState<"apartment" | "private">("apartment");
   const [allEntrances, setAllEntrances] = useState<any[]>([]); // Кэш подъездов из БД
   const [productBindings, setProductBindings] = useState<Record<string, string[]>>({}); // product_id -> entrance_id[]
+  const [entrancePricingMap, setEntrancePricingMap] = useState<Record<string, Record<string, { price_type: string; custom_price: number | null }>>>({}); // entrance_id -> product_id -> pricing
   
   // --- СТЕЙТЫ ДЛЯ УМНОГО АВТОКОМПЛИТА АДРЕСОВ (accounts) ---
   const [allHouses, setAllHouses] = useState<string[]>([]); // Кэш всех уникальных домов
@@ -1791,7 +1792,7 @@ const Cabinet = () => {
     try {
       const [prodRes, bindingsRes, entrancesRes] = await Promise.all([
         supabase.from("products").select("*").eq("is_active", true),
-        supabase.from("entrance_products" as any).select("product_id, entrance_id"),
+        supabase.from("entrance_products" as any).select("product_id, entrance_id, price_type, custom_price"),
         supabase.from("entrances" as any).select("id, city, street, house, entrance, intercom_type, service_type")
       ]);
 
@@ -1803,13 +1804,22 @@ const Cabinet = () => {
       }
 
       if (bindingsRes.data) {
-        // Карта: product_id -> entrance_id[]
+        // Карта: product_id -> entrance_id[] и entrance_id -> product_id -> pricing
         const pMap: Record<string, string[]> = {};
-        bindingsRes.data.forEach((b: { product_id: string; entrance_id: string }) => {
+        const prMap: Record<string, Record<string, { price_type: string; custom_price: number | null }>> = {};
+
+        bindingsRes.data.forEach((b: any) => {
           if (!pMap[b.product_id]) pMap[b.product_id] = [];
           pMap[b.product_id].push(b.entrance_id);
+
+          if (!prMap[b.entrance_id]) prMap[b.entrance_id] = {};
+          prMap[b.entrance_id][b.product_id] = {
+            price_type: b.price_type || "retail",
+            custom_price: b.custom_price != null ? Number(b.custom_price) : null,
+          };
         });
         setProductBindings(pMap);
+        setEntrancePricingMap(prMap);
         console.log(`[Заказ] Загружено связей товаров с подъездами: ${bindingsRes.data.length}`);
       }
 
@@ -2950,13 +2960,34 @@ const Cabinet = () => {
     }
   };
 
-  // Получение актуальной цены товара с учетом статуса дома (льготная цена, если объект на стадии монтажа)
+  // Получение актуальной цены товара с учетом настроек для подъезда и статуса дома
   const getEffectiveProductPrice = (prod: any) => {
     if (!prod) return 0;
+
+    // 1. Приоритет: точная настройка цены для текущего подъезда жильца
+    if (currentMatchedEntrance && entrancePricingMap[currentMatchedEntrance.id]?.[prod.id]) {
+      const pricing = entrancePricingMap[currentMatchedEntrance.id][prod.id];
+      if (pricing.price_type === "custom" && pricing.custom_price != null && !isNaN(Number(pricing.custom_price))) {
+        return Number(pricing.custom_price);
+      }
+      if (pricing.price_type === "promo" && prod.promo_price != null && !isNaN(Number(prod.promo_price))) {
+        return Number(prod.promo_price);
+      }
+      if (pricing.price_type === "installation" && prod.installation_price != null && !isNaN(Number(prod.installation_price))) {
+        return Number(prod.installation_price);
+      }
+      if (pricing.price_type === "retail") {
+        return Number(prod.price || 0);
+      }
+    }
+
+    // 2. Стандартная логика для домов со статусом "монтаж"
     const isInstallation = currentMatchedEntrance?.service_type === "installation";
     if (isInstallation && prod.installation_price != null && !isNaN(Number(prod.installation_price))) {
       return Number(prod.installation_price);
     }
+
+    // 3. Базовая цена товара
     return Number(prod.price || 0);
   };
 
