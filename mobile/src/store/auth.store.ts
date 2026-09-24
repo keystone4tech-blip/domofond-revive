@@ -26,7 +26,7 @@ interface AuthState {
   
   // Действия
   login: (phone: string, password: string) => Promise<void>;
-  register: (phone: string, password: string, fullName: string) => Promise<void>;
+  register: (phone: string, password: string, fullName: string, email?: string) => Promise<void>;
   logout: () => Promise<void>;
   loadProfile: () => Promise<void>;
   setToken: (token: string) => Promise<void>;
@@ -66,14 +66,30 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   // Регистрация
-  register: async (phone, password, full_name) => {
+  register: async (phone: string, password: string, full_name: string, userEmail?: string) => {
     set({ isLoading: true });
     try {
-      console.log(`[AUTH] Попытка регистрации для телефона: ${phone}`);
-      await apiClient.post('/api/auth/register', { phone, password, full_name });
+      const cleanDigits = phone.replace(/\D/g, '');
+      const email = userEmail && userEmail.trim().length > 0
+        ? userEmail.trim().toLowerCase()
+        : `${cleanDigits || 'resident_' + Date.now()}@domofondar.ru`;
+
+      console.log(`[AUTH] Регистрация нового жильца: email=${email}, phone=${phone}`);
+      const response = await apiClient.post('/api/auth/register', {
+        email,
+        password,
+        full_name: full_name.trim(),
+        phone: phone.trim(),
+      });
       
-      // После успешной регистрации сразу логинимся
-      await get().login(phone, password);
+      const token = response.data?.token;
+      if (token) {
+        await get().setToken(token);
+        await get().loadProfile();
+      } else {
+        // Логинимся по созданному аккаунту
+        await get().login(email, password);
+      }
     } catch (error) {
       console.error('[AUTH ERROR] Ошибка при регистрации:', error);
       throw error;

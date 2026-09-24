@@ -1,16 +1,27 @@
 // mobile/app/index.tsx — Стартовый шлюз приложения «Домофондар»
-// Отображает фирменный загрузчик пока RootLayout проверяет сессию
+// Автоматически перенаправляет авторизованных абонентов на главную, а новых — на экран входа
 
+import React from 'react';
+import { Redirect } from 'expo-router';
+import { useAuthStore } from '@/store/auth.store';
 import { View, ActivityIndicator, StyleSheet, Text } from 'react-native';
 
 export default function Index() {
-  return (
-    <View style={styles.container}>
-      <Text style={styles.logoText}>Домофондар</Text>
-      <Text style={styles.subText}>Сервис умного доступа</Text>
-      <ActivityIndicator size="large" color="#10B981" style={styles.loader} />
-    </View>
-  );
+  const { isAuthenticated, isLoading } = useAuthStore();
+
+  // Если стор еще проверяет токен из SecureStore
+  if (isLoading) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.logoText}>Домофондар</Text>
+        <Text style={styles.subText}>Сервис умного доступа</Text>
+        <ActivityIndicator size="large" color="#10B981" style={styles.loader} />
+      </View>
+    );
+  }
+
+  // Безопасный декларативный редирект Expo Router
+  return <Redirect href={isAuthenticated ? '/(tabs)/home' : '/(auth)/login'} />;
 }
 
 const styles = StyleSheet.create({

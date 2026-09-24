@@ -2,9 +2,22 @@
 // Определяет настройки для Android и iOS: иконки, разрешения, плагины, deep linking
 
 import { ExpoConfig, ConfigContext } from 'expo/config';
+import { withAndroidManifest, ConfigPlugin } from '@expo/config-plugins';
 
-export default ({ config }: ConfigContext): ExpoConfig => ({
-  ...config,
+// Плагин для гарантированного разрешения HTTP-трафика (порт 80) к боевому серверу 45.8.99.238
+const withCleartextTraffic: ConfigPlugin = (config) => {
+  return withAndroidManifest(config, async (manifestConfig) => {
+    const androidManifest = manifestConfig.modResults.manifest;
+    if (androidManifest.application && androidManifest.application[0]) {
+      androidManifest.application[0].$['android:usesCleartextTraffic'] = 'true';
+    }
+    return manifestConfig;
+  });
+};
+
+export default ({ config }: ConfigContext): ExpoConfig => {
+  const baseConfig: ExpoConfig = {
+    ...config,
 
   // === Основные параметры приложения ===
   name: 'Домофондар',                         // Название в меню телефона
@@ -103,8 +116,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
 
   extra: {
     // URL основного API сервера (бэкенд Домофондар)
-    apiUrl: process.env.EXPO_PUBLIC_API_URL || 'https://xn--80aha5afebav9a.xn--p1ai/backend-api',
+    apiUrl: process.env.EXPO_PUBLIC_API_URL || 'http://45.8.99.238/backend-api',
     // URL WebSocket сервера (для чата)
-    wsUrl: process.env.EXPO_PUBLIC_WS_URL || 'wss://xn--80aha5afebav9a.xn--p1ai',
+    wsUrl: process.env.EXPO_PUBLIC_WS_URL || 'ws://45.8.99.238/ws',
   },
-});
+  };
+
+  return withCleartextTraffic(baseConfig);
+};

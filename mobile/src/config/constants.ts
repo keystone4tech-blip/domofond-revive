@@ -2,11 +2,11 @@
  * Глобальные константы приложения Домофондар
  */
 
-// Базовый URL для API бэкенда
-export const API_URL = 'https://xn--80aha5afebav9a.xn--p1ai/backend-api';
+// Базовый URL для API бэкенда (боевой сервер Domofondar)
+export const API_URL = 'http://45.8.99.238/backend-api';
 
-// WebSocket URL (если потребуется в будущем, например для чата или уведомлений в реальном времени)
-export const WS_URL = 'wss://xn--80aha5afebav9a.xn--p1ai/ws';
+// WebSocket URL
+export const WS_URL = 'ws://45.8.99.238/ws';
 
 // Текущая версия приложения
 export const APP_VERSION = '1.0.0';

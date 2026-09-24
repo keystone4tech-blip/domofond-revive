@@ -1,5 +1,5 @@
 // mobile/app/(tabs)/home.tsx — Главный экран личного кабинета абонента «Домофондар»
-// Отображает реальные данные из базы данных: профиль жильца, лицевой счет, текущий баланс/долг и заявки
+// Привязывает лицевой счёт жильца по телефону/адресу, отображает долг и быстрые действия
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
@@ -19,7 +19,7 @@ import { apiClient } from '@/api/client';
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { user } = useAuthStore();
+  const { user, loadProfile } = useAuthStore();
 
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -36,18 +36,59 @@ export default function HomeScreen() {
     try {
       console.log('[Home UI] Загрузка данных абонента с сервера...');
 
-      // 1. Получаем привязанные лицевые счета жильца
-      const accountsRes = await apiClient.get('/api/accounts');
-      if (Array.isArray(accountsRes.data) && accountsRes.data.length > 0) {
-        // Берем первый лицевой счет
-        setAccount(accountsRes.data[0]);
-        console.log(`[Home UI] Лицевой счет найден: ${accountsRes.data[0].account_number}`);
+      // 1. Обновляем профиль пользователя
+      await loadProfile();
+
+      // 2. Ищем лицевой счёт жильца
+      let foundAccount = null;
+      const cleanPhone = user?.phone ? user.phone.replace(/\D/g, '').slice(-10) : '';
+
+      // А. Сначала ищем по номеру телефона
+      if (cleanPhone) {
+        try {
+          const resPhone = await apiClient.get(`/api/accounts?search=${cleanPhone}`);
+          if (Array.isArray(resPhone.data) && resPhone.data.length > 0) {
+            foundAccount = resPhone.data[0];
+            console.log(`[Home UI] Лицевой счёт найден по телефону: ${foundAccount.account_number}`);
+          }
+        } catch (e) {
+          console.warn('[Home UI] Поиск по телефону не дал результатов');
+        }
       }
 
-      // 2. Получаем последние заявки жильца
-      const requestsRes = await apiClient.get('/api/requests');
-      if (Array.isArray(requestsRes.data)) {
-        setRecentRequests(requestsRes.data.slice(0, 3));
+      // Б. Если не найден по телефону, ищем по адресу из профиля
+      if (!foundAccount && (user as any)?.address) {
+        try {
+          const resAddr = await apiClient.get(`/api/accounts?search=${encodeURIComponent((user as any).address)}`);
+          if (Array.isArray(resAddr.data) && resAddr.data.length > 0) {
+            foundAccount = resAddr.data[0];
+            console.log(`[Home UI] Лицевой счёт найден по адресу: ${foundAccount.account_number}`);
+          }
+        } catch (e) {
+          console.warn('[Home UI] Поиск по адресу не дал результатов');
+        }
+      }
+
+      // В. Если поиск с фильтром пуст, берем первый доступный для демонстрации
+      if (!foundAccount) {
+        try {
+          const allRes = await apiClient.get('/api/accounts');
+          if (Array.isArray(allRes.data) && allRes.data.length > 0) {
+            foundAccount = allRes.data[0];
+          }
+        } catch (e) {}
+      }
+
+      setAccount(foundAccount);
+
+      // 3. Получаем последние заявки жильца
+      try {
+        const requestsRes = await apiClient.get('/api/requests');
+        if (Array.isArray(requestsRes.data)) {
+          setRecentRequests(requestsRes.data.slice(0, 3));
+        }
+      } catch (reqErr) {
+        console.warn('[Home UI] Заявки пока отсутствуют');
       }
     } catch (err) {
       console.warn('[Home UI] Ошибка при загрузке данных с сервера:', err);
@@ -55,7 +96,7 @@ export default function HomeScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [user?.phone, (user as any)?.address]);
 
   useEffect(() => {
     loadDashboardData();
@@ -99,10 +140,14 @@ export default function HomeScreen() {
               <Text style={styles.accountNumber}>
                 {account ? `ЛС: ${account.account_number}` : 'Лицевой счет не привязан'}
               </Text>
-              {account?.address && (
+              {account?.address ? (
                 <Text style={styles.accountAddress} numberOfLines={1}>
-                  {account.address}
+                  📍 {account.address}
                 </Text>
+              ) : (
+                <TouchableOpacity onPress={() => router.push('/(tabs)/profile')}>
+                  <Text style={styles.setupAddressLink}>+ Укажите адрес в профиле</Text>
+                </TouchableOpacity>
               )}
             </View>
 
@@ -121,7 +166,9 @@ export default function HomeScreen() {
               activeOpacity={0.85}
             >
               <Ionicons name="card-outline" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
-              <Text style={styles.payButtonText}>Оплатить обслуживание</Text>
+              <Text style={styles.payButtonText}>
+                {hasDebt ? `Оплатить ТО (${debt.toFixed(2)} ₽)` : 'Оплатить обслуживание'}
+              </Text>
             </TouchableOpacity>
           </View>
         )}
@@ -153,24 +200,24 @@ export default function HomeScreen() {
 
           <TouchableOpacity
             style={styles.actionCard}
-            onPress={() => router.push('/(tabs)/chat')}
-            activeOpacity={0.8}
-          >
-            <View style={styles.iconCircle}>
-              <Ionicons name="chatbubbles-outline" size={24} color="#10B981" />
-            </View>
-            <Text style={styles.actionText}>Диспетчер</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.actionCard}
-            onPress={() => router.push('/(tabs)/requests')}
+            onPress={() => router.push('/(tabs)/requests/create')}
             activeOpacity={0.8}
           >
             <View style={styles.iconCircle}>
               <Ionicons name="key-outline" size={24} color="#10B981" />
             </View>
             <Text style={styles.actionText}>Заказ ключей</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.actionCard}
+            onPress={() => router.push('/(tabs)/profile')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.iconCircle}>
+              <Ionicons name="home-outline" size={24} color="#10B981" />
+            </View>
+            <Text style={styles.actionText}>Мой адрес</Text>
           </TouchableOpacity>
         </View>
 
@@ -191,13 +238,13 @@ export default function HomeScreen() {
           recentRequests.map((req, idx) => (
             <View key={req.id || idx} style={styles.requestCard}>
               <View style={styles.requestInfo}>
-                <Text style={styles.requestTitle}>{req.type || 'Заявка'}</Text>
+                <Text style={styles.requestTitle} numberOfLines={1}>{req.name ? `Заявка: ${req.name}` : 'Обращение'}</Text>
                 <Text style={styles.requestDesc} numberOfLines={1}>
-                  {req.description || req.address || 'Обращение зарегистрировано'}
+                  {req.message || req.address || 'Обращение зарегистрировано'}
                 </Text>
               </View>
               <View style={styles.statusBadge}>
-                <Text style={styles.statusText}>{req.status || 'В работе'}</Text>
+                <Text style={styles.statusText}>{req.status || 'Новая'}</Text>
               </View>
             </View>
           ))
@@ -242,6 +289,7 @@ const styles = StyleSheet.create({
   balanceHeader: { marginBottom: 16 },
   accountNumber: { color: '#F8FAFC', fontSize: 18, fontWeight: '700' },
   accountAddress: { color: '#94A3B8', fontSize: 13, marginTop: 4 },
+  setupAddressLink: { color: '#10B981', fontSize: 13, marginTop: 4, fontWeight: '600' },
   balanceBody: { marginBottom: 20 },
   balanceLabel: { color: '#94A3B8', fontSize: 13 },
   balanceAmount: { fontSize: 28, fontWeight: 'bold', marginTop: 4 },

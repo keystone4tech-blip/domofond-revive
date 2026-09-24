@@ -55,18 +55,13 @@ export default function RootLayout() {
     prepareApp();
   }, []);
 
-  // Редирект в зависимости от статуса авторизации после того, как приложение готово
+  // Защита приватных маршрутов: если сессия сброшена/не валидна, а пользователь внутри табов
   useEffect(() => {
     if (!isReady) return;
 
-    const inAuthGroup = segments[0] === '(auth)';
-
-    if (!isAuthenticated && !inAuthGroup) {
-      console.log('[App] Сессия не найдена. Переход на экран входа.');
+    if (!isAuthenticated && segments[0] === '(tabs)') {
+      console.log('[App] Доступ запрещен. Переход на экран входа.');
       router.replace('/(auth)/login');
-    } else if (isAuthenticated && inAuthGroup) {
-      console.log('[App] Пользователь авторизован. Переход в главное меню.');
-      router.replace('/(tabs)/home');
     }
   }, [isReady, isAuthenticated, segments]);
 
