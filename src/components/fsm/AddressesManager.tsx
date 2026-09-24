@@ -699,6 +699,16 @@ export const AddressesManager: React.FC = () => {
                         const isAllRent = entranceList.every(e => e.service_type === "rent");
                         const isAllMaintenance = entranceList.every(e => e.service_type === "maintenance" || !e.service_type);
 
+                        // RULE 2: Агрегированная статистика дома (Умный дом и Оборудование)
+                        const totalEnt = entranceList.length;
+                        const smartEntCount = entranceList.filter(e => !!e.has_smart_intercom).length;
+                        const isHouseSmart = smartEntCount > 0;
+                        const isAllSmart = smartEntCount === totalEnt;
+
+                        const equippedEntCount = entranceList.filter(e => (entranceProducts[e.id] || []).length > 0).length;
+                        const isAllEquipped = equippedEntCount > 0 && equippedEntCount === totalEnt;
+                        const isPartialEquipped = equippedEntCount > 0 && equippedEntCount < totalEnt;
+
                         return (
                           <div
                             key={houseKeyId}
@@ -708,7 +718,7 @@ export const AddressesManager: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => toggleHouse(houseKeyId)}
-                              className="w-full flex items-center justify-between p-2.5 px-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors text-left text-xs font-semibold text-foreground"
+                              className="w-full flex items-center justify-between p-2.5 px-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors text-left text-xs font-semibold text-foreground flex-wrap gap-2"
                             >
                               <div className="flex items-center gap-2">
                                 {isHouseExpanded ? (
@@ -720,25 +730,48 @@ export const AddressesManager: React.FC = () => {
                                 <span>{houseName}</span>
                               </div>
 
-                              <div className="flex items-center gap-1.5">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                {/* Индикатор Умный дом на уровне дома */}
+                                {isHouseSmart && (
+                                  <Badge className="text-[9px] px-1.5 py-0 bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-400/40 font-bold shrink-0">
+                                    📱 {isAllSmart ? "Умный домофон" : `Умный дом (${smartEntCount}/${totalEnt})`}
+                                  </Badge>
+                                )}
+
+                                {/* Индикатор привязки оборудования на уровне дома */}
+                                {isAllEquipped ? (
+                                  <Badge className="text-[9px] px-1.5 py-0 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-400/40 font-bold shrink-0">
+                                    📦 Все оборуд.
+                                  </Badge>
+                                ) : isPartialEquipped ? (
+                                  <Badge className="text-[9px] px-1.5 py-0 bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-400/40 font-bold shrink-0">
+                                    📦 Оборуд. ({equippedEntCount}/{totalEnt})
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-[9px] px-1.5 py-0 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-800 bg-amber-500/10 font-bold shrink-0">
+                                    ⚠️ Нет оборуд.
+                                  </Badge>
+                                )}
+
+                                {/* Тарифный статус дома */}
                                 {isAllInstallation ? (
-                                  <Badge className="text-[9px] px-1.5 py-0 bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800 font-bold">
+                                  <Badge className="text-[9px] px-1.5 py-0 bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800 font-bold shrink-0">
                                     🟡 Монтаж
                                   </Badge>
                                 ) : isAllRent ? (
-                                  <Badge className="text-[9px] px-1.5 py-0 bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-800 font-bold">
+                                  <Badge className="text-[9px] px-1.5 py-0 bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-800 font-bold shrink-0">
                                     🔵 Аренда
                                   </Badge>
                                 ) : isAllMaintenance ? (
-                                  <Badge className="text-[9px] px-1.5 py-0 bg-green-500/15 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-800 font-bold">
+                                  <Badge className="text-[9px] px-1.5 py-0 bg-green-500/15 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-800 font-bold shrink-0">
                                     🟢 На ТО
                                   </Badge>
                                 ) : (
-                                  <Badge variant="outline" className="text-[9px] px-1.5 py-0 text-muted-foreground">
+                                  <Badge variant="outline" className="text-[9px] px-1.5 py-0 text-muted-foreground shrink-0">
                                     🟡/🟢 Смешанный
                                   </Badge>
                                 )}
-                                <span className="text-[10px] text-muted-foreground bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full font-mono">
+                                <span className="text-[10px] text-muted-foreground bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full font-mono shrink-0">
                                   {entranceList.length} под.
                                 </span>
                               </div>
@@ -823,34 +856,25 @@ export const AddressesManager: React.FC = () => {
                                             {entStatus === "installation" ? "🟡" : entStatus === "rent" ? "🔵" : "🟢"}
                                           </span>
                                           <DoorClosed className={`h-3.5 w-3.5 shrink-0 ${isSelected ? "text-primary" : "text-slate-400"}`} />
-                                          <span className="truncate">Подъезд {ent.entrance}</span>
+                                          <span className="font-semibold whitespace-nowrap">Подъезд {ent.entrance}</span>
                                         </div>
 
-                                        <div className="flex items-center gap-1.5 shrink-0">
+                                        <div className="flex items-center gap-1 shrink-0">
                                           {ent.has_smart_intercom && (
-                                            <Badge
-                                              className="text-[9px] px-1.5 py-0 h-4 font-bold bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-400/40"
-                                              title="Умный дом (доступна покупка ЛК)"
+                                            <span
+                                              className="text-xs px-1 py-0.5 rounded bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-400/40 font-bold"
+                                              title="Умный домофон (разрешена покупка ЛК)"
                                             >
-                                              📱 Умный дом
-                                            </Badge>
-                                          )}
-                                          {ent.intercom_type && ent.intercom_type.trim() && (
-                                            <Badge
-                                              variant="outline"
-                                              className="text-[9px] px-1.5 py-0 h-4 font-normal bg-slate-100 dark:bg-slate-800 truncate max-w-[90px]"
-                                              title={ent.intercom_type}
-                                            >
-                                              {ent.intercom_type}
-                                            </Badge>
+                                              📱
+                                            </span>
                                           )}
                                           {linkedCount > 0 ? (
-                                            <Badge className="text-[9px] px-1.5 py-0 h-4 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 font-semibold">
-                                              📦 {linkedCount} поз.
+                                            <Badge className="text-[9px] px-1.5 py-0 h-4 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 font-semibold whitespace-nowrap">
+                                              📦 {linkedCount}
                                             </Badge>
                                           ) : (
-                                            <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-800 bg-amber-500/10 font-semibold">
-                                              ⚠️ Нет оборуд.
+                                            <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-800 bg-amber-500/10 font-semibold whitespace-nowrap">
+                                              ⚠️ 0
                                             </Badge>
                                           )}
                                         </div>
@@ -1014,7 +1038,7 @@ export const AddressesManager: React.FC = () => {
                 {/* Настройка типа домофона подъезда */}
                 <div className="space-y-1.5">
                   <Label className="text-xs font-semibold text-foreground">
-                    Модель / Тип домофона:
+                    Модель домофона:
                   </Label>
                   <div className="flex gap-2">
                     <Input

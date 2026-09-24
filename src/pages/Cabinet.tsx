@@ -1041,6 +1041,9 @@ const RemoteAccessCard = ({
   userId,
   profile,
   hasLk = false,
+  hasSmartIntercom = false,
+  entranceNumber,
+  onOpenOrderDialog,
   onOpenVerification
 }: { 
   address: string; 
@@ -1049,6 +1052,9 @@ const RemoteAccessCard = ({
   userId?: string; 
   profile?: any;
   hasLk?: boolean;
+  hasSmartIntercom?: boolean;
+  entranceNumber?: string | number;
+  onOpenOrderDialog?: () => void;
   onOpenVerification?: () => void;
 }) => {
   const { toast } = useToast();
@@ -1231,8 +1237,43 @@ const RemoteAccessCard = ({
     );
   }
 
-  // СЛУЧАЙ 1: Логопасы еще не загружены для этого адреса/квартиры (или умный домофон отсутствует)
+  // СЛУЧАЙ 1: Логопасы еще не загружены для этого адреса/квартиры
   if (!cred) {
+    if (hasSmartIntercom) {
+      return (
+        <div className="p-4 rounded-2xl border border-indigo-200/80 dark:border-indigo-800/80 bg-indigo-50/40 dark:bg-indigo-950/30 flex items-start gap-3.5">
+          <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 shrink-0">
+            <Smartphone className="h-5 w-5" />
+          </div>
+          <div className="text-left space-y-1.5 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="font-semibold text-sm text-foreground">Умный домофон подключен</p>
+              <Badge className="bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-400/30 text-[10px] font-bold">
+                📱 На стадии запуска
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              По вашему адресу ({cleanAddressDisplay}){entranceNumber ? ` в подъезде №${entranceNumber}` : ""} установлен умный домофон. Учётные записи (логин и пароль) формируются оператором.
+            </p>
+            <div className="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-xs text-indigo-900 dark:text-indigo-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <span>
+                💡 Вы можете заблаговременно оформить подключение личного кабинета (300 ₽). Доступ активируется автоматически после загрузки базы.
+              </span>
+              {onOpenOrderDialog && (
+                <Button 
+                  size="sm" 
+                  onClick={onOpenOrderDialog}
+                  className="rounded-xl h-8 px-3 text-xs font-bold btn-premium-gold shrink-0 self-start sm:self-auto"
+                >
+                  Купить ЛК (300 ₽) ➔
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-900/40 flex items-start gap-3.5">
         <div className="p-2.5 rounded-xl bg-slate-500/10 text-slate-600 dark:text-slate-400 shrink-0">
@@ -1814,7 +1855,7 @@ const Cabinet = () => {
       const [prodRes, bindingsRes, entrancesRes] = await Promise.all([
         supabase.from("products").select("*").eq("is_active", true),
         supabase.from("entrance_products" as any).select("product_id, entrance_id, price_type, custom_price"),
-        supabase.from("entrances" as any).select("id, city, street, house, entrance, intercom_type, service_type")
+        supabase.from("entrances" as any).select("id, city, street, house, entrance, intercom_type, service_type, has_smart_intercom")
       ]);
 
       if (prodRes.error) throw prodRes.error;
@@ -2196,7 +2237,7 @@ const Cabinet = () => {
         if (found.street) setDisplayStreet(found.street);
         if (found.house) setDisplayHouse(found.house);
         if (found.housing) setDisplayHousing(found.housing);
-        if (found.entrance) setDisplayEntrance(found.entrance);
+        if (found.entrance) setEntrance(found.entrance);
 
         parseAndSetAddress(found.address || "");
 
@@ -4950,12 +4991,12 @@ const Cabinet = () => {
               </CardContent>
             </Card>
 
-            {/* Доступ к системе: только информация и оплата по личным кабинетам */}
+            {/* Доступ к системе: только информация и оплата по умному домофону */}
             <Card className="glass-premium rounded-[24px] border-none shadow-lg">
               <CardHeader className="pb-4 border-b border-slate-100 dark:border-slate-800">
                 <CardTitle className="flex items-center gap-2 font-display text-lg font-bold text-slate-800 dark:text-slate-100">
                   <Shield className="h-5 w-5 text-amber-500 animate-pulse" />
-                  Доступ к системе (Личный кабинет)
+                  Доступ к системе (Умный домофон)
                 </CardTitle>
                 <CardDescription className="text-xs text-muted-foreground mt-1 leading-relaxed">
                   {profile?.address && !editing
@@ -4972,6 +5013,13 @@ const Cabinet = () => {
                     accountNumber={userAccount?.account_number} 
                     userId={userId || undefined} 
                     profile={profile}
+                    hasSmartIntercom={!!currentMatchedEntrance?.has_smart_intercom}
+                    entranceNumber={currentMatchedEntrance?.entrance}
+                    onOpenOrderDialog={() => {
+                      setOrderType("order");
+                      setIsCabinetSetupChecked(true);
+                      setIsOrderDialogOpen(true);
+                    }}
                     onOpenVerification={() => {
                       const missing: string[] = [];
                       if (!profile?.full_name?.trim() && !fullName?.trim()) missing.push("ФИО");
