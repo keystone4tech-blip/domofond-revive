@@ -518,59 +518,19 @@ const DebtCard = ({
               </div>
             )}
 
-            <div className="flex items-center justify-between pt-1 gap-2">
-              {onOpenOrderDialog && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onOpenOrderDialog("repair")}
-                  className="rounded-xl text-xs flex items-center justify-center gap-1.5 h-8 text-amber-700 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/10 font-semibold"
-                >
-                  <Wrench className="h-3.5 w-3.5 text-amber-500" />
-                  <span>Оставить заявку</span>
-                </Button>
-              )}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={async () => {
-                  setIsHistoryOpen(true);
-                  setLoadingHistory(true);
-                  try {
-                    // 1. Синхронизируем и загружаем онлайн-платежи через ЮKassa
-                    if (account.account_number) {
-                      const syncRes = await fetch(`/backend-api/api/payments/yookassa/sync/${account.account_number}`);
-                      const syncData = await syncRes.json();
-                      if (syncData.success) {
-                        setOnlinePayments(syncData.payments || []);
-                        if (syncData.account) {
-                          setAccount((prev: any) => prev ? { ...prev, debt_amount: Number(syncData.account.debt_amount) } : prev);
-                          if (setParentAccount) {
-                            setParentAccount((prev: any) => prev ? { ...prev, debt_amount: Number(syncData.account.debt_amount) } : prev);
-                          }
-                        }
-                      }
-                    }
-
-                    // 2. Загружаем историю начислений из реестров
-                    const { data: hist } = await supabase
-                      .from("account_history" as any)
-                      .select("*")
-                      .eq("account_number", account.account_number)
-                      .order("batch_number", { ascending: false });
-                    setAccountHistory(hist || []);
-                  } catch (e) {
-                    console.warn("Ошибка загрузки истории:", e);
-                  } finally {
-                    setLoadingHistory(false);
-                  }
+            {/* Кнопка «Оставить заявку» во всю ширину под блоком оплаты в едином фирменном стиле ShinyButton */}
+            {onOpenOrderDialog && (
+              <ShinyButton
+                onClick={() => {
+                  console.log("[DebtCard] Нажата кнопка 'Оставить заявку' во всю ширину под кнопкой оплаты");
+                  onOpenOrderDialog("repair");
                 }}
-                className="rounded-xl text-xs flex items-center justify-center gap-1.5 h-8 text-muted-foreground hover:text-foreground ml-auto"
+                className="w-full justify-center rounded-xl h-10 text-xs sm:text-sm font-semibold flex items-center gap-2 mt-1 shadow-sm"
               >
-                <Receipt className="h-3.5 w-3.5 text-emerald-600" />
-                <span>История и чеки</span>
-              </Button>
-            </div>
+                <Wrench className="h-4 w-4 text-amber-500 shrink-0" />
+                <span>Оставить заявку</span>
+              </ShinyButton>
+            )}
           </div>
 
           {/* Диалог быстрой оплаты через платёжный шлюз ЮKassa */}
@@ -4791,22 +4751,24 @@ const Cabinet = () => {
                           Отслеживайте статус обращений, заказов оборудования и квитанции об оплате ТО
                         </CardDescription>
                       </div>
-                      <Button
+                      {/* Кнопка «Оставить заявку» в едином стиле кнопки «Изменить» (ShinyButton) */}
+                      <ShinyButton
                         onClick={() => {
+                          console.log("[История] Нажата кнопка 'Оставить заявку' в шапке истории");
                           setOrderType("repair");
                           setIsOrderDialogOpen(true);
                         }}
-                        className="rounded-xl px-4 h-9 font-semibold text-xs bg-amber-500 hover:bg-amber-600 text-white flex items-center gap-1.5 shadow-md shadow-amber-500/20 shrink-0 self-start sm:self-auto"
+                        className="rounded-xl px-4 h-9 font-semibold text-xs flex items-center gap-1.5 shrink-0 self-start sm:self-auto"
                       >
                         <Plus className="h-4 w-4" />
                         <span>Оставить заявку</span>
-                      </Button>
+                      </ShinyButton>
                     </div>
                   </CardHeader>
 
                   <CardContent className="pt-4 px-3 sm:px-6">
-                    {/* Переключатель вкладок в стиле страницы Kontakty.tsx */}
-                    <Tabs defaultValue={orderRequests.length > 0 && regularRequests.length === 0 ? "orders" : maintenancePayments.length > 0 && regularRequests.length === 0 ? "to" : "requests"} className="w-full space-y-4">
+                    {/* Переключатель вкладок: по умолчанию открыта вкладка «Заявки» */}
+                    <Tabs defaultValue="requests" className="w-full space-y-4">
                       <div className="flex justify-center">
                         <TabsList className="glass-premium border border-slate-200/50 dark:border-slate-800/50 p-1.5 rounded-2xl grid grid-cols-3 gap-2 w-full max-w-2xl shadow-lg h-auto">
                           <TabsTrigger 
