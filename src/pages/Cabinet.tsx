@@ -848,8 +848,8 @@ const DebtCard = ({
                   {/* Шапка чека */}
                   <div className="text-center pb-3 border-b border-dashed border-slate-300 dark:border-slate-700">
                     <div className="font-extrabold text-sm uppercase tracking-wider text-foreground">ООО «ДОМОФОНДАР»</div>
-                    <div className="text-[11px] text-muted-foreground mt-0.5">ИНН: 2311311000 • ОГРН: 1202300063250</div>
-                    <div className="text-[10px] text-muted-foreground">г. Краснодар • Тел.: +7 (861) 205-00-55</div>
+                    <div className="text-[11px] text-muted-foreground mt-0.5">ИНН: 2311283958 • ОГРН: 1192375010904</div>
+                    <div className="text-[10px] text-muted-foreground">г. Краснодар, проезд им. Репина, д. 1, пом. 134 • Тел.: +7 (903) 411-83-93</div>
                     {selectedReceipt.status === "succeeded" ? (
                       <div className="mt-2.5 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-semibold text-[11px] border border-emerald-500/20">
                         <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
@@ -1796,6 +1796,7 @@ const Cabinet = () => {
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null); // Выбранная услуга
   const [selectedEquipments, setSelectedEquipments] = useState<{ [id: string]: number }>({}); // Выбранное оборудование и количество (для обратной совместимости)
   const [selectedEquipmentId, setSelectedEquipmentId] = useState<string | null>(null); // Выбранная трубка (строго 1 шт на квартиру)
+  const [selectedKeyProductId, setSelectedKeyProductId] = useState<string | null>(null); // Жестко привязанный ID ключа подъезда (UUID)
   const [hasEntranceCredentials, setHasEntranceCredentials] = useState(false); // Загружены ли логопасы для подъезда
   const [keysQuantity, setKeysQuantity] = useState(0); // Количество дополнительных ключей
   const [isCabinetSetupChecked, setIsCabinetSetupChecked] = useState(false); // Выбран ли чекбокс настройки ЛК
@@ -3127,12 +3128,14 @@ const Cabinet = () => {
     let sum2 = 0; // Установка и трубки (SUMMA_OPL2)
     let sum3 = 0; // Личный кабинет (SUMMA_OPL3)
 
-    // RULE 2: Находим ключ строго из доступных для подъезда товаров (availableProducts) с фоллбеком на products
-    const keyProduct = availableProducts.find(isKeyProduct) || products.find(isKeyProduct);
+    // RULE 2: Жесткая привязка номенклатуры ключа по уникальному ID (UUID), исключая любые совпадения по названию
+    const keyProduct = selectedKeyProductId 
+      ? (availableProducts.find(p => p.id === selectedKeyProductId) || products.find(p => p.id === selectedKeyProductId))
+      : (availableProducts.find(p => p.category === "key") || availableProducts.find(isKeyProduct));
     if (keyProduct && keysQuantity > 0) {
       const unitPrice = getEffectiveProductPrice(keyProduct);
       sum1 = unitPrice * keysQuantity;
-      console.log(`[Расчет заказа] Ключи "${keyProduct.name}": кол-во ${keysQuantity} шт. x ${unitPrice} ₽ = ${sum1} ₽`);
+      console.log(`[Расчет заказа] Ключи "${keyProduct.name}" (ID: ${keyProduct.id}): кол-во ${keysQuantity} шт. x ${unitPrice} ₽ = ${sum1} ₽`);
     }
 
     // Выбранная услуга (установка или замена трубки) - только если реально выбрана
@@ -3194,6 +3197,13 @@ const Cabinet = () => {
       setIsCabinetSetupChecked(false);
       setRepairProblem("");
       setOrderPhone(phone || profile?.phone || "");
+      
+      // RULE 2: Жестко находим и привязываем точный ID ключа подъезда (UUID)
+      const attachedKey = availableProducts.find(p => p.category === "key") || availableProducts.find(isKeyProduct);
+      setSelectedKeyProductId(attachedKey ? attachedKey.id : null);
+      if (attachedKey) {
+        console.log(`[Заявка] К подъезду жестко привязан ключ: "${attachedKey.name}" (ID: ${attachedKey.id})`);
+      }
       
       let streetVal = displayStreet || "";
       let houseVal = displayHouse || "";
@@ -3290,8 +3300,10 @@ const Cabinet = () => {
           }
         }
         
-        // RULE 2: Поиск привязанного ключа подъезда без ложных срабатываний на 'выключатель'
-        const keyProduct = availableProducts.find(isKeyProduct) || products.find(isKeyProduct);
+        // RULE 2: Позиция ключа строго по уникальному ID (selectedKeyProductId)
+        const keyProduct = selectedKeyProductId 
+          ? (availableProducts.find(p => p.id === selectedKeyProductId) || products.find(p => p.id === selectedKeyProductId))
+          : (availableProducts.find(p => p.category === "key") || availableProducts.find(isKeyProduct));
         if (keyProduct && keysQuantity > 0) {
           messageText += `— Ключи: ${keyProduct.name} (${keysQuantity} шт. x ${getEffectiveProductPrice(keyProduct).toFixed(2)} ₽ = ${totals.sum1.toFixed(2)} ₽)\n`;
         }
@@ -3420,9 +3432,11 @@ const Cabinet = () => {
           });
         }
         
-        // Вставка выбранных ключей (строго по привязанному товару без выключателей)
+        // Вставка выбранных ключей (строго по уникальному ID selectedKeyProductId)
         if (keysQuantity > 0) {
-          const keyProduct = availableProducts.find(isKeyProduct) || products.find(isKeyProduct);
+          const keyProduct = selectedKeyProductId 
+            ? (availableProducts.find(p => p.id === selectedKeyProductId) || products.find(p => p.id === selectedKeyProductId))
+            : (availableProducts.find(p => p.category === "key") || availableProducts.find(isKeyProduct));
           if (keyProduct) {
             itemsToInsert.push({
               product_id: keyProduct.id,
@@ -3430,7 +3444,7 @@ const Cabinet = () => {
               price: getEffectiveProductPrice(keyProduct),
               name: keyProduct.name,
             });
-            console.log(`[Заказ: Позиция] Добавлены ключи: "${keyProduct.name}" (${keysQuantity} шт.) за ${getEffectiveProductPrice(keyProduct)} ₽/шт`);
+            console.log(`[Заказ: Позиция] Добавлены ключи: "${keyProduct.name}" (ID: ${keyProduct.id}, ${keysQuantity} шт.) за ${getEffectiveProductPrice(keyProduct)} ₽/шт`);
           }
         }
         
@@ -5368,8 +5382,8 @@ const Cabinet = () => {
                     {/* Шапка чека */}
                     <div className="text-center pb-3 border-b border-dashed border-slate-300 dark:border-slate-700">
                       <div className="font-extrabold text-sm uppercase tracking-wider text-foreground">ООО «ДОМОФОНДАР»</div>
-                      <div className="text-[11px] text-muted-foreground mt-0.5">ИНН: 2311311000 • ОГРН: 1202300063250</div>
-                      <div className="text-[10px] text-muted-foreground">г. Краснодар • Тел.: +7 (861) 205-00-55</div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5">ИНН: 2311283958 • ОГРН: 1192375010904</div>
+                      <div className="text-[10px] text-muted-foreground">г. Краснодар, проезд им. Репина, д. 1, пом. 134 • Тел.: +7 (903) 411-83-93</div>
                       {/* RULE 2: Динамический статус проведения платежа в чеке */}
                       {cabinetReceipt.status === "succeeded" ? (
                         <div className="mt-2.5 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-semibold text-[11px] border border-emerald-500/20">
@@ -5899,8 +5913,9 @@ const Cabinet = () => {
                                   <button
                                     type="button"
                                     onClick={() => {
+                                      setSelectedKeyProductId(keyProduct.id);
                                       if (keysQuantity > 0) {
-                                        console.log("[Заявка] Уменьшено кол-во ключей до:", keysQuantity - 1);
+                                        console.log("[Заявка] Уменьшено кол-во ключей до:", keysQuantity - 1, "ID:", keyProduct.id);
                                         setKeysQuantity(prev => prev - 1);
                                       }
                                     }}
@@ -5912,7 +5927,8 @@ const Cabinet = () => {
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      console.log("[Заявка] Увеличено кол-во ключей до:", keysQuantity + 1);
+                                      setSelectedKeyProductId(keyProduct.id);
+                                      console.log("[Заявка] Увеличено кол-во ключей до:", keysQuantity + 1, "ID:", keyProduct.id);
                                       setKeysQuantity(prev => prev + 1);
                                     }}
                                     className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900 text-slate-400 dark:text-slate-550 active:scale-90 transition-all shrink-0 bg-white/40 dark:bg-slate-950/40"
@@ -6012,7 +6028,9 @@ const Cabinet = () => {
 
                       {/* Ключи */}
                       {keysQuantity > 0 && (() => {
-                        const kp = availableProducts.find(isKeyProduct) || products.find(isKeyProduct);
+                        const kp = selectedKeyProductId 
+                          ? (availableProducts.find(p => p.id === selectedKeyProductId) || products.find(p => p.id === selectedKeyProductId))
+                          : (availableProducts.find(p => p.category === "key") || availableProducts.find(isKeyProduct));
                         if (!kp) return null;
                         const kPrice = getEffectiveProductPrice(kp);
                         return (
