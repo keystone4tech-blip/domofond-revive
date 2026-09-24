@@ -6,12 +6,13 @@
 //   2. Фильтрация товаров по папкам ("Все товары", "Без папки", конкретная папка/подпапка).
 //   3. Поиск позиций по наименованию и фильтрация по категории.
 //   4. Массовое перемещение выбранных чекбоксами позиций в любую папку или подпапку.
-//   5. Создание и редактирование товара с привязкой к розничной и акционной цене, а также к папке.
+//   5. Создание и редактирование товара с фото (загрузка файла / ссылка), розничной ценой,
+//      ценой по акции и ценой на монтаже.
 //   6. Импорт номенклатуры из файлов прайс-листов (.txt/.tsv/.csv) с ценами.
-//   7. Пагинация для быстрой и комфортной работы с большими каталогами (700+ позиций).
+//   7. Пагинация и предпросмотр фотографий товаров.
 // ============================================================================
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -59,7 +60,12 @@ import {
   Search,
   ArrowRightLeft,
   FolderTree,
-  MoreVertical,
+  ImageIcon,
+  Camera,
+  X,
+  ExternalLink,
+  Tag,
+  Wrench,
 } from "lucide-react";
 import { ImportNomenclatureDialog } from "./ImportNomenclatureDialog";
 
@@ -69,10 +75,12 @@ interface Product {
   name: string;
   description: string | null;
   price: number;
-  installation_price?: number | null; // Льготная акционная цена на монтаже
+  promo_price?: number | null; // Цена по акции
+  installation_price?: number | null; // Цена на монтаже
   unit: string;
   category: string | null;
   folder_id: string | null; // ID родительской папки
+  image_url?: string | null; // Фото товара/услуги
   is_active: boolean;
   created_at: string;
 }
@@ -107,6 +115,7 @@ export const ProductsManager: React.FC = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { isManager } = useUserRole();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Состояние выбранной папки для фильтрации: "all" | "none" | UUID папки
   const [selectedFolderId, setSelectedFolderId] = useState<string>("all");
@@ -128,7 +137,8 @@ export const ProductsManager: React.FC = () => {
   const [isProductDialogOpen, setIsProductDialogOpen] = useState<boolean>(false);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState<boolean>(false);
   const [isFolderDialogOpen, setIsFolderDialogOpen] = useState<boolean>(false);
-  
+  const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
+
   // Редактируемый товар
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
@@ -144,12 +154,18 @@ export const ProductsManager: React.FC = () => {
     name: "",
     description: "",
     price: "",
+    promo_price: "",
     installation_price: "",
     unit: "шт",
     category: "equipment",
     folder_id: "none",
+    image_url: "",
     is_active: true,
   });
+
+  // Режим ввода фото: загрузка файла или ввод URL
+  const [isPhotoUrlMode, setIsPhotoUrlMode] = useState<boolean>(false);
+  const [isCompressingPhoto, setIsCompressingPhoto] = useState<boolean>(false);
 
   // ============================================================================
   // Запрос списка папок
@@ -296,6 +312,55 @@ export const ProductsManager: React.FC = () => {
     setSelectedProductIds([]);
   };
 
+  // Сжатие изображения через Canvas для компактного сохранения в base64
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsCompressingPhoto(true);
+    console.log(`[ProductsManager] Обработка изображения: ${file.name}, исходный размер: ${(file.size / 1024).toFixed(1)} КБ`);
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const maxDim = 800; // Оптимальный размер для фото товаров
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.85);
+          console.log(`[ProductsManager] Сжатие завершено: ${width}x${height}`);
+          setProductForm((prev) => ({ ...prev, image_url: compressedDataUrl }));
+        } else {
+          setProductForm((prev) => ({ ...prev, image_url: img.src }));
+        }
+        setIsCompressingPhoto(false);
+      };
+      img.onerror = () => {
+        setIsCompressingPhoto(false);
+        toast({ title: "Ошибка", description: "Не удалось прочитать изображение", variant: "destructive" });
+      };
+    };
+    reader.readAsDataURL(file);
+  };
+
   // ============================================================================
   // Мутации: Создание / Обновление / Удаление товаров
   // ============================================================================
@@ -306,10 +371,12 @@ export const ProductsManager: React.FC = () => {
         name: data.name,
         description: data.description || null,
         price: parseFloat(data.price),
+        promo_price: data.promo_price.trim() ? parseFloat(data.promo_price) : null,
         installation_price: data.installation_price.trim() ? parseFloat(data.installation_price) : null,
         unit: data.unit,
         category: data.category,
         folder_id: data.folder_id === "none" ? null : data.folder_id,
+        image_url: data.image_url.trim() ? data.image_url : null,
         is_active: data.is_active,
       });
       if (error) throw error;
@@ -472,13 +539,16 @@ export const ProductsManager: React.FC = () => {
       name: "",
       description: "",
       price: "",
+      promo_price: "",
       installation_price: "",
       unit: "шт",
       category: "equipment",
       folder_id: selectedFolderId !== "all" ? selectedFolderId : "none",
+      image_url: "",
       is_active: true,
     });
     setEditingProduct(null);
+    setIsPhotoUrlMode(false);
   };
 
   const startEditProduct = (product: Product) => {
@@ -487,12 +557,15 @@ export const ProductsManager: React.FC = () => {
       name: product.name,
       description: product.description || "",
       price: product.price.toString(),
+      promo_price: product.promo_price != null ? product.promo_price.toString() : "",
       installation_price: product.installation_price != null ? product.installation_price.toString() : "",
       unit: product.unit,
       category: product.category || "equipment",
       folder_id: product.folder_id || "none",
+      image_url: product.image_url || "",
       is_active: product.is_active,
     });
+    setIsPhotoUrlMode(false);
     setIsProductDialogOpen(true);
   };
 
@@ -504,10 +577,12 @@ export const ProductsManager: React.FC = () => {
         name: productForm.name,
         description: productForm.description || null,
         price: parseFloat(productForm.price),
+        promo_price: productForm.promo_price.trim() ? parseFloat(productForm.promo_price) : null,
         installation_price: productForm.installation_price.trim() ? parseFloat(productForm.installation_price) : null,
         unit: productForm.unit,
         category: productForm.category,
         folder_id: productForm.folder_id === "none" ? null : productForm.folder_id,
+        image_url: productForm.image_url.trim() ? productForm.image_url : null,
         is_active: productForm.is_active,
       });
     } else {
@@ -902,20 +977,24 @@ export const ProductsManager: React.FC = () => {
                         aria-label="Выбрать все на странице"
                       />
                     </TableHead>
+                    <TableHead className="w-[50px] text-center">Фото</TableHead>
                     <TableHead>Наименование</TableHead>
-                    <TableHead className="w-[130px]">Папка</TableHead>
-                    <TableHead className="w-[110px]">Категория</TableHead>
-                    <TableHead className="text-right w-[110px]">Розница</TableHead>
-                    <TableHead className="text-right w-[110px]">На монтаже</TableHead>
-                    <TableHead className="w-[60px]">Ед.</TableHead>
-                    <TableHead className="w-[70px] text-center">Статус</TableHead>
-                    <TableHead className="text-right w-[90px]">Действия</TableHead>
+                    <TableHead className="w-[120px]">Папка</TableHead>
+                    <TableHead className="w-[100px]">Категория</TableHead>
+                    <TableHead className="text-right w-[95px]">Розница</TableHead>
+                    <TableHead className="text-right w-[95px]">
+                      <span className="text-amber-600 dark:text-amber-400 font-semibold">Акция</span>
+                    </TableHead>
+                    <TableHead className="text-right w-[95px]">На монтаже</TableHead>
+                    <TableHead className="w-[50px]">Ед.</TableHead>
+                    <TableHead className="w-[60px] text-center">Статус</TableHead>
+                    <TableHead className="text-right w-[85px]">Действия</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {paginatedProducts.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center py-12 text-muted-foreground">
+                      <TableCell colSpan={11} className="text-center py-12 text-muted-foreground">
                         {searchQuery ? "По запросу ничего не найдено." : "В данной папке нет товаров."}
                       </TableCell>
                     </TableRow>
@@ -935,6 +1014,35 @@ export const ProductsManager: React.FC = () => {
                               onCheckedChange={() => toggleSelectOne(product.id)}
                             />
                           </TableCell>
+
+                          {/* Миниатюра фото товара */}
+                          <TableCell className="text-center p-2">
+                            {product.image_url ? (
+                              <button
+                                type="button"
+                                onClick={() => setPreviewPhotoUrl(product.image_url || null)}
+                                className="h-9 w-9 rounded-lg overflow-hidden border border-border/80 hover:ring-2 hover:ring-primary/50 transition-all bg-muted shrink-0 inline-flex items-center justify-center cursor-pointer"
+                                title="Нажмите для увеличения фото"
+                              >
+                                <img
+                                  src={product.image_url}
+                                  alt={product.name}
+                                  className="h-full w-full object-cover"
+                                  onError={(e) => {
+                                    (e.target as HTMLElement).style.display = "none";
+                                  }}
+                                />
+                              </button>
+                            ) : (
+                              <div
+                                className="h-9 w-9 rounded-lg bg-muted/60 border border-dashed border-border/60 flex items-center justify-center text-muted-foreground/40 mx-auto"
+                                title="Нет фотографии"
+                              >
+                                <Package className="h-4 w-4" />
+                              </div>
+                            )}
+                          </TableCell>
+
                           <TableCell className="font-medium">
                             <div>
                               <span className="text-foreground hover:text-primary transition-colors">
@@ -956,18 +1064,34 @@ export const ProductsManager: React.FC = () => {
                           <TableCell className="text-xs">
                             {getCategoryLabel(product.category)}
                           </TableCell>
+
+                          {/* Розница */}
                           <TableCell className="text-right font-semibold text-foreground">
                             {product.price.toFixed(0)} ₽
                           </TableCell>
+
+                          {/* Акция */}
+                          <TableCell className="text-right">
+                            {product.promo_price != null ? (
+                              <span className="font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 px-2 py-0.5 rounded-lg text-xs">
+                                {product.promo_price.toFixed(0)} ₽
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+
+                          {/* На монтаже */}
                           <TableCell className="text-right">
                             {product.installation_price != null ? (
-                              <span className="font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 px-2 py-0.5 rounded-lg text-xs">
+                              <span className="font-semibold text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800/60 px-2 py-0.5 rounded-lg text-xs">
                                 {product.installation_price.toFixed(0)} ₽
                               </span>
                             ) : (
                               <span className="text-xs text-muted-foreground">—</span>
                             )}
                           </TableCell>
+
                           <TableCell className="text-xs text-muted-foreground">{product.unit}</TableCell>
                           <TableCell className="text-center">
                             <Switch
@@ -1054,13 +1178,103 @@ export const ProductsManager: React.FC = () => {
       {/* ДИАЛОГ: Создание / Редактирование товара */}
       {/* ================================================================== */}
       <Dialog open={isProductDialogOpen} onOpenChange={setIsProductDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingProduct ? "Редактировать позицию" : "Новая позиция в каталог"}
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleProductSubmit} className="space-y-4">
+            {/* Блок прикрепления фотографии */}
+            <div className="space-y-2 p-3 rounded-xl border bg-muted/20">
+              <Label className="text-xs font-semibold flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Camera className="h-4 w-4 text-primary" />
+                  Фотография товара / услуги
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsPhotoUrlMode(!isPhotoUrlMode)}
+                  className="text-[11px] text-primary hover:underline font-normal"
+                >
+                  {isPhotoUrlMode ? "Загрузить файл" : "Ввести ссылку (URL)"}
+                </button>
+              </Label>
+
+              <div className="flex items-center gap-3">
+                {/* Превью фото */}
+                <div className="h-16 w-16 rounded-xl border border-dashed border-border flex items-center justify-center overflow-hidden bg-background shrink-0 relative group">
+                  {productForm.image_url ? (
+                    <>
+                      <img
+                        src={productForm.image_url}
+                        alt="Превью"
+                        className="h-full w-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setProductForm({ ...productForm, image_url: "" })}
+                        className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity"
+                        title="Удалить фото"
+                      >
+                        <X className="h-5 w-5" />
+                      </button>
+                    </>
+                  ) : (
+                    <ImageIcon className="h-6 w-6 text-muted-foreground/40" />
+                  )}
+                </div>
+
+                {/* Управление загрузкой */}
+                <div className="flex-1 space-y-1.5">
+                  {isPhotoUrlMode ? (
+                    <Input
+                      placeholder="https://example.com/image.jpg"
+                      value={productForm.image_url}
+                      onChange={(e) => setProductForm({ ...productForm, image_url: e.target.value })}
+                      className="text-xs h-9"
+                    />
+                  ) : (
+                    <div>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handlePhotoUpload}
+                        className="hidden"
+                        id="product-photo-upload"
+                      />
+                      <label htmlFor="product-photo-upload" className="cursor-pointer">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-9 text-xs w-full sm:w-auto"
+                          disabled={isCompressingPhoto}
+                          onClick={() => fileInputRef.current?.click()}
+                        >
+                          {isCompressingPhoto ? (
+                            <>
+                              <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                              Сжатие фото...
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="h-3.5 w-3.5 mr-2" />
+                              {productForm.image_url ? "Заменить фото" : "Выбрать фото"}
+                            </>
+                          )}
+                        </Button>
+                      </label>
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        PNG, JPG, WebP. Автоматически оптимизируется для быстрой загрузки.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="prod-name">Наименование *</Label>
               <Input
@@ -1104,11 +1318,12 @@ export const ProductsManager: React.FC = () => {
               </Select>
             </div>
 
-            {/* Цены */}
-            <div className="grid grid-cols-2 gap-4">
+            {/* Блок из 3 цен: Розница, Акция, На монтаже */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* 1. Розничная цена */}
               <div className="space-y-1.5">
-                <Label htmlFor="prod-price" className="text-xs font-semibold">
-                  Розничная цена (₽) *
+                <Label htmlFor="prod-price" className="text-xs font-semibold flex items-center gap-1">
+                  <span>Розничная (₽) *</span>
                 </Label>
                 <Input
                   id="prod-price"
@@ -1120,18 +1335,39 @@ export const ProductsManager: React.FC = () => {
                   required
                   placeholder="1500.00"
                 />
-                <p className="text-[10px] text-muted-foreground">Базовая цена по прайсу</p>
+                <p className="text-[10px] text-muted-foreground">Базовая цена</p>
               </div>
 
+              {/* 2. Цена по акции */}
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor="prod-promo-price"
+                  className="text-xs font-semibold text-amber-600 dark:text-amber-400 flex items-center justify-between"
+                >
+                  <span>Акция (₽)</span>
+                  <Tag className="h-3 w-3" />
+                </Label>
+                <Input
+                  id="prod-promo-price"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={productForm.promo_price}
+                  onChange={(e) => setProductForm({ ...productForm, promo_price: e.target.value })}
+                  placeholder="Цена по акции"
+                  className="border-amber-200 dark:border-amber-900/60"
+                />
+                <p className="text-[10px] text-muted-foreground">Специальная цена</p>
+              </div>
+
+              {/* 3. Цена на монтаже */}
               <div className="space-y-1.5">
                 <Label
                   htmlFor="prod-install-price"
-                  className="text-xs font-semibold text-amber-600 dark:text-amber-400 flex items-center justify-between"
+                  className="text-xs font-semibold text-sky-600 dark:text-sky-400 flex items-center justify-between"
                 >
                   <span>На монтаже (₽)</span>
-                  <span className="text-[9px] px-1 py-0.5 rounded bg-amber-100 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-300 font-medium">
-                    Акция
-                  </span>
+                  <Wrench className="h-3 w-3" />
                 </Label>
                 <Input
                   id="prod-install-price"
@@ -1142,10 +1378,10 @@ export const ProductsManager: React.FC = () => {
                   onChange={(e) =>
                     setProductForm({ ...productForm, installation_price: e.target.value })
                   }
-                  placeholder="Оставьте пустым, если = розничной"
-                  className="border-amber-200 dark:border-amber-900/60"
+                  placeholder="Задается вручную"
+                  className="border-sky-200 dark:border-sky-900/60"
                 />
-                <p className="text-[10px] text-muted-foreground">Льготная цена в период монтажа</p>
+                <p className="text-[10px] text-muted-foreground">Ввод дома/монтаж</p>
               </div>
             </div>
 
@@ -1285,6 +1521,23 @@ export const ProductsManager: React.FC = () => {
               {editingFolder ? "Сохранить" : "Создать"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ================================================================== */}
+      {/* ДИАЛОГ: Полноразмерный просмотр фотографии товара */}
+      {/* ================================================================== */}
+      <Dialog open={!!previewPhotoUrl} onOpenChange={() => setPreviewPhotoUrl(null)}>
+        <DialogContent className="sm:max-w-xl p-2 bg-background/95 backdrop-blur-md">
+          <div className="relative flex items-center justify-center p-2">
+            {previewPhotoUrl && (
+              <img
+                src={previewPhotoUrl}
+                alt="Увеличенное фото"
+                className="max-h-[80vh] w-auto object-contain rounded-lg shadow-lg"
+              />
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 

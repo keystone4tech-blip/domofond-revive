@@ -33,6 +33,7 @@ import {
 interface ParsedItem {
   name: string;
   price: number;
+  promo_price: number | null;
   installation_price: number | null;
   unit: string;
   category: string;
@@ -156,7 +157,6 @@ export const ImportNomenclatureDialog: React.FC<ImportNomenclatureDialogProps> =
 
         if (retailPrice !== null || promoPrice !== null) {
           const price = retailPrice !== null ? retailPrice : (promoPrice || 0);
-          const instPrice = promoPrice !== null ? promoPrice : price;
 
           // Автоматическая классификация категории и единицы измерения
           let category = "equipment";
@@ -173,7 +173,8 @@ export const ImportNomenclatureDialog: React.FC<ImportNomenclatureDialogProps> =
           items.push({
             name,
             price,
-            installation_price: instPrice,
+            promo_price: promoPrice,
+            installation_price: null, // На монтаже цены устанавливаются вручную
             unit,
             category,
           });
@@ -227,7 +228,8 @@ export const ImportNomenclatureDialog: React.FC<ImportNomenclatureDialogProps> =
         const batch = parsedItems.slice(i, i + BATCH_SIZE).map((item) => ({
           name: item.name,
           price: item.price,
-          installation_price: item.installation_price,
+          promo_price: item.promo_price,
+          installation_price: null,
           unit: item.unit,
           category: item.category,
           is_active: true,
@@ -378,9 +380,9 @@ export const ImportNomenclatureDialog: React.FC<ImportNomenclatureDialogProps> =
                         </div>
                         <div className="text-right shrink-0">
                           <p className="font-bold text-foreground text-xs">{item.price.toFixed(0)} ₽</p>
-                          {item.installation_price !== null && (
+                          {item.promo_price !== null && (
                             <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold block">
-                              акция: {item.installation_price.toFixed(0)} ₽
+                              акция: {item.promo_price.toFixed(0)} ₽
                             </span>
                           )}
                         </div>
