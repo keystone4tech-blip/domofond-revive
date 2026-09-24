@@ -29,6 +29,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -60,6 +61,7 @@ interface Entrance {
   entrance: string;
   intercom_type?: string | null;
   service_type?: string | null;
+  has_smart_intercom?: boolean | null;
 }
 
 // Интерфейс товара
@@ -115,6 +117,7 @@ export const BindProductsDialog: React.FC<BindProductsDialogProps> = ({
   // Карта настроек привязок: product_id -> ProductBindingConfig
   const [bindingsMap, setBindingsMap] = useState<Record<string, ProductBindingConfig>>({});
   const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [isSmartIntercom, setIsSmartIntercom] = useState<boolean>(false);
 
   // ============================================================================
   // Запрос списка папок
@@ -176,6 +179,7 @@ export const BindProductsDialog: React.FC<BindProductsDialogProps> = ({
   useEffect(() => {
     if (!isOpen) return;
 
+    setIsSmartIntercom(!!entrance?.has_smart_intercom);
     const newMap: Record<string, ProductBindingConfig> = {};
 
     // 1. Инициализируем существующие привязки
@@ -190,7 +194,7 @@ export const BindProductsDialog: React.FC<BindProductsDialogProps> = ({
     setBindingsMap(newMap);
     setSelectedFolderId("all");
     setSearchQuery("");
-  }, [isOpen, currentBindings]);
+  }, [isOpen, currentBindings, entrance]);
 
   // Дерево папок с отступами
   const folderTreeFlat = useMemo(() => {
@@ -420,13 +424,24 @@ export const BindProductsDialog: React.FC<BindProductsDialogProps> = ({
         if (insertErr) throw insertErr;
       }
 
-      console.log(`[BindProductsDialog] Успешно сохранено привязок: ${selectedEntries.length}`);
+      // 3. Обновляем статус «Умный дом» для данного подъезда
+      const { error: updateEntErr } = await supabase
+        .from("entrances" as any)
+        .update({ has_smart_intercom: isSmartIntercom } as any)
+        .eq("id", entrance.id);
+
+      if (updateEntErr) {
+        console.warn("[BindProductsDialog] Не удалось обновить статус has_smart_intercom:", updateEntErr);
+      }
+
+      console.log(`[BindProductsDialog] Успешно сохранено привязок: ${selectedEntries.length}, умный дом: ${isSmartIntercom}`);
       toast({
-        title: "Оборудование привязано",
-        description: `Для подъезда сохранено позиций: ${selectedEntries.length}`,
+        title: "Сохранено",
+        description: `Для подъезда сохранено позиций: ${selectedEntries.length}${isSmartIntercom ? " • Умный дом включен" : ""}`,
       });
 
       queryClient.invalidateQueries({ queryKey: ["entrance_products"] });
+      queryClient.invalidateQueries({ queryKey: ["entrances"] });
       onSaved();
       onClose();
     } catch (err: any) {
@@ -466,7 +481,17 @@ export const BindProductsDialog: React.FC<BindProductsDialogProps> = ({
               </DialogDescription>
             </div>
 
-            <div className="flex items-center gap-2 self-start sm:self-center">
+            <div className="flex items-center gap-2.5 self-start sm:self-center flex-wrap">
+              <div className="flex items-center gap-2 px-3 py-1 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50/70 dark:bg-indigo-950/40">
+                <span className="text-xs font-semibold text-foreground flex items-center gap-1">
+                  📱 Умный дом
+                </span>
+                <Switch
+                  checked={isSmartIntercom}
+                  onCheckedChange={setIsSmartIntercom}
+                />
+              </div>
+
               <Badge variant="outline" className="text-xs px-2.5 py-1 bg-background font-medium">
                 Выбрано для подъезда:{" "}
                 <strong className="text-primary ml-1 text-sm">{selectedCount}</strong>

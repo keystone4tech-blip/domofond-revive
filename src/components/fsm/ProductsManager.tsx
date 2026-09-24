@@ -68,6 +68,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { ImportNomenclatureDialog } from "./ImportNomenclatureDialog";
+import { parseTieredPricing, DEFAULT_KEY_TIERS, KeyPriceTier } from "@/utils/pricing";
 
 // Интерфейс для товара/услуги
 interface Product {
@@ -77,6 +78,9 @@ interface Product {
   price: number;
   promo_price?: number | null; // Цена по акции
   installation_price?: number | null; // Цена на монтаже
+  code_1c?: string | null; // Уникальный код 1С
+  is_tiered_promo?: boolean | null; // Включена ли ступенчатая акция
+  tiered_pricing?: any | null; // Ступени цен [{min_qty: 1, price: 300}, ...]
   unit: string;
   category: string | null;
   folder_id: string | null; // ID родительской папки
@@ -95,9 +99,10 @@ interface ProductFolder {
 
 // Предопределенные категории
 const categories = [
+  { value: "key", label: "Ключи" },
+  { value: "equipment", label: "Оборудование (трубки)" },
   { value: "service", label: "Услуга" },
   { value: "material", label: "Материал" },
-  { value: "equipment", label: "Оборудование" },
   { value: "other", label: "Прочее" },
 ];
 
@@ -161,6 +166,10 @@ export const ProductsManager: React.FC = () => {
     folder_id: "none",
     image_url: "",
     is_active: true,
+    is_tiered_promo: false,
+    tier_1_price: "300",
+    tier_2_price: "250",
+    tier_3_price: "200",
   });
 
   // Режим ввода фото: загрузка файла или ввод URL
@@ -367,6 +376,12 @@ export const ProductsManager: React.FC = () => {
   const createProductMutation = useMutation({
     mutationFn: async (data: typeof productForm) => {
       console.log("[ProductsManager] Создание нового товара:", data.name);
+      const tiersPayload = data.is_tiered_promo ? [
+        { min_qty: 1, price: parseFloat(data.tier_1_price) || parseFloat(data.price) || 300 },
+        { min_qty: 2, price: parseFloat(data.tier_2_price) || 250 },
+        { min_qty: 3, price: parseFloat(data.tier_3_price) || 200 },
+      ] : null;
+
       const { error } = await supabase.from("products").insert({
         name: data.name,
         description: data.description || null,
@@ -378,6 +393,8 @@ export const ProductsManager: React.FC = () => {
         folder_id: data.folder_id === "none" ? null : data.folder_id,
         image_url: data.image_url.trim() ? data.image_url : null,
         is_active: data.is_active,
+        is_tiered_promo: data.is_tiered_promo,
+        tiered_pricing: tiersPayload,
       });
       if (error) throw error;
     },
@@ -546,6 +563,10 @@ export const ProductsManager: React.FC = () => {
       folder_id: selectedFolderId !== "all" ? selectedFolderId : "none",
       image_url: "",
       is_active: true,
+      is_tiered_promo: false,
+      tier_1_price: "300",
+      tier_2_price: "250",
+      tier_3_price: "200",
     });
     setEditingProduct(null);
     setIsPhotoUrlMode(false);
@@ -553,6 +574,13 @@ export const ProductsManager: React.FC = () => {
 
   const startEditProduct = (product: Product) => {
     setEditingProduct(product);
+    
+    // Парсим сохраненные ступени цен либо ставим дефолтные
+    const tiers = parseTieredPricing(product.tiered_pricing);
+    const t1 = tiers.find(t => t.min_qty === 1)?.price ?? (product.price || 300);
+    const t2 = tiers.find(t => t.min_qty === 2)?.price ?? 250;
+    const t3 = tiers.find(t => t.min_qty === 3)?.price ?? 200;
+
     setProductForm({
       name: product.name,
       description: product.description || "",
@@ -564,6 +592,10 @@ export const ProductsManager: React.FC = () => {
       folder_id: product.folder_id || "none",
       image_url: product.image_url || "",
       is_active: product.is_active,
+      is_tiered_promo: !!product.is_tiered_promo,
+      tier_1_price: t1.toString(),
+      tier_2_price: t2.toString(),
+      tier_3_price: t3.toString(),
     });
     setIsPhotoUrlMode(false);
     setIsProductDialogOpen(true);
@@ -571,6 +603,12 @@ export const ProductsManager: React.FC = () => {
 
   const handleProductSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const tiersPayload = productForm.is_tiered_promo ? [
+      { min_qty: 1, price: parseFloat(productForm.tier_1_price) || parseFloat(productForm.price) || 300 },
+      { min_qty: 2, price: parseFloat(productForm.tier_2_price) || 250 },
+      { min_qty: 3, price: parseFloat(productForm.tier_3_price) || 200 },
+    ] : null;
+
     if (editingProduct) {
       updateProductMutation.mutate({
         id: editingProduct.id,
@@ -584,6 +622,8 @@ export const ProductsManager: React.FC = () => {
         folder_id: productForm.folder_id === "none" ? null : productForm.folder_id,
         image_url: productForm.image_url.trim() ? productForm.image_url : null,
         is_active: productForm.is_active,
+        is_tiered_promo: productForm.is_tiered_promo,
+        tiered_pricing: tiersPayload,
       });
     } else {
       createProductMutation.mutate(productForm);
@@ -1072,7 +1112,19 @@ export const ProductsManager: React.FC = () => {
 
                           {/* Акция */}
                           <TableCell className="text-right">
-                            {product.promo_price != null ? (
+                            {product.is_tiered_promo ? (
+                              <div className="flex flex-col items-end gap-0.5">
+                                <span className="font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 px-1.5 py-0.5 rounded text-[10px] whitespace-nowrap">
+                                  🎁 Ступени
+                                </span>
+                                <span className="text-[10px] text-muted-foreground font-mono">
+                                  {(() => {
+                                    const t = parseTieredPricing(product.tiered_pricing);
+                                    return t.map((item) => item.price).join("/");
+                                  })()} ₽
+                                </span>
+                              </div>
+                            ) : product.promo_price != null ? (
                               <span className="font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 px-2 py-0.5 rounded-lg text-xs">
                                 {product.promo_price.toFixed(0)} ₽
                               </span>
@@ -1425,6 +1477,73 @@ export const ProductsManager: React.FC = () => {
                 </Select>
               </div>
             </div>
+
+            {/* Секция ступенчатой акции от количества (для категории Ключи или товаров со словом ключ) */}
+            {(productForm.category === "key" || productForm.name.toLowerCase().includes("ключ")) && (
+              <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-sm font-bold text-foreground flex items-center gap-1.5">
+                      <span>🎁 Ступенчатая акция от количества</span>
+                      {productForm.is_tiered_promo && (
+                        <Badge className="bg-amber-500 text-white text-[9px] px-1.5 py-0 font-bold">Активна</Badge>
+                      )}
+                    </Label>
+                    <p className="text-[11px] text-muted-foreground">
+                      Скидка для жителей домов на ТО при заказе нескольких ключей (автоматически отключается при монтаже)
+                    </p>
+                  </div>
+                  <Switch
+                    checked={productForm.is_tiered_promo}
+                    onCheckedChange={(checked) => setProductForm({ ...productForm, is_tiered_promo: checked })}
+                  />
+                </div>
+
+                {productForm.is_tiered_promo && (
+                  <div className="grid grid-cols-3 gap-2.5 pt-2 border-t border-amber-500/20">
+                    <div>
+                      <Label className="text-[11px] font-semibold text-foreground">1 шт. (₽)</Label>
+                      <Input
+                        type="number"
+                        step="1"
+                        min="0"
+                        value={productForm.tier_1_price}
+                        onChange={(e) => setProductForm({ ...productForm, tier_1_price: e.target.value })}
+                        className="h-8 text-xs bg-background"
+                        placeholder="300"
+                      />
+                      <span className="text-[10px] text-muted-foreground">Розница</span>
+                    </div>
+                    <div>
+                      <Label className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">2 шт. (₽/шт)</Label>
+                      <Input
+                        type="number"
+                        step="1"
+                        min="0"
+                        value={productForm.tier_2_price}
+                        onChange={(e) => setProductForm({ ...productForm, tier_2_price: e.target.value })}
+                        className="h-8 text-xs bg-background border-amber-300 dark:border-amber-800"
+                        placeholder="250"
+                      />
+                      <span className="text-[10px] text-amber-600 font-semibold">500 ₽ за 2 шт</span>
+                    </div>
+                    <div>
+                      <Label className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">от 3 шт. (₽/шт)</Label>
+                      <Input
+                        type="number"
+                        step="1"
+                        min="0"
+                        value={productForm.tier_3_price}
+                        onChange={(e) => setProductForm({ ...productForm, tier_3_price: e.target.value })}
+                        className="h-8 text-xs bg-background border-emerald-300 dark:border-emerald-800"
+                        placeholder="200"
+                      />
+                      <span className="text-[10px] text-emerald-600 font-semibold">от 600 ₽</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="flex items-center gap-2 pt-2">
               <Switch

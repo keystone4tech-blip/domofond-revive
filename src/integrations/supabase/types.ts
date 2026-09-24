@@ -626,10 +626,16 @@ export type Database = {
           code_1c: string | null
           created_at: string | null
           description: string | null
+          folder_id: string | null
           id: string
+          image_url: string | null
+          installation_price: number | null
           is_active: boolean | null
+          is_tiered_promo: boolean | null
           name: string
           price: number
+          promo_price: number | null
+          tiered_pricing: Json | null
           unit: string | null
           updated_at: string | null
         }
@@ -638,10 +644,16 @@ export type Database = {
           code_1c?: string | null
           created_at?: string | null
           description?: string | null
+          folder_id?: string | null
           id?: string
+          image_url?: string | null
+          installation_price?: number | null
           is_active?: boolean | null
+          is_tiered_promo?: boolean | null
           name: string
           price?: number
+          promo_price?: number | null
+          tiered_pricing?: Json | null
           unit?: string | null
           updated_at?: string | null
         }
@@ -650,10 +662,16 @@ export type Database = {
           code_1c?: string | null
           created_at?: string | null
           description?: string | null
+          folder_id?: string | null
           id?: string
+          image_url?: string | null
+          installation_price?: number | null
           is_active?: boolean | null
+          is_tiered_promo?: boolean | null
           name?: string
           price?: number
+          promo_price?: number | null
+          tiered_pricing?: Json | null
           unit?: string | null
           updated_at?: string | null
         }

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -41,6 +42,7 @@ export interface Entrance {
   entrance: string;
   intercom_type: string | null;
   service_type?: 'installation' | 'maintenance' | 'rent' | string; // Статус объекта: монтаж (льготный), ТО (розница), аренда (розница)
+  has_smart_intercom?: boolean | null; // Флаг умного домофона (позволяет жильцам покупать ЛК)
   notes: string | null;
   created_at: string;
 }
@@ -432,6 +434,67 @@ export const AddressesManager: React.FC = () => {
     }
   };
 
+  // Переключение флага «Умный дом» для конкретного подъезда
+  const handleToggleSmartIntercom = async (entranceId: string, currentVal: boolean) => {
+    const newVal = !currentVal;
+    console.log(`[AddressesManager] Смена «Умный дом» для подъезда ${entranceId}: ${newVal}`);
+    try {
+      const { error } = await supabase
+        .from("entrances" as any)
+        .update({ has_smart_intercom: newVal } as any)
+        .eq("id", entranceId);
+
+      if (error) throw error;
+
+      setEntrances(prev => prev.map(e => e.id === entranceId ? { ...e, has_smart_intercom: newVal } : e));
+      if (selectedEntrance?.id === entranceId) {
+        setSelectedEntrance(prev => prev ? { ...prev, has_smart_intercom: newVal } : null);
+      }
+      toast({
+        title: newVal ? "Умный дом активирован" : "Умный дом отключен",
+        description: newVal 
+          ? "Жильцы этого подъезда могут оплачивать подключение Личного кабинета" 
+          : "Оплата Личного кабинета скрыта для жильцов",
+      });
+    } catch (err: any) {
+      console.error("[AddressesManager] Ошибка изменения Умный дом:", err);
+      toast({ title: "Ошибка", description: err.message, variant: "destructive" });
+    }
+  };
+
+  // Переключение флага «Умный дом» для ВСЕХ подъездов дома сразу
+  const handleToggleHouseSmartIntercom = async (city: string, street: string, house: string, targetVal: boolean) => {
+    console.log(`[AddressesManager] Установка «Умный дом» = ${targetVal} для всего дома: ${city}, ${street}, ${house}`);
+    try {
+      const { error } = await supabase
+        .from("entrances" as any)
+        .update({ has_smart_intercom: targetVal } as any)
+        .eq("city", city)
+        .eq("street", street)
+        .eq("house", house);
+
+      if (error) throw error;
+
+      setEntrances(prev => prev.map(e => 
+        e.city === city && e.street === street && e.house === house 
+          ? { ...e, has_smart_intercom: targetVal } 
+          : e
+      ));
+      if (selectedEntrance && selectedEntrance.city === city && selectedEntrance.street === street && selectedEntrance.house === house) {
+        setSelectedEntrance(prev => prev ? { ...prev, has_smart_intercom: targetVal } : null);
+      }
+      toast({
+        title: "Применено ко всему дому",
+        description: targetVal 
+          ? "Умный дом активирован для всех подъездов дома" 
+          : "Умный дом отключен для всех подъездов дома",
+      });
+    } catch (err: any) {
+      console.error("[AddressesManager] Ошибка применения ко всему дому:", err);
+      toast({ title: "Ошибка", description: err.message, variant: "destructive" });
+    }
+  };
+
   // Иерархическая группировка адресов: Город -> Дом -> Подъезды
   const addressTree = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
@@ -764,6 +827,14 @@ export const AddressesManager: React.FC = () => {
                                         </div>
 
                                         <div className="flex items-center gap-1.5 shrink-0">
+                                          {ent.has_smart_intercom && (
+                                            <Badge
+                                              className="text-[9px] px-1.5 py-0 h-4 font-bold bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-400/40"
+                                              title="Умный дом (доступна покупка ЛК)"
+                                            >
+                                              📱 Умный дом
+                                            </Badge>
+                                          )}
                                           {ent.intercom_type && ent.intercom_type.trim() && (
                                             <Badge
                                               variant="outline"
@@ -774,11 +845,13 @@ export const AddressesManager: React.FC = () => {
                                             </Badge>
                                           )}
                                           {linkedCount > 0 ? (
-                                            <Badge className="text-[9px] px-1.5 py-0 h-4 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
-                                              {linkedCount} тов.
+                                            <Badge className="text-[9px] px-1.5 py-0 h-4 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 font-semibold">
+                                              📦 {linkedCount} поз.
                                             </Badge>
                                           ) : (
-                                            <span className="text-[10px] text-muted-foreground">0 тов.</span>
+                                            <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-800 bg-amber-500/10 font-semibold">
+                                              ⚠️ Нет оборуд.
+                                            </Badge>
                                           )}
                                         </div>
                                       </button>
@@ -894,6 +967,44 @@ export const AddressesManager: React.FC = () => {
                       )}
                       className="text-primary hover:underline font-semibold"
                       title="Применить этот же статус ко всем остальным подъездам этого дома"
+                    >
+                      Для всего дома ➔
+                    </button>
+                  </div>
+                </div>
+
+                {/* Блок управления статусом «Умный дом» */}
+                <div className="p-3 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200/70 dark:border-indigo-800/60 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">📱</span>
+                      <div>
+                        <span className="font-bold text-foreground block text-xs">Умный домофон:</span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {selectedEntrance.has_smart_intercom
+                            ? "Разрешена заблаговременная покупка ЛК жильцами"
+                            : "Покупка ЛК скрыта (требуются загруженные учетные записи)"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <Switch
+                      checked={!!selectedEntrance.has_smart_intercom}
+                      onCheckedChange={() => handleToggleSmartIntercom(selectedEntrance.id, !!selectedEntrance.has_smart_intercom)}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1 border-t border-indigo-200/50 dark:border-indigo-800/40 text-[11px]">
+                    <span className="text-muted-foreground">Применить ко всем подъездам дома:</span>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleHouseSmartIntercom(
+                        selectedEntrance.city,
+                        selectedEntrance.street,
+                        selectedEntrance.house,
+                        !selectedEntrance.has_smart_intercom
+                      )}
+                      className="text-primary hover:underline font-semibold"
                     >
                       Для всего дома ➔
                     </button>
