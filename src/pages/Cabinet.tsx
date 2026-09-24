@@ -1833,43 +1833,133 @@ const Cabinet = () => {
 
   // Определение соответствующего подъезда жителя для показа совместимого оборудования
   const currentMatchedEntrance = useMemo(() => {
-    if (!orderStreet || !orderHouse || !allEntrances.length) return null;
-    const cleanStreet = orderStreet.toLowerCase().replace(/[^а-яa-z0-9]/g, "");
-    const cleanHouse = orderHouse.toLowerCase().replace(/[^а-яa-z0-9]/g, "");
-    const cleanEnt = String(orderEntrance || "1").trim();
+    // 1. Извлекаем эффективную улицу, дом и подъезд из стейта формы или профиля жильца
+    let effStreet = orderStreet || displayStreet || "";
+    let effHouse = orderHouse || displayHouse || "";
+    let effEntrance = orderEntrance || entrance || "";
 
-    return allEntrances.find(e => {
-      const eStreet = e.street.toLowerCase().replace(/[^а-яa-z0-9]/g, "");
-      const eHouse = e.house.toLowerCase().replace(/[^а-яa-z0-9]/g, "");
-      const eEnt = String(e.entrance).trim();
+    // Фоллбек: если поля формы пусты, извлекаем напрямую из адреса договора или профиля
+    const rawAddress = userAccount?.address || profile?.address || address || "";
+    if ((!effStreet || !effHouse) && rawAddress) {
+      const parts = rawAddress.split(",");
+      if (parts.length >= 3) {
+        if (!effStreet) effStreet = parts[1].trim();
+        if (!effHouse) effHouse = extractHousePartFromCacheAddr(rawAddress);
+      }
+    }
+    if (!effEntrance && rawAddress) {
+      const entMatch = rawAddress.match(/(?:^|,|\s)(?:п|подъезд)\.?\s*(\d+)/i);
+      if (entMatch) effEntrance = entMatch[1];
+    }
+
+    if (!effStreet || !effHouse || !allEntrances.length) return null;
+
+    // Вспомогательная функция нормализации улицы (убираем приставки ул, пер, пос, скобки и спецсимволы)
+    const normalizeStreetName = (str: string) => {
+      return str
+        .toLowerCase()
+        .replace(/\b(ул|улица|пер|переулок|проезд|пр-кт|проспект|туп|тупик|бульвар|б-р|пос|поселок|п)\b/gi, "")
+        .replace(/[^а-яa-z0-9]/gi, "");
+    };
+
+    const cleanStreet = normalizeStreetName(effStreet);
+    const cleanHouse = effHouse.toLowerCase().replace(/[^а-яa-z0-9]/gi, "").replace(/^д/, "");
+    const cleanEnt = String(effEntrance || "1").replace(/[^0-9]/g, "");
+
+    // 1. Попытка точного совпадения: улица + дом + подъезд
+    const exactMatch = allEntrances.find(e => {
+      const eStreet = normalizeStreetName(e.street);
+      const eHouse = e.house.toLowerCase().replace(/[^а-яa-z0-9]/gi, "").replace(/^д/, "");
+      const eEnt = String(e.entrance).replace(/[^0-9]/g, "");
 
       const streetMatch = eStreet.includes(cleanStreet) || cleanStreet.includes(eStreet);
       const houseMatch = eHouse === cleanHouse;
       const entMatch = eEnt === cleanEnt;
 
       return streetMatch && houseMatch && entMatch;
-    }) || null;
-  }, [orderStreet, orderHouse, orderEntrance, allEntrances]);
+    });
 
-  // Список товаров, доступных для текущего подъезда (универсальные + привязанные именно к этому подъезду)
+    if (exactMatch) {
+      console.log(`[Cabinet] Точно определен подъезд: ${exactMatch.street}, д. ${exactMatch.house}, п. ${exactMatch.entrance} (ID: ${exactMatch.id})`);
+      return exactMatch;
+    }
+
+    // 2. Если точный подъезд не найден, но дом есть в базе: ищем подъезд этого дома с привязанными товарами
+    const houseMatches = allEntrances.filter(e => {
+      const eStreet = normalizeStreetName(e.street);
+      const eHouse = e.house.toLowerCase().replace(/[^а-яa-z0-9]/gi, "").replace(/^д/, "");
+      return (eStreet.includes(cleanStreet) || cleanStreet.includes(eStreet)) && eHouse === cleanHouse;
+    });
+
+    if (houseMatches.length > 0) {
+      const withBindings = houseMatches.find(e => 
+        Object.values(productBindings).some(eIds => eIds && eIds.includes(e.id))
+      );
+      const chosen = withBindings || houseMatches[0];
+      console.log(`[Cabinet] Подъезд подобран по дому: ${chosen.street}, д. ${chosen.house}, п. ${chosen.entrance} (ID: ${chosen.id})`);
+      return chosen;
+    }
+
+    return null;
+  }, [orderStreet, displayStreet, orderHouse, displayHouse, orderEntrance, entrance, userAccount, profile, address, allEntrances, productBindings]);
+
+  // Список товаров, доступных для текущего подъезда (СТРОГАЯ изоляция привязанного оборудования)
   const availableProducts = useMemo(() => {
     if (!products || products.length === 0) return [];
 
+    // Если подъезд абонента успешно определен
+    if (currentMatchedEntrance) {
+      // Собираем множество ID товаров, которые оператор привязал конкретно к этому подъезду
+      const boundToThisEntrance = new Set<string>();
+      Object.entries(productBindings).forEach(([prodId, entranceIds]) => {
+        if (entranceIds && entranceIds.includes(currentMatchedEntrance.id)) {
+          boundToThisEntrance.add(prodId);
+        }
+      });
+
+      // ЕСЛИ К ПОДЪЕЗДУ ПРИВЯЗАНО ОБОРУДОВАНИЕ ИЛИ УСЛУГИ:
+      if (boundToThisEntrance.size > 0) {
+        const boundProductsList = products.filter(p => boundToThisEntrance.has(p.id));
+        const hasBoundEquipment = boundProductsList.some(p => p.category !== "service");
+        const hasBoundServices = boundProductsList.some(p => p.category === "service");
+
+        console.log(`[Cabinet] Для подъезда привязано товаров: ${boundToThisEntrance.size} (оборудование: ${hasBoundEquipment}, услуги: ${hasBoundServices})`);
+
+        return products.filter(product => {
+          // 1. Если товар персонально привязан к текущему подъезду — он всегда доступен
+          if (boundToThisEntrance.has(product.id)) {
+            return true;
+          }
+
+          const boundIds = productBindings[product.id];
+          // 2. Если товар привязан к ДРУГИМ подъездам — он строго недоступен
+          if (boundIds && boundIds.length > 0) {
+            return false;
+          }
+
+          // 3. Для непривязанных (базовых) позиций каталога:
+          // Если для подъезда оператор привязал конкретное оборудование (трубки/ключи),
+          // то все остальные непривязанные модели оборудования из 700+ номенклатуры СКРЫВАЕМ!
+          if (product.category !== "service" && hasBoundEquipment) {
+            return false;
+          }
+
+          // Если оператор привязал конкретные услуги, общие услуги скрываем
+          if (product.category === "service" && hasBoundServices) {
+            return false;
+          }
+
+          // В противном случае оставляем базовую позицию
+          return true;
+        });
+      }
+    }
+
+    // Если подъезд не распознан или к нему ещё ничего не привязали в CRM:
+    // показываем только товары, у которых нет привязок к каким-либо подъездам
     return products.filter(product => {
       const boundEntranceIds = productBindings[product.id];
-
-      // 1. Товар универсален (не ограничен ни одним подъездом)
-      if (!boundEntranceIds || boundEntranceIds.length === 0) {
-        return true;
-      }
-
-      // 2. Товар ограничен подъездами: показываем только если подъезд совпал
-      if (currentMatchedEntrance && boundEntranceIds.includes(currentMatchedEntrance.id)) {
-        return true;
-      }
-
-      // Товар не подходит для этой парадной
-      return false;
+      return !boundEntranceIds || boundEntranceIds.length === 0;
     });
   }, [products, productBindings, currentMatchedEntrance]);
 
@@ -3036,25 +3126,36 @@ const Cabinet = () => {
     if (isOrderDialogOpen) {
       console.log("[Заявка] Инициализация контактных полей формы...");
       setOrderPhone(phone || profile?.phone || "");
-      setOrderStreet(displayStreet || "");
-      setOrderHouse(displayHouse || "");
+      
+      let streetVal = displayStreet || "";
+      let houseVal = displayHouse || "";
+      let entVal = entrance || "";
+
+      // Если displayStreet или displayHouse пустые, попробуем извлечь из сырого адреса
+      const rawAddress = userAccount?.address || profile?.address || address || "";
+      if ((!streetVal || !houseVal) && rawAddress) {
+        const parts = rawAddress.split(",");
+        if (parts.length >= 3) {
+          if (!streetVal) streetVal = parts[1].trim();
+          if (!houseVal) houseVal = extractHousePartFromCacheAddr(rawAddress);
+        }
+      }
+
+      // Автоматическое определение номера подъезда из лицевого счета или профиля
+      if (!entVal && rawAddress) {
+        const entMatch = rawAddress.match(/(?:^|,|\s)(?:п|подъезд)\.?\s*(\d+)/i);
+        if (entMatch) entVal = entMatch[1];
+      }
+
+      setOrderStreet(streetVal);
+      setOrderHouse(houseVal);
+      setOrderEntrance(entVal || "1");
       setOrderApartment(apartment || "");
       setOrderName(fullName || profile?.full_name || "");
       setOrderPremiseType(premiseType || "apartment");
-
-      // Автоматическое определение номера подъезда из лицевого счета или профиля
-      let detectedEntrance = "";
-      if (userAccount?.address) {
-        const entMatch = userAccount.address.match(/(?:^|,|\s)(?:п|подъезд)\.?\s*(\d+)/i);
-        if (entMatch) detectedEntrance = entMatch[1];
-      }
-      if (!detectedEntrance && address) {
-        const entMatch = address.match(/(?:^|,|\s)(?:п|подъезд)\.?\s*(\d+)/i);
-        if (entMatch) detectedEntrance = entMatch[1];
-      }
-      setOrderEntrance(detectedEntrance || "1");
+      console.log(`[Заявка] Поля формы инициализированы: Улица="${streetVal}", Дом="${houseVal}", Подъезд="${entVal || "1"}"`);
     }
-  }, [isOrderDialogOpen, phone, profile, displayStreet, displayHouse, apartment, fullName, premiseType, userAccount, address]);
+  }, [isOrderDialogOpen, phone, profile, displayStreet, displayHouse, entrance, apartment, fullName, premiseType, userAccount, address]);
 
   // --- ОТПРАВКА ЗАЯВКИ ИЛИ ЗАКАЗА В БД ---
   const handleCreateOrderRequest = async () => {
