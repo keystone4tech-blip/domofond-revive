@@ -294,17 +294,34 @@ const DebtCard = ({
             console.log("[ЮKassa] Пользователь вернулся со страницы платежа. Проверка фактического статуса...");
             window.history.replaceState({}, document.title, window.location.pathname);
 
+            const isOrderParam = initialParams.get("is_order") === "1" || initialParams.get("isOrder") === "true";
             const lastP = syncedPayments[0];
+            const isOrderPayment = isOrderParam || 
+                                   !!lastP?.request_id || 
+                                   lastP?.metadata?.is_order === true || 
+                                   lastP?.metadata?.is_order === "true" || 
+                                   !!lastP?.metadata?.order_data ||
+                                   (lastP?.description && lastP.description.toLowerCase().includes("заказ"));
+
             if (lastP) {
               if (lastP.status === "succeeded") {
-                toast({
-                  title: "✅ Оплата успешно зачислена!",
-                  description: `Платёж на сумму ${Number(lastP.amount).toFixed(2)} ₽ успешно проведён через ЮKassa, баланс обновлён. Электронный чек доступен в истории платежей.`,
-                });
+                if (isOrderPayment) {
+                  toast({
+                    title: "✅ Заказ успешно оплачен!",
+                    description: `Платёж на сумму ${Number(lastP.amount).toFixed(2)} ₽ успешно проведён через ЮKassa. Заявка передана мастеру в работу! Детали наряда и электронный чек доступны в истории заказов.`,
+                  });
+                } else {
+                  toast({
+                    title: "✅ Оплата успешно зачислена!",
+                    description: `Платёж на сумму ${Number(lastP.amount).toFixed(2)} ₽ успешно проведён через ЮKassa, баланс обновлён. Электронный чек доступен в истории платежей.`,
+                  });
+                }
               } else if (lastP.status === "canceled") {
                 toast({
                   title: "Платёж отменён",
-                  description: "Оплата не была завершена. Средства с вашей карты не списывались.",
+                  description: isOrderPayment
+                    ? "Оплата заказа оборудования не была завершена. Средства с вашей карты не списывались."
+                    : "Оплата не была завершена. Средства с вашей карты не списывались.",
                   variant: "destructive",
                 });
               } else {
@@ -3094,14 +3111,24 @@ const Cabinet = () => {
     return Number(prod.price || 0);
   };
 
+  // RULE 2: Надежная функция проверки принадлежности товара к ключам домофона
+  // Исключает ложные срабатывания на подстроку "ключ" в словах "выключатель", "переключатель", "подключение"
+  const isKeyProduct = (p: any) => {
+    if (!p || !p.name) return false;
+    const name = p.name.toLowerCase();
+    if (name.includes("выключатель") || name.includes("переключатель") || name.includes("подключ")) {
+      return false;
+    }
+    return p.category === "key" || /(?:^|\s)ключ/i.test(name);
+  };
+
   const calculateTotals = () => {
     let sum1 = 0; // Ключи (SUMMA_OPL1)
     let sum2 = 0; // Установка и трубки (SUMMA_OPL2)
     let sum3 = 0; // Личный кабинет (SUMMA_OPL3)
 
     // RULE 2: Находим ключ строго из доступных для подъезда товаров (availableProducts) с фоллбеком на products
-    const keyProduct = availableProducts.find(p => p.name.toLowerCase().includes("ключ")) 
-      || products.find(p => p.name.toLowerCase().includes("ключ"));
+    const keyProduct = availableProducts.find(isKeyProduct) || products.find(isKeyProduct);
     if (keyProduct && keysQuantity > 0) {
       const unitPrice = getEffectiveProductPrice(keyProduct);
       sum1 = unitPrice * keysQuantity;
@@ -3263,7 +3290,8 @@ const Cabinet = () => {
           }
         }
         
-        const keyProduct = availableProducts.find(p => p.name.toLowerCase().includes("ключ")) || products.find(p => p.name.toLowerCase().includes("ключ"));
+        // RULE 2: Поиск привязанного ключа подъезда без ложных срабатываний на 'выключатель'
+        const keyProduct = availableProducts.find(isKeyProduct) || products.find(isKeyProduct);
         if (keyProduct && keysQuantity > 0) {
           messageText += `— Ключи: ${keyProduct.name} (${keysQuantity} шт. x ${getEffectiveProductPrice(keyProduct).toFixed(2)} ₽ = ${totals.sum1.toFixed(2)} ₽)\n`;
         }
@@ -3350,9 +3378,9 @@ const Cabinet = () => {
         // Платный заказ оборудования/ключей — заявка составляется СТРОГО ПОСЛЕ успешной оплаты через ЮKassa!
         const itemsToInsert: any[] = [];
         
-        // Вставка выбранной услуги
+        // Вставка выбранной услуги (сначала ищем в доступных товарах подъезда)
         if (selectedServiceId) {
-          const prod = products.find(p => p.id === selectedServiceId);
+          const prod = availableProducts.find(p => p.id === selectedServiceId) || products.find(p => p.id === selectedServiceId);
           if (prod) {
             itemsToInsert.push({
               product_id: selectedServiceId,
@@ -3360,25 +3388,41 @@ const Cabinet = () => {
               price: getEffectiveProductPrice(prod),
               name: prod.name,
             });
+            console.log(`[Заказ: Позиция] Добавлена услуга: "${prod.name}" за ${getEffectiveProductPrice(prod)} ₽`);
           }
         }
         
-        // Вставка выбранного оборудования (трубок)
-        Object.entries(selectedEquipments).forEach(([id, qty]) => {
-          const prod = products.find(p => p.id === id);
-          if (prod && qty > 0) {
+        // Вставка выбранного оборудования (одиночная трубка ТКП)
+        if (selectedEquipmentId) {
+          const prod = availableProducts.find(p => p.id === selectedEquipmentId) || products.find(p => p.id === selectedEquipmentId);
+          if (prod) {
             itemsToInsert.push({
-              product_id: id,
-              quantity: qty,
+              product_id: selectedEquipmentId,
+              quantity: 1,
               price: getEffectiveProductPrice(prod),
               name: prod.name,
             });
+            console.log(`[Заказ: Позиция] Добавлена трубка ТКП: "${prod.name}" (1 шт.) за ${getEffectiveProductPrice(prod)} ₽`);
           }
-        });
+        } else {
+          // Резервная поддержка множественного выбора
+          Object.entries(selectedEquipments).forEach(([id, qty]) => {
+            const prod = availableProducts.find(p => p.id === id) || products.find(p => p.id === id);
+            if (prod && qty > 0) {
+              itemsToInsert.push({
+                product_id: id,
+                quantity: qty,
+                price: getEffectiveProductPrice(prod),
+                name: prod.name,
+              });
+              console.log(`[Заказ: Позиция] Добавлено оборудование: "${prod.name}" (${qty} шт.) за ${getEffectiveProductPrice(prod)} ₽`);
+            }
+          });
+        }
         
-        // Вставка выбранных ключей
+        // Вставка выбранных ключей (строго по привязанному товару без выключателей)
         if (keysQuantity > 0) {
-          const keyProduct = products.find(p => p.name.toLowerCase().includes("ключ"));
+          const keyProduct = availableProducts.find(isKeyProduct) || products.find(isKeyProduct);
           if (keyProduct) {
             itemsToInsert.push({
               product_id: keyProduct.id,
@@ -3386,20 +3430,21 @@ const Cabinet = () => {
               price: getEffectiveProductPrice(keyProduct),
               name: keyProduct.name,
             });
+            console.log(`[Заказ: Позиция] Добавлены ключи: "${keyProduct.name}" (${keysQuantity} шт.) за ${getEffectiveProductPrice(keyProduct)} ₽/шт`);
           }
         }
         
         // Вставка настройки личного кабинета
-        if (isCabinetSetupChecked) {
+        if (isCabinetSetupChecked && hasEntranceCredentials) {
           const cabinetProduct = products.find(p => p.name.toLowerCase().includes("кабинет"));
-          if (cabinetProduct) {
-            itemsToInsert.push({
-              product_id: cabinetProduct.id,
-              quantity: 1,
-              price: Number(cabinetProduct.price),
-              name: cabinetProduct.name,
-            });
-          }
+          const cPrice = cabinetProduct ? getEffectiveProductPrice(cabinetProduct) : 300;
+          itemsToInsert.push({
+            product_id: cabinetProduct?.id || null,
+            quantity: 1,
+            price: cPrice,
+            name: cabinetProduct?.name || "Подключение личного кабинета",
+          });
+          console.log(`[Заказ: Позиция] Добавлен Личный кабинет за ${cPrice} ₽`);
         }
 
         // Расчет 5% комиссии эквайринга
@@ -3446,8 +3491,8 @@ const Cabinet = () => {
             accountNumber: userAccount?.account_number || undefined,
             user_id: userId || undefined,
             userId: userId || undefined,
-            return_url: `${window.location.origin}/cabinet?check_payment=1&account=${encodeURIComponent(userAccount?.account_number || "")}`,
-            returnUrl: `${window.location.origin}/cabinet?check_payment=1&account=${encodeURIComponent(userAccount?.account_number || "")}`,
+            return_url: `${window.location.origin}/cabinet?check_payment=1&is_order=1&account=${encodeURIComponent(userAccount?.account_number || "")}`,
+            returnUrl: `${window.location.origin}/cabinet?check_payment=1&is_order=1&account=${encodeURIComponent(userAccount?.account_number || "")}`,
             order_data: orderPayload,
             orderData: orderPayload,
             is_order: true,
@@ -4893,8 +4938,15 @@ const Cabinet = () => {
               const orderRequests = (userRequests || []).filter((r: any) => 
                 r.status !== "draft" && (r.order_type === "equipment_order" || Number(r.payment_amount) > 0)
               );
-              // 3. Платежи за техническое обслуживание (ТО)
-              const maintenancePayments = toPayments || [];
+              // 3. Платежи за техническое обслуживание (ТО) - строго абонентская плата, без заказов оборудования и услуг
+              const maintenancePayments = (toPayments || []).filter((p: any) => {
+                const isOrder = !!p.request_id || 
+                                p.metadata?.is_order === true || 
+                                p.metadata?.is_order === "true" || 
+                                !!p.metadata?.order_data ||
+                                (p.description && p.description.toLowerCase().includes("заказ"));
+                return !isOrder;
+              });
 
               console.log("[ЛК Кабинет: История] Отрисовка блока с 3 вкладками:", {
                 regular: regularRequests.length,
@@ -5118,8 +5170,8 @@ const Cabinet = () => {
                                         variant="outline"
                                         onClick={() => {
                                           console.log("[ЛК Кабинет: Заказы] Просмотр электронного чека по заказу ID:", req.id);
-                                          // Ищем платёж в базе либо генерируем объект чека
-                                          const matchedPayment = maintenancePayments.find((p: any) => p.request_id === req.id || String(p.request_id) === String(req.id));
+                                          // Ищем платёж в базе (по полному списку транзакций toPayments) либо генерируем объект чека
+                                          const matchedPayment = (toPayments || []).find((p: any) => p.request_id === req.id || String(p.request_id) === String(req.id));
                                           setCabinetReceipt(matchedPayment || {
                                             id: `REQ-${req.id}`,
                                             yookassa_payment_id: req.payment_id || `REQ-${req.id}`,
@@ -5238,7 +5290,7 @@ const Cabinet = () => {
                                       {isSucceeded ? (
                                         <Badge className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 text-[10px] py-0 font-medium">
                                           <CheckCircle2 className="h-3 w-3 mr-1 text-emerald-600 inline" />
-                                          Зачислен
+                                          Оплачен
                                         </Badge>
                                       ) : isPending ? (
                                         <Badge className="bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 text-[10px] py-0 font-medium">
@@ -5709,14 +5761,14 @@ const Cabinet = () => {
                     )}
 
                     {/* Выбор модели трубки (ТКП) - разворачивается СТРОГО ПОСЛЕ ВЫБОРА УСЛУГИ */}
-                    {selectedServiceId && availableProducts.some(p => p.category === "equipment" && !p.name.toLowerCase().includes("ключ")) && (
+                    {selectedServiceId && availableProducts.some(p => p.category === "equipment" && !isKeyProduct(p)) && (
                       <div className="space-y-2 text-left animate-in fade-in slide-in-from-top-2 duration-300">
                         <Label className="text-sm font-semibold text-foreground flex items-center gap-1.5 font-display">
                           🏢 Выберите трубку (ТКП) под ваш домофон
                         </Label>
                         <div className="space-y-2">
                           {availableProducts
-                            .filter(p => p.category === "equipment" && !p.name.toLowerCase().includes("ключ"))
+                            .filter(p => p.category === "equipment" && !isKeyProduct(p))
                             .map((equip) => {
                               const effPrice = getEffectiveProductPrice(equip);
                               const hasDiscount = currentMatchedEntrance?.service_type === "installation" && 
@@ -5789,13 +5841,13 @@ const Cabinet = () => {
                     )}
 
                     {/* Заказ дополнительных ключей (отображаются ВСЕГДА) */}
-                    {availableProducts.filter(p => p.name.toLowerCase().includes("ключ")).length > 0 && (
+                    {availableProducts.filter(isKeyProduct).length > 0 && (
                       <div className="space-y-2 text-left">
                         <Label className="text-sm font-semibold text-foreground flex items-center gap-1.5 font-display">
                           🔑 Дополнительные ключи от домофона
                         </Label>
                         {availableProducts
-                          .filter(p => p.name.toLowerCase().includes("ключ"))
+                          .filter(isKeyProduct)
                           .map((keyProduct) => {
                             const effPrice = getEffectiveProductPrice(keyProduct);
                             const hasDiscount = currentMatchedEntrance?.service_type === "installation" && 
@@ -5960,7 +6012,7 @@ const Cabinet = () => {
 
                       {/* Ключи */}
                       {keysQuantity > 0 && (() => {
-                        const kp = availableProducts.find(p => p.name.toLowerCase().includes("ключ")) || products.find(p => p.name.toLowerCase().includes("ключ"));
+                        const kp = availableProducts.find(isKeyProduct) || products.find(isKeyProduct);
                         if (!kp) return null;
                         const kPrice = getEffectiveProductPrice(kp);
                         return (

@@ -314,7 +314,9 @@ export const InstallerSheetManager: React.FC = () => {
         const cat = (item.product?.category || "").toLowerCase();
         const lower = name.toLowerCase();
 
-        if (cat === "key" || lower.includes("ключ")) {
+        // RULE 2: Надежная проверка ключей домофона (исключаем выключатели, переключатели и подключения)
+        const isKey = cat === "key" || (/(?:^|\s)ключ/i.test(lower) && !lower.includes("выключатель") && !lower.includes("переключатель") && !lower.includes("подключ"));
+        if (isKey) {
           keysList.push(`${name}: ${item.quantity} шт.`);
           keysCount += item.quantity;
         } else if (cat === "equipment" || lower.includes("ткп") || lower.includes("трубк") || lower.includes("домофон") || lower.includes("панель")) {
@@ -360,8 +362,8 @@ export const InstallerSheetManager: React.FC = () => {
           continue;
         }
 
-        // Ключи
-        if (keysList.length === 0 && lowerLine.includes("ключ")) {
+        // Ключи (с защитой от слов 'выключатель', 'переключатель', 'подключение')
+        if (keysList.length === 0 && /(?:^|\s)ключ/i.test(lowerLine) && !lowerLine.includes("выключатель") && !lowerLine.includes("переключатель") && !lowerLine.includes("подключ")) {
           const clean = line.replace(/^[—\-*•\s]*(?:Ключи|Ключ)[^:]*:\s*/i, "").trim();
           const qtyMatch = clean.match(/\((\d+)\s*шт/i);
           const qty = qtyMatch ? parseInt(qtyMatch[1], 10) : 1;
