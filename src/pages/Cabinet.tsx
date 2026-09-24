@@ -3054,23 +3054,33 @@ const Cabinet = () => {
     let sum2 = 0; // Установка и трубки (SUMMA_OPL2)
     let sum3 = 0; // Личный кабинет (SUMMA_OPL3)
 
-    // Находим ключ
-    const keyProduct = products.find(p => p.name.toLowerCase().includes("ключ"));
+    // RULE 2: Находим ключ строго из доступных для подъезда товаров (availableProducts) с фоллбеком на products
+    const keyProduct = availableProducts.find(p => p.name.toLowerCase().includes("ключ")) 
+      || products.find(p => p.name.toLowerCase().includes("ключ"));
     if (keyProduct && keysQuantity > 0) {
-      sum1 = getEffectiveProductPrice(keyProduct) * keysQuantity;
+      const unitPrice = getEffectiveProductPrice(keyProduct);
+      sum1 = unitPrice * keysQuantity;
+      console.log(`[Расчет заказа] Ключи "${keyProduct.name}": кол-во ${keysQuantity} шт. x ${unitPrice} ₽ = ${sum1} ₽`);
     }
 
-    // Выбранная услуга (установка или замена трубки)
-    const selectedService = products.find(p => p.id === selectedServiceId);
-    if (selectedService) {
-      sum2 += getEffectiveProductPrice(selectedService);
+    // Выбранная услуга (установка или замена трубки) - только если реально выбрана
+    if (selectedServiceId) {
+      const selectedService = availableProducts.find(p => p.id === selectedServiceId)
+        || products.find(p => p.id === selectedServiceId);
+      if (selectedService) {
+        const sPrice = getEffectiveProductPrice(selectedService);
+        sum2 += sPrice;
+        console.log(`[Расчет заказа] Услуга "${selectedService.name}": ${sPrice} ₽`);
+      }
     }
 
     // Выбранные трубки (оборудование)
     Object.entries(selectedEquipments).forEach(([id, qty]) => {
-      const prod = products.find(p => p.id === id);
+      const prod = availableProducts.find(p => p.id === id) || products.find(p => p.id === id);
       if (prod && qty > 0) {
-        sum2 += getEffectiveProductPrice(prod) * qty;
+        const prodPrice = getEffectiveProductPrice(prod);
+        sum2 += prodPrice * qty;
+        console.log(`[Расчет заказа] Трубка "${prod.name}": ${qty} шт. x ${prodPrice} ₽ = ${prodPrice * qty} ₽`);
       }
     });
 
@@ -3082,6 +3092,7 @@ const Cabinet = () => {
       } else {
         sum3 = 300; // Резервное значение, если товара нет в БД
       }
+      console.log(`[Расчет заказа] Личный кабинет: ${sum3} ₽`);
     }
 
     const total = sum1 + sum2 + sum3;
@@ -3092,7 +3103,13 @@ const Cabinet = () => {
   // Эффект инициализации полей новой заявки при открытии диалогового окна
   useEffect(() => {
     if (isOrderDialogOpen) {
-      console.log("[Заявка] Инициализация контактных полей формы...");
+      console.log("[Заявка] Инициализация формы заявки, полный сброс ранее выбранных товаров и услуг...");
+      // RULE 2: Полностью сбрасываем кэш и стейт выбора товаров и услуг
+      setSelectedServiceId(null);
+      setSelectedEquipments({});
+      setKeysQuantity(0);
+      setIsCabinetSetupChecked(false);
+      setRepairProblem("");
       setOrderPhone(phone || profile?.phone || "");
       
       let streetVal = displayStreet || "";
@@ -5339,9 +5356,17 @@ const Cabinet = () => {
 
             {/* --- ДИАЛОГ ПОДАЧИ ЗАЯВКИ / ЗАКАЗА УСЛУГ --- */}
             <Dialog open={isOrderDialogOpen} onOpenChange={(openState) => {
-              // RULE 2: Логируем состояние диалога создания заявки
+              // RULE 2: Логируем состояние диалога создания заявки и очищаем выбранные позиции при закрытии
               console.log("[ЛК Кабинет] Изменение состояния диалога заявки, открыт:", openState);
               setIsOrderDialogOpen(openState);
+              if (!openState) {
+                console.log("[ЛК Кабинет] Диалог закрыт, сброс выбора услуг и оборудования");
+                setSelectedServiceId(null);
+                setSelectedEquipments({});
+                setKeysQuantity(0);
+                setIsCabinetSetupChecked(false);
+                setRepairProblem("");
+              }
             }}>
               <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto p-4 sm:p-6 glass-premium border-none rounded-[24px] shadow-2xl animate-in fade-in duration-200">
                 <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
@@ -5473,10 +5498,6 @@ const Cabinet = () => {
                       // RULE 2: Логируем переключение на заказ
                       console.log("[Заявка] Абонент переключил таб на: Заказ услуг и оборудования");
                       setOrderType("order");
-                      const service = products.find(p => p.category === "service");
-                      if (service && !selectedServiceId) {
-                        setSelectedServiceId(service.id);
-                      }
                     }}
                     className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
                       orderType === "order"
@@ -5932,46 +5953,54 @@ const Cabinet = () => {
                       
                       {/* Услуга */}
                       {selectedServiceId && (() => {
-                        const s = products.find(p => p.id === selectedServiceId);
-                        return s ? (
+                        const s = availableProducts.find(p => p.id === selectedServiceId) || products.find(p => p.id === selectedServiceId);
+                        if (!s) return null;
+                        const sPrice = getEffectiveProductPrice(s);
+                        return (
                           <div className="flex justify-between text-slate-500 dark:text-slate-400">
                             <span>{s.name}</span>
-                            <span className="font-semibold text-foreground">{Number(s.price) === 0 ? "Бесплатно" : `${Number(s.price).toFixed(0)} ₽`}</span>
+                            <span className="font-semibold text-foreground">{sPrice === 0 ? "Бесплатно" : `${sPrice.toFixed(0)} ₽`}</span>
                           </div>
-                        ) : null;
+                        );
                       })()}
 
                       {/* Оборудование (трубки) */}
                       {Object.entries(selectedEquipments).map(([id, qty]) => {
-                        const prod = products.find(p => p.id === id);
-                        return prod && qty > 0 ? (
+                        const prod = availableProducts.find(p => p.id === id) || products.find(p => p.id === id);
+                        if (!prod || qty <= 0) return null;
+                        const pPrice = getEffectiveProductPrice(prod);
+                        return (
                           <div key={id} className="flex justify-between text-slate-500 dark:text-slate-400">
                             <span>{prod.name.toUpperCase()} (x{qty})</span>
-                            <span className="font-semibold text-foreground">{(Number(prod.price) * qty).toFixed(0)} ₽</span>
+                            <span className="font-semibold text-foreground">{(pPrice * qty).toFixed(0)} ₽</span>
                           </div>
-                        ) : null;
+                        );
                       })}
 
                       {/* Ключи */}
                       {keysQuantity > 0 && (() => {
-                        const kp = products.find(p => p.name.toLowerCase().includes("ключ"));
-                        return kp ? (
+                        const kp = availableProducts.find(p => p.name.toLowerCase().includes("ключ")) || products.find(p => p.name.toLowerCase().includes("ключ"));
+                        if (!kp) return null;
+                        const kPrice = getEffectiveProductPrice(kp);
+                        return (
                           <div className="flex justify-between text-slate-500 dark:text-slate-400">
-                            <span>🔑 Ключи Mifare (x{keysQuantity})</span>
-                            <span className="font-semibold text-foreground">{(Number(kp.price) * keysQuantity).toFixed(0)} ₽</span>
+                            <span>🔑 {kp.name} (x{keysQuantity})</span>
+                            <span className="font-semibold text-foreground">{(kPrice * keysQuantity).toFixed(0)} ₽</span>
                           </div>
-                        ) : null;
+                        );
                       })()}
 
                       {/* ЛК */}
                       {isCabinetSetupChecked && (() => {
                         const cp = products.find(p => p.name.toLowerCase().includes("кабинет"));
-                        return cp ? (
+                        if (!cp) return null;
+                        const cPrice = getEffectiveProductPrice(cp);
+                        return (
                           <div className="flex justify-between text-slate-500 dark:text-slate-400">
                             <span>📱 Подключение личного кабинета</span>
-                            <span className="font-semibold text-foreground">{Number(cp.price).toFixed(0)} ₽</span>
+                            <span className="font-semibold text-foreground">{cPrice.toFixed(0)} ₽</span>
                           </div>
-                        ) : null;
+                        );
                       })()}
 
                       {/* Детализация эквайринга 5% */}
