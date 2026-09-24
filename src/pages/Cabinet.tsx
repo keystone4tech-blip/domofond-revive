@@ -1777,7 +1777,9 @@ const Cabinet = () => {
   const [orderType, setOrderType] = useState<"repair" | "order">("repair"); // Тип обращения: неисправность или заказ
   const [repairProblem, setRepairProblem] = useState(""); // Текст проблемы для бесплатной заявки
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null); // Выбранная услуга
-  const [selectedEquipments, setSelectedEquipments] = useState<{ [id: string]: number }>({}); // Выбранное оборудование и количество
+  const [selectedEquipments, setSelectedEquipments] = useState<{ [id: string]: number }>({}); // Выбранное оборудование и количество (для обратной совместимости)
+  const [selectedEquipmentId, setSelectedEquipmentId] = useState<string | null>(null); // Выбранная трубка (строго 1 шт на квартиру)
+  const [hasEntranceCredentials, setHasEntranceCredentials] = useState(false); // Загружены ли логопасы для подъезда
   const [keysQuantity, setKeysQuantity] = useState(0); // Количество дополнительных ключей
   const [isCabinetSetupChecked, setIsCabinetSetupChecked] = useState(false); // Выбран ли чекбокс настройки ЛК
   const [orderComment, setOrderComment] = useState(""); // Комментарий к платному заказу
@@ -1930,6 +1932,49 @@ const Cabinet = () => {
     console.log("[Cabinet] К данному подъезду оператор пока не привязал оборудование. Выдача пуста.");
     return [];
   }, [products, productBindings, currentMatchedEntrance]);
+
+  // Проверка наличия загруженных логопасов (учетных записей) для текущего подъезда
+  useEffect(() => {
+    const checkEntranceCredentials = async () => {
+      if (!currentMatchedEntrance) {
+        setHasEntranceCredentials(false);
+        return;
+      }
+      try {
+        console.log(`[Cabinet] Проверка наличия логопасов для подъезда: ${currentMatchedEntrance.street}, д. ${currentMatchedEntrance.house}, п. ${currentMatchedEntrance.entrance}`);
+        
+        // 1. Проверяем по entrance_id
+        const { count, error } = await supabase
+          .from("intercom_credentials" as any)
+          .select("id", { count: "exact", head: true })
+          .eq("entrance_id", currentMatchedEntrance.id);
+
+        if (!error && count && count > 0) {
+          console.log(`[Cabinet] Для подъезда найдено ${count} логопасов по entrance_id`);
+          setHasEntranceCredentials(true);
+          return;
+        }
+
+        // 2. Резервная проверка по улице, дому и подъезду
+        const cleanStreetPart = currentMatchedEntrance.street.replace(/\b(ул|улица|пос|п|пер)\b/gi, "").trim();
+        const { count: countByAddr } = await supabase
+          .from("intercom_credentials" as any)
+          .select("id", { count: "exact", head: true })
+          .ilike("street", `%${cleanStreetPart}%`)
+          .eq("house", currentMatchedEntrance.house)
+          .eq("entrance", currentMatchedEntrance.entrance);
+
+        const hasAny = !!(countByAddr && countByAddr > 0);
+        console.log(`[Cabinet] Результат проверки логопасов по адресу: ${hasAny} (найдено: ${countByAddr || 0})`);
+        setHasEntranceCredentials(hasAny);
+      } catch (err) {
+        console.error("[Cabinet] Ошибка при проверке логопасов подъезда:", err);
+        setHasEntranceCredentials(false);
+      }
+    };
+
+    checkEntranceCredentials();
+  }, [currentMatchedEntrance]);
 
   // Функция для очистки полного адреса (убираем город "Краснодар, " или "пос. Южный, ") для отображения
   const getDisplayAddress = (fullAddr: string) => {
@@ -3074,18 +3119,28 @@ const Cabinet = () => {
       }
     }
 
-    // Выбранные трубки (оборудование)
-    Object.entries(selectedEquipments).forEach(([id, qty]) => {
-      const prod = availableProducts.find(p => p.id === id) || products.find(p => p.id === id);
-      if (prod && qty > 0) {
+    // Выбранная трубка (ТКП) - строго 1 шт на квартиру
+    if (selectedEquipmentId) {
+      const prod = availableProducts.find(p => p.id === selectedEquipmentId) || products.find(p => p.id === selectedEquipmentId);
+      if (prod) {
         const prodPrice = getEffectiveProductPrice(prod);
-        sum2 += prodPrice * qty;
-        console.log(`[Расчет заказа] Трубка "${prod.name}": ${qty} шт. x ${prodPrice} ₽ = ${prodPrice * qty} ₽`);
+        sum2 += prodPrice;
+        console.log(`[Расчет заказа] Выбрана трубка "${prod.name}": 1 шт. x ${prodPrice} ₽ = ${prodPrice} ₽`);
       }
-    });
+    } else {
+      // Резервная поддержка selectedEquipments
+      Object.entries(selectedEquipments).forEach(([id, qty]) => {
+        const prod = availableProducts.find(p => p.id === id) || products.find(p => p.id === id);
+        if (prod && qty > 0) {
+          const prodPrice = getEffectiveProductPrice(prod);
+          sum2 += prodPrice * qty;
+          console.log(`[Расчет заказа] Трубка "${prod.name}": ${qty} шт. x ${prodPrice} ₽ = ${prodPrice * qty} ₽`);
+        }
+      });
+    }
 
-    // Настройка личного кабинета (300 руб)
-    if (isCabinetSetupChecked) {
+    // Настройка личного кабинета (300 руб) - доступна строго при наличии логопасов на подъезде
+    if (isCabinetSetupChecked && hasEntranceCredentials) {
       const cabinetProduct = products.find(p => p.name.toLowerCase().includes("кабинет"));
       if (cabinetProduct) {
         sum3 = getEffectiveProductPrice(cabinetProduct);
@@ -3106,6 +3161,7 @@ const Cabinet = () => {
       console.log("[Заявка] Инициализация формы заявки, полный сброс ранее выбранных товаров и услуг...");
       // RULE 2: Полностью сбрасываем кэш и стейт выбора товаров и услуг
       setSelectedServiceId(null);
+      setSelectedEquipmentId(null);
       setSelectedEquipments({});
       setKeysQuantity(0);
       setIsCabinetSetupChecked(false);
@@ -3195,27 +3251,27 @@ const Cabinet = () => {
       } else {
         messageText = `🛍️ ЗАКАЗ УСЛУГ И ОБОРУДОВАНИЯ\n`;
         
-        const selectedService = products.find(p => p.id === selectedServiceId);
+        const selectedService = availableProducts.find(p => p.id === selectedServiceId) || products.find(p => p.id === selectedServiceId);
         if (selectedService) {
           messageText += `— Услуга: ${selectedService.name} (${getEffectiveProductPrice(selectedService).toFixed(2)} ₽)\n`;
         }
         
-        let hasEquip = false;
-        Object.entries(selectedEquipments).forEach(([id, qty]) => {
-          const prod = products.find(p => p.id === id);
-          if (prod && qty > 0) {
-            messageText += `— Оборудование: ${prod.name} (${qty} шт. x ${getEffectiveProductPrice(prod).toFixed(2)} ₽)\n`;
-            hasEquip = true;
+        if (selectedEquipmentId) {
+          const prod = availableProducts.find(p => p.id === selectedEquipmentId) || products.find(p => p.id === selectedEquipmentId);
+          if (prod) {
+            messageText += `— Оборудование: ${prod.name} (1 шт. x ${getEffectiveProductPrice(prod).toFixed(2)} ₽)\n`;
           }
-        });
+        }
         
-        const keyProduct = products.find(p => p.name.toLowerCase().includes("ключ"));
+        const keyProduct = availableProducts.find(p => p.name.toLowerCase().includes("ключ")) || products.find(p => p.name.toLowerCase().includes("ключ"));
         if (keyProduct && keysQuantity > 0) {
           messageText += `— Ключи: ${keyProduct.name} (${keysQuantity} шт. x ${getEffectiveProductPrice(keyProduct).toFixed(2)} ₽ = ${totals.sum1.toFixed(2)} ₽)\n`;
         }
         
-        if (isCabinetSetupChecked) {
-          messageText += `— Сервис: Настройка личного кабинета (300.00 ₽)\n`;
+        if (isCabinetSetupChecked && hasEntranceCredentials) {
+          const cabinetProduct = products.find(p => p.name.toLowerCase().includes("кабинет"));
+          const cPrice = cabinetProduct ? getEffectiveProductPrice(cabinetProduct) : 300;
+          messageText += `— Сервис: Подключение личного кабинета (${cPrice.toFixed(2)} ₽)\n`;
         }
         
         messageText += `💵 Итоговая сумма заказа: ${totals.total.toFixed(2)} ₽\n`;
@@ -5362,6 +5418,7 @@ const Cabinet = () => {
               if (!openState) {
                 console.log("[ЛК Кабинет] Диалог закрыт, сброс выбора услуг и оборудования");
                 setSelectedServiceId(null);
+                setSelectedEquipmentId(null);
                 setSelectedEquipments({});
                 setKeysQuantity(0);
                 setIsCabinetSetupChecked(false);
@@ -5379,101 +5436,15 @@ const Cabinet = () => {
                   </DialogDescription>
                 </DialogHeader>
 
-                {/* --- БЛОК КОНТАКТОВ И АДРЕСА ВЫЗОВА ДЛЯ ЗАЯВКИ --- */}
-                <div className="p-4 bg-white/40 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800/80 rounded-2xl space-y-4 my-2 text-left animate-in fade-in duration-300">
-                  <div className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-800/80 pb-1.5 font-display">
-                    <Smartphone className="h-4 w-4 text-amber-500" />
-                    <span>Контакты и адрес вызова для этой заявки</span>
+                {/* Плашка с автоопределением домофона по подъезду */}
+                {currentMatchedEntrance && (
+                  <div className="my-2 flex items-center gap-2 p-2.5 px-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-800 dark:text-emerald-300 text-xs font-medium animate-in fade-in duration-200 text-left">
+                    <DoorClosed className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                    <span>
+                      Оборудование подобрано под ваш домофон: <strong>{currentMatchedEntrance.intercom_type || "Стандартный"}</strong> (Подъезд №{currentMatchedEntrance.entrance})
+                    </span>
                   </div>
-
-                  {/* Имя и Телефон */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="orderName" className="text-xs font-semibold text-slate-500 dark:text-slate-400">ФИО клиента</Label>
-                      <Input
-                        id="orderName"
-                        value={orderName}
-                        onChange={(e) => setOrderName(e.target.value)}
-                        placeholder="Иванов Иван Иванович"
-                        className="bg-white/50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 h-9 text-sm font-medium transition-all rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="orderPhone" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-0.5">
-                        Телефон для связи <span className="text-destructive">*</span>
-                      </Label>
-                      <Input
-                        id="orderPhone"
-                        value={orderPhone}
-                        onChange={(e) => setOrderPhone(e.target.value)}
-                        placeholder="+7 (999) 999-99-99"
-                        className="bg-white/50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 h-9 text-sm font-medium transition-all rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Адрес: Улица, Дом, Подъезд, Квартира в одной строке */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                    <div className="space-y-1.5 col-span-2 sm:col-span-1">
-                      <Label htmlFor="orderStreet" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-0.5">
-                        Улица <span className="text-destructive">*</span>
-                      </Label>
-                      <Input
-                        id="orderStreet"
-                        value={orderStreet}
-                        onChange={(e) => setOrderStreet(e.target.value)}
-                        placeholder="Название улицы"
-                        className="bg-white/50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 h-9 text-sm font-medium transition-all rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
-                      />
-                    </div>
-                    <div className="space-y-1.5 col-span-1 sm:col-span-1">
-                      <Label htmlFor="orderHouse" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-0.5">
-                        Дом <span className="text-destructive">*</span>
-                      </Label>
-                      <Input
-                        id="orderHouse"
-                        value={orderHouse}
-                        onChange={(e) => setOrderHouse(e.target.value)}
-                        placeholder="Например: 58а"
-                        className="bg-white/50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 h-9 text-sm font-medium transition-all rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
-                      />
-                    </div>
-                    <div className="space-y-1.5 col-span-1 sm:col-span-1">
-                      <Label htmlFor="orderEntrance" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-0.5">
-                        Подъезд
-                      </Label>
-                      <Input
-                        id="orderEntrance"
-                        value={orderEntrance}
-                        onChange={(e) => setOrderEntrance(e.target.value)}
-                        placeholder="1"
-                        className="bg-white/50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 h-9 text-sm font-medium transition-all rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
-                      />
-                    </div>
-                    <div className="space-y-1.5 col-span-2 sm:col-span-1 animate-in fade-in slide-in-from-top-1 duration-200">
-                      <Label htmlFor="orderApartment" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-0.5">
-                        Кв. / Офис
-                      </Label>
-                      <Input
-                        id="orderApartment"
-                        value={orderApartment}
-                        onChange={(e) => setOrderApartment(e.target.value)}
-                        placeholder="Например: 12"
-                        className="bg-white/50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 h-9 text-sm font-medium transition-all rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
-                      />
-                    </div>
-
-                    {/* Плашка с автоопределением домофона по подъезду */}
-                    {currentMatchedEntrance && (
-                      <div className="col-span-full flex items-center gap-2 p-2 px-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-700 dark:text-emerald-400 text-xs font-medium animate-in fade-in duration-200">
-                        <DoorClosed className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-                        <span>
-                          Оборудование подобрано под ваш домофон: <strong>{currentMatchedEntrance.intercom_type || "Стандартный"}</strong> (Подъезд №{currentMatchedEntrance.entrance})
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                )}
 
                 {/* Переключатель вкладок типа обращения */}
                 <div className="flex rounded-xl border border-slate-200 dark:border-slate-850 p-1 bg-white/20 dark:bg-slate-900/20 w-full my-4">
@@ -5663,9 +5634,11 @@ const Cabinet = () => {
                     
                     {/* Выбор услуги (установка / замена) - только если к подъезду привязаны услуги */}
                     {availableProducts.some(p => p.category === "service" && !p.name.toLowerCase().includes("кабинет")) && (
-                      <div className="space-y-2">
-                        <Label className="text-sm font-semibold text-foreground flex items-center gap-1">🛠️ Выберите услугу</Label>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div className="space-y-2 text-left">
+                        <Label className="text-sm font-semibold text-foreground flex items-center gap-1.5 font-display">
+                          🛠️ Выберите услугу
+                        </Label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                           {availableProducts
                             .filter(p => p.category === "service" && !p.name.toLowerCase().includes("кабинет"))
                             .map((service) => {
@@ -5673,137 +5646,222 @@ const Cabinet = () => {
                               const hasDiscount = currentMatchedEntrance?.service_type === "installation" && 
                                 service.installation_price != null && 
                                 Number(service.installation_price) < Number(service.price);
+                              const isSelected = selectedServiceId === service.id;
 
                               return (
-                                <button
+                                <div
                                   key={service.id}
-                                  type="button"
                                   onClick={() => {
-                                    console.log("[Заявка] Выбрана услуга ID:", service.id, "цена:", effPrice);
-                                    setSelectedServiceId(service.id);
+                                    if (isSelected) {
+                                      console.log("[Заявка] Отмена выбора услуги:", service.name);
+                                      setSelectedServiceId(null);
+                                      setSelectedEquipmentId(null); // Сбрасываем и трубку при отмене услуги
+                                    } else {
+                                      console.log("[Заявка] Выбрана услуга ID:", service.id, "цена:", effPrice);
+                                      setSelectedServiceId(service.id);
+                                    }
                                   }}
-                                  className={`p-3.5 text-left rounded-xl border text-sm transition-all hover:scale-[1.01] ${
-                                    selectedServiceId === service.id
-                                      ? "border-amber-500 bg-amber-500/5 text-foreground shadow-sm font-semibold"
-                                      : "border-slate-200 dark:border-slate-800 bg-white/20 dark:bg-slate-900/20 text-muted-foreground hover:text-foreground"
+                                  className={`p-3.5 rounded-xl border text-left cursor-pointer transition-all flex flex-col justify-between ${
+                                    isSelected
+                                      ? "border-amber-500 bg-amber-500/10 shadow-sm ring-1 ring-amber-500/30"
+                                      : "border-slate-200 dark:border-slate-800 bg-white/20 dark:bg-slate-900/20 hover:border-amber-500/50 hover:bg-white/40"
                                   }`}
                                 >
                                   {service.image_url && (
                                     <img 
                                       src={service.image_url} 
                                       alt={service.name} 
-                                      className="w-full h-24 object-cover rounded-md mb-2 cursor-pointer hover:opacity-80 transition-opacity" 
+                                      className="w-full h-24 object-cover rounded-lg mb-2.5 cursor-pointer hover:opacity-85 transition-opacity" 
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         setPreviewImage(service.image_url);
                                       }}
                                     />
                                   )}
-                                  <div className="font-semibold text-foreground">{service.name}</div>
-                                  <div className="text-xs text-amber-500 font-bold mt-1 flex items-center gap-1">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="font-semibold text-sm text-foreground leading-snug">{service.name}</div>
+                                    <div className={`w-5 h-5 rounded-full shrink-0 flex items-center justify-center transition-all ${
+                                      isSelected
+                                        ? "bg-amber-500 text-white"
+                                        : "border border-slate-300 dark:border-slate-700"
+                                    }`}>
+                                      {isSelected && <CheckCircle2 className="w-5 h-5 fill-amber-500 text-white" />}
+                                    </div>
+                                  </div>
+                                  <div className="text-xs text-amber-500 font-bold mt-2 flex items-center gap-1.5">
                                     {hasDiscount && (
                                       <span className="line-through text-slate-400 font-normal text-[11px]">
                                         {Number(service.price).toFixed(0)} ₽
                                       </span>
                                     )}
-                                    <span>{effPrice === 0 ? "Бесплатно" : `${effPrice.toFixed(0)} ₽`}</span>
+                                    <span className="text-sm">{effPrice === 0 ? "Бесплатно" : `${effPrice.toFixed(0)} ₽`}</span>
                                     {hasDiscount && (
-                                      <span className="text-[9px] px-1 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 font-semibold">
+                                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 font-semibold">
                                         Монтаж
                                       </span>
                                     )}
                                   </div>
-                                </button>
+                                </div>
                               );
                             })}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              console.log("[Заявка] Сброс выбора услуги");
-                              setSelectedServiceId(null);
-                            }}
-                            className={`p-3.5 text-left rounded-xl border text-sm transition-all hover:scale-[1.01] ${
-                              selectedServiceId === null
-                                ? "border-amber-500 bg-amber-500/5 text-foreground shadow-sm font-semibold"
-                                : "border-slate-200 dark:border-slate-800 bg-white/20 dark:bg-slate-900/20 text-muted-foreground hover:text-foreground"
-                            }`}
-                          >
-                            <div className="font-semibold text-foreground">Без услуги</div>
-                            <div className="text-xs text-slate-400 dark:text-slate-500 mt-1">Только покупка трубки/ключей</div>
-                          </button>
                         </div>
                       </div>
                     )}
 
-                    {/* Выбор модели трубки */}
-                    <div className="space-y-2">
-                      <Label className="text-sm font-semibold text-foreground flex items-center gap-1">🏢 Выберите трубку (ТКП)</Label>
-                      <div className="space-y-2">
+                    {/* Выбор модели трубки (ТКП) - разворачивается СТРОГО ПОСЛЕ ВЫБОРА УСЛУГИ */}
+                    {selectedServiceId && availableProducts.some(p => p.category === "equipment" && !p.name.toLowerCase().includes("ключ")) && (
+                      <div className="space-y-2 text-left animate-in fade-in slide-in-from-top-2 duration-300">
+                        <Label className="text-sm font-semibold text-foreground flex items-center gap-1.5 font-display">
+                          🏢 Выберите трубку (ТКП) под ваш домофон
+                        </Label>
+                        <div className="space-y-2">
+                          {availableProducts
+                            .filter(p => p.category === "equipment" && !p.name.toLowerCase().includes("ключ"))
+                            .map((equip) => {
+                              const effPrice = getEffectiveProductPrice(equip);
+                              const hasDiscount = currentMatchedEntrance?.service_type === "installation" && 
+                                equip.installation_price != null && 
+                                Number(equip.installation_price) < Number(equip.price);
+                              const isSelected = selectedEquipmentId === equip.id;
+
+                              return (
+                                <div
+                                  key={equip.id}
+                                  onClick={() => {
+                                    if (isSelected) {
+                                      console.log("[Заявка] Снятие выбора трубки:", equip.name);
+                                      setSelectedEquipmentId(null);
+                                    } else {
+                                      console.log("[Заявка] Выбрана трубка:", equip.name, "цена:", effPrice);
+                                      setSelectedEquipmentId(equip.id);
+                                    }
+                                  }}
+                                  className={`flex items-center justify-between p-3.5 rounded-xl border cursor-pointer transition-all ${
+                                    isSelected
+                                      ? "border-amber-500 bg-amber-500/10 shadow-sm ring-1 ring-amber-500/30"
+                                      : "border-slate-200 dark:border-slate-800 bg-white/20 dark:bg-slate-900/20 hover:border-amber-500/50 hover:bg-white/40"
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-3">
+                                    {equip.image_url && (
+                                      <img 
+                                        src={equip.image_url} 
+                                        alt={equip.name} 
+                                        className="h-16 w-16 object-cover rounded-lg flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity" 
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setPreviewImage(equip.image_url);
+                                        }}
+                                      />
+                                    )}
+                                    <div className="text-left">
+                                      <div className="font-semibold text-sm text-foreground">{equip.name.toUpperCase()}</div>
+                                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{equip.description || "Абонентская трубка домофона"}</div>
+                                      <div className="text-xs text-amber-500 font-bold mt-1 flex items-center gap-1.5">
+                                        {hasDiscount && (
+                                          <span className="line-through text-slate-400 font-normal text-[11px]">
+                                            {Number(equip.price).toFixed(0)} ₽
+                                          </span>
+                                        )}
+                                        <span className="text-sm">{effPrice.toFixed(0)} ₽</span>
+                                        {hasDiscount && (
+                                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 font-semibold">
+                                            Монтаж
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  
+                                  {/* Индикатор выбора трубки (одиночный выбор) */}
+                                  <div className={`w-5 h-5 rounded-full shrink-0 flex items-center justify-center transition-all ${
+                                    isSelected
+                                      ? "bg-amber-500 text-white"
+                                      : "border border-slate-300 dark:border-slate-700"
+                                  }`}>
+                                    {isSelected && <CheckCircle2 className="w-5 h-5 fill-amber-500 text-white" />}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Заказ дополнительных ключей (отображаются ВСЕГДА) */}
+                    {availableProducts.filter(p => p.name.toLowerCase().includes("ключ")).length > 0 && (
+                      <div className="space-y-2 text-left">
+                        <Label className="text-sm font-semibold text-foreground flex items-center gap-1.5 font-display">
+                          🔑 Дополнительные ключи от домофона
+                        </Label>
                         {availableProducts
-                          .filter(p => p.category === "equipment" && !p.name.toLowerCase().includes("ключ"))
-                          .map((equip) => {
-                            const qty = selectedEquipments[equip.id] || 0;
-                            const effPrice = getEffectiveProductPrice(equip);
+                          .filter(p => p.name.toLowerCase().includes("ключ"))
+                          .map((keyProduct) => {
+                            const effPrice = getEffectiveProductPrice(keyProduct);
                             const hasDiscount = currentMatchedEntrance?.service_type === "installation" && 
-                              equip.installation_price != null && 
-                              Number(equip.installation_price) < Number(equip.price);
+                              keyProduct.installation_price != null && 
+                              Number(keyProduct.installation_price) < Number(keyProduct.price);
 
                             return (
                               <div
-                                key={equip.id}
-                                className="flex items-center justify-between p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/20 dark:bg-slate-900/20"
+                                key={keyProduct.id}
+                                className="flex items-center justify-between p-3.5 rounded-xl border border-amber-500/20 bg-amber-500/5 shadow-sm shadow-amber-500/5"
                               >
-                                <div className="flex gap-3">
-                                  {equip.image_url && (
+                                <div className="flex items-center gap-3 text-left">
+                                  {keyProduct.image_url ? (
                                     <img 
-                                      src={equip.image_url} 
-                                      alt={equip.name} 
-                                      className="h-16 w-16 object-cover rounded-md flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity" 
+                                      src={keyProduct.image_url} 
+                                      alt={keyProduct.name} 
+                                      className="h-12 w-12 object-cover rounded-lg flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity" 
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        setPreviewImage(equip.image_url);
+                                        setPreviewImage(keyProduct.image_url);
                                       }}
                                     />
+                                  ) : (
+                                    <div className="w-12 h-12 rounded-lg bg-amber-500/10 flex items-center justify-center text-xl shrink-0">
+                                      🔑
+                                    </div>
                                   )}
-                                  <div className="text-left">
-                                    <div className="font-semibold text-sm text-foreground">{equip.name.toUpperCase()}</div>
-                                    <div className="text-xs text-slate-500 dark:text-slate-450 mt-0.5">{equip.description || "Абонентская трубка домофона"}</div>
-                                    <div className="text-xs text-amber-500 font-bold mt-1 flex items-center gap-1">
+                                  <div>
+                                    <div className="font-semibold text-sm text-foreground">{keyProduct.name.toUpperCase()}</div>
+                                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Ключ с повышенной защитой от копирования</div>
+                                    <div className="text-xs text-amber-500 font-bold mt-1 flex items-center gap-1.5">
                                       {hasDiscount && (
                                         <span className="line-through text-slate-400 font-normal text-[11px]">
-                                          {Number(equip.price).toFixed(0)} ₽
+                                          {Number(keyProduct.price).toFixed(0)} ₽
                                         </span>
                                       )}
-                                      <span>{effPrice.toFixed(0)} ₽</span>
+                                      <span className="text-sm">{effPrice.toFixed(0)} ₽ за шт.</span>
                                       {hasDiscount && (
-                                        <span className="text-[9px] px-1 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 font-semibold">
+                                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 font-semibold">
                                           Монтаж
                                         </span>
                                       )}
                                     </div>
                                   </div>
                                 </div>
-                                
-                                {/* Счетчик количества */}
+
+                                {/* Счетчик количества ключей */}
                                 <div className="flex items-center gap-2">
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      if (qty > 0) {
-                                        console.log("[Заявка] Уменьшено кол-во трубок", equip.name, "до:", qty - 1);
-                                        setSelectedEquipments(prev => ({ ...prev, [equip.id]: qty - 1 }));
+                                      if (keysQuantity > 0) {
+                                        console.log("[Заявка] Уменьшено кол-во ключей до:", keysQuantity - 1);
+                                        setKeysQuantity(prev => prev - 1);
                                       }
                                     }}
                                     className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900 text-slate-400 dark:text-slate-550 active:scale-90 transition-all shrink-0 bg-white/40 dark:bg-slate-950/40"
                                   >
                                     <Minus className="h-3.5 w-3.5" />
                                   </button>
-                                  <span className="w-6 text-center font-bold text-sm text-foreground">{qty}</span>
+                                  <span className="w-6 text-center font-bold text-sm text-foreground">{keysQuantity}</span>
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      console.log("[Заявка] Увеличено кол-во трубок", equip.name, "до:", qty + 1);
-                                      setSelectedEquipments(prev => ({ ...prev, [equip.id]: qty + 1 }));
+                                      console.log("[Заявка] Увеличено кол-во ключей до:", keysQuantity + 1);
+                                      setKeysQuantity(prev => prev + 1);
                                     }}
                                     className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900 text-slate-400 dark:text-slate-550 active:scale-90 transition-all shrink-0 bg-white/40 dark:bg-slate-950/40"
                                   >
@@ -5814,92 +5872,15 @@ const Cabinet = () => {
                             );
                           })}
                       </div>
-                    </div>
+                    )}
 
-                    {/* Заказ дополнительных ключей */}
-                    {availableProducts
-                      .filter(p => p.name.toLowerCase().includes("ключ"))
-                      .map((keyProduct) => {
-                        const effPrice = getEffectiveProductPrice(keyProduct);
-                        const hasDiscount = currentMatchedEntrance?.service_type === "installation" && 
-                          keyProduct.installation_price != null && 
-                          Number(keyProduct.installation_price) < Number(keyProduct.price);
-
-                        return (
-                          <div
-                            key={keyProduct.id}
-                            className="flex items-center justify-between p-3.5 rounded-xl border border-amber-500/20 bg-amber-500/5 shadow-sm shadow-amber-500/5"
-                          >
-                            <div className="flex items-center gap-3 text-left">
-                              {keyProduct.image_url ? (
-                                <img 
-                                  src={keyProduct.image_url} 
-                                  alt={keyProduct.name} 
-                                  className="h-12 w-12 object-cover rounded-md flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity" 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setPreviewImage(keyProduct.image_url);
-                                  }}
-                                />
-                              ) : (
-                                <span className="text-xl">🔑</span>
-                              )}
-                              <div>
-                                <div className="font-semibold text-sm text-foreground">{keyProduct.name.toUpperCase()}</div>
-                                <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Ключ с повышенной защитой от копирования</div>
-                                <div className="text-xs text-amber-500 font-bold mt-1 flex items-center gap-1">
-                                  {hasDiscount && (
-                                    <span className="line-through text-slate-400 font-normal text-[11px]">
-                                      {Number(keyProduct.price).toFixed(0)} ₽
-                                    </span>
-                                  )}
-                                  <span>{effPrice.toFixed(0)} ₽ за шт.</span>
-                                  {hasDiscount && (
-                                    <span className="text-[9px] px-1 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 font-semibold">
-                                      Монтаж
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-
-                          {/* Счетчик количества ключей */}
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (keysQuantity > 0) {
-                                  console.log("[Заявка] Уменьшено кол-во ключей до:", keysQuantity - 1);
-                                  setKeysQuantity(prev => prev - 1);
-                                }
-                              }}
-                              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900 text-slate-400 dark:text-slate-550 active:scale-90 transition-all shrink-0 bg-white/40 dark:bg-slate-950/40"
-                            >
-                              <Minus className="h-3.5 w-3.5" />
-                            </button>
-                            <span className="w-6 text-center font-bold text-sm text-foreground">{keysQuantity}</span>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                console.log("[Заявка] Увеличено кол-во ключей до:", keysQuantity + 1);
-                                setKeysQuantity(prev => prev + 1);
-                              }}
-                              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900 text-slate-400 dark:text-slate-550 active:scale-90 transition-all shrink-0 bg-white/40 dark:bg-slate-950/40"
-                            >
-                              <Plus className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-
-                    {/* Подключение личного кабинета */}
-                    {products
+                    {/* Подключение личного кабинета - отображается ТОЛЬКО если на подъезде загружены логины и пароли */}
+                    {hasEntranceCredentials && products
                       .filter(p => p.name.toLowerCase().includes("кабинет"))
                       .map((cabinetProduct) => (
                         <div
                           key={cabinetProduct.id}
-                          className="flex items-start gap-3 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/20 dark:bg-slate-900/20"
+                          className="flex items-start gap-3 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/20 dark:bg-slate-900/20 text-left"
                         >
                           <input
                             id="cabinetSetup"
@@ -5916,7 +5897,7 @@ const Cabinet = () => {
                               <img 
                                 src={cabinetProduct.image_url} 
                                 alt={cabinetProduct.name} 
-                                className="h-12 w-12 object-cover rounded-md flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity" 
+                                className="h-12 w-12 object-cover rounded-lg flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity" 
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setPreviewImage(cabinetProduct.image_url);
@@ -5935,7 +5916,7 @@ const Cabinet = () => {
                       ))}
 
                     {/* Комментарий к платному заказу */}
-                    <div className="space-y-2">
+                    <div className="space-y-2 text-left">
                       <Label htmlFor="orderComment" className="text-sm font-semibold text-foreground">Желаемое время и примечания</Label>
                       <Textarea
                         id="orderComment"
@@ -5949,7 +5930,7 @@ const Cabinet = () => {
 
                     {/* Смета заказа (Чек) */}
                     <div className="p-4 rounded-2xl bg-white/40 dark:bg-slate-900/40 border border-dashed border-slate-200 dark:border-slate-800 space-y-2 text-sm">
-                      <div className="font-semibold text-xs text-slate-450 dark:text-slate-400 uppercase tracking-wider pb-1.5 border-b border-slate-100 dark:border-slate-800/80">Детализация расчета:</div>
+                      <div className="font-semibold text-xs text-slate-450 dark:text-slate-400 uppercase tracking-wider pb-1.5 border-b border-slate-100 dark:border-slate-800/80 text-left">Детализация расчета:</div>
                       
                       {/* Услуга */}
                       {selectedServiceId && (() => {
@@ -5964,18 +5945,18 @@ const Cabinet = () => {
                         );
                       })()}
 
-                      {/* Оборудование (трубки) */}
-                      {Object.entries(selectedEquipments).map(([id, qty]) => {
-                        const prod = availableProducts.find(p => p.id === id) || products.find(p => p.id === id);
-                        if (!prod || qty <= 0) return null;
+                      {/* Оборудование (трубка) */}
+                      {selectedEquipmentId && (() => {
+                        const prod = availableProducts.find(p => p.id === selectedEquipmentId) || products.find(p => p.id === selectedEquipmentId);
+                        if (!prod) return null;
                         const pPrice = getEffectiveProductPrice(prod);
                         return (
-                          <div key={id} className="flex justify-between text-slate-500 dark:text-slate-400">
-                            <span>{prod.name.toUpperCase()} (x{qty})</span>
-                            <span className="font-semibold text-foreground">{(pPrice * qty).toFixed(0)} ₽</span>
+                          <div className="flex justify-between text-slate-500 dark:text-slate-400">
+                            <span>{prod.name.toUpperCase()} (1 шт.)</span>
+                            <span className="font-semibold text-foreground">{pPrice.toFixed(0)} ₽</span>
                           </div>
                         );
-                      })}
+                      })()}
 
                       {/* Ключи */}
                       {keysQuantity > 0 && (() => {
@@ -5991,7 +5972,7 @@ const Cabinet = () => {
                       })()}
 
                       {/* ЛК */}
-                      {isCabinetSetupChecked && (() => {
+                      {isCabinetSetupChecked && hasEntranceCredentials && (() => {
                         const cp = products.find(p => p.name.toLowerCase().includes("кабинет"));
                         if (!cp) return null;
                         const cPrice = getEffectiveProductPrice(cp);
