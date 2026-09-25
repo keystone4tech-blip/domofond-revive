@@ -13,7 +13,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { 
   Camera, Upload, Star, ChevronLeft, ChevronRight, Video, 
   Image as ImageIcon, Sparkles, Building, User, Building2, 
-  CheckCircle2, Loader2, ShieldCheck, Heart, MessageSquarePlus 
+  CheckCircle2, Loader2, ShieldCheck, Heart, MessageSquarePlus,
+  Clock, Users, Zap, Award
 } from "lucide-react";
 
 interface MediaItem {
@@ -577,26 +578,91 @@ const NashiRaboty = () => {
           </div>
         </section>
 
-        {/* Блок доверия */}
-        <section className="py-10 bg-muted/30 border-t border-border/50">
+        {/* Блок ключевых показателей доверия компании с фирменным неоновым переливом */}
+        <section className="py-12 bg-muted/20 border-t border-border/50">
           <div className="container px-4 max-w-5xl mx-auto">
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 text-center">
-              <div className="p-4 rounded-2xl bg-background/50 border border-border/40">
-                <div className="text-3xl font-extrabold text-primary mb-1">с 2005 г.</div>
-                <div className="text-xs text-muted-foreground">20 лет опыта в Краснодаре</div>
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4 text-center">
+              
+              {/* Карточка 1: Опыт в Краснодаре и по ЮФО */}
+              <div className="shiny-border-card group cursor-default">
+                <div className="shiny-border-card-inner p-5">
+                  <div className="shiny-icon-badge mb-3">
+                    <div className="shiny-icon-badge-inner">
+                      <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform duration-300" />
+                    </div>
+                  </div>
+                  <div className="text-2xl sm:text-3xl font-extrabold tracking-tight hero-title-shimmer mb-1">
+                    7 лет
+                  </div>
+                  <div className="text-xs font-semibold text-foreground">
+                    В Краснодаре
+                  </div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5">
+                    Более 20 лет опыта по ЮФО
+                  </div>
+                </div>
               </div>
-              <div className="p-4 rounded-2xl bg-background/50 border border-border/40">
-                <div className="text-3xl font-extrabold text-primary mb-1">100+</div>
-                <div className="text-xs text-muted-foreground">Домов на постоянном ТО</div>
+
+              {/* Карточка 2: Абонентская база */}
+              <div className="shiny-border-card group cursor-default">
+                <div className="shiny-border-card-inner p-5">
+                  <div className="shiny-icon-badge mb-3">
+                    <div className="shiny-icon-badge-inner">
+                      <Users className="h-5 w-5 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform duration-300" />
+                    </div>
+                  </div>
+                  <div className="text-2xl sm:text-3xl font-extrabold tracking-tight hero-title-shimmer mb-1">
+                    11 200+
+                  </div>
+                  <div className="text-xs font-semibold text-foreground">
+                    Абонентов на ТО
+                  </div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5">
+                    МКД, квартиры и коммерция
+                  </div>
+                </div>
               </div>
-              <div className="p-4 rounded-2xl bg-background/50 border border-border/40">
-                <div className="text-3xl font-extrabold text-primary mb-1">24/7</div>
-                <div className="text-xs text-muted-foreground">Собственная служба мастеров</div>
+
+              {/* Карточка 3: Скорость выполнения заявок вместо недействительного 24/7 */}
+              <div className="shiny-border-card group cursor-default">
+                <div className="shiny-border-card-inner p-5">
+                  <div className="shiny-icon-badge mb-3">
+                    <div className="shiny-icon-badge-inner">
+                      <Zap className="h-5 w-5 text-amber-500 group-hover:scale-110 transition-transform duration-300" />
+                    </div>
+                  </div>
+                  <div className="text-2xl sm:text-3xl font-extrabold tracking-tight hero-title-shimmer mb-1">
+                    до 2 дней
+                  </div>
+                  <div className="text-xs font-semibold text-foreground">
+                    Выполнение заявок
+                  </div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5">
+                    Рекордная скорость в городе
+                  </div>
+                </div>
               </div>
-              <div className="p-4 rounded-2xl bg-background/50 border border-border/40">
-                <div className="text-3xl font-extrabold text-primary mb-1">100%</div>
-                <div className="text-xs text-muted-foreground">Официальная гарантия</div>
+
+              {/* Карточка 4: Официальная гарантия */}
+              <div className="shiny-border-card group cursor-default">
+                <div className="shiny-border-card-inner p-5">
+                  <div className="shiny-icon-badge mb-3">
+                    <div className="shiny-icon-badge-inner">
+                      <Award className="h-5 w-5 text-emerald-500 group-hover:scale-110 transition-transform duration-300" />
+                    </div>
+                  </div>
+                  <div className="text-2xl sm:text-3xl font-extrabold tracking-tight hero-title-shimmer mb-1">
+                    до 3 лет
+                  </div>
+                  <div className="text-xs font-semibold text-foreground">
+                    Официальная гарантия
+                  </div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5">
+                    На оборудование (1 год на работы)
+                  </div>
+                </div>
               </div>
+
             </div>
           </div>
         </section>

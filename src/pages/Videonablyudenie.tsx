@@ -70,7 +70,7 @@ const Videonablyudenie = () => {
         "Неограниченное количество камер",
         "Аналитика и отчеты",
         "Серверное хранение",
-        "Круглосуточная поддержка",
+        "Гарантия до 3 лет и выезд до 2 дней",
       ],
     },
   ];
@@ -208,26 +208,35 @@ const Videonablyudenie = () => {
               </p>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
               {features.map((feature, index) => (
-                <Card
+                <div
                   key={index}
-                  className={`${
+                  className={`shiny-border-card group cursor-default ${
                     isVisible.features[index]
                       ? 'opacity-100 translate-y-0 scale-100'
                       : 'opacity-0 translate-y-10 scale-95'
                   } transition-all duration-700 ease-out`}
                 >
-                  <CardHeader>
-                    <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 mb-4">
-                      <feature.icon className="h-6 w-6 text-primary" />
+                  <div className="shiny-border-card-inner p-6 flex flex-col items-center text-center h-full justify-start">
+                    {/* Переливающийся бейдж иконки */}
+                    <div className="shiny-icon-badge mb-4">
+                      <div className="shiny-icon-badge-inner">
+                        <feature.icon className="h-6 w-6 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform duration-300" />
+                      </div>
                     </div>
-                    <CardTitle className="text-lg">{feature.title}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">{feature.description}</p>
-                  </CardContent>
-                </Card>
+                    
+                    {/* Заголовок с легким переливом при наведении */}
+                    <h3 className="text-lg font-bold tracking-tight text-foreground mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                      {feature.title}
+                    </h3>
+
+                    {/* Описание технологии */}
+                    <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                      {feature.description}
+                    </p>
+                  </div>
+                </div>
               ))}
             </div>
           </div>

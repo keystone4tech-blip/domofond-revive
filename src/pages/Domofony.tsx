@@ -4,7 +4,7 @@ import Footer from "@/components/Footer";
 import { ShinyButton } from "@/components/ui/shiny-button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Phone, Check } from "lucide-react";
+import { Phone, Check, Clock, ShieldCheck, Zap, Wrench } from "lucide-react";
 
 const Domofony = () => {
   const [isVisible, setIsVisible] = useState({
@@ -169,66 +169,92 @@ const Domofony = () => {
               >
                 Почему выбирают нас
               </h2>
-              <div className="grid gap-4 md:grid-cols-2">
-                <Card
-                  className={`hover:shadow-xl hover:-translate-y-1 border border-transparent hover:border-primary/30 dark:hover:border-primary/50 hover:bg-slate-50/50 dark:hover:bg-slate-900/50 cursor-pointer transition-all duration-300 ${
+              <div className="grid gap-5 md:grid-cols-2">
+                
+                {/* Карточка 1: Опыт в Краснодаре и ЮФО */}
+                <div
+                  className={`shiny-border-card group cursor-default ${
                     isVisible.whyChooseUs ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-10 scale-95'
-                  } ease-out`}
+                  } transition-all duration-700 ease-out`}
                 >
-                  <CardHeader>
-                    <CardTitle className="text-lg">Опыт более 10 лет</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">
-                      Установили более 5000 домофонных систем в Москве и области
+                  <div className="shiny-border-card-inner p-6 flex flex-col items-center text-center h-full justify-start">
+                    <div className="shiny-icon-badge mb-3">
+                      <div className="shiny-icon-badge-inner">
+                        <Clock className="h-6 w-6 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform duration-300" />
+                      </div>
+                    </div>
+                    <h3 className="text-lg font-bold tracking-tight text-foreground mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                      7 лет в Краснодаре
+                    </h3>
+                    <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                      Более 20 лет опыта по Югу России и свыше 11 200 абонентов на постоянном обслуживании
                     </p>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
 
-                <Card
-                  className={`hover:shadow-xl hover:-translate-y-1 border border-transparent hover:border-primary/30 dark:hover:border-primary/50 hover:bg-slate-50/50 dark:hover:bg-slate-900/50 cursor-pointer transition-all duration-300 ${
+                {/* Карточка 2: Официальная гарантия */}
+                <div
+                  className={`shiny-border-card group cursor-default ${
                     isVisible.whyChooseUs ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-10 scale-95'
-                  } ease-out delay-100`}
+                  } transition-all duration-700 ease-out delay-100`}
                 >
-                  <CardHeader>
-                    <CardTitle className="text-lg">Гарантия качества</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">
-                      Официальная гарантия на оборудование до 3 лет
+                  <div className="shiny-border-card-inner p-6 flex flex-col items-center text-center h-full justify-start">
+                    <div className="shiny-icon-badge mb-3">
+                      <div className="shiny-icon-badge-inner">
+                        <ShieldCheck className="h-6 w-6 text-emerald-500 group-hover:scale-110 transition-transform duration-300" />
+                      </div>
+                    </div>
+                    <h3 className="text-lg font-bold tracking-tight text-foreground mb-2 group-hover:text-emerald-500 transition-colors">
+                      Гарантия до 3 лет
+                    </h3>
+                    <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                      Официальная заводская гарантия на оборудование и до 1 года на выполненные монтажные работы
                     </p>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
 
-                <Card
-                  className={`hover:shadow-xl hover:-translate-y-1 border border-transparent hover:border-primary/30 dark:hover:border-primary/50 hover:bg-slate-50/50 dark:hover:bg-slate-900/50 cursor-pointer transition-all duration-300 ${
+                {/* Карточка 3: Монтаж за 1 день */}
+                <div
+                  className={`shiny-border-card group cursor-default ${
                     isVisible.whyChooseUs ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-10 scale-95'
-                  } ease-out delay-200`}
+                  } transition-all duration-700 ease-out delay-200`}
                 >
-                  <CardHeader>
-                    <CardTitle className="text-lg">Быстрый монтаж</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">
-                      Установка домофона за 1 день с полной настройкой
+                  <div className="shiny-border-card-inner p-6 flex flex-col items-center text-center h-full justify-start">
+                    <div className="shiny-icon-badge mb-3">
+                      <div className="shiny-icon-badge-inner">
+                        <Wrench className="h-6 w-6 text-primary group-hover:scale-110 transition-transform duration-300" />
+                      </div>
+                    </div>
+                    <h3 className="text-lg font-bold tracking-tight text-foreground mb-2 group-hover:text-primary transition-colors">
+                      Чистый монтаж за 1 день
+                    </h3>
+                    <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                      Установка домофонной системы, доводчиков и замков под ключ с полной настройкой всех квартир
                     </p>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
 
-                <Card
-                  className={`hover:shadow-xl hover:-translate-y-1 border border-transparent hover:border-primary/30 dark:hover:border-primary/50 hover:bg-slate-50/50 dark:hover:bg-slate-900/50 cursor-pointer transition-all duration-300 ${
+                {/* Карточка 4: Рекордный сервис до 2 дней вместо недействительного 24/7 */}
+                <div
+                  className={`shiny-border-card group cursor-default ${
                     isVisible.whyChooseUs ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-10 scale-95'
-                  } ease-out delay-300`}
+                  } transition-all duration-700 ease-out delay-300`}
                 >
-                  <CardHeader>
-                    <CardTitle className="text-lg">Сервисная поддержка</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">
-                      Техническая поддержка и обслуживание 24/7
+                  <div className="shiny-border-card-inner p-6 flex flex-col items-center text-center h-full justify-start">
+                    <div className="shiny-icon-badge mb-3">
+                      <div className="shiny-icon-badge-inner">
+                        <Zap className="h-6 w-6 text-amber-500 group-hover:scale-110 transition-transform duration-300" />
+                      </div>
+                    </div>
+                    <h3 className="text-lg font-bold tracking-tight text-foreground mb-2 group-hover:text-amber-500 transition-colors">
+                      Оперативный сервис
+                    </h3>
+                    <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                      Выполнение заявок на диагностику и ремонт до 2 рабочих дней — лучшая скорость сервиса в Краснодаре
                     </p>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
+
               </div>
             </div>
           </div>
