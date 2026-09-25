@@ -1828,6 +1828,7 @@ const Cabinet = () => {
 
   const hasAdminConsoleAccess = userRoles.some((role) => ["admin", "director"].includes(role));
   const isLocked = !!profile?.is_verified && !editing;
+  const [isConfirmChangeDialogOpen, setIsConfirmChangeDialogOpen] = useState(false); // Открытие диалога подтверждения перед редактированием профиля
 
   // --- СТЕЙТЫ ДЛЯ ФОРМЫ ЗАКАЗА УСЛУГ И ОБОРУДОВАНИЯ ---
   const [products, setProducts] = useState<any[]>([]); // Для товаров и услуг
@@ -3905,8 +3906,110 @@ const Cabinet = () => {
         throw new Error("Сессия пользователя не найдена. Пожалуйста, авторизуйтесь заново.");
       }
 
+      // Если профиль уже верифицирован, формируем заявку на согласование изменения данных!
+      // Основные боевые реквизиты профиля НЕ перезаписываются, чтобы абонент сохранил старый доступ, начисления и оплату
+      if (profile?.is_verified) {
+        const isDataChanged = 
+          fullName.trim() !== (profile.full_name || "").trim() ||
+          phone.trim() !== (profile.phone || "").trim() ||
+          currentAddress.trim() !== (profile.address || "").trim() ||
+          apartment.trim() !== (profile.apartment || "").trim() ||
+          (accountSearchInput?.trim() && accountSearchInput.trim() !== (userAccount?.account_number || ""));
+
+        if (!isDataChanged) {
+          toast({
+            title: "Данные не изменились",
+            description: "Вы не внесли никаких изменений в профиль.",
+          });
+          setEditing(false);
+          setSaving(false);
+          return;
+        }
+
+        console.log("[Кабинет] Зафиксированы изменения верифицированного профиля. Создаем pending_data_change...");
+        const pendingChange = {
+          full_name: fullName.trim(),
+          phone: phone.trim(),
+          address: currentAddress,
+          apartment: premiseType === "private" ? "" : apartment.trim(),
+          floor: premiseType === "private" ? "" : floor.trim(),
+          account_number: accountSearchInput?.trim() || userAccount?.account_number || "",
+          submitted_at: new Date().toISOString(),
+          old_data: {
+            full_name: profile.full_name || "",
+            phone: profile.phone || "",
+            address: profile.address || "",
+            apartment: profile.apartment || "",
+            account_number: userAccount?.account_number || "",
+          }
+        };
+
+        // Сохраняем pending_data_change в profiles
+        const { error: profErr } = await supabase
+          .from("profiles")
+          .update({
+            pending_data_change: pendingChange,
+            data_change_notification: null, // Сбрасываем старое уведомление
+          })
+          .eq("id", session.user.id);
+
+        if (profErr) throw profErr;
+
+        // Создаем карточку наряда в таблице requests для CRM
+        try {
+          const fullAddr = `${currentAddress}${apartment.trim() ? `, кв. ${apartment.trim()}` : ""}`;
+          await supabase.from("requests").insert({
+            client_id: session.user.id,
+            name: fullName.trim(),
+            phone: phone.trim(),
+            address: fullAddr,
+            apartment: premiseType === "private" ? "" : apartment.trim(),
+            street: displayStreet?.trim() || null,
+            house: displayHouse?.trim() || null,
+            entrance: entrance?.trim() || null,
+            floor: floor?.trim() || null,
+            order_type: "data_change_request",
+            message: `📝 Заявка на изменение данных абонента.
+Старый адрес: ${profile.address || "Не указан"}, кв. ${profile.apartment || "-"}
+Новый адрес: ${currentAddress}, кв. ${apartment.trim() || "-"}
+Старое ФИО: ${profile.full_name || "-"} ➔ Новое ФИО: ${fullName.trim()}
+Лицевой счет: ${accountSearchInput?.trim() || userAccount?.account_number || "-"}`,
+            notes: JSON.stringify(pendingChange),
+            status: "pending",
+            priority: "medium",
+          });
+        } catch (reqErr) {
+          console.warn("[Кабинет] Ошибка создания наряда в requests:", reqErr);
+        }
+
+        // Обновляем локальный стейт профиля
+        setProfile((prev: any) => prev ? {
+          ...prev,
+          pending_data_change: pendingChange,
+          data_change_notification: null,
+        } : prev);
+
+        // Возвращаем поля ввода формы к текущим утвержденным реквизитам абонента
+        setFullName(profile.full_name || "");
+        setPhone(profile.phone || "");
+        setAddress(profile.address || "");
+        setDisplayAddress(getDisplayAddress(profile.address || ""));
+        setSelectedStreet(null);
+        setApartment(profile.apartment || "");
+        setFloor(profile.floor || "");
+
+        toast({
+          title: "Заявка отправлена оператору",
+          description: "Запрос на изменение данных передан на согласование. До подтверждения действуют ваши прежние реквизиты.",
+        });
+
+        setEditing(false);
+        setSaving(false);
+        return;
+      }
+
       console.log(`[Верификация] Запись данных профиля в БД для ID: ${session.user.id}, Email: ${finalEmail}`); // Логирование
-      // 2. Записываем данные в базу данных (статус верификации не проставляется автоматически)
+      // 2. Записываем данные в базу данных для не верифицированного профиля
       const currentIsVerified = profile?.is_verified ?? false;
       const { error } = await supabase
         .from("profiles")
@@ -4351,7 +4454,7 @@ const Cabinet = () => {
 
                     <CardDescription className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
                       {isLocked
-                        ? "Данные профиля верифицированы. Чтобы внести изменения — нажмите «Изменить»."
+                        ? "Данные профиля подтверждены. Чтобы внести изменения — воспользуйтесь кнопкой «Изменить персональные данные» внизу карточки."
                         : profile?.verification_status === "pending"
                         ? "Ваши документы проверяются диспетчером. Доступ к услугам откроется сразу после проверки."
                         : profile?.verification_status === "rejected"
@@ -4359,18 +4462,94 @@ const Cabinet = () => {
                         : "Пожалуйста, заполните обязательные графы для отправки профиля на верификацию."}
                     </CardDescription>
                   </div>
-                  {profile?.is_verified && !editing && (
-                    <ShinyButton onClick={() => { setEditing(true); setAgreedToTerms(true); }} className="px-4 h-9 rounded-xl">
-                      <Pencil className="h-4 w-4 mr-1.5" />
-                      Изменить
-                    </ShinyButton>
-                  )}
                 </div>
               </CardHeader>
               <CardContent className="space-y-5 pt-5">
                 
+                {/* 0. СИСТЕМНОЕ ПИСЬМО-УВЕДОМЛЕНИЕ: Ответ оператора CRM по заявке на изменение данных */}
+                {profile?.data_change_notification && (
+                  <div className={cn(
+                    "p-4 rounded-2xl border flex items-start gap-3.5 text-left animate-in fade-in slide-in-from-top-2 duration-300 shadow-sm",
+                    profile.data_change_notification.type === "approved"
+                      ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-900 dark:text-emerald-200"
+                      : "bg-red-500/10 border-red-500/30 text-red-900 dark:text-red-200"
+                  )}>
+                    {profile.data_change_notification.type === "approved" ? (
+                      <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                    ) : (
+                      <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+                    )}
+                    <div className="flex-1 text-xs">
+                      <div className="font-bold text-sm mb-1 flex items-center justify-between">
+                        <span>
+                          {profile.data_change_notification.type === "approved"
+                            ? "✅ Ваши персональные данные успешно обновлены"
+                            : "❌ Заявка на изменение данных отклонена"}
+                        </span>
+                        {profile.data_change_notification.timestamp && (
+                          <span className="text-[10px] text-muted-foreground font-normal">
+                            {new Date(profile.data_change_notification.timestamp).toLocaleDateString("ru-RU")}
+                          </span>
+                        )}
+                      </div>
+                      <p className="leading-relaxed">
+                        {profile.data_change_notification.message || (
+                          profile.data_change_notification.type === "approved"
+                            ? "Оператор проверил и утвердил новые реквизиты. Все данные профиля обновлены."
+                            : `Причина: ${profile.data_change_notification.reason || "Несоответствие данных"}. Ваши прежние реквизиты сохранены.`
+                        )}
+                      </p>
+                      <div className="mt-2.5 flex justify-end">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs px-3.5 rounded-lg border-current/20 hover:bg-current/10 font-semibold"
+                          onClick={async () => {
+                            try {
+                              console.log("[Кабинет] Жилец подтвердил прочтение письма об изменении данных");
+                              await supabase.from("profiles").update({ data_change_notification: null }).eq("id", userId);
+                              setProfile((prev: any) => prev ? { ...prev, data_change_notification: null } : prev);
+                            } catch (e) {
+                              console.warn("[Кабинет] Ошибка закрытия уведомления:", e);
+                            }
+                          }}
+                        >
+                          Понятно
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 0.1. СТАТУС НАХОЖДЕНИЯ ЗАЯВКИ НА ПРОВЕРКЕ У ОПЕРАТОРА */}
+                {profile?.pending_data_change && (
+                  <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3.5 text-left animate-in fade-in duration-300">
+                    <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5 animate-pulse" />
+                    <div className="flex-1 text-xs">
+                      <div className="font-bold text-amber-800 dark:text-amber-300 text-sm mb-1">
+                        ⏳ Заявка на изменение данных находится на проверке
+                      </div>
+                      <div className="text-amber-700 dark:text-amber-400 space-y-1">
+                        <p>Вы отправили оператору запрос на смену реквизитов:</p>
+                        {profile.pending_data_change.full_name && (
+                          <p>• ФИО: <span className="font-semibold text-foreground">{profile.pending_data_change.full_name}</span></p>
+                        )}
+                        {profile.pending_data_change.address && (
+                          <p>• Адрес: <span className="font-semibold text-foreground">{profile.pending_data_change.address}{profile.pending_data_change.apartment ? `, кв. ${profile.pending_data_change.apartment}` : ""}</span></p>
+                        )}
+                        {profile.pending_data_change.account_number && (
+                          <p>• Лицевой счёт: <span className="font-semibold font-mono text-foreground">{profile.pending_data_change.account_number}</span></p>
+                        )}
+                        <p className="text-[11px] text-muted-foreground mt-1.5 pt-1 border-t border-amber-500/20">
+                          До момента одобрения оператором CRM действуют ваши текущие реквизиты, расчет задолженности и доступ.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* RULE 2: Состояние лицевого счёта и оплата ТО (в самом верху личной информации) */}
-                {profile?.address && !editing ? (
+                {profile?.address ? (
                   <div className="space-y-2.5 pb-2">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
@@ -4945,9 +5124,58 @@ const Cabinet = () => {
                   </div>
                 )}
 
+                {/* 10. КНОПКА «ИЗМЕНИТЬ ПЕРСОНАЛЬНЫЕ ДАННЫЕ» (перенесена в нижнюю часть раздела) */}
+                {profile?.is_verified && !editing && (
+                  <div className="pt-4 border-t border-slate-100 dark:border-slate-800/60 flex flex-col items-center gap-2">
+                    <AlertDialog open={isConfirmChangeDialogOpen} onOpenChange={setIsConfirmChangeDialogOpen}>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="rounded-xl font-bold border-amber-500/40 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10 h-10 px-5 gap-2 shadow-xs transition-all"
+                        >
+                          <Pencil className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                          <span>Изменить персональные данные</span>
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="glass-premium border-none rounded-3xl shadow-2xl p-6">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle className="text-lg font-bold text-foreground font-display flex items-center gap-2">
+                            <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0" />
+                            <span>Изменение персональных данных</span>
+                          </AlertDialogTitle>
+                          <AlertDialogDescription className="text-xs text-slate-600 dark:text-slate-300 mt-2 leading-relaxed space-y-2 text-left">
+                            <p>
+                              Внимание! Изменение персональных данных (адрес, лицевой счёт, ФИО) потребует обязательной повторной проверки и верификации оператором.
+                            </p>
+                            <p className="text-[11px] text-muted-foreground">
+                              До момента подтверждения оператором продолжают действовать ваши текущие реквизиты, расчет задолженности и доступ.
+                            </p>
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter className="mt-4 gap-2">
+                          <AlertDialogCancel className="font-semibold rounded-xl h-10">
+                            Отмена
+                          </AlertDialogCancel>
+                          <AlertDialogAction 
+                            onClick={() => {
+                              console.log("[Кабинет] Жилец подтвердил предупреждение и открыл форму редактирования профиля");
+                              setEditing(true);
+                              setAgreedToTerms(true);
+                            }} 
+                            className="bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-xl h-10"
+                          >
+                            Да, продолжить
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                )}
+
                 {/* 11. Маленькая неброская кнопка сброса профиля */}
                 {(profile?.is_verified || profile?.full_name || profile?.address) && (
-                  <div className="pt-3 border-t border-slate-100 dark:border-slate-800/60 flex justify-center">
+                  <div className="pt-2 flex justify-center">
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <button
@@ -4991,7 +5219,7 @@ const Cabinet = () => {
               </CardContent>
             </Card>
 
-            {/* Доступ к системе: только информация и оплата по умному домофону */}
+            {/* Доступ к системе: только информация и оплата по умному домофону (больше НЕ исчезает при редактировании!) */}
             <Card className="glass-premium rounded-[24px] border-none shadow-lg">
               <CardHeader className="pb-4 border-b border-slate-100 dark:border-slate-800">
                 <CardTitle className="flex items-center gap-2 font-display text-lg font-bold text-slate-800 dark:text-slate-100">
@@ -4999,12 +5227,12 @@ const Cabinet = () => {
                   Доступ к системе (Умный домофон)
                 </CardTitle>
                 <CardDescription className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                  {profile?.address && !editing
+                  {profile?.address
                     ? "Информация о подключении к умному домофону и оплата доступа к личному кабинету"
                     : "Доступ к домофону и оплата отображаются после сохранения данных профиля."}
                 </CardDescription>
               </CardHeader>
-              {profile?.address && !editing ? (
+              {profile?.address ? (
                 <CardContent className="space-y-4 pt-4">
                   {/* Удаленный доступ к домофону: статус подключения, приложение и оплата подписки на личные кабинеты */}
                   <RemoteAccessCard 

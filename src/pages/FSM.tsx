@@ -98,7 +98,9 @@ const FSM = () => {
       setStatusFilter(filter);
     } else {
       // Значения по умолчанию
-      if (tab === "requests" || tab === "tasks") {
+      if (tab === "requests") {
+        setStatusFilter("all");
+      } else if (tab === "tasks") {
         setStatusFilter("pending");
       }
     }

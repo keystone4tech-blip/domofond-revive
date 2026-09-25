@@ -109,7 +109,7 @@ interface RequestsManagerProps {
 }
 
 const RequestsManager = ({ 
-  initialFilter = "pending",
+  initialFilter = "all",
   initialRequestId,
   onClearInitialRequestId
 }: RequestsManagerProps) => {
@@ -798,16 +798,17 @@ const RequestsManager = ({
   // Детали теперь отображаются в модальном окне Dialog
 
 
-  // Get title for current tab
+  // Получение заголовка и иконки для текущей активной вкладки
   const getTabTitle = () => {
     switch (activeTab) {
+      case "all": return { title: "Все заявки", icon: FileText, count: stats.total };
       case "pending": return { title: "Новые заявки", icon: Clock, count: stats.pending };
       case "in_progress": return { title: "В работе", icon: AlertCircle, count: stats.inProgress };
       case "completed": return { title: "Выполненные", icon: CheckCircle2, count: stats.completed };
       case "cancelled": return { title: "Отменённые", icon: CircleDashed, count: stats.cancelled };
       case "masters": return { title: "По мастерам", icon: HandMetal, count: mastersWithRequests.length };
       case "reports": return { title: "Финансовые отчёты", icon: Banknote, count: null };
-      default: return { title: "Заявки", icon: FileText, count: stats.total };
+      default: return { title: "Все заявки", icon: FileText, count: stats.total };
     }
   };
 
@@ -1232,8 +1233,71 @@ const RequestsManager = ({
         </span>
       </div>
 
-      {/* Content based on active tab */}
+      {/* Контейнер вкладок с фильтрацией по статусам заявок */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
+        {/* Интерактивная панель переключения статусов заявок со счетчиками */}
+        <TabsList className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 w-full h-auto p-1.5 gap-1.5 bg-slate-100/90 dark:bg-slate-800/80 rounded-xl mb-3">
+          <TabsTrigger value="all" className="flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:shadow-sm">
+            <FileText className="h-3.5 w-3.5 text-slate-500" />
+            <span>Все</span>
+            <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-[10px] h-4 bg-slate-200 dark:bg-slate-700">{stats.total}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="pending" className="flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:shadow-sm">
+            <Clock className="h-3.5 w-3.5 text-yellow-500" />
+            <span>Новые</span>
+            {stats.pending > 0 && (
+              <Badge className="ml-1 px-1.5 py-0 text-[10px] h-4 bg-yellow-500 text-white font-bold">{stats.pending}</Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="in_progress" className="flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:shadow-sm">
+            <AlertCircle className="h-3.5 w-3.5 text-blue-500" />
+            <span>В работе</span>
+            {stats.inProgress > 0 && (
+              <Badge className="ml-1 px-1.5 py-0 text-[10px] h-4 bg-blue-500 text-white font-bold">{stats.inProgress}</Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="completed" className="flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:shadow-sm">
+            <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+            <span>Выполнены</span>
+            {stats.completed > 0 && (
+              <Badge className="ml-1 px-1.5 py-0 text-[10px] h-4 bg-green-500 text-white font-bold">{stats.completed}</Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="cancelled" className="flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:shadow-sm">
+            <CircleDashed className="h-3.5 w-3.5 text-gray-500" />
+            <span>Отменены</span>
+            {stats.cancelled > 0 && (
+              <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-[10px] h-4 bg-gray-200 dark:bg-gray-700">{stats.cancelled}</Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="masters" className="flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:shadow-sm">
+            <HandMetal className="h-3.5 w-3.5 text-primary" />
+            <span>Мастера</span>
+            {mastersWithRequests.length > 0 && (
+              <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-[10px] h-4 bg-primary/20 text-primary">{mastersWithRequests.length}</Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="reports" className="flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:shadow-sm">
+            <Banknote className="h-3.5 w-3.5 text-emerald-600" />
+            <span>Отчёты</span>
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Все заявки (общий список) */}
+        <TabsContent value="all" className="mt-0">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <FileText className="h-5 w-5 text-primary" />
+                Все заявки ({filteredAllRequests.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {renderRequestsTable(filteredAllRequests)}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         {/* Pending Requests */}
         <TabsContent value="pending" className="mt-0">
           <Card>

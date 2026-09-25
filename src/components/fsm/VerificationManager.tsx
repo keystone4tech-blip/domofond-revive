@@ -61,6 +61,24 @@ interface Profile {
   verification_reviewed_at?: string | null;
   created_at: string | null;
   updated_at: string | null;
+  // Поля запроса на изменение данных жильца
+  pending_data_change?: {
+    full_name?: string;
+    phone?: string;
+    address?: string;
+    apartment?: string;
+    floor?: string;
+    account_number?: string;
+    submitted_at?: string;
+    old_data?: {
+      full_name?: string;
+      phone?: string;
+      address?: string;
+      apartment?: string;
+      account_number?: string;
+    };
+  } | null;
+  data_change_notification?: any;
 }
 
 // Предустановленные причины отклонения верификации для быстрого выбора
@@ -72,15 +90,29 @@ const REJECT_REASONS = [
   "Прикреплен неподходящий документ (требуется ЕГРН, прописка или договор найма)",
 ];
 
+// Предустановленные причины отклонения изменения персональных данных
+const DATA_CHANGE_REJECT_REASONS = [
+  "Указанный адрес не обслуживается компанией «Домофондар»",
+  "Несоответствие данных собственника или лицевого счёта в реестре",
+  "Ошибочно указан номер квартиры или подъезда",
+  "Для смены адреса требуется повторное предоставление выписки ЕГРН или договора аренды",
+];
+
 const VerificationManager: React.FC = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Активная вкладка фильтра
-  const [activeFilter, setActiveFilter] = useState<"pending" | "verified" | "rejected">("pending");
+  // Активная вкладка фильтра (включая 'data_changes' для изменения данных)
+  const [activeFilter, setActiveFilter] = useState<"pending" | "verified" | "rejected" | "data_changes">("pending");
 
-  // Выбранный профиль для просмотра в диалоге
+  // Выбранный профиль для просмотра в диалоге верификации
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
+
+  // Стейты для отклонения заявки на изменение данных
+  const [rejectingDataProfile, setRejectingDataProfile] = useState<Profile | null>(null);
+  const [isRejectDataDialogOpen, setIsRejectDataDialogOpen] = useState(false);
+  const [dataRejectReason, setDataRejectReason] = useState("");
+  const [isRejectingData, setIsRejectingData] = useState(false);
 
   // Режим редактирования реквизитов
   const [editMode, setEditMode] = useState(false);
@@ -151,6 +183,144 @@ const VerificationManager: React.FC = () => {
 
   const verifiedProfiles = (profiles || []).filter((p) => p.is_verified);
   const rejectedProfiles = (profiles || []).filter((p) => p.verification_status === "rejected");
+
+  // Фильтрация поступивших заявок на изменение персональных данных абонентов
+  const dataChangeRequests = (profiles || []).filter(
+    (p: any) => p.pending_data_change && typeof p.pending_data_change === "object"
+  );
+
+  // Одобрение замены персональных данных абонента диспетчером
+  const handleApproveDataChange = async (profile: Profile) => {
+    try {
+      const change = profile.pending_data_change;
+      if (!change) return;
+
+      console.log(`[Верификация FSM] Подтверждение изменения данных для профиля ID: ${profile.id}`, change);
+      const now = new Date().toISOString();
+
+      // 1. Применяем новые реквизиты в profiles и формируем системное уведомление (письмо) жильцу
+      const { data, error } = await supabase
+        .from("profiles")
+        .update({
+          full_name: change.full_name?.trim() || profile.full_name,
+          phone: change.phone?.trim() || profile.phone,
+          address: change.address?.trim() || profile.address,
+          apartment: change.apartment !== undefined ? change.apartment?.trim() : profile.apartment,
+          floor: change.floor !== undefined ? change.floor?.trim() : profile.floor,
+          pending_data_change: null, // Очищаем заявку, так как она одобрена
+          data_change_notification: {
+            type: "approved",
+            message: `Ваши новые реквизиты успешно подтверждены оператором: ${change.address || ""}${change.apartment ? `, кв. ${change.apartment}` : ""}. Все данные профиля обновлены.`,
+            timestamp: now,
+          },
+        })
+        .eq("id", profile.id)
+        .select("*")
+        .single();
+
+      if (error) throw error;
+
+      // 2. Завершаем соответствующую заявку в requests
+      try {
+        await supabase
+          .from("requests")
+          .update({
+            status: "completed",
+            completed_at: now,
+            notes: `✅ Изменение данных подтверждено оператором: ${new Date().toLocaleString()}`,
+          })
+          .eq("client_id", profile.id)
+          .eq("order_type", "data_change_request");
+      } catch (reqErr) {
+        console.warn("[Верификация FSM] Заявка в requests не обновлена:", reqErr);
+      }
+
+      toast({
+        title: "✅ Данные обновлены!",
+        description: `Новые реквизиты для ${change.full_name || profile.full_name} успешно применены.`,
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["verification-profiles"] });
+      queryClient.invalidateQueries({ queryKey: ["fsm-sidebar-counts"] });
+      queryClient.invalidateQueries({ queryKey: ["requests"] });
+    } catch (err: any) {
+      console.error("[Верификация FSM] Ошибка применения изменений:", err);
+      toast({
+        title: "Ошибка обновления данных",
+        description: err.message || "Не удалось сохранить новые данные.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Открытие диалога отклонения запроса на изменение данных
+  const handleStartRejectDataChange = (profile: Profile) => {
+    setRejectingDataProfile(profile);
+    setDataRejectReason(DATA_CHANGE_REJECT_REASONS[0]);
+    setIsRejectDataDialogOpen(true);
+  };
+
+  // Фиксация отклонения с записью причины в профиль жильца
+  const handleConfirmRejectDataChange = async () => {
+    if (!rejectingDataProfile) return;
+
+    try {
+      setIsRejectingData(true);
+      const reason = dataRejectReason.trim() || "Данные не соответствуют реестру абонентов";
+      console.log(`[Верификация FSM] Отклонение изменения данных для профиля ID: ${rejectingDataProfile.id}, причина: ${reason}`);
+      const now = new Date().toISOString();
+
+      // 1. Очищаем pending_data_change в profiles и фиксируем письмо-уведомление об отклонении
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          pending_data_change: null,
+          data_change_notification: {
+            type: "rejected",
+            reason,
+            message: `Заявка на изменение данных отклонена оператором. Причина: ${reason}. Ваши прежние реквизиты сохранены.`,
+            timestamp: now,
+          },
+        })
+        .eq("id", rejectingDataProfile.id);
+
+      if (error) throw error;
+
+      // 2. Отклоняем наряд в requests
+      try {
+        await supabase
+          .from("requests")
+          .update({
+            status: "cancelled",
+            notes: `❌ Отклонено оператором. Причина: ${reason}`,
+          })
+          .eq("client_id", rejectingDataProfile.id)
+          .eq("order_type", "data_change_request");
+      } catch (reqErr) {
+        console.warn("[Верификация FSM] Заявка в requests не обновлена:", reqErr);
+      }
+
+      toast({
+        title: "Заявка отклонена",
+        description: `Запрос на изменение данных отклонен. Причина: ${reason}`,
+      });
+
+      setIsRejectDataDialogOpen(false);
+      setRejectingDataProfile(null);
+      queryClient.invalidateQueries({ queryKey: ["verification-profiles"] });
+      queryClient.invalidateQueries({ queryKey: ["fsm-sidebar-counts"] });
+      queryClient.invalidateQueries({ queryKey: ["requests"] });
+    } catch (err: any) {
+      console.error("[Верификация FSM] Ошибка отклонения данных:", err);
+      toast({
+        title: "Ошибка отклонения",
+        description: err.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsRejectingData(false);
+    }
+  };
 
   const openProfile = (profile: Profile) => {
     setSelectedProfile(profile);
@@ -410,6 +580,25 @@ const VerificationManager: React.FC = () => {
               </Badge>
             )}
           </button>
+
+          {/* Вкладка заявок на изменение персональных данных абонентов */}
+          <button
+            onClick={() => setActiveFilter("data_changes")}
+            className={cn(
+              "px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5",
+              activeFilter === "data_changes"
+                ? "bg-blue-600 text-white shadow-xs"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Edit className="h-3.5 w-3.5" />
+            <span>Изменение данных</span>
+            {dataChangeRequests.length > 0 && (
+              <Badge className={cn("text-[10px] px-1.5 py-0 font-bold", activeFilter === "data_changes" ? "bg-white/20 text-white" : "bg-blue-600 text-white")}>
+                {dataChangeRequests.length}
+              </Badge>
+            )}
+          </button>
         </div>
       </div>
 
@@ -584,6 +773,129 @@ const VerificationManager: React.FC = () => {
                   </CardContent>
                 </Card>
               ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 4. Вкладка "Изменение данных" */}
+      {activeFilter === "data_changes" && (
+        <div className="space-y-4">
+          {dataChangeRequests.length === 0 ? (
+            <Card className="border-slate-200 dark:border-slate-800">
+              <CardContent className="py-12 text-center text-muted-foreground space-y-2">
+                <FileCheck className="h-8 w-8 text-blue-500 mx-auto" />
+                <p className="font-bold text-sm text-foreground">Нет активных заявок на изменение персональных данных</p>
+                <p className="text-xs">Когда абоненты запросят изменение адреса, квартиры или ФИО, запросы появятся здесь.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 gap-4">
+              {dataChangeRequests.map((profile) => {
+                const change = profile.pending_data_change;
+                const oldData = change?.old_data || {};
+                return (
+                  <Card key={profile.id} className="border border-blue-500/30 dark:border-blue-500/20 bg-blue-50/15 dark:bg-blue-950/10 rounded-2xl shadow-sm">
+                    <CardHeader className="pb-3 border-b border-blue-100 dark:border-blue-900/30">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <Badge className="bg-blue-600 text-white font-bold text-xs">
+                            Заявка на смену данных
+                          </Badge>
+                          {change?.submitted_at && (
+                            <span className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {new Date(change.submitted_at).toLocaleString("ru-RU")}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs font-mono text-muted-foreground">
+                          ID: {profile.id.slice(0, 8)}...
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4 pt-4">
+                      {/* Сравнение реквизитов "Было ➔ Стало" */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Текущие данные (Было) */}
+                        <div className="p-3.5 rounded-xl bg-slate-100/90 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs space-y-2 text-left">
+                          <div className="font-bold text-slate-500 uppercase tracking-wider text-[10px] flex items-center gap-1.5 pb-1 border-b border-slate-200 dark:border-slate-700">
+                            <span>Было (Действующие реквизиты)</span>
+                          </div>
+                          <div><span className="text-muted-foreground">ФИО:</span> <span className="font-medium text-foreground">{oldData.full_name || profile.full_name || "—"}</span></div>
+                          <div><span className="text-muted-foreground">Телефон:</span> <span className="font-medium text-foreground font-mono">{oldData.phone || profile.phone || "—"}</span></div>
+                          <div><span className="text-muted-foreground">Адрес:</span> <span className="font-medium text-foreground">{oldData.address || profile.address || "—"}</span></div>
+                          <div><span className="text-muted-foreground">Квартира:</span> <span className="font-medium text-foreground">{oldData.apartment || profile.apartment || "—"}</span></div>
+                          {oldData.account_number && (
+                            <div><span className="text-muted-foreground">Лицевой счёт:</span> <span className="font-medium text-foreground font-mono">{oldData.account_number}</span></div>
+                          )}
+                        </div>
+
+                        {/* Запрошенные изменения (Стало) */}
+                        <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs space-y-2 text-left">
+                          <div className="font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider text-[10px] flex items-center justify-between pb-1 border-b border-emerald-500/20">
+                            <span>Стало (Новые реквизиты)</span>
+                            <Badge variant="outline" className="border-emerald-500/40 text-emerald-700 dark:text-emerald-300 text-[9px] py-0">На проверке</Badge>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">ФИО:</span>{" "}
+                            <span className={cn("font-medium", change?.full_name !== oldData.full_name && "font-bold text-emerald-700 dark:text-emerald-300 underline decoration-emerald-500/50")}>
+                              {change?.full_name || "—"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Телефон:</span>{" "}
+                            <span className={cn("font-medium font-mono", change?.phone !== oldData.phone && "font-bold text-emerald-700 dark:text-emerald-300")}>
+                              {change?.phone || "—"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Адрес:</span>{" "}
+                            <span className={cn("font-medium", change?.address !== oldData.address && "font-bold text-emerald-700 dark:text-emerald-300 underline decoration-emerald-500/50")}>
+                              {change?.address || "—"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Квартира:</span>{" "}
+                            <span className={cn("font-medium", change?.apartment !== oldData.apartment && "font-bold text-emerald-700 dark:text-emerald-300")}>
+                              {change?.apartment || "—"}
+                            </span>
+                          </div>
+                          {change?.account_number && (
+                            <div>
+                              <span className="text-muted-foreground">Лицевой счёт:</span>{" "}
+                              <span className={cn("font-medium font-mono", change?.account_number !== oldData.account_number && "font-bold text-emerald-700 dark:text-emerald-300")}>
+                                {change.account_number}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Кнопки подтверждения или отклонения */}
+                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200/60 dark:border-slate-800">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="rounded-xl border-red-500/30 text-red-600 hover:bg-red-500/10 text-xs h-9 px-4 gap-1.5 font-bold"
+                          onClick={() => handleStartRejectDataChange(profile)}
+                        >
+                          <XCircle className="h-4 w-4" />
+                          <span>Отклонить</span>
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-9 px-4 gap-1.5 shadow-sm"
+                          onClick={() => handleApproveDataChange(profile)}
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                          <span>Подтвердить замену данных</span>
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </div>
@@ -863,6 +1175,67 @@ const VerificationManager: React.FC = () => {
             >
               {isRejecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
               <span>Подтвердить отказ</span>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Диалог отклонения заявки на изменение данных */}
+      <Dialog open={isRejectDataDialogOpen} onOpenChange={setIsRejectDataDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base font-bold text-red-600">
+              <AlertCircle className="h-5 w-5" />
+              <span>Отклонить изменение данных</span>
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Укажите причину отклонения. Абонент увидит её в личном кабинете, а его прежние реквизиты останутся без изменений.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2 text-xs">
+            <Label className="text-xs font-semibold">Выберите типовую причину:</Label>
+            <div className="space-y-1.5">
+              {DATA_CHANGE_REJECT_REASONS.map((reason, idx) => (
+                <div
+                  key={idx}
+                  onClick={() => setDataRejectReason(reason)}
+                  className={cn(
+                    "p-2 rounded-lg border text-left cursor-pointer transition-all",
+                    dataRejectReason === reason
+                      ? "border-red-500 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 font-semibold"
+                      : "border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900"
+                  )}
+                >
+                  {reason}
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-1 pt-1">
+              <Label className="text-xs font-semibold">Или введите свой комментарий:</Label>
+              <Input
+                value={dataRejectReason}
+                onChange={(e) => setDataRejectReason(e.target.value)}
+                placeholder="Причина отклонения..."
+                className="text-xs"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" size="sm" onClick={() => setIsRejectDataDialogOpen(false)} className="rounded-xl">
+              Отмена
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={isRejectingData || !dataRejectReason.trim()}
+              onClick={handleConfirmRejectDataChange}
+              className="rounded-xl font-bold gap-1.5"
+            >
+              {isRejectingData ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
+              <span>Отклонить запрос</span>
             </Button>
           </DialogFooter>
         </DialogContent>

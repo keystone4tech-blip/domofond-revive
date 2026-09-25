@@ -32,14 +32,14 @@ export const FSMSidebar = ({ activeTab, setActiveTab, isManager, isOpen, setIsOp
       const [tasksRes, requestsRes, profilesRes] = await Promise.all([
         supabase.from("tasks").select("status"),
         supabase.from("requests").select("status"),
-        supabase.from("profiles").select("id, is_verified, verification_status, verification_document_url, full_name"),
+        supabase.from("profiles").select("id, is_verified, verification_status, verification_document_url, full_name, pending_data_change"),
       ]);
       
       const tasks = tasksRes.data || [];
       const requests = requestsRes.data || [];
       const profiles = profilesRes.data || [];
       
-      // Подсчет количества поступивших заявок на верификацию
+      // Подсчет количества поступивших заявок на первичную верификацию
       const pendingVerifications = profiles.filter((p: any) => {
         if (p.is_verified) return false;
         if (p.verification_status === "rejected") return false;
@@ -48,10 +48,15 @@ export const FSMSidebar = ({ activeTab, setActiveTab, isManager, isOpen, setIsOp
         return false;
       }).length;
 
+      // Подсчет поступивших заявок на изменение персональных данных абонентов
+      const pendingDataChanges = profiles.filter((p: any) => 
+        p.pending_data_change && typeof p.pending_data_change === "object"
+      ).length;
+
       return {
         pendingTasks: tasks.filter((t) => t.status === "pending" || t.status === "assigned" || t.status === "in_progress").length,
         pendingRequests: requests.filter((r) => r.status === "pending" || r.status === "in_progress").length,
-        pendingVerifications,
+        pendingVerifications: pendingVerifications + pendingDataChanges,
       };
     },
     refetchInterval: 5000, // Онлайн-обновление каждые 5 секунд
