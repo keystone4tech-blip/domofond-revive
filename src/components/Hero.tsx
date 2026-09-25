@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { 
   CreditCard, 
   User, 
@@ -19,10 +19,18 @@ import { useNavigate } from "react-router-dom";
 import { ShinyButton } from "@/components/ui/shiny-button";
 import { SmartIntercomTerminal } from "@/components/ui/SmartIntercomTerminal";
 
+// Список сменяемых объектов защиты для динамического заголовка
+const ROTATING_TARGETS = [
+  { word: "дома", label: "Частный дом / Коттедж" },
+  { word: "квартиры", label: "Квартира в МКД" },
+  { word: "офиса", label: "Офис и бизнес" },
+  { word: "ЖК", label: "Жилой комплекс" }
+];
+
 /**
  * Главная Hero-секция сайта
  * Включает:
- * - Технологичный заголовок с эффектом перелива hero-title-shimmer
+ * - Технологичный заголовок с динамической сменой объекта («дома» ➔ «квартиры» ➔ «офиса» ➔ «ЖК»)
  * - Реальные преимущества компании (заявки до 2 дней, гарантия 3 года, 11 200+ абонентов)
  * - Единый ряд быстрых действий: «Оплатить ТО», «Личный кабинет», «Сделать расчет», «Контакты»
  * - Высокотехнологичный интерактивный 3D-терминал домофона и видеонаблюдения со сканером Face ID
@@ -30,9 +38,30 @@ import { SmartIntercomTerminal } from "@/components/ui/SmartIntercomTerminal";
 const Hero = () => {
   const navigate = useNavigate();
 
+  // Состояние текущего отображаемого слова
+  const [targetIndex, setTargetIndex] = useState(0);
+  // Флаг анимации выхода (улетания слова вверх)
+  const [isExiting, setIsExiting] = useState(false);
+
+  // Циклическая плавная смена ключевого слова каждые 2.8 секунды
+  useEffect(() => {
+    const timer = setInterval(() => {
+      // Шаг 1: Запуск ухода текущего слова вверх с размытием
+      setIsExiting(true);
+
+      // Шаг 2: Через 350 мс смена слова и плавный выезд нового слова снизу
+      setTimeout(() => {
+        setTargetIndex((prev) => (prev + 1) % ROTATING_TARGETS.length);
+        setIsExiting(false);
+      }, 350);
+    }, 2800);
+
+    return () => clearInterval(timer);
+  }, []);
+
   // Логирование монтирования компонента Hero
   useEffect(() => {
-    console.log("[Hero] Компонент Hero успешно смонтирован с обновленным интерактивным терминалом безопасности.");
+    console.log("[Hero] Компонент Hero успешно смонтирован с динамической сменой ключевого слова в заголовке.");
   }, []);
 
   return (
@@ -72,11 +101,22 @@ const Hero = () => {
               <span>Безопасность и контроль нового поколения</span>
             </div>
 
-            {/* Главный заголовок с бегущим лучом Shimmer */}
+            {/* Главный заголовок с бегущим лучом Shimmer и динамической сменой объекта */}
             <div className="space-y-1 md:space-y-2">
-              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-5xl font-extrabold tracking-tight hero-title-shimmer leading-[1.18] pb-1 inline-block animate-fade-in">
+              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-5xl font-extrabold tracking-tight hero-title-shimmer leading-[1.22] pb-1 inline-block animate-fade-in">
                 Домофондар: <br />
-                Безопасность дома <br />
+                <span>Безопасность </span>
+                <span className="relative inline-flex items-baseline overflow-hidden transition-all duration-300">
+                  <span
+                    key={targetIndex}
+                    className={`inline-block font-extrabold bg-gradient-to-r from-blue-600 via-sky-500 to-indigo-600 dark:from-sky-400 dark:via-blue-400 dark:to-indigo-300 bg-clip-text text-transparent underline decoration-sky-400/40 decoration-wavy ${
+                      isExiting ? "animate-word-out" : "animate-word-in"
+                    }`}
+                  >
+                    {ROTATING_TARGETS[targetIndex].word}
+                  </span>
+                </span>
+                <br />
                 нового уровня
               </h1>
             </div>
