@@ -9,6 +9,7 @@ import {
   HandMetal, Banknote, User, Menu, Home, LogOut, FileSpreadsheet, DoorClosed, KeyRound, ClipboardCheck
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useUserRole } from "@/hooks/useUserRole";
 
 interface FSMBottomNavProps {
   activeTab: string;
@@ -19,6 +20,7 @@ interface FSMBottomNavProps {
 const FSMBottomNav = ({ activeTab, onTabChange, isManager }: FSMBottomNavProps) => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { hasPermission } = useUserRole();
   const [showTasksSubmenu, setShowTasksSubmenu] = useState(false);
   const [showRequestsSubmenu, setShowRequestsSubmenu] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false); // Для дополнительных разделов менеджера
@@ -225,95 +227,120 @@ const FSMBottomNav = ({ activeTab, onTabChange, isManager }: FSMBottomNavProps) 
           </div>
           <div className="grid grid-cols-2 gap-2">
             {/* Раздел Товары */}
-            <button
-              onClick={() => { onTabChange("products"); closeAllMenus(); }}
-              className={cn("flex items-center gap-3 p-3 rounded-xl text-left transition-all active:scale-95 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800", activeTab === "products" && "bg-primary/10 text-primary")}
-            >
-              <Package className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-              <span className="text-xs font-semibold">Товары</span>
-            </button>
+            {hasPermission("products") && (
+              <button
+                onClick={() => { onTabChange("products"); closeAllMenus(); }}
+                className={cn("flex items-center gap-3 p-3 rounded-xl text-left transition-all active:scale-95 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800", activeTab === "products" && "bg-primary/10 text-primary")}
+              >
+                <Package className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                <span className="text-xs font-semibold">Товары</span>
+              </button>
+            )}
 
             {/* Раздел Лист монтажника */}
-            <button
-              onClick={() => { onTabChange("installer-sheet"); closeAllMenus(); }}
-              className={cn("flex items-center gap-3 p-3 rounded-xl text-left transition-all active:scale-95 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800", activeTab === "installer-sheet" && "bg-primary/10 text-primary")}
-            >
-              <ClipboardCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-              <span className="text-xs font-semibold">Лист монтажника</span>
-            </button>
+            {hasPermission("installer-sheet") && (
+              <button
+                onClick={() => { onTabChange("installer-sheet"); closeAllMenus(); }}
+                className={cn("flex items-center gap-3 p-3 rounded-xl text-left transition-all active:scale-95 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800", activeTab === "installer-sheet" && "bg-primary/10 text-primary")}
+              >
+                <ClipboardCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                <span className="text-xs font-semibold">Лист монтажника</span>
+              </button>
+            )}
 
             {/* Раздел Лицевые счета для сотрудников */}
-            <button
-              onClick={() => { onTabChange("accounts"); closeAllMenus(); }}
-              className={cn("flex items-center gap-3 p-3 rounded-xl text-left transition-all active:scale-95 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800", activeTab === "accounts" && "bg-primary/10 text-primary")}
-            >
-              <FileSpreadsheet className="h-4 w-4 text-teal-600 dark:text-teal-400" />
-              <span className="text-xs font-semibold">Счета</span>
-            </button>
+            {hasPermission("accounts") && (
+              <button
+                onClick={() => { onTabChange("accounts"); closeAllMenus(); }}
+                className={cn("flex items-center gap-3 p-3 rounded-xl text-left transition-all active:scale-95 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800", activeTab === "accounts" && "bg-primary/10 text-primary")}
+              >
+                <FileSpreadsheet className="h-4 w-4 text-teal-600 dark:text-teal-400" />
+                <span className="text-xs font-semibold">Счета</span>
+              </button>
+            )}
 
             {/* Раздел Адреса и подъезды */}
-            <button
-              onClick={() => { onTabChange("addresses"); closeAllMenus(); }}
-              className={cn("flex items-center gap-3 p-3 rounded-xl text-left transition-all active:scale-95 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800", activeTab === "addresses" && "bg-primary/10 text-primary")}
-            >
-              <DoorClosed className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-              <span className="text-xs font-semibold">Адреса</span>
-            </button>
+            {hasPermission("addresses") && (
+              <button
+                onClick={() => { onTabChange("addresses"); closeAllMenus(); }}
+                className={cn("flex items-center gap-3 p-3 rounded-xl text-left transition-all active:scale-95 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800", activeTab === "addresses" && "bg-primary/10 text-primary")}
+              >
+                <DoorClosed className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                <span className="text-xs font-semibold">Адреса</span>
+              </button>
+            )}
 
             {/* Раздел Логопасы умного домофона */}
-            <button
-              onClick={() => { onTabChange("logins"); closeAllMenus(); }}
-              className={cn("flex items-center gap-3 p-3 rounded-xl text-left transition-all active:scale-95 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800", activeTab === "logins" && "bg-primary/10 text-primary")}
-            >
-              <KeyRound className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-              <span className="text-xs font-semibold">Логопасы</span>
-            </button>
+            {hasPermission("logins") && (
+              <button
+                onClick={() => { onTabChange("logins"); closeAllMenus(); }}
+                className={cn("flex items-center gap-3 p-3 rounded-xl text-left transition-all active:scale-95 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800", activeTab === "logins" && "bg-primary/10 text-primary")}
+              >
+                <KeyRound className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                <span className="text-xs font-semibold">Логопасы</span>
+              </button>
+            )}
 
-            {isManager && (
-              <>
-                <button
-                  onClick={() => { onTabChange("employees"); closeAllMenus(); }}
-                  className={cn("flex items-center gap-3 p-3 rounded-xl text-left transition-all active:scale-95 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800", activeTab === "employees" && "bg-primary/10 text-primary")}
-                >
-                  <Users className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                  <span className="text-xs font-semibold">Кадры</span>
-                </button>
-                <button
-                  onClick={() => { onTabChange("clients"); closeAllMenus(); }}
-                  className={cn("flex items-center gap-3 p-3 rounded-xl text-left transition-all active:scale-95 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800", activeTab === "clients" && "bg-primary/10 text-primary")}
-                >
-                  <Building2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                  <span className="text-xs font-semibold">Клиенты</span>
-                </button>
-                <button
-                  onClick={() => { onTabChange("map"); closeAllMenus(); }}
-                  className={cn("flex items-center gap-3 p-3 rounded-xl text-left transition-all active:scale-95 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800", activeTab === "map" && "bg-primary/10 text-primary")}
-                >
-                  <MapPin className="h-4 w-4 text-rose-600 dark:text-rose-400" />
-                  <span className="text-xs font-semibold">Карта</span>
-                </button>
-                <button
-                  onClick={() => { onTabChange("reports"); closeAllMenus(); }}
-                  className={cn("flex items-center gap-3 p-3 rounded-xl text-left transition-all active:scale-95 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800", activeTab === "reports" && "bg-primary/10 text-primary")}
-                >
-                  <BarChart3 className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                  <span className="text-xs font-semibold">Отчеты</span>
-                </button>
-                <button
-                  onClick={() => { onTabChange("verification"); closeAllMenus(); }}
-                  className={cn("flex items-center justify-between p-3 rounded-xl text-left transition-all active:scale-95 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800", activeTab === "verification" && "bg-primary/10 text-primary")}
-                >
-                  <div className="flex items-center gap-3">
-                    <ShieldCheck className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
-                    <span className="text-xs font-semibold">Верификация</span>
-                  </div>
-                  {(counts?.pendingVerifications || 0) > 0 && (
-                    <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-[10px] font-bold text-white bg-red-500 rounded-full shadow-sm animate-pulse">
-                      {counts.pendingVerifications}
-                    </span>
-                  )}
-                </button>
-              </>
+            {/* Раздел Сотрудники и роли */}
+            {hasPermission("employees") && (
+              <button
+                onClick={() => { onTabChange("employees"); closeAllMenus(); }}
+                className={cn("flex items-center gap-3 p-3 rounded-xl text-left transition-all active:scale-95 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800", activeTab === "employees" && "bg-primary/10 text-primary")}
+              >
+                <Users className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                <span className="text-xs font-semibold">Кадры</span>
+              </button>
+            )}
+
+            {/* Раздел Клиенты / Объекты */}
+            {hasPermission("clients") && (
+              <button
+                onClick={() => { onTabChange("clients"); closeAllMenus(); }}
+                className={cn("flex items-center gap-3 p-3 rounded-xl text-left transition-all active:scale-95 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800", activeTab === "clients" && "bg-primary/10 text-primary")}
+              >
+                <Building2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                <span className="text-xs font-semibold">Клиенты</span>
+              </button>
+            )}
+
+            {/* Раздел Карта мастеров */}
+            {hasPermission("map") && (
+              <button
+                onClick={() => { onTabChange("map"); closeAllMenus(); }}
+                className={cn("flex items-center gap-3 p-3 rounded-xl text-left transition-all active:scale-95 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800", activeTab === "map" && "bg-primary/10 text-primary")}
+              >
+                <MapPin className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+                <span className="text-xs font-semibold">Карта</span>
+              </button>
+            )}
+
+            {/* Раздел Финансовые отчеты */}
+            {hasPermission("reports") && (
+              <button
+                onClick={() => { onTabChange("reports"); closeAllMenus(); }}
+                className={cn("flex items-center gap-3 p-3 rounded-xl text-left transition-all active:scale-95 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800", activeTab === "reports" && "bg-primary/10 text-primary")}
+              >
+                <BarChart3 className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                <span className="text-xs font-semibold">Отчеты</span>
+              </button>
+            )}
+
+            {/* Раздел Верификация */}
+            {hasPermission("verification") && (
+              <button
+                onClick={() => { onTabChange("verification"); closeAllMenus(); }}
+                className={cn("flex items-center justify-between p-3 rounded-xl text-left transition-all active:scale-95 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800", activeTab === "verification" && "bg-primary/10 text-primary")}
+              >
+                <div className="flex items-center gap-3">
+                  <ShieldCheck className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
+                  <span className="text-xs font-semibold">Верификация</span>
+                </div>
+                {(counts?.pendingVerifications || 0) > 0 && (
+                  <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-[10px] font-bold text-white bg-red-500 rounded-full shadow-sm animate-pulse">
+                    {counts.pendingVerifications}
+                  </span>
+                )}
+              </button>
             )}
           </div>
 

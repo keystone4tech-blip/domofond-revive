@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useToast } from "@/hooks/use-toast";
@@ -36,9 +36,9 @@ import FSMBottomNav from "@/components/fsm/FSMBottomNav";
 import { FSMSidebar } from "@/components/fsm/FSMSidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import PushNotificationToggle from "@/components/fsm/PushNotificationToggle";
+import { FSM_TABS } from "@/types/crmRoles";
 
 const FSM = () => {
-
   const [isVisible, setIsVisible] = useState({
     header: false,
     content: false
@@ -57,8 +57,9 @@ const FSM = () => {
 
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user, isFSMUser, isManager, isLoading, roles } = useUserRole();
+  const { user, isFSMUser, isManager, isLoading, roles, permissions, hasPermission } = useUserRole();
 
+  // Анимация плавного появления интерфейса
   useEffect(() => {
     if (!isLoading && user && isFSMUser) {
       console.log("[FSM] Инициализация страницы...");
@@ -67,6 +68,7 @@ const FSM = () => {
     }
   }, [isLoading, user, isFSMUser]);
 
+  // Проверка авторизации и доступа к CRM
   useEffect(() => {
     console.log("FSM page access check - isLoading:", isLoading, "user:", !!user, "isFSMUser:", isFSMUser, "roles:", roles);
     
@@ -89,8 +91,34 @@ const FSM = () => {
     }
   }, [user, isFSMUser, isLoading, roles, navigate, toast]);
 
+  // Автоматическая корректировка активной вкладки: если у роли нет доступа к текущей вкладке, переключаем на первую разрешенную
+  useEffect(() => {
+    if (!isLoading && user && isFSMUser) {
+      if (!hasPermission(activeTab)) {
+        console.warn(`[FSM] Вкладка "${activeTab}" недоступна для текущей роли. Поиск доступной вкладки...`);
+        // Ищем первую вкладку из списка разрешенных
+        const firstAllowed = FSM_TABS.find(t => hasPermission(t.id));
+        if (firstAllowed) {
+          console.log(`[FSM] Авто-переключение на разрешенную вкладку: ${firstAllowed.id}`);
+          setActiveTab(firstAllowed.id);
+        }
+      }
+    }
+  }, [isLoading, user, isFSMUser, activeTab, hasPermission]);
+
   // Обработчик переключения вкладок с поддержкой фильтров и ID переходов
   const handleTabChange = (tab: string, filter?: string, id?: string) => {
+    // Проверяем право доступа к запрашиваемой вкладке
+    if (!hasPermission(tab)) {
+      console.warn(`[FSM] Попытка переключения на запрещенную вкладку: ${tab}`);
+      toast({
+        title: "Ограничение доступа",
+        description: "У вашей роли нет разрешения на просмотр этого раздела",
+        variant: "destructive",
+      });
+      return;
+    }
+
     console.log(`[FSM] Переключение вкладки на "${tab}". Фильтр: "${filter || 'нет'}", ID: "${id || 'нет'}"`);
     setActiveTab(tab);
     
@@ -133,6 +161,7 @@ const FSM = () => {
   }
 
   const getRoleLabel = () => {
+    if (roles.includes("superadmin")) return "Суперадмин";
     if (roles.includes("admin")) return "Администратор";
     if (roles.includes("director")) return "Директор";
     if (roles.includes("manager")) return "Менеджер";
@@ -143,19 +172,8 @@ const FSM = () => {
   };
 
   const getTabTitle = () => {
-    switch (activeTab) {
-      case "dashboard": return "Панель управления";
-      case "tasks": return "Задачи";
-      case "requests": return "Заявки клиентов";
-      case "installer-sheet": return "Лист монтажника (Акты выдачи)";
-      case "products": return "Товары и услуги";
-      case "employees": return "Кадровый состав";
-      case "clients": return "Список клиентов";
-      case "map": return "Карта выездов";
-      case "reports": return "Аналитические отчеты";
-      case "verification": return "Верификация аккаунтов";
-      default: return "FSM Панель";
-    }
+    const tabDef = FSM_TABS.find(t => t.id === activeTab);
+    return tabDef ? tabDef.label : "FSM Панель";
   };
 
   return (
@@ -214,7 +232,7 @@ const FSM = () => {
           </div>
         </header>
 
-        {/* Главная рабочая область контента */}
+        {/* Главная рабочая область контента: отображаем только те вкладки, к которым есть доступ */}
         <main className="flex-1 p-3 sm:p-4 lg:p-6 w-full overflow-x-hidden min-w-0">
           <Tabs
             value={activeTab}
@@ -223,73 +241,104 @@ const FSM = () => {
               isVisible.content ? 'opacity-100' : 'opacity-0'
             } transition-opacity duration-300`}
           >
-            <TabsContent value="dashboard" className="mt-0 outline-none">
-              <FSMDashboard isManager={isManager} onNavigate={handleTabChange} />
-            </TabsContent>
+            {/* 1. Панель управления */}
+            {hasPermission("dashboard") && (
+              <TabsContent value="dashboard" className="mt-0 outline-none">
+                <FSMDashboard isManager={isManager} onNavigate={handleTabChange} />
+              </TabsContent>
+            )}
 
-            <TabsContent value="tasks" className="mt-0 outline-none">
-              <TasksManager 
-                isManager={isManager} 
-                initialFilter={statusFilter}
-                initialTaskId={selectedTaskId}
-                onClearInitialTaskId={clearSelectedTaskId}
-              />
-            </TabsContent>
+            {/* 2. Задачи */}
+            {hasPermission("tasks") && (
+              <TabsContent value="tasks" className="mt-0 outline-none">
+                <TasksManager 
+                  isManager={isManager} 
+                  initialFilter={statusFilter}
+                  initialTaskId={selectedTaskId}
+                  onClearInitialTaskId={clearSelectedTaskId}
+                />
+              </TabsContent>
+            )}
 
-            <TabsContent value="requests" className="mt-0 outline-none">
-              <RequestsManager 
-                initialFilter={statusFilter} 
-                initialRequestId={selectedRequestId}
-                onClearInitialRequestId={clearSelectedRequestId}
-              />
-            </TabsContent>
+            {/* 3. Заявки клиентов */}
+            {hasPermission("requests") && (
+              <TabsContent value="requests" className="mt-0 outline-none">
+                <RequestsManager 
+                  initialFilter={statusFilter} 
+                  initialRequestId={selectedRequestId}
+                  onClearInitialRequestId={clearSelectedRequestId}
+                />
+              </TabsContent>
+            )}
 
-            {/* Вкладка Лист монтажника (сводная выдача оборудования по домам) */}
-            <TabsContent value="installer-sheet" className="mt-0 outline-none">
-              <InstallerSheetManager />
-            </TabsContent>
+            {/* 4. Лист монтажника (сводная выдача оборудования по домам) */}
+            {hasPermission("installer-sheet") && (
+              <TabsContent value="installer-sheet" className="mt-0 outline-none">
+                <InstallerSheetManager />
+              </TabsContent>
+            )}
 
-            <TabsContent value="products" className="mt-0 outline-none">
-              <ProductsManager />
-            </TabsContent>
+            {/* 5. Товары и услуги */}
+            {hasPermission("products") && (
+              <TabsContent value="products" className="mt-0 outline-none">
+                <ProductsManager />
+              </TabsContent>
+            )}
 
-            {/* Вкладка управления лицевыми счетами и задолженностями */}
-            <TabsContent value="accounts" className="mt-0 outline-none">
-              <AccountsManager />
-            </TabsContent>
+            {/* 6. Адреса и подъезды */}
+            {hasPermission("addresses") && (
+              <TabsContent value="addresses" className="mt-0 outline-none">
+                <AddressesManager />
+              </TabsContent>
+            )}
 
-            {/* Вкладка дерева адресов и привязки оборудования к подъездам */}
-            <TabsContent value="addresses" className="mt-0 outline-none">
-              <AddressesManager />
-            </TabsContent>
+            {/* 7. Лицевые счета и задолженности */}
+            {hasPermission("accounts") && (
+              <TabsContent value="accounts" className="mt-0 outline-none">
+                <AccountsManager />
+              </TabsContent>
+            )}
 
-            {/* Вкладка управления логопасами умного домофона (выгрузки логинов и паролей) */}
-            <TabsContent value="logins" className="mt-0 outline-none">
-              <IntercomLoginsManager />
-            </TabsContent>
+            {/* 8. Логопасы умного домофона (выгрузка учетных записей) */}
+            {hasPermission("logins") && (
+              <TabsContent value="logins" className="mt-0 outline-none">
+                <IntercomLoginsManager />
+              </TabsContent>
+            )}
 
-            {isManager && (
-              <>
-                <TabsContent value="employees" className="mt-0 outline-none">
-                  <EmployeesManager />
-                </TabsContent>
+            {/* 9. Сотрудники и роли */}
+            {hasPermission("employees") && (
+              <TabsContent value="employees" className="mt-0 outline-none">
+                <EmployeesManager />
+              </TabsContent>
+            )}
 
-                <TabsContent value="clients" className="mt-0 outline-none">
-                  <ClientsManager />
-                </TabsContent>
+            {/* 10. Клиенты / Объекты */}
+            {hasPermission("clients") && (
+              <TabsContent value="clients" className="mt-0 outline-none">
+                <ClientsManager />
+              </TabsContent>
+            )}
 
-                <TabsContent value="map" className="mt-0 outline-none">
-                  <LocationMap />
-                </TabsContent>
+            {/* 11. Карта мастеров */}
+            {hasPermission("map") && (
+              <TabsContent value="map" className="mt-0 outline-none">
+                <LocationMap />
+              </TabsContent>
+            )}
 
-                <TabsContent value="reports" className="mt-0 outline-none">
-                  <FSMReports />
-                </TabsContent>
+            {/* 12. Финансовые отчеты */}
+            {hasPermission("reports") && (
+              <TabsContent value="reports" className="mt-0 outline-none">
+                <FSMReports />
+              </TabsContent>
+            )}
 
-                <TabsContent value="verification" className="mt-0 outline-none">
-                  <VerificationManager />
-                </TabsContent>
-              </>
+            {/* 13. Верификация аккаунтов и смены данных */}
+            {hasPermission("verification") && (
+              <TabsContent value="verification" className="mt-0 outline-none">
+                <VerificationManager />
+              </TabsContent>
             )}
           </Tabs>
         </main>
@@ -312,4 +361,3 @@ const FSMWithErrorBoundary = () => (
 );
 
 export default FSMWithErrorBoundary;
-

@@ -19,10 +19,10 @@ interface FSMSidebarProps {
   setIsOpen?: (open: boolean) => void;
 }
 
-export const FSMSidebar = ({ activeTab, setActiveTab, isManager, isOpen, setIsOpen }: FSMSidebarProps) => {
+export const FSMSidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }: FSMSidebarProps) => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { isAdmin } = useUserRole();
+  const { isAdmin, hasPermission } = useUserRole();
 
   // Получение количества активных задач, заявок и верификаций для бейджей (онлайн опрос каждые 5 сек)
   const { data: counts } = useQuery({
@@ -77,8 +77,8 @@ export const FSMSidebar = ({ activeTab, setActiveTab, isManager, isOpen, setIsOp
     };
   }, [queryClient]);
 
-  // Элементы навигации
-  const menuItems = [
+  // Полный перечень всех 13 вкладок FSM навигации с иконками и бейджами
+  const allMenuItems = [
     { id: "dashboard", label: "Панель управления", icon: LayoutDashboard },
     { 
       id: "tasks", 
@@ -101,23 +101,21 @@ export const FSMSidebar = ({ activeTab, setActiveTab, isManager, isOpen, setIsOp
     { id: "accounts", label: "Лицевые счета", icon: FileSpreadsheet },
     // Раздел управления логопасами умного домофона (учетными данными приложения)
     { id: "logins", label: "Логопасы", icon: KeyRound },
-  ];
-
-  // Элементы навигации только для менеджера
-  const managerItems = [
-    { id: "employees", label: "Сотрудники", icon: Users },
+    // Раздел кадрового состава и прав доступа
+    { id: "employees", label: "Сотрудники и роли", icon: Users },
     { id: "clients", label: "Клиенты / Объекты", icon: Building2 },
     { id: "map", label: "Карта мастеров", icon: MapPin },
     { id: "reports", label: "Финансовые отчеты", icon: BarChart3 },
     { 
       id: "verification", 
       label: "Верификация", 
-      icon: ShieldCheck,
+      icon: ShieldCheck, 
       badge: counts?.pendingVerifications || 0 
     },
   ];
 
-  const visibleItems = isManager ? [...menuItems, ...managerItems] : menuItems;
+  // Динамически фильтруем отображаемые вкладки на основе назначенных прав роли текущего пользователя
+  const visibleItems = allMenuItems.filter((item) => hasPermission(item.id));
 
   // Обработчик выбора вкладки
   const handleTabClick = (tabId: string) => {
@@ -151,7 +149,7 @@ export const FSMSidebar = ({ activeTab, setActiveTab, isManager, isOpen, setIsOp
           </div>
         </div>
 
-        {/* Список разделов навигации */}
+        {/* Список разделов навигации согласно правам роли */}
         <nav className="p-4 space-y-1 max-h-[calc(100vh-14rem)] overflow-y-auto custom-scrollbar">
           {visibleItems.map((item) => {
             const Icon = item.icon;
