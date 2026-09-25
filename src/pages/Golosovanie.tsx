@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Vote, Calendar, MapPin, Loader2, CheckCircle2, ShieldCheck, ChevronLeft, ChevronRight, AlertCircle, User, Home, Phone, KeyRound } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { LegalDocumentsModal } from "@/components/LegalDocumentsModal";
 
 interface Voting {
   id: string;
@@ -387,6 +388,8 @@ const StepperBallot = (p: StepperProps) => {
     return e;
   }, [p]);
 
+  const [legalModalOpen, setLegalModalOpen] = useState(false);
+
   const steps = [
     { key: "personal", title: "Собственник", icon: User, fields: ["fullName", "apartment", "areaSqm"] },
     { key: "questions", title: "Вопросы", icon: Vote, fields: p.questions.map((q) => `q_${q.id}`) },
@@ -536,9 +539,20 @@ const StepperBallot = (p: StepperProps) => {
                 onCheckedChange={(v) => { p.setIsOwner(!!v); setTouched((t) => ({ ...t, isOwner: true })); }}
                 className="mt-0.5"
               />
-              <Label htmlFor="is_owner" className="text-xs font-normal cursor-pointer">
-                Я подтверждаю, что являюсь собственником указанной квартиры и согласен на обработку
-                персональных данных в целях проведения голосования. Понимаю, что заведомо ложные
+              <Label htmlFor="is_owner" className="text-xs font-normal">
+                Я подтверждаю, что являюсь собственником указанной квартиры и согласен на{" "}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setLegalModalOpen(true);
+                  }}
+                  className="text-primary hover:underline font-semibold focus:outline-none inline cursor-pointer"
+                >
+                  обработку персональных данных (ФЗ-152 РФ)
+                </button>{" "}
+                в целях проведения голосования. Понимаю, что заведомо ложные
                 данные могут повлечь оспаривание решения собрания.
               </Label>
             </div>
@@ -598,6 +612,13 @@ const StepperBallot = (p: StepperProps) => {
           )}
         </div>
       </CardContent>
+
+      {/* Модальное окно с официальным согласием на обработку ПДн */}
+      <LegalDocumentsModal
+        isOpen={legalModalOpen}
+        onClose={() => setLegalModalOpen(false)}
+        initialDocumentId="data-consent"
+      />
     </Card>
   );
 };

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import Header from "@/components/Header";
 import Contact from "@/components/Contact";
@@ -35,6 +36,8 @@ const slideVariants = {
  * Реализовано плавное переключение между вкладками на базе framer-motion и пошаговая анимация появления.
  */
 const Kontakty = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+
   // Состояния для пошаговой анимации появления элементов
   const [isVisible, setIsVisible] = useState({
     tabsList: false,
@@ -45,6 +48,18 @@ const Kontakty = () => {
   const tabsOrder = ["contact-form", "requisites", "documents"];
   const [activeTab, setActiveTab] = useState("contact-form");
   const [direction, setDirection] = useState(0); // -1 — назад (влево), 1 — вперед (вправо)
+
+  // Проверяем параметр вкладки в URL (?tab=documents или #documents)
+  useEffect(() => {
+    const requestedTab = searchParams.get("tab");
+    if (requestedTab && tabsOrder.includes(requestedTab)) {
+      console.log(`[Контакты] Автоматический выбор вкладки из URL: ${requestedTab}`);
+      setActiveTab(requestedTab);
+    } else if (window.location.hash === "#documents") {
+      console.log("[Контакты] Автоматический выбор вкладки documents по хэшу URL");
+      setActiveTab("documents");
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     // Пошаговый запуск анимаций при монтировании

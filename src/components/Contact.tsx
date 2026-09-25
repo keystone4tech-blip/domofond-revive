@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
+import { LegalDocumentsModal } from "@/components/LegalDocumentsModal";
 const contactSchema = z.object({
   name: z.string().trim().min(2, { message: "Имя должно содержать минимум 2 символа" }).max(100),
   phone: z.string().trim().min(10, { message: "Введите корректный номер телефона" }).max(20),
@@ -20,6 +21,7 @@ interface ContactProps {
 
 const Contact = ({ isTabPage = false }: ContactProps) => {
   const { toast } = useToast();
+  const [legalModalOpen, setLegalModalOpen] = useState(false);
 
   useEffect(() => {
     console.log("[Contact] Компонент обратной связи смонтирован. Режим вкладки: ", isTabPage);
@@ -288,12 +290,26 @@ const Contact = ({ isTabPage = false }: ContactProps) => {
               </ShinyButton>
 
               <p className="text-xs text-muted-foreground text-center">
-                Нажимая кнопку, вы соглашаетесь с политикой конфиденциальности
+                Нажимая кнопку, вы соглашаетесь с{" "}
+                <button
+                  type="button"
+                  onClick={() => setLegalModalOpen(true)}
+                  className="text-primary hover:underline font-semibold focus:outline-none inline cursor-pointer"
+                >
+                  политикой конфиденциальности (ФЗ-152 РФ)
+                </button>
               </p>
             </form>
           </div>
         </div>
       </div>
+
+      {/* Модальное окно политики конфиденциальности по 152-ФЗ */}
+      <LegalDocumentsModal
+        isOpen={legalModalOpen}
+        onClose={() => setLegalModalOpen(false)}
+        initialDocumentId="privacy-policy"
+      />
     </Wrapper>
   );
 };

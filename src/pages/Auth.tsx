@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import { LegalDocumentsModal } from "@/components/LegalDocumentsModal";
 
 const Auth = () => {
   const [loginInput, setLoginInput] = useState(""); // Стейт для логина входа (Email или телефон)
@@ -18,6 +19,15 @@ const Auth = () => {
   const [fullName, setFullName] = useState(""); // Стейт для полного имени (передается пустым при регистрации)
   const [loading, setLoading] = useState(false); // Стейт процесса загрузки запроса к API
   const [agreedToTerms, setAgreedToTerms] = useState(true); // Стейт согласия на обработку персональных данных (ФЗ-152 РФ, включен по умолчанию)
+  const [legalModalOpen, setLegalModalOpen] = useState(false); // Стейт показа модального окна документов
+  const [legalDocId, setLegalDocId] = useState<"privacy-policy" | "data-consent" | "public-offer">("data-consent"); // Выбранный документ
+
+  // Функция открытия модального окна для конкретного юридического документа
+  const openLegalDoc = (docId: "privacy-policy" | "data-consent" | "public-offer") => {
+    console.log(`[Auth] Открытие модального окна документа: ${docId}`);
+    setLegalDocId(docId);
+    setLegalModalOpen(true);
+  };
 
   // Умное форматирование для поля ввода: если вводятся цифры — форматируем как телефон +7 (XXX) XXX-XX-XX, если email — убираем пробелы
   const handleSmartInputChange = (val: string, setter: (v: string) => void) => {
@@ -440,8 +450,32 @@ const Auth = () => {
                       onChange={(e) => setAgreedToTerms(e.target.checked)}
                       className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary shrink-0 cursor-pointer"
                     />
-                    <Label htmlFor="signup-agreed" className="text-xs text-muted-foreground leading-normal cursor-pointer select-none font-medium">
-                      Я соглашаюсь на <span className="text-primary hover:underline font-semibold">обработку персональных данных</span> в соответствии с ФЗ-152 РФ и принимаю условия <span className="text-primary hover:underline font-semibold">публичной оферты</span>.
+                    <Label htmlFor="signup-agreed" className="text-xs text-muted-foreground leading-normal select-none font-medium">
+                      Я соглашаюсь на{" "}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          openLegalDoc("data-consent");
+                        }}
+                        className="text-primary hover:underline font-semibold focus:outline-none inline cursor-pointer text-left"
+                      >
+                        обработку персональных данных
+                      </button>{" "}
+                      в соответствии с ФЗ-152 РФ и принимаю условия{" "}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          openLegalDoc("public-offer");
+                        }}
+                        className="text-primary hover:underline font-semibold focus:outline-none inline cursor-pointer text-left"
+                      >
+                        публичной оферты
+                      </button>
+                      .
                     </Label>
                   </div>
 
@@ -464,6 +498,14 @@ const Auth = () => {
           </CardContent>
         </Card>
       </main>
+
+      {/* Модальное окно с официальными документами 152-ФЗ и офертой (без ухода со страницы регистрации) */}
+      <LegalDocumentsModal
+        isOpen={legalModalOpen}
+        onClose={() => setLegalModalOpen(false)}
+        initialDocumentId={legalDocId}
+      />
+
       <Footer />
     </div>
   );

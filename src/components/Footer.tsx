@@ -1,10 +1,19 @@
 import { useState, useEffect } from "react";
-import { Phone, Mail, MapPin, ShieldCheck } from "lucide-react";
+import { Phone, Mail, MapPin, ShieldCheck, FileText, Scale } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { LegalDocumentsModal } from "@/components/LegalDocumentsModal";
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
   const navigate = useNavigate();
+  const [legalModalOpen, setLegalModalOpen] = useState(false);
+  const [legalDocId, setLegalDocId] = useState<"privacy-policy" | "data-consent" | "public-offer">("privacy-policy");
+
+  const openLegalDoc = (docId: "privacy-policy" | "data-consent" | "public-offer") => {
+    console.log(`[Footer] Открытие документа: ${docId}`);
+    setLegalDocId(docId);
+    setLegalModalOpen(true);
+  };
 
   // Логирование монтирования компонента Footer
   useEffect(() => {
@@ -49,7 +58,7 @@ const Footer = () => {
           </div>
 
           <div>
-            <h3 className="font-semibold mb-4">Компания</h3>
+            <h3 className="font-semibold mb-4">Компания и документы</h3>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>
                 <a href="#about" className="hover:text-foreground transition-colors">
@@ -57,14 +66,38 @@ const Footer = () => {
                 </a>
               </li>
               <li>
+                <button
+                  type="button"
+                  onClick={() => navigate("/kontakty?tab=documents")}
+                  className="hover:text-foreground transition-colors text-left flex items-center gap-1.5"
+                >
+                  <FileText className="h-3.5 w-3.5 text-primary" />
+                  <span>Документы и регламенты</span>
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  onClick={() => navigate("/kontakty?tab=requisites")}
+                  className="hover:text-foreground transition-colors text-left flex items-center gap-1.5"
+                >
+                  <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+                  <span>Реквизиты компании</span>
+                </button>
+              </li>
+              <li>
                 <a href="#faq" className="hover:text-foreground transition-colors">
                   Вопросы и ответы
                 </a>
               </li>
               <li>
-                <a href="#contact" className="hover:text-foreground transition-colors">
+                <button
+                  type="button"
+                  onClick={() => navigate("/kontakty")}
+                  className="hover:text-foreground transition-colors text-left"
+                >
                   Контакты
-                </a>
+                </button>
               </li>
             </ul>
           </div>
@@ -92,10 +125,43 @@ const Footer = () => {
           </div>
         </div>
 
-        <div className="border-t mt-8 pt-8 text-center text-sm text-muted-foreground">
-          <p>&copy; {currentYear} Домофондар. Все права защищены.</p>
+        <div className="border-t mt-8 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
+          <p>&copy; {currentYear} ООО «ДомофонДар». Все права защищены.</p>
+
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
+            <button
+              type="button"
+              onClick={() => openLegalDoc("privacy-policy")}
+              className="hover:text-foreground transition-colors hover:underline"
+            >
+              Политика конфиденциальности (152-ФЗ)
+            </button>
+            <span>•</span>
+            <button
+              type="button"
+              onClick={() => openLegalDoc("data-consent")}
+              className="hover:text-foreground transition-colors hover:underline"
+            >
+              Согласие на обработку данных
+            </button>
+            <span>•</span>
+            <button
+              type="button"
+              onClick={() => openLegalDoc("public-offer")}
+              className="hover:text-foreground transition-colors hover:underline"
+            >
+              Публичная оферта
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Модальное окно официальных документов */}
+      <LegalDocumentsModal
+        isOpen={legalModalOpen}
+        onClose={() => setLegalModalOpen(false)}
+        initialDocumentId={legalDocId}
+      />
     </footer>
   );
 };

@@ -21,6 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { VerificationUploadDialog } from "@/components/VerificationUploadDialog";
+import { LegalDocumentsModal } from "@/components/LegalDocumentsModal";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 import { calculateKeyPriceDetails, parseTieredPricing } from "@/utils/pricing";
@@ -1838,6 +1839,15 @@ const Cabinet = () => {
   // --- НОВЫЕ СТЕЙТЫ: ТИП ПОМЕЩЕНИЯ, СОГЛАСИЕ ФЗ-152, ДИАЛОГ ВАЛИДАЦИИ И DaData ---
   const [premiseType, setPremiseType] = useState<"apartment" | "private">("apartment"); // Тип недвижимости: apartment (кв./офис) vs private (частный дом)
   const [agreedToTerms, setAgreedToTerms] = useState(true); // Согласие по ФЗ-152 РФ (по умолчанию включено)
+  const [legalModalOpen, setLegalModalOpen] = useState(false); // Модалка документов 152-ФЗ
+  const [legalDocId, setLegalDocId] = useState<"privacy-policy" | "data-consent" | "public-offer">("data-consent"); // Выбранный документ
+
+  const openLegalDoc = (docId: "privacy-policy" | "data-consent" | "public-offer") => {
+    console.log(`[Cabinet] Открытие документа: ${docId}`);
+    setLegalDocId(docId);
+    setLegalModalOpen(true);
+  };
+
   const [showValidationDialog, setShowValidationDialog] = useState(false); // Красивая модалка для ошибок
   const [validationErrors, setValidationErrors] = useState<string[]>([]); // Массив текстов незаполненных граф
   const [dadataStreetSuggestions, setDadataStreetSuggestions] = useState<any[]>([]); // Подсказки улиц от DaData
@@ -5217,8 +5227,32 @@ const Cabinet = () => {
                       onChange={(e) => setAgreedToTerms(e.target.checked)}
                       className="mt-1 h-4 w-4 rounded border-slate-300 text-amber-500 focus:ring-amber-500/20 shrink-0 cursor-pointer"
                     />
-                    <Label htmlFor="agreedToTerms" className="text-[11px] text-muted-foreground leading-normal cursor-pointer select-none font-semibold hover:text-foreground transition-colors">
-                      Я соглашаюсь на <span className="text-primary hover:underline font-bold">обработку персональных данных</span> в соответствии с ФЗ-152 РФ и принимаю условия <span className="text-primary hover:underline font-bold">публичной оферты</span> при использовании сервиса «Домофондар».
+                    <Label htmlFor="agreedToTerms" className="text-[11px] text-muted-foreground leading-normal select-none font-semibold">
+                      Я соглашаюсь на{" "}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          openLegalDoc("data-consent");
+                        }}
+                        className="text-primary hover:underline font-bold focus:outline-none inline cursor-pointer text-left"
+                      >
+                        обработку персональных данных
+                      </button>{" "}
+                      в соответствии с ФЗ-152 РФ и принимаю условия{" "}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          openLegalDoc("public-offer");
+                        }}
+                        className="text-primary hover:underline font-bold focus:outline-none inline cursor-pointer text-left"
+                      >
+                        публичной оферты
+                      </button>{" "}
+                      при использовании сервиса «Домофондар».
                     </Label>
                   </div>
                 )}
@@ -6957,6 +6991,13 @@ const Cabinet = () => {
         onSuccess={(updated) => {
           setProfile((prev: any) => ({ ...prev, ...updated }));
         }}
+      />
+
+      {/* Модальное окно с официальными документами (152-ФЗ, Согласие, Оферта) */}
+      <LegalDocumentsModal
+        isOpen={legalModalOpen}
+        onClose={() => setLegalModalOpen(false)}
+        initialDocumentId={legalDocId}
       />
 
       <Footer />
