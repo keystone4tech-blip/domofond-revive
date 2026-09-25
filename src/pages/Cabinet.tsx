@@ -3154,11 +3154,11 @@ const Cabinet = () => {
       setFloor(data.floor || ""); // Инициализируем этаж
       
       // Автоподстановка Email из профиля, сессии регистрации или localStorage
-      // RULE 2: Исключаем технический системный email phone_XXXXXXXXXX@domofondar.ru
+      // RULE 2: Исключаем технический системный email phone_XXXXXXXXXX@domofondar.ru / @домофондар.рф
       const storedUser = localStorage.getItem("user") || sessionStorage.getItem("user");
       const parsedUser = storedUser ? JSON.parse(storedUser) : null;
       const rawCandidateEmail = (data.email || session.user?.email || parsedUser?.email || "").trim();
-      const isSystemPhoneEmail = !rawCandidateEmail || rawCandidateEmail.startsWith("phone_") || rawCandidateEmail.endsWith("@domofondar.ru");
+      const isSystemPhoneEmail = !rawCandidateEmail || rawCandidateEmail.startsWith("phone_") || rawCandidateEmail.endsWith("@domofondar.ru") || rawCandidateEmail.endsWith("@домофондар.рф");
       const realEmail = isSystemPhoneEmail ? "" : rawCandidateEmail;
 
       if (realEmail) {

@@ -341,13 +341,13 @@ export const generateProposalDocx = async (data: ProposalData): Promise<Blob> =>
             new ExternalHyperlink({
               children: [
                 new TextRun({
-                  text: "www.domofondar.ru",
+                  text: "домофондар.рф",
                   color: "0000FF",
                   underline: {},
                   size: 20,
                 }),
               ],
-              link: "http://www.domofondar.ru",
+              link: "https://домофондар.рф",
             }),
           ],
         }),
