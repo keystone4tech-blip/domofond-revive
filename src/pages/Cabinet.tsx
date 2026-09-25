@@ -649,27 +649,17 @@ const DebtCard = ({
                   </div>
                 </div>
 
-                {/* Детализация суммы и комиссии за эквайринг 5% */}
+                {/* Итоговая сумма к оплате ТО */}
                 {(() => {
                   const base = parseFloat(payAmount) || 0;
-                  const fee = Math.round(base * 0.05 * 100) / 100;
-                  const total = Math.round((base + fee) * 100) / 100;
                   return (
                     <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs space-y-1.5 text-left">
-                      <div className="flex justify-between items-center text-slate-600 dark:text-slate-300">
-                        <span>Зачисление на лицевой счёт:</span>
-                        <span className="font-mono font-bold text-foreground">{base.toFixed(2)} ₽</span>
-                      </div>
-                      <div className="flex justify-between items-center text-slate-600 dark:text-slate-300">
-                        <span>Комиссия за эквайринг (5%):</span>
-                        <span className="font-mono font-medium text-amber-700 dark:text-amber-400">+{fee.toFixed(2)} ₽</span>
-                      </div>
-                      <div className="flex justify-between items-center font-bold pt-1.5 border-t border-amber-500/20 text-foreground text-sm">
-                        <span>Итого к списанию с карты / СБП:</span>
-                        <span className="font-mono font-extrabold text-amber-600 dark:text-amber-400 text-base">{total.toFixed(2)} ₽</span>
+                      <div className="flex justify-between items-center font-bold text-foreground text-sm">
+                        <span>Итого к оплате:</span>
+                        <span className="font-mono font-extrabold text-amber-600 dark:text-amber-400 text-base">{base.toFixed(2)} ₽</span>
                       </div>
                       <p className="text-[10px] text-slate-500 dark:text-slate-400 pt-1 leading-snug">
-                        💡 Взимается 5% за интернет-эквайринг (возможна минимальная комиссия за транзакцию от банка-эмитента). На ваш лицевой счёт поступит полная сумма {base.toFixed(2)} ₽.
+                        💡 Возможна оплата за транзакцию.
                       </p>
                     </div>
                   );
@@ -3650,7 +3640,7 @@ const Cabinet = () => {
 
         toast({
           title: "Переход к оплате заказа",
-          description: `Сумма: ${totalAmountWithFee.toFixed(2)} ₽ (с учетом комиссии 5%). Перенаправляем на платежный шлюз ЮKassa...`,
+          description: "Перенаправляем на платежный шлюз ЮKassa...",
         });
 
         const resp = await fetch("/backend-api/api/payments/yookassa/create", {
@@ -5608,7 +5598,7 @@ const Cabinet = () => {
                                           console.log(`[ЛК Кабинет: Оплата Заказа] Инициация оплаты заказа #${req.id}: база ${baseAmount} ₽, комиссия 5% ${feeAmount} ₽, итог ${totalAmountWithFee} ₽`);
                                           toast({
                                             title: "Переход к оплате",
-                                            description: `Сумма к оплате: ${totalAmountWithFee.toFixed(2)} ₽ (с учетом эквайринга 5%). Перенаправляем на шлюз ЮKassa...`,
+                                            description: "Перенаправляем на платежный шлюз ЮKassa...",
                                           });
 
                                           try {
@@ -6575,27 +6565,17 @@ const Cabinet = () => {
                         );
                       })()}
 
-                      {/* Детализация эквайринга 5% */}
+                      {/* Итоговая сумма заказа оборудования */}
                       {(() => {
                         const base = calculateTotals().total || 0;
-                        const fee = Math.round(base * 0.05 * 100) / 100;
-                        const total = Math.round((base + fee) * 100) / 100;
                         return (
                           <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5 text-left">
-                            <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
-                              <span>Стоимость оборудования/услуг:</span>
-                              <span className="font-semibold text-foreground font-mono">{base.toFixed(2)} ₽</span>
-                            </div>
-                            <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
-                              <span>Комиссия за эквайринг (5%):</span>
-                              <span className="font-medium text-amber-600 dark:text-amber-400 font-mono">+{fee.toFixed(2)} ₽</span>
-                            </div>
-                            <div className="flex justify-between font-bold text-base text-foreground pt-1 border-t border-slate-100 dark:border-slate-800">
-                              <span>Итого к списанию с карты / СБП:</span>
-                              <span className="text-amber-500 font-mono text-lg font-black">{total.toFixed(2)} ₽</span>
+                            <div className="flex justify-between font-bold text-base text-foreground pt-1">
+                              <span>Итого к оплате:</span>
+                              <span className="text-amber-500 font-mono text-lg font-black">{base.toFixed(2)} ₽</span>
                             </div>
                             <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-snug">
-                              💡 Оплата производится онлайн через ЮKassa. Заявка на монтаж/доставку регистрируется сразу после подтверждения оплаты.
+                              💡 Возможна оплата за транзакцию. Оплата производится онлайн через ЮKassa.
                             </p>
                           </div>
                         );
