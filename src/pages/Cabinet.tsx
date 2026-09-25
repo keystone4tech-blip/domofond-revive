@@ -1028,9 +1028,11 @@ const RemoteAccessCard = ({
   address, 
   apartment, 
   accountNumber, 
-  userId,
+  userId, 
   profile,
   hasLk = false,
+  isCabinetPurchased = false,
+  onCredentialsLoaded,
   hasSmartIntercom = false,
   entranceNumber,
   onOpenOrderDialog,
@@ -1042,6 +1044,8 @@ const RemoteAccessCard = ({
   userId?: string; 
   profile?: any;
   hasLk?: boolean;
+  isCabinetPurchased?: boolean;
+  onCredentialsLoaded?: (cred: any) => void;
   hasSmartIntercom?: boolean;
   entranceNumber?: string | number;
   onOpenOrderDialog?: () => void;
@@ -1170,6 +1174,9 @@ const RemoteAccessCard = ({
       }
 
       setCred(found);
+      if (onCredentialsLoaded) {
+        onCredentialsLoaded(found);
+      }
     } catch (err) {
       console.error("[Умный домофон] Ошибка при проверке учетных данных:", err);
     } finally {
@@ -1247,7 +1254,11 @@ const RemoteAccessCard = ({
 
       setIsPaymentOpen(false);
       // Обновляем локальное состояние
-      setCred((prev: any) => (prev ? { ...prev, is_purchased: true, has_lk: true } : prev));
+      setCred((prev: any) => {
+        const next = prev ? { ...prev, is_purchased: true, has_lk: true } : prev;
+        if (onCredentialsLoaded) onCredentialsLoaded(next);
+        return next;
+      });
     } catch (err: any) {
       console.error("[Умный домофон] Ошибка при проведении оплаты:", err);
       toast({
@@ -1278,6 +1289,29 @@ const RemoteAccessCard = ({
   const isSmartAvailable = smartIntercomAvailable || hasSmartIntercom;
   if (!cred) {
     if (isSmartAvailable) {
+      // Если личный кабинет уже приобретен (предзаказ на этапе запуска дома)
+      if (isCabinetPurchased || hasLk) {
+        return (
+          <div className="p-4 rounded-2xl border border-emerald-500/30 bg-emerald-50/40 dark:bg-emerald-950/20 flex items-start gap-3.5 text-left animate-in fade-in duration-300">
+            <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0">
+              <CheckCircle2 className="h-5 w-5" />
+            </div>
+            <div className="space-y-1.5 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="font-semibold text-sm text-foreground">Личный кабинет приобретен</p>
+                <Badge className="bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3" />
+                  Предзаказ оплачен
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                По вашему адресу ({cleanAddressDisplay}){detectedEntrance ? ` в подъезде №${detectedEntrance}` : ""} подключение личного кабинета оплачено. Учётные записи (логин и пароль) формируются оператором и автоматически отобразятся здесь сразу после запуска системы.
+              </p>
+            </div>
+          </div>
+        );
+      }
+
       return (
         <div className="p-4 rounded-2xl border border-indigo-200/80 dark:border-indigo-800/80 bg-indigo-50/40 dark:bg-indigo-950/30 flex items-start gap-3.5">
           <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 shrink-0">
@@ -1328,7 +1362,7 @@ const RemoteAccessCard = ({
   }
 
   // СЛУЧАЙ 2: Услуга ОПЛАЧЕНА или ВКЛЮЧЕНА В ТАРИФ (is_purchased = true или has_lk = true)
-  const isUnlocked = !!(cred.is_purchased || cred.has_lk || hasLk);
+  const isUnlocked = !!(cred.is_purchased || cred.has_lk || hasLk || isCabinetPurchased);
   const isFromTariff = !!(cred.has_lk || hasLk);
 
   if (isUnlocked) {
@@ -1886,6 +1920,7 @@ const Cabinet = () => {
   const [lastCreatedRequestId, setLastCreatedRequestId] = useState<string | null>(null); // ID созданной заявки для оплаты
   const [lastOrderTotals, setLastOrderTotals] = useState<any>(null); // Рассчитанные суммы платежа для передачи в шлюз
   const [userAccount, setUserAccount] = useState<any>(null); // Лицевой счет пользователя, проброшенный из карточки баланса
+  const [apartmentIntercomCred, setApartmentIntercomCred] = useState<any | null>(null); // Загруженные учетные данные умного домофона для квартиры
   const equipmentSectionRef = useRef<HTMLDivElement>(null); // Ссылка на блок выбора трубок для плавного автоскролла
 
   // Загрузка активных товаров и услуг из БД, а также привязок оборудования к подъездам
@@ -3209,6 +3244,63 @@ const Cabinet = () => {
     return p.category === "key" || /(?:^|\s)ключ/i.test(name);
   };
 
+  // Получаем историю заявок абонента по его номеру телефона для отображения в Личном кабинете
+  const userPhoneForHistory = phone || profile?.phone;
+  const { data: userRequests, refetch: refetchUserRequests } = useQuery({
+    queryKey: ["user-requests", userPhoneForHistory],
+    enabled: !!userPhoneForHistory,
+    queryFn: async () => {
+      console.log(`[История] Загрузка истории заявок для телефона: "${userPhoneForHistory}"`);
+      const { data, error } = await supabase
+        .from("requests")
+        .select("*")
+        .eq("phone", userPhoneForHistory)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // RULE 2: Комплексная проверка факта покупки / владения личным кабинетом (Умный домофон)
+  // Проверяет 3 независимых источника:
+  // 1) Флаг has_lk в таблице accounts (лицевой счет абонента)
+  // 2) Флаг is_purchased или has_lk в intercom_credentials (данные домофона для квартиры)
+  // 3) Оплаченную заявку на подключение ЛК / умного домофона в requests
+  const isCabinetPurchased = useMemo(() => {
+    // 1. Проверка по лицевому счету
+    if (userAccount?.has_lk === true) {
+      console.log("[Cabinet: ЛК Статус] Личный кабинет подтвержден по лицевому счету (accounts.has_lk = true)");
+      return true;
+    }
+    // 2. Проверка по учетной записи домофона
+    if (apartmentIntercomCred?.is_purchased === true || apartmentIntercomCred?.has_lk === true) {
+      console.log("[Cabinet: ЛК Статус] Личный кабинет подтвержден по данным домофона (intercom_credentials)");
+      return true;
+    }
+    // 3. Проверка по оплаченным заявкам пользователя
+    if (Array.isArray(userRequests) && userRequests.length > 0) {
+      const hasPaidCabinetOrder = userRequests.some((r: any) => {
+        if (r.payment_status !== "paid") return false;
+        const msg = (r.message || "").toLowerCase();
+        return msg.includes("кабинет") || msg.includes("умный домофон") || msg.includes("удалённый доступ");
+      });
+      if (hasPaidCabinetOrder) {
+        console.log("[Cabinet: ЛК Статус] Личный кабинет подтвержден по оплаченной заявке в requests");
+        return true;
+      }
+    }
+    return false;
+  }, [userAccount?.has_lk, apartmentIntercomCred?.is_purchased, apartmentIntercomCred?.has_lk, userRequests]);
+
+  // Автоматический сброс выбора чекбокса подключения ЛК, если он уже приобретен
+  useEffect(() => {
+    if (isCabinetPurchased && isCabinetSetupChecked) {
+      console.log("[Cabinet: ЛК] Личный кабинет уже приобретен, деактивация чекбокса добавления ЛК в заказ");
+      setIsCabinetSetupChecked(false);
+    }
+  }, [isCabinetPurchased, isCabinetSetupChecked]);
+
   const calculateTotals = () => {
     let sum1 = 0; // Ключи (SUMMA_OPL1)
     let sum2 = 0; // Установка и трубки (SUMMA_OPL2)
@@ -3268,8 +3360,8 @@ const Cabinet = () => {
       });
     }
 
-    // Настройка личного кабинета (300 руб) - доступна при наличии логопасов ИЛИ активном статусе Умный дом
-    const canPurchaseCabinet = hasEntranceCredentials || !!currentMatchedEntrance?.has_smart_intercom;
+    // Настройка личного кабинета (300 руб) - доступна при наличии логопасов ИЛИ активном статусе Умный дом (если ЛК еще не приобретен)
+    const canPurchaseCabinet = !isCabinetPurchased && (hasEntranceCredentials || !!currentMatchedEntrance?.has_smart_intercom);
     if (isCabinetSetupChecked && canPurchaseCabinet) {
       const cabinetProduct = products.find(p => p.name.toLowerCase().includes("кабинет"));
       if (cabinetProduct) {
@@ -3441,7 +3533,7 @@ const Cabinet = () => {
           messageText += `— Ключи: ${keyProduct.name} (${keysQuantity} шт. x ${keyCalc.unitPrice.toFixed(2)} ₽ = ${keyCalc.totalPrice.toFixed(2)} ₽ ${keyCalc.tierText})\n`;
         }
         
-        const canBuyCabinet = hasEntranceCredentials || !!currentMatchedEntrance?.has_smart_intercom;
+        const canBuyCabinet = !isCabinetPurchased && (hasEntranceCredentials || !!currentMatchedEntrance?.has_smart_intercom);
         if (isCabinetSetupChecked && canBuyCabinet) {
           const cabinetProduct = products.find(p => p.name.toLowerCase().includes("кабинет"));
           const cPrice = cabinetProduct ? getEffectiveProductPrice(cabinetProduct) : 300;
@@ -3597,8 +3689,8 @@ const Cabinet = () => {
           }
         }
         
-        // Вставка настройки личного кабинета (если есть логопасы ИЛИ активен Умный дом)
-        const canBuyCabinet = hasEntranceCredentials || !!currentMatchedEntrance?.has_smart_intercom;
+        // Вставка настройки личного кабинета (если есть логопасы ИЛИ активен Умный дом, и ЛК еще не куплен)
+        const canBuyCabinet = !isCabinetPurchased && (hasEntranceCredentials || !!currentMatchedEntrance?.has_smart_intercom);
         if (isCabinetSetupChecked && canBuyCabinet) {
           const cabinetProduct = products.find(p => p.name.toLowerCase().includes("кабинет"));
           const cPrice = cabinetProduct ? getEffectiveProductPrice(cabinetProduct) : 300;
@@ -3768,24 +3860,6 @@ const Cabinet = () => {
       );
     },
     enabled: !!userId,
-  });
-
-  // Получаем историю заявок абонента по его номеру телефона для отображения в Личном кабинете
-  const userPhoneForHistory = phone || profile?.phone;
-  const { data: userRequests, refetch: refetchUserRequests } = useQuery({
-    queryKey: ["user-requests", userPhoneForHistory],
-    enabled: !!userPhoneForHistory,
-    queryFn: async () => {
-      console.log(`[История] Загрузка истории заявок для телефона: "${userPhoneForHistory}"`);
-      const { data, error } = await supabase
-        .from("requests")
-        .select("*")
-        .eq("phone", userPhoneForHistory)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      return data || [];
-    },
   });
 
   // Получаем историю платежей за ТО (ЮKassa) для отображения чеков и оплат ТО
@@ -5288,7 +5362,9 @@ const Cabinet = () => {
                     entranceNumber={currentMatchedEntrance?.entrance || userAccount?.entrance || profile?.entrance || (profile.address?.match(/(?:^|,|\s)(?:п|подъезд|под\.?|п\.)\s*(\d+)/i)?.[1])}
                     onOpenOrderDialog={() => {
                       setOrderType("order");
-                      setIsCabinetSetupChecked(true);
+                      if (!isCabinetPurchased) {
+                        setIsCabinetSetupChecked(true);
+                      }
                       setIsOrderDialogOpen(true);
                     }}
                     onOpenVerification={() => {
@@ -5309,6 +5385,14 @@ const Cabinet = () => {
                       setIsVerificationDialogOpen(true);
                     }}
                     hasLk={userAccount?.has_lk || false}
+                    isCabinetPurchased={isCabinetPurchased}
+                    onCredentialsLoaded={(c) => {
+                      console.log("[Cabinet: Домофон] Получены учетные данные домофона квартиры:", c);
+                      setApartmentIntercomCred(c);
+                      if (c?.id) {
+                        setHasEntranceCredentials(true);
+                      }
+                    }}
                   />
                 </CardContent>
               ) : (
@@ -6394,8 +6478,11 @@ const Cabinet = () => {
                       </div>
                     )}
 
-                    {/* 4. БЛОК: ПОДКЛЮЧИТЬ УМНЫЙ ДОМОФОН (если есть учетные записи ИЛИ активен Умный дом) */}
+                    {/* 4. БЛОК: ПОДКЛЮЧИТЬ УМНЫЙ ДОМОФОН (если есть учетные записи ИЛИ активен Умный дом, и ЛК еще не приобретен) */}
                     {(() => {
+                      // Если личный кабинет уже приобретен пользователем, не отображаем его в форме заказа
+                      if (isCabinetPurchased) return null;
+
                       const canBuyCabinet = hasEntranceCredentials || !!currentMatchedEntrance?.has_smart_intercom;
                       if (!canBuyCabinet) return null;
 
@@ -6548,8 +6635,8 @@ const Cabinet = () => {
                         );
                       })()}
 
-                      {/* ЛК */}
-                      {isCabinetSetupChecked && (hasEntranceCredentials || !!currentMatchedEntrance?.has_smart_intercom) && (() => {
+                      {/* ЛК (только если еще не приобретен) */}
+                      {!isCabinetPurchased && isCabinetSetupChecked && (hasEntranceCredentials || !!currentMatchedEntrance?.has_smart_intercom) && (() => {
                         const cp = products.find(p => p.name.toLowerCase().includes("кабинет"));
                         const cPrice = cp ? getEffectiveProductPrice(cp) : 300;
                         return (

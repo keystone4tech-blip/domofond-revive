@@ -713,16 +713,20 @@ async function processSuccessfulPayment(yooData, fallbackPayment = null) {
       console.log(`[Бэкенд: ЮKassa Заказ] ✅ Официальная заявка наряда создана с ID: ${reqId}`);
 
       // Сохраняем детальные позиции товаров в request_items
+      let hasCabinetItem = false;
       if (reqId && Array.isArray(order.items) && order.items.length > 0) {
         for (const item of order.items) {
           if (!item.product_id) continue;
+          if (item.name && (item.name.toLowerCase().includes('кабинет') || item.name.toLowerCase().includes('умный домофон'))) {
+            hasCabinetItem = true;
+          }
           await pool.query(
             `INSERT INTO request_items (request_id, product_id, quantity, price)
              VALUES ($1, $2, $3, $4)`,
             [reqId, item.product_id, item.quantity || 1, item.price || 0]
           );
         }
-        console.log(`[Бэкенд: ЮKassa Заказ] Добавлено ${order.items.length} позиций товаров в таблицу request_items`);
+        console.log(`[Бэкенд: ЮKassa Заказ] Добавлено ${order.items.length} позиций товаров в таблицу request_items (покупка ЛК: ${hasCabinetItem})`);
       }
 
       // Привязываем созданную заявку к платежу
@@ -732,6 +736,35 @@ async function processSuccessfulPayment(yooData, fallbackPayment = null) {
           'UPDATE payments SET request_id = $1, metadata = $2 WHERE yookassa_payment_id = $3',
           [reqId, JSON.stringify(combinedMeta), paymentId]
         );
+      }
+
+      // Если в оплаченном заказе была позиция Личного кабинета — сразу активируем статус владения в БД
+      if (hasCabinetItem) {
+        console.log(`[Бэкенд: ЮKassa Заказ] 📱 В заказе #${reqId} подтверждена оплата Личного кабинета! Активируем has_lk...`);
+        const accNumber = order.account_number || paymentRecord?.account_number || combinedMeta?.account_number;
+        if (accNumber) {
+          await pool.query(
+            "UPDATE accounts SET has_lk = true, updated_at = CURRENT_TIMESTAMP WHERE account_number = $1",
+            [accNumber]
+          );
+          await pool.query(
+            "UPDATE intercom_credentials SET is_purchased = true, has_lk = true, purchased_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE account_number = $1",
+            [accNumber]
+          );
+          console.log(`[Бэкенд: ЮKassa Заказ] ✅ Активирован has_lk = true для счета ${accNumber}`);
+        }
+        if (order.apartment) {
+          const aptClean = String(order.apartment).trim();
+          const houseClean = String(order.house || '').trim();
+          if (houseClean) {
+            await pool.query(
+              `UPDATE intercom_credentials 
+               SET is_purchased = true, has_lk = true, purchased_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP 
+               WHERE apartment = $1 AND (house = $2 OR address ILIKE $3)`,
+              [aptClean, houseClean, `%${houseClean}%`]
+            );
+          }
+        }
       }
     } catch (orderErr) {
       console.error('[Бэкенд: ЮKassa Заказ] Ошибка создания заявки из order_data:', orderErr.message);
@@ -743,6 +776,33 @@ async function processSuccessfulPayment(yooData, fallbackPayment = null) {
       [reqId]
     );
     console.log(`[Бэкенд: ЮKassa] Существующая заявка ${reqId} переведена в статус 'paid'`);
+
+    // Проверяем, есть ли среди позиций существующей заявки Личный кабинет
+    try {
+      const cabCheck = await pool.query(
+        `SELECT ri.id FROM request_items ri 
+         JOIN products p ON ri.product_id = p.id 
+         WHERE ri.request_id = $1 AND (p.name ILIKE '%кабинет%' OR p.name ILIKE '%умный домофон%')`,
+        [reqId]
+      );
+      if (cabCheck.rows.length > 0) {
+        console.log(`[Бэкенд: ЮKassa] Заявка #${reqId} содержала Личный кабинет. Активируем has_lk...`);
+        const rData = (await pool.query("SELECT account_number, apartment, house FROM requests WHERE id = $1", [reqId])).rows[0];
+        const acc = rData?.account_number || combinedMeta?.account_number;
+        if (acc) {
+          await pool.query("UPDATE accounts SET has_lk = true, updated_at = CURRENT_TIMESTAMP WHERE account_number = $1", [acc]);
+          await pool.query("UPDATE intercom_credentials SET is_purchased = true, has_lk = true, purchased_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE account_number = $1", [acc]);
+        }
+        if (rData?.apartment && rData?.house) {
+          await pool.query(
+            "UPDATE intercom_credentials SET is_purchased = true, has_lk = true, purchased_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE apartment = $1 AND house = $2",
+            [rData.apartment, rData.house]
+          );
+        }
+      }
+    } catch (cabErr) {
+      console.warn('[Бэкенд: ЮKassa] Ошибка проверки request_items на ЛК:', cabErr.message);
+    }
   }
 
   // 3. Если это обычная оплата ТО лицевого счета (не покупка оборудования/ключей)
