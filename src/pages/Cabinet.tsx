@@ -1896,6 +1896,7 @@ const Cabinet = () => {
   const [lastCreatedRequestId, setLastCreatedRequestId] = useState<string | null>(null); // ID созданной заявки для оплаты
   const [lastOrderTotals, setLastOrderTotals] = useState<any>(null); // Рассчитанные суммы платежа для передачи в шлюз
   const [userAccount, setUserAccount] = useState<any>(null); // Лицевой счет пользователя, проброшенный из карточки баланса
+  const equipmentSectionRef = useRef<HTMLDivElement>(null); // Ссылка на блок выбора трубок для плавного автоскролла
 
   // Загрузка активных товаров и услуг из БД, а также привязок оборудования к подъездам
   const loadProducts = async () => {
@@ -5895,16 +5896,6 @@ const Cabinet = () => {
                   </DialogDescription>
                 </DialogHeader>
 
-                {/* Плашка с автоопределением домофона по подъезду */}
-                {currentMatchedEntrance && (
-                  <div className="my-2 flex items-center gap-2 p-2.5 px-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-800 dark:text-emerald-300 text-xs font-medium animate-in fade-in duration-200 text-left">
-                    <DoorClosed className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-                    <span>
-                      Оборудование подобрано под ваш домофон: <strong>{currentMatchedEntrance.intercom_type || "Стандартный"}</strong> (Подъезд №{currentMatchedEntrance.entrance})
-                    </span>
-                  </div>
-                )}
-
                 {/* Переключатель вкладок типа обращения */}
                 <div className="flex rounded-xl border border-slate-200 dark:border-slate-850 p-1 bg-white/20 dark:bg-slate-900/20 w-full my-4">
                   <button
@@ -6221,12 +6212,29 @@ const Cabinet = () => {
                     {/* 2. БЛОК: ВЫБОР УСЛУГИ (установка / замена) */}
                     {availableProducts.some(p => p.category === "service" && !p.name.toLowerCase().includes("кабинет")) && (
                       <div className="space-y-2 text-left">
-                        <Label className="text-sm font-semibold text-foreground flex items-center gap-1.5 font-display">
-                          🛠️ Выберите услугу
-                        </Label>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-semibold text-foreground flex items-center gap-1.5 font-display">
+                            🛠️ Выберите услугу
+                          </Label>
+                          {selectedServiceId && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                // RULE 2: Логируем сброс услуги для раскрытия всех вариантов
+                                console.log("[Заявка] Сброс услуги абонентом для изменения выбора");
+                                setSelectedServiceId(null);
+                                setSelectedEquipmentId(null);
+                              }}
+                              className="text-xs text-amber-600 dark:text-amber-400 font-semibold hover:underline"
+                            >
+                              Изменить выбор
+                            </button>
+                          )}
+                        </div>
+                        <div className={`grid gap-2.5 ${selectedServiceId ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2"}`}>
                           {availableProducts
                             .filter(p => p.category === "service" && !p.name.toLowerCase().includes("кабинет"))
+                            .filter(service => !selectedServiceId || service.id === selectedServiceId)
                             .map((service) => {
                               const effPrice = getEffectiveProductPrice(service);
                               const hasDiscount = currentMatchedEntrance?.service_type === "installation" && 
@@ -6245,6 +6253,12 @@ const Cabinet = () => {
                                     } else {
                                       console.log("[Заявка] Выбрана услуга ID:", service.id, "цена:", effPrice);
                                       setSelectedServiceId(service.id);
+                                      // Автоскролл к блоку выбора трубок
+                                      setTimeout(() => {
+                                        if (equipmentSectionRef.current) {
+                                          equipmentSectionRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                                        }
+                                      }, 150);
                                     }
                                   }}
                                   className={`p-3.5 rounded-xl border text-left cursor-pointer transition-all flex flex-col justify-between ${
@@ -6296,13 +6310,29 @@ const Cabinet = () => {
 
                     {/* 3. БЛОК: ВЫБОР ТРУБКИ (ТКП) - РАЗВОРАЧИВАЕТСЯ СТРОГО ПОСЛЕ ВЫБОРА УСЛУГИ */}
                     {selectedServiceId && availableProducts.some(p => p.category === "equipment" && !isKeyProduct(p)) && (
-                      <div className="space-y-2 text-left animate-in fade-in slide-in-from-top-2 duration-300">
-                        <Label className="text-sm font-semibold text-foreground flex items-center gap-1.5 font-display">
-                          🏢 Выберите трубку (ТКП) под ваш домофон
-                        </Label>
+                      <div ref={equipmentSectionRef} className="space-y-2 text-left animate-in fade-in slide-in-from-top-2 duration-300">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-semibold text-foreground flex items-center gap-1.5 font-display">
+                            🏢 Выберите трубку (ТКП) под ваш домофон
+                          </Label>
+                          {selectedEquipmentId && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                // RULE 2: Логируем сброс трубки для отображения всех моделей
+                                console.log("[Заявка] Сброс трубки абонентом для изменения выбора модели");
+                                setSelectedEquipmentId(null);
+                              }}
+                              className="text-xs text-amber-600 dark:text-amber-400 font-semibold hover:underline"
+                            >
+                              Выбрать другую
+                            </button>
+                          )}
+                        </div>
                         <div className="space-y-2">
                           {availableProducts
                             .filter(p => p.category === "equipment" && !isKeyProduct(p))
+                            .filter(equip => !selectedEquipmentId || equip.id === selectedEquipmentId)
                             .map((equip) => {
                               const effPrice = getEffectiveProductPrice(equip);
                               const hasDiscount = currentMatchedEntrance?.service_type === "installation" && 
