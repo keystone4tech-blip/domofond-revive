@@ -5,7 +5,7 @@ import {
   Calculator, Sparkles, Newspaper, Vote, BarChart3, Tag, 
   FileText, Crown, MessageSquare, Hash, Grid, CreditCard, 
   Bot, History, Home, LogOut, Shield, ChevronLeft, ChevronRight, Database,
-  LayoutDashboard, User
+  LayoutDashboard, User, Camera
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -19,6 +19,7 @@ interface AdminSidebarProps {
 
 // Элементы навигации админки
 const menuItems = [
+  { id: "portfolio", label: "📸 Портфолио и отзывы", icon: Camera },
   { id: "calculations", label: "Расчёты", icon: Calculator },
   { id: "accounts", label: "Лиц. счета", icon: CreditCard },
   { id: "backups", label: "💾 Бэкапы БД", icon: Database },

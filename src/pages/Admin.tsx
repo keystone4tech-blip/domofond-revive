@@ -18,6 +18,7 @@ import { SEOManager } from "@/components/admin/SEOManager";
 import { NewsAutomation } from "@/components/admin/NewsAutomation";
 import { VotingManager } from "@/components/admin/VotingManager";
 import { BackupsManager } from "@/components/admin/BackupsManager";
+import { PortfolioManager } from "@/components/admin/PortfolioManager";
 import { Loader2, Shield, Menu, ChevronRight } from "lucide-react";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -186,6 +187,10 @@ const Admin = () => {
             onValueChange={setActiveTab}
             className={`w-full ${isVisible.content ? "opacity-100" : "opacity-0"} transition-opacity duration-300`}
           >
+            <TabsContent value="portfolio" className="mt-0 outline-none">
+              <PortfolioManager />
+            </TabsContent>
+
             <TabsContent value="calculations" className="mt-0 outline-none">
               <CalculationsManager />
             </TabsContent>

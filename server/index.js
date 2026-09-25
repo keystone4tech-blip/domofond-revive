@@ -56,7 +56,20 @@ const ACTIVE_JWT_SECRET = JWT_SECRET || 'super-secret-jwt-token-with-at-least-32
 
 // Базовые middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '60mb' }));
+app.use(express.urlencoded({ extended: true, limit: '60mb' }));
+
+// Раздача медиафайлов портфолио и документов
+const PORTFOLIO_MEDIA_DIR = path.join(__dirname, '../public/media/portfolio');
+if (!fs.existsSync(PORTFOLIO_MEDIA_DIR)) {
+  try {
+    fs.mkdirSync(PORTFOLIO_MEDIA_DIR, { recursive: true });
+    console.log(`[Бэкенд: Медиа] Создана папка для медиафайлов портфолио: ${PORTFOLIO_MEDIA_DIR}`);
+  } catch (err) {
+    console.warn(`[Бэкенд: Медиа] Ошибка создания папки ${PORTFOLIO_MEDIA_DIR}:`, err.message);
+  }
+}
+app.use('/media', express.static(path.join(__dirname, '../public/media')));
 
 // Подключение к СУБД PostgreSQL
 const pool = new Pool({
@@ -1184,6 +1197,219 @@ app.post('/api/payments/yookassa/cancel/:paymentId', async (req, res) => {
   } catch (err) {
     console.error('[Бэкенд: ЮKassa Отмена] Ошибка:', err.message);
     res.status(500).json({ error: 'Ошибка отмены платежа' });
+  }
+});
+
+// ------------------------------------------------------------------------------
+// МОДУЛЬ «НАШИ РАБОТЫ И ПОРТФОЛИО» С ПОЛЬЗОВАТЕЛЬСКИМ КОНТЕНТОМ И МОДЕРАЦИЕЙ
+// ------------------------------------------------------------------------------
+
+/**
+ * 1. Загрузка медиафайла (фото или видео) для портфолио
+ * Принимает JSON: { fileBase64: 'data:...;base64,...', fileName: 'photo.jpg', fileType: 'image/jpeg' }
+ */
+app.post('/api/portfolio/upload', async (req, res) => {
+  try {
+    const { fileBase64, fileName, fileType } = req.body;
+    if (!fileBase64 || !fileName) {
+      return res.status(400).json({ error: 'Файл или имя файла не переданы' });
+    }
+
+    // Извлекаем чистый Base64 буфер
+    const matches = fileBase64.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+    let buffer;
+    if (matches && matches.length === 3) {
+      buffer = Buffer.from(matches[2], 'base64');
+    } else {
+      buffer = Buffer.from(fileBase64, 'base64');
+    }
+
+    // Определяем расширение и тип (фото или видео)
+    const ext = path.extname(fileName).toLowerCase() || '.jpg';
+    const isVideo = ['.mp4', '.mov', '.webm', '.avi', '.m4v'].includes(ext) || (fileType && fileType.startsWith('video/'));
+    const safeBaseName = path.basename(fileName, ext).replace(/[^a-zA-Z0-9а-яА-Я_-]/g, '_').slice(0, 40);
+    const uniqueFileName = `${Date.now()}_${crypto.randomBytes(4).toString('hex')}_${safeBaseName}${ext}`;
+
+    // Сохраняем в папку media/portfolio
+    const targetDir = PORTFOLIO_MEDIA_DIR;
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
+    }
+    const fullPath = path.join(targetDir, uniqueFileName);
+    fs.writeFileSync(fullPath, buffer);
+
+    console.log(`[Бэкенд: Портфолио] Загружен файл ${uniqueFileName} (${isVideo ? 'Видео' : 'Фото'}, ${(buffer.length / 1024 / 1024).toFixed(2)} МБ)`);
+
+    // Возвращаем веб-путь
+    const mediaUrl = `/media/portfolio/${uniqueFileName}`;
+    res.json({
+      success: true,
+      url: mediaUrl,
+      type: isVideo ? 'video' : 'image',
+      fileName: uniqueFileName,
+      size: buffer.length
+    });
+  } catch (err) {
+    console.error('[Бэкенд: Портфолио] Ошибка загрузки файла:', err.message);
+    res.status(500).json({ error: 'Ошибка сохранения файла на сервере' });
+  }
+});
+
+/**
+ * 2. Получить список опубликованных объектов (для витрины сайта)
+ */
+app.get('/api/portfolio', async (req, res) => {
+  try {
+    const query = `
+      SELECT id, author_type, author_display_name, project_type, title, review_text, rating, media_files, likes_count, created_at
+      FROM portfolio_projects
+      WHERE status = 'approved'
+      ORDER BY created_at DESC
+      LIMIT 100;
+    `;
+    const result = await pool.query(query);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('[Бэкенд: Портфолио] Ошибка получения опубликованных объектов:', err.message);
+    res.status(500).json({ error: 'Ошибка получения объектов портфолио' });
+  }
+});
+
+/**
+ * 3. Отправить новый объект/отзыв от клиента (поступает со статусом 'pending' на модерацию)
+ */
+app.post('/api/portfolio', async (req, res) => {
+  try {
+    const {
+      author_type = 'client',
+      author_display_name,
+      project_type = 'Умный домофон',
+      title,
+      review_text,
+      rating = 5,
+      media_files = [],
+      author_phone
+    } = req.body;
+
+    if (!author_display_name || !author_display_name.trim()) {
+      return res.status(400).json({ error: 'Укажите имя/отчество или название организации' });
+    }
+    if (!review_text || !review_text.trim()) {
+      return res.status(400).json({ error: 'Напишите отзыв или описание работ' });
+    }
+
+    const query = `
+      INSERT INTO portfolio_projects 
+      (author_type, author_display_name, project_type, title, review_text, rating, media_files, author_phone, status, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', CURRENT_TIMESTAMP)
+      RETURNING *;
+    `;
+    const values = [
+      author_type,
+      author_display_name.trim(),
+      project_type,
+      (title || '').trim() || null,
+      review_text.trim(),
+      Math.min(5, Math.max(1, Number(rating) || 5)),
+      JSON.stringify(media_files || []),
+      author_phone || null
+    ];
+
+    const result = await pool.query(query, values);
+    console.log(`[Бэкенд: Портфолио] Поступил новый объект на модерацию от "${author_display_name}": ${result.rows[0].id}`);
+
+    res.json({
+      success: true,
+      message: 'Объект успешно отправлен на модерацию. После проверки он будет опубликован на сайте!',
+      project: result.rows[0]
+    });
+  } catch (err) {
+    console.error('[Бэкенд: Портфолио] Ошибка отправки объекта:', err.message);
+    res.status(500).json({ error: 'Не удалось отправить объект на модерацию' });
+  }
+});
+
+/**
+ * 4. Получить все объекты для панели модерации (для админов/диспетчеров)
+ */
+app.get('/api/admin/portfolio', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { status } = req.query;
+    let query = `SELECT * FROM portfolio_projects`;
+    const params = [];
+
+    if (status && status !== 'all') {
+      query += ` WHERE status = $1`;
+      params.push(status);
+    }
+    query += ` ORDER BY created_at DESC LIMIT 200;`;
+
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('[Бэкенд: Админка Портфолио] Ошибка получения объектов:', err.message);
+    res.status(500).json({ error: 'Ошибка получения списка объектов' });
+  }
+});
+
+/**
+ * 5. Изменение статуса объекта (одобрить / отклонить / заметка)
+ */
+app.patch('/api/admin/portfolio/:id', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, moderator_comment, title, review_text, author_display_name, project_type } = req.body;
+
+    const query = `
+      UPDATE portfolio_projects
+      SET 
+        status = COALESCE($1, status),
+        moderator_comment = COALESCE($2, moderator_comment),
+        title = COALESCE($3, title),
+        review_text = COALESCE($4, review_text),
+        author_display_name = COALESCE($5, author_display_name),
+        project_type = COALESCE($6, project_type),
+        approved_at = CASE WHEN $1 = 'approved' THEN CURRENT_TIMESTAMP ELSE approved_at END
+      WHERE id = $7
+      RETURNING *;
+    `;
+    const result = await pool.query(query, [
+      status || null,
+      moderator_comment || null,
+      title || null,
+      review_text || null,
+      author_display_name || null,
+      project_type || null,
+      id
+    ]);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Объект не найден' });
+    }
+
+    console.log(`[Бэкенд: Админка Портфолио] Объект ${id} обновлен модератором: статус=${status}`);
+    res.json({ success: true, project: result.rows[0] });
+  } catch (err) {
+    console.error('[Бэкенд: Админка Портфолио] Ошибка обновления объекта:', err.message);
+    res.status(500).json({ error: 'Ошибка обновления объекта' });
+  }
+});
+
+/**
+ * 6. Удаление объекта
+ */
+app.delete('/api/admin/portfolio/:id', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query('DELETE FROM portfolio_projects WHERE id = $1 RETURNING *;', [id]);
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Объект не найден' });
+    }
+    console.log(`[Бэкенд: Админка Портфолио] Объект ${id} удален модератором`);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[Бэкенд: Админка Портфолио] Ошибка удаления объекта:', err.message);
+    res.status(500).json({ error: 'Ошибка удаления объекта' });
   }
 });
 
