@@ -43,7 +43,7 @@ const Hero = () => {
   // Флаг анимации выхода (улетания слова вверх)
   const [isExiting, setIsExiting] = useState(false);
 
-  // Циклическая плавная смена ключевого слова каждые 2.8 секунды
+  // Циклическая плавная смена ключевого слова каждые 3.8 секунды (на 1 секунду дольше для комфортного чтения)
   useEffect(() => {
     const timer = setInterval(() => {
       // Шаг 1: Запуск ухода текущего слова вверх с размытием
@@ -54,7 +54,7 @@ const Hero = () => {
         setTargetIndex((prev) => (prev + 1) % ROTATING_TARGETS.length);
         setIsExiting(false);
       }, 350);
-    }, 2800);
+    }, 3800);
 
     return () => clearInterval(timer);
   }, []);
@@ -109,7 +109,7 @@ const Hero = () => {
                 <span className="relative inline-flex items-baseline overflow-hidden transition-all duration-300">
                   <span
                     key={targetIndex}
-                    className={`inline-block font-extrabold bg-gradient-to-r from-blue-600 via-sky-500 to-indigo-600 dark:from-sky-400 dark:via-blue-400 dark:to-indigo-300 bg-clip-text text-transparent underline decoration-sky-400/40 decoration-wavy ${
+                    className={`inline-block ${
                       isExiting ? "animate-word-out" : "animate-word-in"
                     }`}
                   >
