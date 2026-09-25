@@ -865,3 +865,20 @@
   box-shadow: 0 0 20px rgba(56, 189, 248, 0.4);
 }
 
+/* Лазерный луч сканера Face ID на терминале домофона */
+@keyframes scan-line {
+  0% {
+    top: 5%;
+    opacity: 0.2;
+  }
+  50% {
+    top: 85%;
+    opacity: 1;
+  }
+  100% {
+    top: 5%;
+    opacity: 0.2;
+  }
+}
+
+
