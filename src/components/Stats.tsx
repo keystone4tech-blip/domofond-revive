@@ -62,60 +62,76 @@ const DEFAULT_STATS: StatBlock[] = [
 
 /**
  * Карточка одного статистического показателя
- * Поддерживает:
- * - Плавную числовую анимацию с разделением тысяч (например, «11 244»)
- * - Корректное сохранение процентов («100%») и суффиксов со словами («7 лет», «22 года»)
- * - Фиксированные строки со слэшами («24/7») без математических сбоев
- * - Премиальный лазурно-сапфировый стиль с мягким свечением и эффектом стекла
+ * Оснащена:
+ * - Бегущим световым лучом по контуру в стиле ShinyButton (.shiny-border-card)
+ * - Сапфирово-лазурным стеклянным фоном в тон дизайну сайта для светлой и темной тем
+ * - Переливающимся бейджем иконки (.shiny-icon-badge)
+ * - Числовым переливом (.hero-title-shimmer)
+ * - Точным форматированием чисел с разделителями тысяч («11 244») и пробелом перед словами («7 лет», «22 года»)
  */
 const StatCard = ({ stat }: { stat: StatBlock }) => {
   const Icon = iconMap[stat.icon as keyof typeof iconMap] || Users;
   const rawValue = (stat.value || "").trim();
 
-  // Проверяем, является ли значение специальным строковым форматом (например "24/7")
+  // Проверяем спецформаты вроде 24/7 (со слэшем)
   const isSpecialNonNumeric = rawValue.includes("/") || isNaN(parseInt(rawValue.replace(/\s+/g, ""), 10));
 
-  // Извлекаем первое числовое значение для плавной анимации
-  const numericMatch = rawValue.match(/(\d[\d\s]*)/);
-  const numericString = numericMatch ? numericMatch[0].replace(/\s+/g, "") : "0";
-  const numericValue = parseInt(numericString, 10) || 0;
-
-  // Суффикс (знаки %, +, слова "лет", "года" и т.п.)
+  // Строго извлекаем ведущую числовую группу и текстовый суффикс
+  // Пример: "7 лет" -> digits = 7, suffix = "лет"
+  // Пример: "22 года" -> digits = 22, suffix = "года"
+  // Пример: "11 244" -> digits = 11244, suffix = ""
+  // Пример: "100%" -> digits = 100, suffix = "%"
+  let numericValue = 0;
   let suffix = "";
-  if (numericMatch) {
-    const afterNumber = rawValue.slice(numericMatch.index! + numericMatch[0].length);
-    suffix = afterNumber;
+
+  if (!isSpecialNonNumeric) {
+    const match = rawValue.match(/^([\d\s]+)(.*)$/);
+    if (match) {
+      numericValue = parseInt(match[1].replace(/\s+/g, ""), 10) || 0;
+      suffix = match[2].trim();
+    } else {
+      numericValue = parseInt(rawValue.replace(/[^\d]/g, ""), 10) || 0;
+    }
   }
 
   // Хук плавной анимации чисел от 0 до numericValue
   const { count, elementRef } = useCountUp(isSpecialNonNumeric ? 0 : numericValue, 2000);
 
-  // Форматируем число с красивым разделителем тысяч (например "11 244")
-  const formattedCount = isSpecialNonNumeric 
-    ? rawValue 
-    : count.toLocaleString("ru-RU") + suffix;
+  // Формируем результирующую строку:
+  // Если суффикс начинается с букв ("лет", "года"), гарантируем пробел!
+  let displayValue = rawValue;
+  if (!isSpecialNonNumeric) {
+    const formattedNum = count.toLocaleString("ru-RU");
+    if (suffix) {
+      const isWord = /^[a-zA-Zа-яА-ЯёЁ]/.test(suffix);
+      displayValue = isWord ? `${formattedNum} ${suffix}` : `${formattedNum}${suffix}`;
+    } else {
+      displayValue = formattedNum;
+    }
+  }
 
   return (
     <div
       ref={elementRef}
-      className="relative group p-6 rounded-2xl bg-card/75 backdrop-blur-md border border-border/70 hover:border-primary/50 shadow-sm hover:shadow-xl hover:shadow-primary/10 transition-all duration-500 flex flex-col items-center justify-center text-center overflow-hidden"
+      className="shiny-border-card group cursor-default"
     >
-      {/* Деликатный верхний световой блик при наведении */}
-      <div className="absolute inset-x-0 -top-px h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+      <div className="shiny-border-card-inner">
+        {/* Иконка в переливающемся бейдже с бегущим лучом */}
+        <div className="shiny-icon-badge mb-3 sm:mb-4">
+          <div className="shiny-icon-badge-inner">
+            <Icon className="h-6 w-6 sm:h-7 sm:w-7 transition-transform duration-500 group-hover:scale-110" />
+          </div>
+        </div>
 
-      {/* Иконка в сапфирово-лазурном круге с мягким свечением */}
-      <div className="relative mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 border border-primary/20 text-primary transition-all duration-500 group-hover:scale-110 group-hover:bg-primary group-hover:text-primary-foreground group-hover:shadow-[0_0_25px_rgba(56,189,248,0.35)]">
-        <Icon className="h-7 w-7 transition-transform duration-500" />
-      </div>
+        {/* Анимированное значение с бегущим переливом */}
+        <div className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight hero-title-shimmer mb-2">
+          {displayValue}
+        </div>
 
-      {/* Анимированное числовое значение */}
-      <div className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground group-hover:text-primary transition-colors duration-300 mb-2">
-        {formattedCount}
-      </div>
-
-      {/* Текстовая подпись показателя */}
-      <div className="text-sm font-medium text-muted-foreground leading-snug">
-        {stat.label}
+        {/* Текстовая подпись показателя */}
+        <div className="text-xs sm:text-sm font-medium text-slate-700 dark:text-neutral-300 leading-snug">
+          {stat.label}
+        </div>
       </div>
     </div>
   );
@@ -133,7 +149,7 @@ const Stats = () => {
   }, []);
 
   /**
-   * Загрузка показателей: сначала проверяем API /api/public-stats с реальными данными из БД,
+   * Загрузка показателей: сначала проверяем API /backend-api/api/public-stats с реальными данными из БД,
    * а при необходимости синхронизируемся с site_blocks.
    */
   const fetchStats = async () => {
@@ -186,9 +202,9 @@ const Stats = () => {
   }
 
   return (
-    <section id="stats" className="py-8 md:py-12 bg-muted/20 border-y border-border/40">
+    <section id="stats" className="py-8 md:py-12 bg-gradient-to-b from-muted/30 via-background to-muted/20 border-y border-border/40">
       <div className="container">
-        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-5 md:gap-6">
           {stats.map((stat) => (
             <StatCard key={stat.id} stat={stat} />
           ))}

@@ -736,3 +736,132 @@
   animation: nav-glow-pulse 3s ease-in-out infinite;
 }
 
+/* ========================================================================= */
+/* Премиальные карточки статистики со светящимся бегущим лучом (Shiny Card) */
+/* ========================================================================= */
+
+.shiny-border-card {
+  position: relative;
+  border-radius: 1.25rem;
+  padding: 1.5px; /* Толщина переливающегося контура */
+  overflow: hidden;
+  transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+  isolation: isolate;
+}
+
+.shiny-border-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 30px -5px rgba(37, 99, 235, 0.25);
+}
+
+.dark .shiny-border-card:hover {
+  box-shadow: 0 12px 30px -5px rgba(56, 189, 248, 0.25);
+}
+
+/* Вращающийся сапфирово-лазурный световой луч по контуру карточки */
+.shiny-border-card::before {
+  content: "";
+  position: absolute;
+  inset: -50%;
+  width: 200%;
+  height: 200%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    rgba(56, 189, 248, 0.2) 45deg,
+    rgba(56, 189, 248, 0.95) 90deg,
+    rgba(255, 255, 255, 1) 100deg,
+    rgba(59, 130, 246, 0.95) 110deg,
+    rgba(37, 99, 235, 0.25) 150deg,
+    transparent 180deg
+  );
+  animation: rotate-border-ray 4.5s linear infinite;
+  z-index: -1;
+}
+
+@keyframes rotate-border-ray {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Внутреннее тело карточки с благородным стеклянно-голубоватым оттенком */
+.shiny-border-card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: calc(1.25rem - 1.5px);
+  padding: 1.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  /* Светлая тема: элегантный лазурно-голубой градиент вместо тускло-белого */
+  background: linear-gradient(145deg, rgba(240, 249, 255, 0.94) 0%, rgba(255, 255, 255, 0.97) 45%, rgba(224, 242, 254, 0.88) 100%);
+  box-shadow: inset 0 0 0 1px rgba(186, 230, 253, 0.7);
+}
+
+/* Темная тема: глубокий сапфирово-синий оттенок ночи вместо глухого черного */
+.dark .shiny-border-card-inner {
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.96) 0%, rgba(30, 41, 59, 0.9) 50%, rgba(23, 37, 84, 0.85) 100%);
+  box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.25);
+}
+
+/* Переливающийся бейдж иконки с бегущим лучом */
+.shiny-icon-badge {
+  position: relative;
+  border-radius: 1rem;
+  padding: 1.5px;
+  overflow: hidden;
+  transition: transform 0.4s ease, box-shadow 0.4s ease;
+  isolation: isolate;
+}
+
+.shiny-icon-badge::before {
+  content: "";
+  position: absolute;
+  inset: -50%;
+  width: 200%;
+  height: 200%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    rgba(56, 189, 248, 0.4) 60deg,
+    rgba(255, 255, 255, 0.95) 90deg,
+    rgba(59, 130, 246, 0.85) 120deg,
+    transparent 180deg
+  );
+  animation: rotate-border-ray 3s linear infinite;
+  z-index: 0;
+}
+
+.shiny-icon-badge-inner {
+  position: relative;
+  z-index: 1;
+  border-radius: calc(1rem - 1.5px);
+  width: 3.5rem;
+  height: 3.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(224, 242, 254, 0.95) 0%, rgba(186, 230, 253, 0.85) 100%);
+  color: #0284c7;
+  transition: all 0.3s ease;
+}
+
+.dark .shiny-icon-badge-inner {
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 58, 138, 0.85) 100%);
+  color: #38bdf8;
+}
+
+.shiny-border-card:hover .shiny-icon-badge {
+  transform: scale(1.1);
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.4);
+}
+
