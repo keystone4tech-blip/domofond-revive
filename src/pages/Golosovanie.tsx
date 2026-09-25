@@ -147,18 +147,22 @@ const Golosovanie = () => {
     return (
       <div className="min-h-screen flex flex-col">
         <Header />
-        <main className="flex-1 container mx-auto px-4 py-8">
-          <div className="max-w-3xl mx-auto">
-            <div className="flex items-center gap-3 mb-6">
-              <Vote className="h-7 w-7 text-primary" />
-              <h1 className="text-2xl md:text-3xl font-bold">Электронные голосования</h1>
+        <main className="flex-1">
+          {/* Шапка страницы "Электронные голосования" в едином стиле */}
+          <section className="py-8 md:py-12 bg-gradient-to-br from-primary/10 via-background to-primary/5 border-b border-border/40">
+            <div className="container px-4">
+              <div className="max-w-3xl mx-auto text-center">
+                <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight hero-title-shimmer">
+                  Электронные голосования
+                </h1>
+                <p className="text-base sm:text-lg text-muted-foreground mt-4 mb-2 max-w-2xl mx-auto leading-relaxed">
+                  Платформа для проведения общих собраний собственников (ОСС) и опросов жителей многоквартирных домов в соответствии с ЖК РФ.
+                </p>
+              </div>
             </div>
-            <p className="text-muted-foreground mb-8">
-              Платформа для проведения общих собраний собственников (ОСС) и опросов жителей ЖК.
-              Голосования по выбору обслуживающей организации и решению других вопросов проводятся
-              в соответствии с положениями Жилищного кодекса РФ. Идентификация — по номеру телефона
-              с подтверждением SMS-кодом.
-            </p>
+          </section>
+
+          <div className="container mx-auto px-4 py-8 max-w-3xl">
 
             {list.length === 0 ? (
               <Card>

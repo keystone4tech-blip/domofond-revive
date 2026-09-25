@@ -163,6 +163,12 @@ const NashiRaboty = () => {
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [clientFullData, setClientFullData] = useState<any>(null);
 
+  // Стейты пошаговой анимации появления страницы в едином стиле
+  const [isVisible, setIsVisible] = useState({
+    header: false,
+    content: false
+  });
+
   // Загрузка опубликованных объектов с бэкенда
   const fetchPublishedProjects = async () => {
     try {
@@ -184,6 +190,15 @@ const NashiRaboty = () => {
   useEffect(() => {
     fetchPublishedProjects();
     loadCurrentUserProfile();
+
+    console.log("[NashiRaboty] Страница 'Наши работы' смонтирована. Запуск анимаций появления элементов.");
+    const headerTimer = setTimeout(() => setIsVisible(prev => ({ ...prev, header: true })), 300);
+    const contentTimer = setTimeout(() => setIsVisible(prev => ({ ...prev, content: true })), 700);
+
+    return () => {
+      clearTimeout(headerTimer);
+      clearTimeout(contentTimer);
+    };
   }, []);
 
   // Если пользователь авторизован, автоматически собираем все данные абонента в фоне
@@ -416,17 +431,29 @@ const NashiRaboty = () => {
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
       <main className="flex-1">
-        {/* Шапка раздела */}
+        {/* Шапка раздела в едином стиле с плавной анимацией появления */}
         <section className="py-8 md:py-12 bg-gradient-to-br from-primary/10 via-background to-primary/5 border-b border-border/40">
           <div className="container px-4 max-w-4xl mx-auto text-center">
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight hero-title-shimmer">
+            <h1
+              className={`text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight hero-title-shimmer transition-all duration-700 ease-out ${
+                isVisible.header ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-10'
+              }`}
+            >
               Наши работы и отзывы клиентов
             </h1>
-            <p className="text-base sm:text-lg text-muted-foreground mt-4 mb-6 max-w-2xl mx-auto leading-relaxed">
+            <p
+              className={`text-base sm:text-lg text-muted-foreground mt-4 mb-6 max-w-2xl mx-auto leading-relaxed transition-all duration-700 delay-300 ease-out ${
+                isVisible.header ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'
+              }`}
+            >
               Честные примеры установленных систем домофонии, видеонаблюдения и СКУД в Краснодаре с живыми фотографиями и видео от жителей и ТСЖ.
             </p>
 
-            <div className="flex flex-wrap items-center justify-center gap-3">
+            <div
+              className={`flex flex-wrap items-center justify-center gap-3 transition-all duration-700 delay-500 ease-out ${
+                isVisible.header ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
+              }`}
+            >
               <Button
                 size="lg"
                 onClick={() => setIsSubmitOpen(true)}
@@ -439,8 +466,12 @@ const NashiRaboty = () => {
           </div>
         </section>
 
-        {/* Основной контент */}
-        <section className="py-10 md:py-14">
+        {/* Основной контент с плавной анимацией появления */}
+        <section
+          className={`py-10 md:py-14 transition-all duration-1000 ease-out ${
+            isVisible.content ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-8 scale-98'
+          }`}
+        >
           <div className="container px-4 max-w-6xl mx-auto">
             {loading ? (
               <div className="flex items-center justify-center py-20 text-muted-foreground">

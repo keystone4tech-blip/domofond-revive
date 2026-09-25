@@ -40,6 +40,7 @@ const Kontakty = () => {
 
   // Состояния для пошаговой анимации появления элементов
   const [isVisible, setIsVisible] = useState({
+    header: false,
     tabsList: false,
     content: false
   });
@@ -62,12 +63,14 @@ const Kontakty = () => {
   }, [searchParams]);
 
   useEffect(() => {
-    // Пошаговый запуск анимаций при монтировании
-    console.log("[Контакты] Инициализация страницы контактов, запуск пошаговых анимаций...");
-    const tabsTimer = setTimeout(() => setIsVisible(prev => ({ ...prev, tabsList: true })), 400);
-    const contentTimer = setTimeout(() => setIsVisible(prev => ({ ...prev, content: true })), 800);
+    // Пошаговый запуск анимаций при монтировании (в едином стиле с Видеонаблюдение и Домофоны)
+    console.log("[Контакты] Инициализация страницы контактов, запуск пошаговых анимаций появления...");
+    const headerTimer = setTimeout(() => setIsVisible(prev => ({ ...prev, header: true })), 300);
+    const tabsTimer = setTimeout(() => setIsVisible(prev => ({ ...prev, tabsList: true })), 600);
+    const contentTimer = setTimeout(() => setIsVisible(prev => ({ ...prev, content: true })), 900);
     
     return () => {
+      clearTimeout(headerTimer);
       clearTimeout(tabsTimer);
       clearTimeout(contentTimer);
     };
@@ -93,21 +96,33 @@ const Kontakty = () => {
     <div className="min-h-screen flex flex-col transition-colors duration-300">
       <Header />
       <main className="flex-1">
-        {/* Шапка страницы "Контакты" в едином стиле */}
+        {/* Шапка страницы "Контакты" в едином стиле с плавной анимацией появления */}
         <section className="py-8 md:py-12 bg-gradient-to-br from-primary/10 via-background to-primary/5 border-b border-border/40">
           <div className="container px-4">
             <div className="max-w-3xl mx-auto text-center">
-              <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight hero-title-shimmer">
+              <h1
+                className={`text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight hero-title-shimmer transition-all duration-700 ease-out ${
+                  isVisible.header ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-10'
+                }`}
+              >
                 Контакты и реквизиты
               </h1>
-              <p className="text-base sm:text-lg text-muted-foreground mt-4 mb-2 max-w-2xl mx-auto leading-relaxed">
+              <p
+                className={`text-base sm:text-lg text-muted-foreground mt-4 mb-2 max-w-2xl mx-auto leading-relaxed transition-all duration-700 delay-300 ease-out ${
+                  isVisible.header ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'
+                }`}
+              >
                 Свяжитесь с нами удобным способом, посетите офис в Краснодаре или ознакомьтесь с официальными документами компании.
               </p>
             </div>
           </div>
         </section>
 
-        <div className="container mx-auto px-4 py-8 md:py-12 max-w-7xl">
+        <div
+          className={`container mx-auto px-4 py-8 md:py-12 max-w-7xl transition-all duration-1000 ease-out ${
+            isVisible.content ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+          }`}
+        >
           {/* Интерактивные вкладки на странице контактов с контролируемым значением */}
           <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-8">
           
