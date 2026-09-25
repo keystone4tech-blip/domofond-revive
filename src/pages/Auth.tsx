@@ -19,11 +19,12 @@ const Auth = () => {
   const [loading, setLoading] = useState(false); // Стейт процесса загрузки запроса к API
   const [agreedToTerms, setAgreedToTerms] = useState(true); // Стейт согласия на обработку персональных данных (ФЗ-152 РФ, включен по умолчанию)
 
-  // Умное форматирование для поля ввода: если вводятся цифры — форматируем как телефон +7 (XXX) XXX-XX-XX, если email — сохраняем как есть
+  // Умное форматирование для поля ввода: если вводятся цифры — форматируем как телефон +7 (XXX) XXX-XX-XX, если email — убираем пробелы
   const handleSmartInputChange = (val: string, setter: (v: string) => void) => {
     // Если содержит буквы или символ @ — пользователь вводит email
     if (/[a-zA-Z@]/.test(val)) {
-      setter(val);
+      // RULE 2: Автоматически вырезаем любые случайные пробелы внутри адреса электронной почты
+      setter(val.replace(/\s+/g, ""));
       return;
     }
 
@@ -98,9 +99,22 @@ const Auth = () => {
     }
 
     const isEmail = rawLogin.includes("@");
-    const digits = rawLogin.replace(/\D/g, "");
+    // RULE 2: Строго очищаем Email от пробелов
+    const cleanLogin = isEmail ? rawLogin.toLowerCase().replace(/\s+/g, "") : rawLogin;
+    const digits = cleanLogin.replace(/\D/g, "");
 
-    if (!isEmail && digits.length < 10) {
+    if (isEmail) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(cleanLogin)) {
+        toast({
+          title: "Некорректный Email",
+          description: "Пожалуйста, проверьте правильность написания адреса почты (например, name@mail.ru).",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+    } else if (digits.length < 10) {
       toast({
         title: "Некорректный номер телефона",
         description: "Пожалуйста, укажите полный номер телефона (не менее 10 цифр) или действующий email.",
@@ -135,14 +149,14 @@ const Auth = () => {
     }
 
     try {
-      console.log(`[Регистрация] Отправка запроса на регистрацию для логина: "${rawLogin}"`); // Логирование
+      console.log(`[Регистрация] Отправка запроса на регистрацию для логина: "${cleanLogin}"`); // Логирование
       const response = await fetch(`${API_URL}/api/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-          login: rawLogin, 
-          email: isEmail ? rawLogin.toLowerCase() : undefined, 
-          phone: !isEmail ? rawLogin : undefined, 
+          login: cleanLogin, 
+          email: isEmail ? cleanLogin : undefined, 
+          phone: !isEmail ? cleanLogin : undefined, 
           password, 
           full_name: "" 
         }),
@@ -153,10 +167,10 @@ const Auth = () => {
       if (!response.ok) {
         let friendlyMessage = data.error || "Не удалось завершить регистрацию.";
         const errMsg = String(friendlyMessage).toLowerCase();
-        if (errMsg.includes("user already exists") || errMsg.includes("exists") || errMsg.includes("unique") || errMsg.includes("duplicate")) {
+        if (errMsg.includes("user already exists") || errMsg.includes("exists") || errMsg.includes("unique") || errMsg.includes("duplicate") || errMsg.includes("уже зарегистрирован")) {
           friendlyMessage = isEmail
-            ? "Этот Email-адрес уже зарегистрирован. Пожалуйста, перейдите на вкладку 'Вход' или укажите другую почту."
-            : "Этот номер телефона уже зарегистрирован. Пожалуйста, перейдите на вкладку 'Вход'.";
+            ? "Этот Email-адрес уже зарегистрирован. Пожалуйста, перейдите на вкладку «Вход»."
+            : "Этот номер телефона уже зарегистрирован. Пожалуйста, перейдите на вкладку «Вход».";
         }
         
         throw new Error(friendlyMessage);
@@ -211,12 +225,16 @@ const Auth = () => {
       return;
     }
 
+    // RULE 2: Очищаем Email от пробелов и приводим к нижнему регистру
+    const isEmail = rawLogin.includes("@");
+    const cleanLogin = isEmail ? rawLogin.toLowerCase().replace(/\s+/g, "") : rawLogin;
+
     try {
-      console.log(`[Вход] Попытка авторизации пользователя: "${rawLogin}"`); // Логирование
+      console.log(`[Вход] Попытка авторизации пользователя: "${cleanLogin}"`); // Логирование
       const response = await fetch(`${API_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ login: rawLogin, password }),
+        body: JSON.stringify({ login: cleanLogin, password }),
       });
 
       const data = await response.json();

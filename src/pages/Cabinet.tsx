@@ -2980,13 +2980,9 @@ const Cabinet = () => {
     if (!userId) return;
 
     const pollProfile = async () => {
-      // КРИТИЧЕСКИ ВАЖНО: Если пользователь сейчас редактирует форму (editing === true),
-      // мы полностью пропускаем обновление стейтов ввода, чтобы введенные им новые данные не сбрасывались на старые из БД!
-      if (editing) {
-        console.log("[Кабинет] Polling: пропуск синхронизации с БД во время активного редактирования"); // Логирование
-        return;
-      }
-
+      // RULE 2: Фоновый опрос профиля предназначен ИСКЛЮЧИТЕЛЬНО для синхронизации
+      // системных статусов (верификация документов, одобрение заявки, проверка ролей).
+      // Он НИКОГДА не должен затирать введённые абонентом поля формы (ФИО, телефон, адрес, квартиру)!
       try {
         const { data } = await supabase
           .from("profiles")
@@ -2994,41 +2990,13 @@ const Cabinet = () => {
           .eq("id", userId)
           .single();
 
-        // Двойная проверка на случай, если пользователь нажал "Изменить" во время асинхронного REST-запроса
-        if (data && !editing) {
+        if (data) {
+          // Обновляем только состояние профиля и статус верификации для реактивных карточек
           setProfile(data);
-          setFullName(data.full_name || ""); // Инициализируем ФИО абонента
-          setPhone(data.phone || ""); // Инициализируем контактный телефон
-          setAddress(data.address || ""); // Инициализируем полный адрес для БД
-          
-          // Разделяем адрес на улицу и дом с помощью кастомного парсера
-          parseAndSetAddress(data.address || "");
-          
-          setApartment(data.apartment || ""); // Инициализируем квартиру
-          
-          // Динамически определяем тип недвижимости при polling
-          if (data.apartment && data.apartment.trim()) {
-            setPremiseType("apartment");
-          } else if (data.address && data.address.includes(", д. ")) {
-            setPremiseType("private");
-          } else {
-            setPremiseType("apartment"); // По умолчанию многоквартирный
-          }
-          
-          setFloor(data.floor || ""); // Инициализируем этаж
-          
-          // Инициализируем Email из профиля или сохраненной сессии
-          const storedUser = localStorage.getItem("user") || sessionStorage.getItem("user");
-          const parsedUser = storedUser ? JSON.parse(storedUser) : null;
-          const defaultEmail = data.email || parsedUser?.email || "";
-          if (defaultEmail) {
-            setEmail(defaultEmail);
-            setEmailInput((prev) => (prev && prev.trim() ? prev : defaultEmail));
-          }
-          setEmailVerified(!!data.email_verified || !!defaultEmail);
+          console.log("[Кабинет: Polling] Статус профиля синхронизирован (верификация:", data.verification_status, ")");
         }
       } catch (err) {
-        console.error("[Кабинет] Ошибка polling профиля:", err); // Логирование
+        console.warn("[Кабинет: Polling] Предупреждение при проверке профиля:", err);
       }
     };
 
@@ -3176,15 +3144,23 @@ const Cabinet = () => {
       setFloor(data.floor || ""); // Инициализируем этаж
       
       // Автоподстановка Email из профиля, сессии регистрации или localStorage
+      // RULE 2: Исключаем технический системный email phone_XXXXXXXXXX@domofondar.ru
       const storedUser = localStorage.getItem("user") || sessionStorage.getItem("user");
       const parsedUser = storedUser ? JSON.parse(storedUser) : null;
-      const defaultEmail = data.email || session.user?.email || parsedUser?.email || "";
-      if (defaultEmail) {
-        setEmail(defaultEmail);
-        setEmailInput((prev) => (prev && prev.trim() ? prev : defaultEmail));
+      const rawCandidateEmail = (data.email || session.user?.email || parsedUser?.email || "").trim();
+      const isSystemPhoneEmail = !rawCandidateEmail || rawCandidateEmail.startsWith("phone_") || rawCandidateEmail.endsWith("@domofondar.ru");
+      const realEmail = isSystemPhoneEmail ? "" : rawCandidateEmail;
+
+      if (realEmail) {
+        setEmail(realEmail);
+        setEmailInput(realEmail);
+        setEmailVerified(!!data.email_verified || true);
+      } else {
+        setEmail("");
+        setEmailInput("");
+        setEmailVerified(false);
       }
-      setEmailVerified(!!data.email_verified || !!defaultEmail);
-      console.log(`[Cabinet Auth] Почта инициализирована: "${defaultEmail}" (верифицирована: ${!!data.email_verified || !!defaultEmail})`);
+      console.log(`[Cabinet Auth] Почта инициализирована: "${realEmail || 'не указана (по желанию)'}"`);
 
       // Автоматический поиск адреса по номеру телефона, если адрес еще не заполнен
       const targetPhone = data.phone || parsedUser?.phone || "";
@@ -3558,6 +3534,56 @@ const Cabinet = () => {
       }`;
 
       console.log(`[Заказ] Запись в БД по адресу: "${orderFullAddress}", телефон: "${orderPhone}"`);
+
+      // RULE 2: АВТОСОХРАНЕНИЕ В ПРОФИЛЬ АБОНЕНТА
+      // Если профиль пользователя ещё не заполнен, автоматически сохраняем введённые им в заявке данные!
+      if (userId && (!profile?.address || !profile?.full_name)) {
+        try {
+          console.log("[Заказ] ⚡ Автоматическое сохранение реквизитов заявки в профиль абонента...");
+          const finalProfileName = (orderName.trim() || fullName.trim());
+          const finalProfilePhone = (orderPhone.trim() || phone.trim());
+          
+          const profileAutoData: any = {
+            updated_at: new Date().toISOString()
+          };
+          if (!profile?.full_name && finalProfileName) {
+            profileAutoData.full_name = finalProfileName;
+          }
+          if (!profile?.phone && finalProfilePhone) {
+            profileAutoData.phone = finalProfilePhone;
+          }
+          if (!profile?.address && orderFullAddress) {
+            profileAutoData.address = orderFullAddress;
+          }
+          if (!profile?.apartment && cleanOrderApartment) {
+            profileAutoData.apartment = cleanOrderApartment;
+          }
+          if (floor) {
+            profileAutoData.floor = String(floor).trim();
+          }
+
+          if (Object.keys(profileAutoData).length > 1) {
+            const { error: profUpdErr } = await supabase
+              .from("profiles")
+              .update(profileAutoData)
+              .eq("id", userId);
+
+            if (!profUpdErr) {
+              setProfile((prev: any) => prev ? { ...prev, ...profileAutoData } : prev);
+              if (profileAutoData.full_name) setFullName(profileAutoData.full_name);
+              if (profileAutoData.phone) setPhone(profileAutoData.phone);
+              if (profileAutoData.address) setAddress(profileAutoData.address);
+              if (cleanOrderStreet) setDisplayStreet(cleanOrderStreet);
+              if (cleanOrderHouse) setDisplayHouse(cleanOrderHouse);
+              if (orderEntrance) setEntrance(orderEntrance);
+              if (cleanOrderApartment) setApartment(cleanOrderApartment);
+              console.log("[Заказ] ✅ Профиль абонента успешно обновлен данными из заявки!");
+            }
+          }
+        } catch (syncErr) {
+          console.warn("[Заказ] Предупреждение при автосохранении профиля:", syncErr);
+        }
+      }
 
       // 3. Обработка обращения в зависимости от типа (бесплатный ремонт или платный заказ)
       if (orderType === "repair") {
@@ -4136,8 +4162,8 @@ const Cabinet = () => {
           address: currentAddress, // Полный эталонный адрес (улица + дом)
           apartment: premiseType === "private" ? "" : apartment.trim(),
           floor: premiseType === "private" ? "" : floor.trim(),
-          email: finalEmail,
-          email_verified: true, // Автоматически подтверждаем email
+          email: finalEmail || null,
+          email_verified: !!finalEmail, // Подтверждаем только если email реально указан
           is_verified: currentIsVerified, // Сохраняем текущий статус верификации
         })
         .eq("id", session.user.id);
@@ -4152,14 +4178,14 @@ const Cabinet = () => {
         address: currentAddress, 
         apartment: premiseType === "private" ? "" : apartment.trim(), 
         floor: premiseType === "private" ? "" : floor.trim(),
-        email: finalEmail,
-        email_verified: true,
+        email: finalEmail || null,
+        email_verified: !!finalEmail,
         is_verified: currentIsVerified 
       } : prev);
 
       // Синхронизируем Email и Address в стейтах
       setEmail(finalEmail);
-      setEmailVerified(true);
+      setEmailVerified(!!finalEmail);
       setAddress(currentAddress);
 
       toast({
@@ -4695,38 +4721,59 @@ const Cabinet = () => {
                     />
                   </div>
                 ) : (
-                  <div className="p-3.5 mb-2 rounded-2xl border border-dashed border-amber-500/30 bg-amber-50/40 dark:bg-amber-950/20 text-xs text-amber-800 dark:text-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-left">
-                    <div className="flex items-start gap-2.5">
-                      <CreditCard className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />
-                      <div>
-                        <span className="font-bold">Состояние лицевого счёта и оплата:</span> Баланс, начисления за техническое обслуживание и онлайн-оплата отобразятся здесь сразу после заполнения и сохранения данных адреса.
+                  <div className="p-4 mb-2 rounded-2xl bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-500/5 border border-amber-500/30 shadow-sm text-left space-y-3 animate-in fade-in duration-300">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="flex items-start gap-2.5">
+                        <div className="h-8 w-8 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 mt-0.5">
+                          <Wrench className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <p className="font-bold text-xs sm:text-sm text-foreground flex items-center gap-1.5">
+                            ⚡ Быстрый старт: подайте заявку сразу!
+                          </p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
+                            Вы можете сразу оставить заявку на вызов мастера или заказ оборудования — введённый адрес и имя сохранятся в вашем профиле автоматически.
+                          </p>
+                        </div>
                       </div>
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setOrderType("repair");
+                          setIsOrderDialogOpen(true);
+                        }}
+                        className="btn-premium-gold shrink-0 h-9 px-3.5 text-xs font-bold rounded-xl shadow-md shadow-amber-500/15 self-start sm:self-auto"
+                      >
+                        <Wrench className="h-3.5 w-3.5 mr-1.5" />
+                        Оставить заявку ➔
+                      </Button>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setOrderType("repair");
-                        setIsOrderDialogOpen(true);
-                      }}
-                      className="rounded-xl text-xs font-semibold shrink-0 text-amber-700 dark:text-amber-300 border-amber-500/30 hover:bg-amber-500/10"
-                    >
-                      <Wrench className="h-3.5 w-3.5 mr-1" />
-                      Оставить заявку
-                    </Button>
                   </div>
                 )}
 
                 {/* 1. ФИО Абонента */}
                 <div className="space-y-2 text-left">
-                  <Label htmlFor="fullName" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">👤 Полное имя (ФИО) *</Label>
+                  <div className="flex justify-between items-center">
+                    <Label htmlFor="fullName" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">👤 Полное имя (ФИО) *</Label>
+                    {!isLocked && !fullName?.trim() && (
+                      <span className="text-[10px] bg-amber-500/15 text-amber-700 dark:text-amber-400 font-bold px-2 py-0.5 rounded-full border border-amber-400/30">
+                        Обязательно
+                      </span>
+                    )}
+                  </div>
                   <Input
                     id="fullName"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="Иван Иванович Иванов"
                     disabled={isLocked}
-                    className="bg-white/40 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 font-medium h-10 transition-all rounded-xl placeholder-slate-400"
+                    className={`font-medium h-10 transition-all rounded-xl placeholder-slate-400 ${
+                      !isLocked && !fullName?.trim()
+                        ? "border-amber-400/80 dark:border-amber-500/80 bg-amber-500/5 focus:border-amber-500"
+                        : !isLocked && fullName?.trim()
+                        ? "border-emerald-500/40 bg-emerald-500/5 dark:bg-emerald-950/10"
+                        : "bg-white/40 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700"
+                    }`}
                   />
                 </div>
 
@@ -4734,8 +4781,14 @@ const Cabinet = () => {
                 <div className="space-y-2 text-left">
                   <div className="flex justify-between items-center">
                     <Label htmlFor="phone" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">📞 Контактный телефон *</Label>
-                    {!address && (
-                      <span className="text-[10px] text-primary font-medium">Автопоиск адреса ⚡</span>
+                    {!isLocked && !phone?.trim() ? (
+                      <span className="text-[10px] bg-amber-500/15 text-amber-700 dark:text-amber-400 font-bold px-2 py-0.5 rounded-full border border-amber-400/30">
+                        Обязательно
+                      </span>
+                    ) : (
+                      !address && (
+                        <span className="text-[10px] text-primary font-medium">Автопоиск адреса ⚡</span>
+                      )
                     )}
                   </div>
                   <Input
@@ -4749,13 +4802,22 @@ const Cabinet = () => {
                     }}
                     placeholder="+7 (999) 123-45-67"
                     disabled={isLocked}
-                    className="bg-white/40 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 font-medium h-10 transition-all rounded-xl placeholder-slate-400 font-mono"
+                    className={`font-medium h-10 transition-all rounded-xl placeholder-slate-400 font-mono ${
+                      !isLocked && !phone?.trim()
+                        ? "border-amber-400/80 dark:border-amber-500/80 bg-amber-500/5 focus:border-amber-500"
+                        : !isLocked && phone?.trim()
+                        ? "border-emerald-500/40 bg-emerald-500/5 dark:bg-emerald-950/10"
+                        : "bg-white/40 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700"
+                    }`}
                   />
                 </div>
 
                 {/* 3. Электронная почта (необязательно) */}
                 <div className="space-y-2 text-left">
-                  <Label htmlFor="emailInput" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">📧 Электронная почта (Email) (необязательно)</Label>
+                  <div className="flex justify-between items-center">
+                    <Label htmlFor="emailInput" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">📧 Электронная почта (Email)</Label>
+                    <span className="text-[10px] text-muted-foreground font-normal">необязательно (по желанию)</span>
+                  </div>
                   <div className="relative">
                     <Input
                       id="emailInput"
@@ -4766,8 +4828,8 @@ const Cabinet = () => {
                       disabled={isLocked}
                       className="bg-white/40 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 font-medium h-10 transition-all rounded-xl placeholder-slate-400 disabled:opacity-50 disabled:cursor-not-allowed"
                     />
-                    <span className="absolute right-3 top-2.5 text-[9px] text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 font-semibold select-none">
-                      🔒 Регистрация
+                    <span className="absolute right-3 top-2.5 text-[9px] text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200/50 dark:border-slate-700 font-semibold select-none">
+                      По желанию
                     </span>
                   </div>
                 </div>
@@ -4887,7 +4949,14 @@ const Cabinet = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Поле «Улица» */}
                   <div className="space-y-2 relative text-left">
-                    <Label htmlFor="street" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">🛣️ Улица *</Label>
+                    <div className="flex justify-between items-center">
+                      <Label htmlFor="street" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">🛣️ Улица *</Label>
+                      {!isLocked && !displayStreet?.trim() && (
+                        <span className="text-[10px] bg-amber-500/15 text-amber-700 dark:text-amber-400 font-bold px-2 py-0.5 rounded-full border border-amber-400/30">
+                          Обязательно
+                        </span>
+                      )}
+                    </div>
                     <div className="relative">
                       <Input
                         id="street"
@@ -4897,7 +4966,13 @@ const Cabinet = () => {
                         onBlur={() => setTimeout(() => setShowStreetSuggestions(false), 250)}
                         placeholder="Начните вводить название улицы"
                         disabled={isLocked}
-                        className="bg-white/40 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 font-medium h-10 transition-all rounded-xl placeholder-slate-400"
+                        className={`font-medium h-10 transition-all rounded-xl placeholder-slate-400 ${
+                          !isLocked && !displayStreet?.trim()
+                            ? "border-amber-400/80 dark:border-amber-500/80 bg-amber-500/5 focus:border-amber-500"
+                            : !isLocked && displayStreet?.trim()
+                            ? "border-emerald-500/40 bg-emerald-500/5 dark:bg-emerald-950/10"
+                            : "bg-white/40 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700"
+                        }`}
                       />
                       {loadingAddressCache && (
                         <Loader2 className="absolute right-3 top-3 h-4 w-4 animate-spin text-primary" />
@@ -4939,7 +5014,14 @@ const Cabinet = () => {
 
                   {/* Поле «Номер дома» */}
                   <div className="space-y-2 relative text-left">
-                    <Label htmlFor="house" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">🏢 Номер дома *</Label>
+                    <div className="flex justify-between items-center">
+                      <Label htmlFor="house" className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">🏢 Номер дома *</Label>
+                      {!isLocked && !displayHouse?.trim() && (
+                        <span className="text-[10px] bg-amber-500/15 text-amber-700 dark:text-amber-400 font-bold px-2 py-0.5 rounded-full border border-amber-400/30">
+                          Обязательно
+                        </span>
+                      )}
+                    </div>
                     <div className="relative">
                       <Input
                         id="house"
@@ -4949,7 +5031,13 @@ const Cabinet = () => {
                         onBlur={() => setTimeout(() => setShowHouseSuggestions(false), 250)}
                         placeholder={displayStreet?.trim() ? "Введите номер дома" : "Сначала введите улицу"}
                         disabled={isLocked || !displayStreet?.trim()}
-                        className="bg-white/40 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 font-medium h-10 transition-all rounded-xl placeholder-slate-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className={`font-medium h-10 transition-all rounded-xl placeholder-slate-400 disabled:opacity-50 disabled:cursor-not-allowed ${
+                          !isLocked && !displayHouse?.trim()
+                            ? "border-amber-400/80 dark:border-amber-500/80 bg-amber-500/5 focus:border-amber-500"
+                            : !isLocked && displayHouse?.trim()
+                            ? "border-emerald-500/40 bg-emerald-500/5 dark:bg-emerald-950/10"
+                            : "bg-white/40 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700"
+                        }`}
                       />
                     </div>
                     

@@ -180,8 +180,16 @@ app.post('/api/auth/register', async (req, res) => {
   let cleanPhone = null;
 
   if (isEmail) {
-    cleanEmail = rawInput.toLowerCase();
-    // Если дополнительно был передан телефон
+    // RULE 2: Строгая очистка Email от абсолютно любых пробелов (в т.ч. случайных автозамен на смартфонах)
+    cleanEmail = rawInput.toLowerCase().replace(/\s+/g, '');
+    
+    // Проверка корректности формата Email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(cleanEmail)) {
+      console.warn(`[Бэкенд: Регистрация] Некорректный формат email: "${cleanEmail}"`);
+      return res.status(400).json({ error: 'Пожалуйста, введите корректный адрес электронной почты (например, name@mail.ru).' });
+    }
+
     if (phone) {
       cleanPhone = String(phone).trim();
     }
@@ -189,46 +197,55 @@ app.post('/api/auth/register', async (req, res) => {
   } else {
     // Ввод распознан как номер телефона
     if (digitsOnly.length < 10) {
-      return res.status(400).json({ error: 'Пожалуйста, введите корректный номер телефона (не менее 10 цифр) или адрес электронной почты' });
+      return res.status(400).json({ error: 'Пожалуйста, введите корректный номер телефона (не менее 10 цифр) или адрес электронной почты.' });
     }
-    // Сохраняем номер телефона в стандартном формате
-    cleanPhone = rawInput;
-    // Для системной совместимости с полем users.email (NOT NULL) формируем системный email
     const last10 = digitsOnly.slice(-10);
+    // Приводим телефон к стандартному презентабельному виду
+    cleanPhone = `+7 (${last10.slice(0, 3)}) ${last10.slice(3, 6)}-${last10.slice(6, 8)}-${last10.slice(8, 10)}`;
+    // Для системной совместимости с полем users.email (NOT NULL) формируем системный email
     cleanEmail = `phone_${last10}@domofondar.ru`;
     console.log(`[Бэкенд: Регистрация] Регистрация по номеру телефона: "${cleanPhone}" (системный email: "${cleanEmail}")`);
   }
 
   try {
-    // 1. Проверяем, существует ли пользователь с таким Email в users
-    const userCheck = await pool.query('SELECT id FROM users WHERE LOWER(email) = LOWER($1)', [cleanEmail]);
-    if (userCheck.rows.length > 0) {
-      console.warn(`[Бэкенд: Регистрация] Отклонено: пользователь с Email/логином "${cleanEmail}" уже существует`);
-      return res.status(400).json({ 
-        error: isEmail 
-          ? 'Этот Email-адрес уже зарегистрирован. Пожалуйста, укажите другую почту или войдите в аккаунт.' 
-          : 'Этот номер телефона уже зарегистрирован. Пожалуйста, войдите в личный кабинет.'
-      });
-    }
-
-    // 2. Если регистрация по телефону, дополнительно проверяем profiles на наличие такого номера
-    if (!isEmail && digitsOnly.length >= 10) {
-      const last10 = digitsOnly.slice(-10);
-      const phoneCheck = await pool.query(
-        "SELECT id FROM profiles WHERE REGEXP_REPLACE(COALESCE(phone, ''), '[^0-9]', '', 'g') LIKE '%' || $1",
-        [last10]
+    // 1. Комплексная проверка дубликатов в users и profiles
+    if (isEmail) {
+      const emailDupCheck = await pool.query(
+        `SELECT u.id FROM users u 
+         LEFT JOIN profiles p ON p.id = u.id 
+         WHERE LOWER(u.email) = LOWER($1) OR LOWER(COALESCE(p.email, '')) = LOWER($1)
+         LIMIT 1`,
+        [cleanEmail]
       );
-      if (phoneCheck.rows.length > 0) {
-        console.warn(`[Бэкенд: Регистрация] Отклонено: номер телефона "${last10}" уже привязан к существующему профилю`);
-        return res.status(400).json({ error: 'Пользователь с таким номером телефона уже зарегистрирован. Пожалуйста, войдите в личный кабинет.' });
+      if (emailDupCheck.rows.length > 0) {
+        console.warn(`[Бэкенд: Регистрация] Отклонено: пользователь с Email "${cleanEmail}" уже существует`);
+        return res.status(400).json({ 
+          error: 'Пользователь с такой электронной почтой уже зарегистрирован. Пожалуйста, перейдите на вкладку «Вход».' 
+        });
+      }
+    } else {
+      const last10 = digitsOnly.slice(-10);
+      const phoneDupCheck = await pool.query(
+        `SELECT u.id FROM users u 
+         LEFT JOIN profiles p ON p.id = u.id 
+         WHERE u.email = $1 
+            OR REGEXP_REPLACE(COALESCE(p.phone, ''), '[^0-9]', '', 'g') LIKE '%' || $2
+         LIMIT 1`,
+        [`phone_${last10}@domofondar.ru`, last10]
+      );
+      if (phoneDupCheck.rows.length > 0) {
+        console.warn(`[Бэкенд: Регистрация] Отклонено: номер телефона "${last10}" уже зарегистрирован`);
+        return res.status(400).json({ 
+          error: 'Пользователь с таким номером телефона уже зарегистрирован. Пожалуйста, перейдите на вкладку «Вход».' 
+        });
       }
     }
 
-    // 3. Хэшируем пароль пользователя с солью 10 раундов
+    // 2. Хэшируем пароль пользователя с солью 10 раундов
     const salt = await bcrypt.genSalt(10);
     const password_hash = await bcrypt.hash(password, salt);
 
-    // 4. Вставляем запись нового пользователя в таблицу users
+    // 3. Вставляем запись нового пользователя в таблицу users
     const newUser = await pool.query(
       'INSERT INTO users (email, password_hash, role) VALUES ($1, $2, $3) RETURNING id, email, role',
       [cleanEmail, password_hash, 'user']
@@ -237,19 +254,25 @@ app.post('/api/auth/register', async (req, res) => {
     const user = newUser.rows[0];
     console.log(`[Бэкенд: Регистрация] Создана запись в users для ID: ${user.id}`);
 
-    // 5. Создаем профиль пользователя с сохранением телефона и email
+    // 4. Создаем профиль пользователя с сохранением телефона и email
     await pool.query(
-      'INSERT INTO profiles (id, full_name, phone, email, email_verified) VALUES ($1, $2, $3, $4, true) ON CONFLICT (id) DO UPDATE SET full_name = COALESCE(EXCLUDED.full_name, profiles.full_name), phone = COALESCE(EXCLUDED.phone, profiles.phone), email = COALESCE(EXCLUDED.email, profiles.email), email_verified = true',
+      `INSERT INTO profiles (id, full_name, phone, email, email_verified) 
+       VALUES ($1, $2, $3, $4, true) 
+       ON CONFLICT (id) DO UPDATE SET 
+         full_name = COALESCE(NULLIF(EXCLUDED.full_name, ''), profiles.full_name), 
+         phone = COALESCE(NULLIF(EXCLUDED.phone, ''), profiles.phone), 
+         email = COALESCE(NULLIF(EXCLUDED.email, ''), profiles.email), 
+         email_verified = true`,
       [user.id, full_name || '', cleanPhone, isEmail ? cleanEmail : null]
     );
 
-    // 6. Назначаем базовую роль 'user' в user_roles
+    // 5. Назначаем базовую роль 'user' в user_roles
     await pool.query(
       'INSERT INTO user_roles (user_id, role) VALUES ($1, $2) ON CONFLICT DO NOTHING',
       [user.id, 'user']
     );
 
-    // 7. Генерируем JWT-токен сессии на 7 дней
+    // 6. Генерируем JWT-токен сессии на 7 дней
     const token = jwt.sign(
       { id: user.id, email: user.email, role: 'authenticated', sub: user.id },
       ACTIVE_JWT_SECRET,
@@ -261,7 +284,7 @@ app.post('/api/auth/register', async (req, res) => {
   } catch (err) {
     console.error('[Бэкенд: Регистрация] Критическая ошибка во время регистрации:', err);
     if (err.code === '23505') {
-      return res.status(400).json({ error: 'Пользователь с такими данными уже зарегистрирован' });
+      return res.status(400).json({ error: 'Пользователь с такими данными уже зарегистрирован. Пожалуйста, выполните вход.' });
     }
     res.status(500).json({ error: 'Критическая ошибка сервера при регистрации. Повторите попытку позже.' });
   }
@@ -278,9 +301,10 @@ app.post('/api/auth/login', async (req, res) => {
   }
 
   const cleanInput = String(loginInput).trim();
-  const cleanEmail = cleanInput.toLowerCase();
+  // Удаляем все пробелы, если это email
+  const cleanEmail = cleanInput.toLowerCase().replace(/\s+/g, '');
   const digitsOnly = cleanInput.replace(/\D/g, ''); // Извлекаем только цифры для проверки телефона
-  console.log(`[Бэкенд: Вход] Попытка входа для: "${cleanInput}" (цифры: "${digitsOnly}")`);
+  console.log(`[Бэкенд: Вход] Попытка входа для: "${cleanInput}" (очищенный email: "${cleanEmail}", цифры: "${digitsOnly}")`);
 
   try {
     // 1. Ищем пользователя в таблице users по Email либо по номеру телефона в profiles
@@ -292,13 +316,21 @@ app.post('/api/auth/login', async (req, res) => {
         `SELECT u.* FROM users u 
          LEFT JOIN profiles p ON p.id = u.id 
          WHERE LOWER(u.email) = LOWER($1) 
-            OR REGEXP_REPLACE(COALESCE(p.phone, ''), '[^0-9]', '', 'g') LIKE '%' || $2
+            OR u.email = $2
+            OR REGEXP_REPLACE(COALESCE(p.phone, ''), '[^0-9]', '', 'g') LIKE '%' || $3
+            OR LOWER(COALESCE(p.email, '')) = LOWER($1)
          LIMIT 1`,
-        [cleanEmail, last10Digits]
+        [cleanEmail, `phone_${last10Digits}@domofondar.ru`, last10Digits]
       );
     } else {
-      // Ищем строго по Email
-      result = await pool.query('SELECT * FROM users WHERE LOWER(email) = LOWER($1)', [cleanEmail]);
+      // Ищем по Email (в users и в profiles)
+      result = await pool.query(
+        `SELECT u.* FROM users u 
+         LEFT JOIN profiles p ON p.id = u.id 
+         WHERE LOWER(u.email) = LOWER($1) OR LOWER(COALESCE(p.email, '')) = LOWER($1)
+         LIMIT 1`,
+        [cleanEmail]
+      );
     }
 
     if (result.rows.length === 0) {
