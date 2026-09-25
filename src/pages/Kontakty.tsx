@@ -86,6 +86,7 @@ const Kontakty = () => {
     
     setDirection(newDirection);
     setActiveTab(newTab);
+    setSearchParams({ tab: newTab });
   };
 
   return (
