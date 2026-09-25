@@ -10,26 +10,128 @@ import {
   Eye, 
   CheckCircle2, 
   LockOpen,
+  Phone,
+  PhoneOff,
+  Video,
+  Database,
+  Bluetooth,
+  Key,
+  Info,
+  X,
   Volume2
 } from "lucide-react";
 
-/**
- * Интерактивный терминал «Умный домофон & Видеонаблюдение нового поколения»
- * Преимущества:
- * - Мгновенная загрузка (0 секунд задержки, без тяжелых библиотек и сбоев WebGL)
- * - 3D Tilt-эффект при движении курсора мыши
- * - Анимация сканера распознавания лиц Face ID
- * - Интерактивная кнопка открытия двери с обратной визуальной связью
- * - Парящие технологичные виджеты безопасности
- */
+// Типы интерактивных режимов терминала
+type IntercomMode = "incoming_call" | "in_call" | "door_open" | "idle";
+
+// Описание летающих интерактивных фич с подробной информацией при клике
+interface FeatureInfo {
+  id: string;
+  title: string;
+  badge: string;
+  icon: any;
+  color: string;
+  description: string;
+  details: string[];
+}
+
+const FEATURES_DATA: Record<string, FeatureInfo> = {
+  hd_video: {
+    id: "hd_video",
+    title: "Видео HD качества",
+    badge: "1080p HD",
+    icon: Video,
+    color: "sky",
+    description: "Четкое широкоугольное изображение посетителей без задержек и размытия.",
+    details: [
+      "Широкий угол обзора 160° — видно всю площадку перед дверью",
+      "Инфракрасная ночная подсветка до 30 метров без слепящих лучей",
+      "Адаптивный битрейт — стабильное видео даже при слабом мобильном интернете"
+    ]
+  },
+  archive_5days: {
+    id: "archive_5days",
+    title: "Архив видеозаписи 5 дней",
+    badge: "5 дней",
+    icon: Database,
+    color: "blue",
+    description: "Безопасное облачное хранение всех событий и звонков в течение 5 суток.",
+    details: [
+      "Запись каждого звонка и попыток открытия двери",
+      "Удобная перемотка архива по таймлайну со смартфона",
+      "Возможность сохранить и скачать фрагмент видеозаписи"
+    ]
+  },
+  live_247: {
+    id: "live_247",
+    title: "Просмотр камер 24/7",
+    badge: "Онлайн 24/7",
+    icon: Eye,
+    color: "emerald",
+    description: "Круглосуточный прямой эфир с камер подъезда, двора и парковки.",
+    details: [
+      "Контроль придомовой территории из любой точки планеты",
+      "Мгновенное подключение к трансляции в одно касание",
+      "Безопасный доступ только для подтвержденных жильцов дома"
+    ]
+  },
+  bluetooth: {
+    id: "bluetooth",
+    title: "Bluetooth-открывание двери",
+    badge: "Hands-Free",
+    icon: Bluetooth,
+    color: "indigo",
+    description: "Бесключевой доступ: дверь распознает ваш смартфон и открывается сама.",
+    details: [
+      "Свободные руки: не нужно доставать ключи, когда несете сумки",
+      "Автоматическое открывание при приближении на расстояние 1–2 метра",
+      "Шифрованный протокол BLE с защитой от перехвата сигнала"
+    ]
+  },
+  crypto_keys: {
+    id: "crypto_keys",
+    title: "Ключи с повышенной защитой",
+    badge: "Крипто-RFID",
+    icon: Key,
+    color: "amber",
+    description: "Электронные ключи нового поколения с защитой от несанкционированного клонирования.",
+    details: [
+      "Уникальный цифровой криптографический чип в каждом ключе",
+      "Невозможно сделать нелегальный дубликат в обычной мастерской",
+      "Мгновенная блокировка потерянного ключа в системе управляющей компании"
+    ]
+  }
+};
+
 export const SmartIntercomTerminal = () => {
   const containerRef = useRef<HTMLDivElement>(null);
+  
+  // 3D Tilt координаты
   const [rotate, setRotate] = useState({ x: 0, y: 0 });
+  const [eyeOffset, setEyeOffset] = useState({ x: 0, y: 0 });
   const [isHovered, setIsHovered] = useState(false);
-  const [doorUnlocked, setDoorUnlocked] = useState(false);
-  const [callActive, setCallActive] = useState(false);
+  
+  // Режимы интерактивного видеозвонка
+  const [mode, setMode] = useState<IntercomMode>("incoming_call");
+  const [callDuration, setCallDuration] = useState(0);
 
-  // Обработка 3D-наклона вслед за курсором мыши
+  // Активная карточка-подсказка летающего значка
+  const [activeFeature, setActiveFeature] = useState<FeatureInfo | null>(null);
+
+  // Таймер разговора
+  useEffect(() => {
+    let interval: any = null;
+    if (mode === "in_call") {
+      interval = setInterval(() => {
+        setCallDuration((prev) => prev + 1);
+      }, 1000);
+    } else {
+      setCallDuration(0);
+    }
+    return () => clearInterval(interval);
+  }, [mode]);
+
+  // Обработка 3D-наклона терминала и слежения зрачка камеры за мышью
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
@@ -38,32 +140,48 @@ export const SmartIntercomTerminal = () => {
     const centerX = rect.width / 2;
     const centerY = rect.height / 2;
 
-    // Плавный угол поворота от -12 до +12 градусов
+    // Угол наклона корпуса (-10° ... +10°)
     const rotateX = ((centerY - y) / centerY) * 10;
     const rotateY = ((x - centerX) / centerX) * 10;
-
     setRotate({ x: rotateX, y: rotateY });
+
+    // Смещение зрачка камеры (-7px ... +7px)
+    const eyeX = ((x - centerX) / centerX) * 7;
+    const eyeY = ((y - centerY) / centerY) * 7;
+    setEyeOffset({ x: eyeX, y: eyeY });
   };
 
   const handleMouseLeave = () => {
     setIsHovered(false);
     setRotate({ x: 0, y: 0 });
+    setEyeOffset({ x: 0, y: 0 });
   };
 
-  // Клик по кнопке ключа: имитация моментального открытия двери
+  // Форматирование секунд в таймер разговора MM:SS
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  // Сценарии кнопок вызова
+  const handleAnswerCall = () => {
+    setMode("in_call");
+  };
+
+  const handleDeclineCall = () => {
+    setMode("idle");
+  };
+
   const handleUnlockDoor = () => {
-    setDoorUnlocked(true);
+    setMode("door_open");
     setTimeout(() => {
-      setDoorUnlocked(false);
-    }, 2800);
+      setMode("idle");
+    }, 3200);
   };
 
-  // Клик по вызову: имитация звонка в квартиру/на телефон
-  const handleCall = () => {
-    setCallActive(true);
-    setTimeout(() => {
-      setCallActive(false);
-    }, 3000);
+  const handleRestartCall = () => {
+    setMode("incoming_call");
   };
 
   return (
@@ -72,170 +190,383 @@ export const SmartIntercomTerminal = () => {
       onMouseMove={handleMouseMove}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={handleMouseLeave}
-      className="relative w-full h-[480px] lg:h-[540px] flex items-center justify-center select-none perspective-[1200px]"
+      className="relative w-full h-[540px] sm:h-[580px] lg:h-[620px] flex items-center justify-center select-none perspective-[1200px]"
     >
       {/* Мягкое фоновое сапфировое свечение вокруг устройства */}
-      <div className="absolute inset-0 bg-gradient-to-tr from-primary/25 via-sky-400/20 to-blue-600/10 rounded-full blur-3xl opacity-60 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-tr from-primary/30 via-sky-400/20 to-blue-600/15 rounded-full blur-3xl opacity-60 pointer-events-none" />
 
-      {/* Парящий виджет №1 (Сверху справа): Видеопоток 4K Ultra HD */}
-      <div className="absolute -top-2 -right-2 sm:right-4 z-30 bg-card/85 backdrop-blur-xl border border-sky-400/30 rounded-2xl p-3 shadow-lg shadow-sky-500/10 flex items-center gap-3 animate-[float_5s_ease-in-out_infinite]">
-        <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-sky-500/15 text-sky-500">
-          <Camera className="h-5 w-5" />
-          <span className="absolute -top-1 -right-1 flex h-3 w-3">
+      {/* ============================================================== */}
+      {/* 5 ИНТЕРАКТИВНЫХ ЛЕТАЮЩИХ ЗНАЧКОВ С СИЯНИЕМ И КЛИКАМИ           */}
+      {/* ============================================================== */}
+
+      {/* Значок 1: Видео HD качества (Сверху справа) */}
+      <button
+        type="button"
+        onClick={() => setActiveFeature(FEATURES_DATA.hd_video)}
+        className="absolute -top-3 right-0 sm:right-2 z-30 p-2 sm:p-2.5 rounded-2xl bg-card/85 backdrop-blur-xl border border-sky-400/40 shadow-lg shadow-sky-500/15 hover:shadow-sky-500/30 hover:scale-105 transition-all duration-300 flex items-center gap-2.5 group cursor-pointer text-left animate-[float_5s_ease-in-out_infinite]"
+      >
+        <div className="relative flex h-8 w-8 items-center justify-center rounded-xl bg-sky-500/15 text-sky-500 group-hover:bg-sky-500 group-hover:text-white transition-colors">
+          <Video className="h-4 w-4" />
+          <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500" />
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
           </span>
         </div>
-        <div className="text-left">
-          <div className="text-xs font-bold text-foreground flex items-center gap-1.5">
-            Ultra HD 4K
-            <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-semibold">REC</span>
+        <div className="pr-1">
+          <div className="text-[11px] font-bold text-foreground flex items-center gap-1">
+            Видео HD качества
+            <Info className="h-3 w-3 text-sky-400 opacity-60 group-hover:opacity-100" />
           </div>
-          <div className="text-[11px] text-muted-foreground">Ночная подсветка 30м</div>
+          <div className="text-[10px] text-muted-foreground">1080p • Широкий угол 160°</div>
         </div>
-      </div>
+      </button>
 
-      {/* Парящий виджет №2 (Снизу слева): Face ID & Замок */}
-      <div className="absolute -bottom-2 -left-2 sm:left-4 z-30 bg-card/85 backdrop-blur-xl border border-emerald-500/30 rounded-2xl p-3 shadow-lg shadow-emerald-500/10 flex items-center gap-3 animate-[float_6s_ease-in-out_infinite]" style={{ animationDelay: "1.5s" }}>
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-500">
-          <ShieldCheck className="h-5 w-5" />
+      {/* Значок 2: Архив видеозаписи 5 дней (Сверху слева) */}
+      <button
+        type="button"
+        onClick={() => setActiveFeature(FEATURES_DATA.archive_5days)}
+        className="absolute -top-3 left-0 sm:left-2 z-30 p-2 sm:p-2.5 rounded-2xl bg-card/85 backdrop-blur-xl border border-blue-400/40 shadow-lg shadow-blue-500/15 hover:shadow-blue-500/30 hover:scale-105 transition-all duration-300 flex items-center gap-2.5 group cursor-pointer text-left animate-[float_6s_ease-in-out_infinite]"
+        style={{ animationDelay: "1s" }}
+      >
+        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-500/15 text-blue-500 group-hover:bg-blue-500 group-hover:text-white transition-colors">
+          <Database className="h-4 w-4" />
         </div>
-        <div className="text-left">
-          <div className="text-xs font-bold text-foreground flex items-center gap-1">
-            Face ID 0.2 сек
-            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+        <div className="pr-1">
+          <div className="text-[11px] font-bold text-foreground flex items-center gap-1">
+            Архив записи 5 дней
+            <Info className="h-3 w-3 text-blue-400 opacity-60 group-hover:opacity-100" />
           </div>
-          <div className="text-[11px] text-muted-foreground">Распознавание жильцов</div>
+          <div className="text-[10px] text-muted-foreground">Облако • Скачивание</div>
         </div>
-      </div>
+      </button>
 
-      {/* Парящий виджет №3 (Снизу справа): Приложение на смартфоне */}
-      <div className="hidden sm:flex absolute bottom-12 -right-4 z-30 bg-card/85 backdrop-blur-xl border border-primary/30 rounded-2xl p-3 shadow-lg shadow-primary/10 items-center gap-3 animate-[float_7s_ease-in-out_infinite]" style={{ animationDelay: "3s" }}>
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/15 text-primary">
-          <Smartphone className="h-5 w-5" />
+      {/* Значок 3: Просмотр камер 24/7 (Справа по центру) */}
+      <button
+        type="button"
+        onClick={() => setActiveFeature(FEATURES_DATA.live_247)}
+        className="hidden sm:flex absolute top-[44%] -right-5 z-30 p-2 sm:p-2.5 rounded-2xl bg-card/85 backdrop-blur-xl border border-emerald-400/40 shadow-lg shadow-emerald-500/15 hover:shadow-emerald-500/30 hover:scale-105 transition-all duration-300 items-center gap-2.5 group cursor-pointer text-left animate-[float_7s_ease-in-out_infinite]"
+        style={{ animationDelay: "2s" }}
+      >
+        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+          <Eye className="h-4 w-4" />
         </div>
-        <div className="text-left">
-          <div className="text-xs font-bold text-foreground">Звонок на смартфон</div>
-          <div className="text-[11px] text-muted-foreground">iOS & Android приложение</div>
+        <div className="pr-1">
+          <div className="text-[11px] font-bold text-foreground flex items-center gap-1">
+            Просмотр камер 24/7
+            <Info className="h-3 w-3 text-emerald-400 opacity-60 group-hover:opacity-100" />
+          </div>
+          <div className="text-[10px] text-muted-foreground">Двор, парковка, подъезд</div>
         </div>
-      </div>
+      </button>
 
-      {/* ОСНОВНОЙ КОРПУС ТЕРМИНАЛА IP-ДОМОФОНА С 3D TILT */}
+      {/* Значок 4: Bluetooth открывание (Снизу слева) */}
+      <button
+        type="button"
+        onClick={() => setActiveFeature(FEATURES_DATA.bluetooth)}
+        className="absolute -bottom-3 left-0 sm:left-2 z-30 p-2 sm:p-2.5 rounded-2xl bg-card/85 backdrop-blur-xl border border-indigo-400/40 shadow-lg shadow-indigo-500/15 hover:shadow-indigo-500/30 hover:scale-105 transition-all duration-300 flex items-center gap-2.5 group cursor-pointer text-left animate-[float_6.5s_ease-in-out_infinite]"
+        style={{ animationDelay: "1.5s" }}
+      >
+        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-500/15 text-indigo-500 group-hover:bg-indigo-500 group-hover:text-white transition-colors">
+          <Bluetooth className="h-4 w-4" />
+        </div>
+        <div className="pr-1">
+          <div className="text-[11px] font-bold text-foreground flex items-center gap-1">
+            Bluetooth-доступ
+            <Info className="h-3 w-3 text-indigo-400 opacity-60 group-hover:opacity-100" />
+          </div>
+          <div className="text-[10px] text-muted-foreground">Hands-Free без ключей</div>
+        </div>
+      </button>
+
+      {/* Значок 5: Ключи с повышенной защитой (Снизу справа) */}
+      <button
+        type="button"
+        onClick={() => setActiveFeature(FEATURES_DATA.crypto_keys)}
+        className="absolute -bottom-3 right-0 sm:right-2 z-30 p-2 sm:p-2.5 rounded-2xl bg-card/85 backdrop-blur-xl border border-amber-400/40 shadow-lg shadow-amber-500/15 hover:shadow-amber-500/30 hover:scale-105 transition-all duration-300 flex items-center gap-2.5 group cursor-pointer text-left animate-[float_5.5s_ease-in-out_infinite]"
+        style={{ animationDelay: "2.5s" }}
+      >
+        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-500/15 text-amber-500 group-hover:bg-amber-500 group-hover:text-white transition-colors">
+          <Key className="h-4 w-4" />
+        </div>
+        <div className="pr-1">
+          <div className="text-[11px] font-bold text-foreground flex items-center gap-1">
+            Ключи с крипто-защитой
+            <Info className="h-3 w-3 text-amber-400 opacity-60 group-hover:opacity-100" />
+          </div>
+          <div className="text-[10px] text-muted-foreground">Защита от дубликатов</div>
+        </div>
+      </button>
+
+      {/* ============================================================== */}
+      {/* КОРПУС ТЕРМИНАЛА IP-ДОМОФОНА С 3D TILT И ИНТЕРАКТИВНОЙ КАМЕРОЙ  */}
+      {/* ============================================================== */}
       <div 
         style={{
           transform: `perspective(1000px) rotateX(${rotate.x}deg) rotateY(${rotate.y}deg) scale3d(${isHovered ? 1.02 : 1}, ${isHovered ? 1.02 : 1}, 1)`,
           transition: isHovered ? "transform 0.12s ease-out" : "transform 0.6s cubic-bezier(0.25, 1, 0.5, 1)"
         }}
-        className="relative z-20 w-[290px] sm:w-[330px] rounded-3xl p-3 sm:p-4 bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900 border-2 border-sky-500/40 shadow-2xl shadow-sky-500/20 text-white overflow-hidden"
+        className="relative z-20 w-[290px] sm:w-[335px] rounded-3xl p-3.5 sm:p-4 bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900 border-2 border-sky-500/40 shadow-2xl shadow-sky-500/20 text-white overflow-hidden"
       >
-        {/* Верхний световой бегущий кант (Shimmer) */}
+        {/* Верхний световой перелив */}
         <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-sky-400 to-transparent animate-shimmer" />
 
         {/* 1. ВЕРХНЯЯ АППАРАТНАЯ ПАНЕЛЬ ТЕРМИНАЛА */}
-        <div className="flex items-center justify-between mb-3 px-2 pt-1 border-b border-white/10 pb-2.5">
+        <div className="flex items-center justify-between mb-2.5 px-2 pt-0.5 border-b border-white/10 pb-2">
           <div className="flex items-center gap-1.5">
             <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
             <span className="text-[10px] tracking-wider uppercase font-semibold text-slate-300">ДОМОФОНДАР IP</span>
           </div>
-          <div className="flex items-center gap-2 text-slate-400">
+          <div className="flex items-center gap-1.5 text-slate-400">
             <Wifi className="h-3.5 w-3.5 text-sky-400" />
             <span className="text-[10px] font-mono text-sky-400">ONLINE</span>
           </div>
         </div>
 
-        {/* 2. БЛОК КАМЕРЫ С ИК-ПОДСВЕТКОЙ */}
-        <div className="relative mb-3 flex items-center justify-center">
+        {/* 2. ЖИВОЙ ОБЪЕКТИВ КАМЕРЫ СО СЛЕЖЕНИЕМ И РАДАРОМ */}
+        <div className="relative mb-2.5 flex items-center justify-center group/lens">
+          {/* Внешний корпус камеры */}
           <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-b from-slate-800 to-slate-950 border-2 border-slate-700/80 shadow-inner">
-            {/* ИК-светодиоды ночной подсветки по кругу */}
-            <div className="absolute top-1.5 h-1.5 w-1.5 rounded-full bg-red-500/60 shadow-[0_0_6px_red]" />
-            <div className="absolute bottom-1.5 h-1.5 w-1.5 rounded-full bg-red-500/60 shadow-[0_0_6px_red]" />
-            <div className="absolute left-1.5 h-1.5 w-1.5 rounded-full bg-red-500/60 shadow-[0_0_6px_red]" />
-            <div className="absolute right-1.5 h-1.5 w-1.5 rounded-full bg-red-500/60 shadow-[0_0_6px_red]" />
             
-            {/* Центральный объектив камеры с бликом */}
-            <div className="relative flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 border border-sky-400/40 shadow-lg shadow-sky-500/30">
-              <div className="h-6 w-6 rounded-full bg-gradient-to-tr from-sky-600 via-blue-900 to-sky-400 opacity-90" />
-              <div className="absolute top-2 left-2 h-2.5 w-2.5 rounded-full bg-white/70 blur-[0.5px]" />
+            {/* Круговой лазерный сканирующий радар фокуса (вращается при наведении) */}
+            <div className={`absolute inset-0 rounded-full border border-dashed border-sky-400/40 ${isHovered ? "animate-[camera-radar_4s_linear_infinite]" : "opacity-30"}`} />
+
+            {/* ИК-диоды ночной подсветки по кругу */}
+            <div className="absolute top-1.5 h-1.5 w-1.5 rounded-full bg-red-500/70 shadow-[0_0_6px_red]" />
+            <div className="absolute bottom-1.5 h-1.5 w-1.5 rounded-full bg-red-500/70 shadow-[0_0_6px_red]" />
+            <div className="absolute left-1.5 h-1.5 w-1.5 rounded-full bg-red-500/70 shadow-[0_0_6px_red]" />
+            <div className="absolute right-1.5 h-1.5 w-1.5 rounded-full bg-red-500/70 shadow-[0_0_6px_red]" />
+
+            {/* Внутренняя просветленная оптика с диафрагмой */}
+            <div className="relative flex h-13 w-13 items-center justify-center rounded-full bg-slate-900 border border-sky-400/50 shadow-lg shadow-sky-500/40 overflow-hidden">
+              
+              {/* Зрачок камеры, плавно следящий за курсором мыши */}
+              <div 
+                style={{
+                  transform: `translate(${eyeOffset.x}px, ${eyeOffset.y}px)`,
+                  transition: "transform 0.1s ease-out"
+                }}
+                className="relative flex h-8 w-8 items-center justify-center rounded-full camera-shimmer-lens shadow-inner"
+              >
+                {/* Центральный апертурный зрачок */}
+                <div className="h-4 w-4 rounded-full bg-slate-950 border border-sky-300/60 flex items-center justify-center shadow-inner">
+                  <div className="h-1.5 w-1.5 rounded-full bg-sky-400 animate-ping opacity-75" />
+                </div>
+
+                {/* Световой блик оптики */}
+                <div className="absolute top-1 left-1.5 h-2 w-2 rounded-full bg-white/80 blur-[0.5px]" />
+                <div className="absolute bottom-1.5 right-1.5 h-1 w-1 rounded-full bg-sky-200/60" />
+              </div>
+            </div>
+
+            {/* Бейдж статуса автофокуса при наведении */}
+            <div className="absolute -bottom-1.5 px-1.5 py-0.2 rounded-full bg-sky-500/20 border border-sky-400/40 text-[8px] font-mono text-sky-300">
+              {isHovered ? "TRACKING ON" : "AUTO-FOCUS"}
             </div>
           </div>
         </div>
 
-        {/* 3. СЕНСОРНЫЙ ЭКРАН С ВИДЕОПОТОКОМ И СКАНЕРОМ FACE ID */}
-        <div className="relative rounded-2xl bg-slate-950/90 border border-sky-500/30 p-3 mb-3 overflow-hidden shadow-inner">
-          {/* Сетка сканера безопасности */}
-          <div className="absolute inset-0 bg-[linear-gradient(to_right,#0284c710_1px,transparent_1px),linear-gradient(to_bottom,#0284c710_1px,transparent_1px)] bg-[size:14px_14px]" />
+        {/* 3. ИНТЕРАКТИВНЫЙ ЭКРАН ВИДЕОЗВОНКА */}
+        <div className="relative rounded-2xl bg-slate-950/95 border border-sky-500/35 p-3 mb-2.5 overflow-hidden shadow-inner min-h-[148px] flex flex-col justify-between">
+          {/* Сетка сканера */}
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,#0284c712_1px,transparent_1px),linear-gradient(to_bottom,#0284c712_1px,transparent_1px)] bg-[size:14px_14px] pointer-events-none" />
 
-          {/* Бегущий лазерный луч сканирования Face ID */}
-          <div className="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-sky-400 to-transparent shadow-[0_0_12px_#38bdf8] animate-[scan-line_2.8s_ease-in-out_infinite]" />
+          {/* Бегущий лазерный луч Face ID */}
+          <div className="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-sky-400 to-transparent shadow-[0_0_12px_#38bdf8] animate-[scan-line_2.8s_ease-in-out_infinite] pointer-events-none" />
 
-          <div className="relative z-10 flex flex-col items-center py-2 text-center">
-            {doorUnlocked ? (
-              <div className="animate-scale-in flex flex-col items-center">
-                <div className="h-10 w-10 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mb-1.5 shadow-[0_0_20px_rgba(16,185,129,0.5)]">
-                  <LockOpen className="h-6 w-6 animate-bounce" />
-                </div>
-                <div className="text-xs font-bold text-emerald-400 uppercase tracking-wider">ДВЕРЬ ОТКРЫТА</div>
-                <div className="text-[10px] text-emerald-300/80">Добро пожаловать домой!</div>
+          {/* СЦЕНАРИЙ А: ВХОДЯЩИЙ ВИДЕОЗВОНОК С ПОДЪЕЗДА */}
+          {mode === "incoming_call" && (
+            <div className="relative z-10 flex flex-col items-center justify-between h-full py-1 text-center animate-fade-in">
+              <div className="flex items-center gap-1.5 text-amber-400 text-xs font-bold animate-pulse">
+                <BellRing className="h-4 w-4" />
+                <span>ВХОДЯЩИЙ ВЫЗОВ В КВАРТИРУ</span>
               </div>
-            ) : callActive ? (
-              <div className="animate-scale-in flex flex-col items-center">
-                <div className="h-10 w-10 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center mb-1.5 shadow-[0_0_20px_rgba(245,158,11,0.5)] animate-pulse">
-                  <BellRing className="h-6 w-6" />
+
+              {/* Видео-окно с гостем/курьером у двери */}
+              <div className="my-1.5 flex items-center justify-center">
+                <div className="relative flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-sky-400/40 shadow-lg">
+                  <div className="h-8 w-8 rounded-full bg-sky-500/20 border border-sky-400/50 flex items-center justify-center text-sky-400">
+                    <Camera className="h-4 w-4" />
+                  </div>
+                  <div className="text-left">
+                    <div className="text-xs font-bold text-white leading-tight">Подъезд №1 • Домофон</div>
+                    <div className="text-[10px] text-emerald-400 font-mono flex items-center gap-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
+                      Видео 1080p HD онлайн
+                    </div>
+                  </div>
                 </div>
-                <div className="text-xs font-bold text-amber-400 uppercase tracking-wider">ВЫЗОВ В КВАРТИРУ...</div>
-                <div className="text-[10px] text-slate-300">Видеосигнал передан на смартфон</div>
               </div>
-            ) : (
-              <div className="flex flex-col items-center">
-                <div className="h-10 w-10 rounded-full bg-sky-500/15 text-sky-400 flex items-center justify-center mb-1.5 border border-sky-400/30 shadow-[0_0_15px_rgba(56,189,248,0.25)]">
-                  <Eye className="h-5 w-5 animate-pulse" />
-                </div>
-                <div className="text-xs font-bold text-sky-300 flex items-center gap-1">
-                  <span>Система активна</span>
-                  <Sparkles className="h-3 w-3 text-sky-400" />
-                </div>
-                <div className="text-[10px] text-slate-400">Нажмите кнопку для открытия или вызова</div>
+
+              {/* Кнопки: «Ответить» и «Отклонить» */}
+              <div className="grid grid-cols-2 gap-2 w-full pt-1">
+                <button
+                  type="button"
+                  onClick={handleAnswerCall}
+                  className="py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 animate-ring-pulse transition-all shadow-md"
+                >
+                  <Phone className="h-3.5 w-3.5" />
+                  <span>Ответить</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDeclineCall}
+                  className="py-2 px-3 rounded-xl bg-rose-600/80 hover:bg-rose-600 text-white font-semibold text-xs flex items-center justify-center gap-1.5 transition-all"
+                >
+                  <PhoneOff className="h-3.5 w-3.5" />
+                  <span>Отклонить</span>
+                </button>
               </div>
-            )}
-          </div>
+            </div>
+          )}
+
+          {/* СЦЕНАРИЙ Б: РАЗГОВОР АКТИВЕН */}
+          {mode === "in_call" && (
+            <div className="relative z-10 flex flex-col items-center justify-between h-full py-1 text-center animate-fade-in">
+              <div className="flex items-center justify-between w-full px-1">
+                <div className="flex items-center gap-1.5 text-emerald-400 text-[11px] font-semibold">
+                  <Volume2 className="h-3.5 w-3.5 animate-pulse" />
+                  <span>Разговор с посетителем</span>
+                </div>
+                <div className="font-mono text-xs font-bold text-sky-300 bg-sky-950/80 px-2 py-0.5 rounded border border-sky-400/30">
+                  {formatTime(callDuration)}
+                </div>
+              </div>
+
+              <div className="my-1 text-center">
+                <div className="text-xs font-bold text-white">Входная группа открыта для диалога</div>
+                <div className="text-[10px] text-slate-300">Нажмите «Открыть дверь» для входа жильца</div>
+              </div>
+
+              {/* Кнопки: «Открыть дверь» и «Завершить» */}
+              <div className="grid grid-cols-2 gap-2 w-full pt-1">
+                <button
+                  type="button"
+                  onClick={handleUnlockDoor}
+                  className="py-2 px-3 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-[0_0_15px_rgba(2,132,199,0.5)] transition-all hover:scale-102"
+                >
+                  <KeyRound className="h-3.5 w-3.5" />
+                  <span>Открыть дверь</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDeclineCall}
+                  className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-rose-600/80 text-slate-200 hover:text-white font-semibold text-xs flex items-center justify-center gap-1.5 transition-all"
+                >
+                  <PhoneOff className="h-3.5 w-3.5" />
+                  <span>Завершить</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* СЦЕНАРИЙ В: ДВЕРЬ ОТКРЫТА */}
+          {mode === "door_open" && (
+            <div className="relative z-10 flex flex-col items-center justify-center h-full py-3 text-center animate-scale-in">
+              <div className="h-11 w-11 rounded-full bg-emerald-500/25 text-emerald-400 flex items-center justify-center mb-1.5 shadow-[0_0_25px_rgba(16,185,129,0.6)]">
+                <LockOpen className="h-6 w-6 animate-bounce" />
+              </div>
+              <div className="text-xs font-extrabold text-emerald-400 uppercase tracking-wider">ДВЕРЬ РАЗБЛОКИРОВАНА ✓</div>
+              <div className="text-[10px] text-emerald-200/90 mt-0.5">Электромагнитный замок открыт. Добро пожаловать!</div>
+            </div>
+          )}
+
+          {/* СЦЕНАРИЙ Г: РЕЖИМ ОЖИДАНИЯ / FACE ID СКАНИРОВАНИЕ */}
+          {mode === "idle" && (
+            <div className="relative z-10 flex flex-col items-center justify-between h-full py-1 text-center animate-fade-in">
+              <div className="flex items-center gap-1 text-sky-400 text-[11px] font-semibold">
+                <ShieldCheck className="h-3.5 w-3.5" />
+                <span>Терминал готов к работе</span>
+              </div>
+
+              <div className="my-1 flex flex-col items-center">
+                <div className="text-xs font-bold text-white">Режим контроля доступа</div>
+                <div className="text-[10px] text-slate-400">Face ID, ключ или звонок на смартфон</div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 w-full pt-1">
+                <button
+                  type="button"
+                  onClick={handleRestartCall}
+                  className="py-1.5 px-2.5 rounded-xl bg-sky-600/80 hover:bg-sky-500 text-white font-bold text-[11px] flex items-center justify-center gap-1 transition-all"
+                >
+                  <BellRing className="h-3.5 w-3.5" />
+                  <span>Позвонить</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleUnlockDoor}
+                  className="py-1.5 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-300 font-semibold text-[11px] flex items-center justify-center gap-1 border border-sky-400/30 transition-all"
+                >
+                  <KeyRound className="h-3.5 w-3.5" />
+                  <span>Открыть</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* 4. ИНТЕРАКТИВНЫЕ СЕНСОРНЫЕ КНОПКИ УПРАВЛЕНИЯ */}
-        <div className="grid grid-cols-2 gap-2 pt-1">
-          {/* Кнопка открытия замка (Ключ) */}
-          <button
-            type="button"
-            onClick={handleUnlockDoor}
-            className={`relative group/btn py-2.5 px-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition-all duration-300 ${
-              doorUnlocked 
-                ? "bg-emerald-600 border-emerald-400 text-white shadow-[0_0_20px_rgba(16,185,129,0.5)]" 
-                : "bg-slate-800/90 hover:bg-sky-600/30 border-sky-500/30 hover:border-sky-400 text-sky-300 hover:text-white"
-            }`}
-          >
-            <KeyRound className="h-4 w-4" />
-            <span>{doorUnlocked ? "Открыто!" : "Открыть замок"}</span>
-          </button>
-
-          {/* Кнопка вызова жильца / консьержа */}
-          <button
-            type="button"
-            onClick={handleCall}
-            className={`relative group/btn py-2.5 px-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition-all duration-300 ${
-              callActive
-                ? "bg-amber-600 border-amber-400 text-white shadow-[0_0_20px_rgba(245,158,11,0.5)]"
-                : "bg-slate-800/90 hover:bg-sky-600/30 border-sky-500/30 hover:border-sky-400 text-slate-300 hover:text-white"
-            }`}
-          >
-            <BellRing className="h-4 w-4 text-sky-400 group-hover/btn:text-white" />
-            <span>Вызов</span>
-          </button>
-        </div>
-
-        {/* Нижний лаконичный бейдж */}
-        <div className="mt-3 text-center text-[10px] text-slate-500 border-t border-white/5 pt-2">
-          Умная СКУД • Безопасный двор • Домофондар
+        {/* 4. НИЖНЯЯ ПАНЕЛЬ СТАТУСА */}
+        <div className="text-center text-[10px] text-slate-400 border-t border-white/5 pt-1.5 flex items-center justify-between px-1">
+          <span className="flex items-center gap-1">
+            <Sparkles className="h-3 w-3 text-sky-400" />
+            Интерактивный симулятор
+          </span>
+          <span className="text-slate-500">Домофондар 2026</span>
         </div>
       </div>
+
+      {/* ============================================================== */}
+      {/* ВСплывающая карточка с подробной информацией о фиче (по клику) */}
+      {/* ============================================================== */}
+      {activeFeature && (
+        <div className="absolute inset-x-2 sm:inset-x-8 bottom-2 z-40 bg-card/95 backdrop-blur-2xl border-2 border-primary/40 rounded-2xl p-4 shadow-2xl shadow-primary/20 animate-scale-in text-left">
+          <div className="flex items-start justify-between gap-3 mb-2">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/15 text-primary shrink-0">
+                <activeFeature.icon className="h-5 w-5" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-foreground flex items-center gap-2">
+                  {activeFeature.title}
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/15 text-primary">
+                    {activeFeature.badge}
+                  </span>
+                </h4>
+                <p className="text-xs text-muted-foreground mt-0.5">{activeFeature.description}</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveFeature(null)}
+              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="grid gap-1.5 mt-2 pt-2 border-t border-border/60">
+            {activeFeature.details.map((detail, idx) => (
+              <div key={idx} className="flex items-start gap-2 text-xs text-slate-700 dark:text-neutral-200">
+                <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
+                <span>{detail}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-3 flex justify-end">
+            <button
+              type="button"
+              onClick={() => setActiveFeature(null)}
+              className="px-3 py-1 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition-opacity"
+            >
+              Понятно ✓
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
