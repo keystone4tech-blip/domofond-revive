@@ -1064,6 +1064,15 @@ const RemoteAccessCard = ({
   const [showInstructions, setShowInstructions] = useState(false);
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  // Локальный стейт доступности умного домофона с поддержкой быстрой прямой проверки
+  const [smartIntercomAvailable, setSmartIntercomAvailable] = useState<boolean>(hasSmartIntercom);
+  const [detectedEntrance, setDetectedEntrance] = useState<string | number | undefined>(entranceNumber);
+
+  // Синхронизируем локальный стейт при изменении пропсов
+  useEffect(() => {
+    if (hasSmartIntercom) setSmartIntercomAvailable(true);
+    if (entranceNumber) setDetectedEntrance(entranceNumber);
+  }, [hasSmartIntercom, entranceNumber]);
 
   // Формируем чистый адрес без дублирования номера квартиры
   const cleanAddressDisplay = useMemo(() => {
@@ -1132,6 +1141,44 @@ const RemoteAccessCard = ({
         }
       }
 
+      // 3. Прямая онлайн-проверка статуса умного домофона в таблице entrances
+      // Если пропс hasSmartIntercom еще не успел обновиться, проверяем напрямую подъезд и дом
+      try {
+        const { street, house } = parseAddressParts(address);
+        const cleanStreetQuery = street.replace(/(?:\b(?:ул\.?|улица)\b|\(ул\))\s*/gi, "").trim();
+        
+        let ent = entranceNumber;
+        if (!ent && address) {
+          const m = address.match(/(?:^|,|\s)(?:п|подъезд|под\.?|п\.)\s*(\d+)/i);
+          if (m) ent = m[1];
+        }
+
+        if (cleanStreetQuery && house) {
+          console.log(`[Умный домофон] Прямой запрос к entrances: улица "${cleanStreetQuery}", дом "${house}", подъезд "${ent || 'любой'}"`);
+          let q = supabase
+            .from("entrances")
+            .select("id, entrance, has_smart_intercom")
+            .ilike("street", `%${cleanStreetQuery}%`)
+            .eq("house", house);
+
+          if (ent) {
+            q = q.eq("entrance", ent);
+          }
+
+          const { data: entList } = await q;
+          if (entList && entList.length > 0) {
+            const hasSmart = entList.some((e: any) => e.has_smart_intercom === true);
+            if (hasSmart) {
+              console.log("[Умный домофон] ✅ Подтверждено наличие умного домофона в таблице entrances");
+              setSmartIntercomAvailable(true);
+              if (ent) setDetectedEntrance(ent);
+            }
+          }
+        }
+      } catch (checkErr) {
+        console.warn("[Умный домофон] Не удалось выполнить прямую проверку entrances:", checkErr);
+      }
+
       setCred(found);
     } catch (err) {
       console.error("[Умный домофон] Ошибка при проверке учетных данных:", err);
@@ -1142,7 +1189,7 @@ const RemoteAccessCard = ({
 
   useEffect(() => {
     loadCredentials();
-  }, [address, apartment, accountNumber]);
+  }, [address, apartment, accountNumber, entranceNumber]);
 
   // Обработчик покупки доступа к приложению
   const handlePurchaseAccess = async () => {
@@ -1238,8 +1285,9 @@ const RemoteAccessCard = ({
   }
 
   // СЛУЧАЙ 1: Логопасы еще не загружены для этого адреса/квартиры
+  const isSmartAvailable = smartIntercomAvailable || hasSmartIntercom;
   if (!cred) {
-    if (hasSmartIntercom) {
+    if (isSmartAvailable) {
       return (
         <div className="p-4 rounded-2xl border border-indigo-200/80 dark:border-indigo-800/80 bg-indigo-50/40 dark:bg-indigo-950/30 flex items-start gap-3.5">
           <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 shrink-0">
@@ -1253,7 +1301,7 @@ const RemoteAccessCard = ({
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              По вашему адресу ({cleanAddressDisplay}){entranceNumber ? ` в подъезде №${entranceNumber}` : ""} установлен умный домофон. Учётные записи (логин и пароль) формируются оператором.
+              По вашему адресу ({cleanAddressDisplay}){detectedEntrance ? ` в подъезде №${detectedEntrance}` : ""} установлен умный домофон. Учётные записи (логин и пароль) формируются оператором.
             </p>
             <div className="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-xs text-indigo-900 dark:text-indigo-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <span>
@@ -1899,7 +1947,7 @@ const Cabinet = () => {
     // 1. Извлекаем эффективную улицу, дом и подъезд из стейта формы или профиля жильца
     let effStreet = orderStreet || displayStreet || "";
     let effHouse = orderHouse || displayHouse || "";
-    let effEntrance = orderEntrance || entrance || "";
+    let effEntrance = orderEntrance || entrance || userAccount?.entrance || profile?.entrance || "";
 
     // Фоллбек: если поля формы пусты, извлекаем напрямую из адреса договора или профиля
     const rawAddress = userAccount?.address || profile?.address || address || "";
@@ -1911,7 +1959,7 @@ const Cabinet = () => {
       }
     }
     if (!effEntrance && rawAddress) {
-      const entMatch = rawAddress.match(/(?:^|,|\s)(?:п|подъезд)\.?\s*(\d+)/i);
+      const entMatch = rawAddress.match(/(?:^|,|\s)(?:п|подъезд|под\.?|п\.)\s*(\d+)/i);
       if (entMatch) effEntrance = entMatch[1];
     }
 
@@ -1927,27 +1975,30 @@ const Cabinet = () => {
 
     const cleanStreet = normalizeStreetName(effStreet);
     const cleanHouse = effHouse.toLowerCase().replace(/[^а-яa-z0-9]/gi, "").replace(/^д/, "");
-    const cleanEnt = String(effEntrance || "1").replace(/[^0-9]/g, "");
+    const cleanEnt = effEntrance ? String(effEntrance).replace(/[^0-9]/g, "") : "";
 
-    // 1. Попытка точного совпадения: улица + дом + подъезд
-    const exactMatch = allEntrances.find(e => {
-      const eStreet = normalizeStreetName(e.street);
-      const eHouse = e.house.toLowerCase().replace(/[^а-яa-z0-9]/gi, "").replace(/^д/, "");
-      const eEnt = String(e.entrance).replace(/[^0-9]/g, "");
+    // 1. Попытка точного совпадения: улица + дом + подъезд (если подъезд известен)
+    if (cleanEnt) {
+      const exactMatch = allEntrances.find(e => {
+        const eStreet = normalizeStreetName(e.street);
+        const eHouse = e.house.toLowerCase().replace(/[^а-яa-z0-9]/gi, "").replace(/^д/, "");
+        const eEnt = String(e.entrance).replace(/[^0-9]/g, "");
 
-      const streetMatch = eStreet.includes(cleanStreet) || cleanStreet.includes(eStreet);
-      const houseMatch = eHouse === cleanHouse;
-      const entMatch = eEnt === cleanEnt;
+        const streetMatch = eStreet.includes(cleanStreet) || cleanStreet.includes(eStreet);
+        const houseMatch = eHouse === cleanHouse;
+        const entMatch = eEnt === cleanEnt;
 
-      return streetMatch && houseMatch && entMatch;
-    });
+        return streetMatch && houseMatch && entMatch;
+      });
 
-    if (exactMatch) {
-      console.log(`[Cabinet] Точно определен подъезд: ${exactMatch.street}, д. ${exactMatch.house}, п. ${exactMatch.entrance} (ID: ${exactMatch.id})`);
-      return exactMatch;
+      if (exactMatch) {
+        console.log(`[Cabinet] Точно определен подъезд: ${exactMatch.street}, д. ${exactMatch.house}, п. ${exactMatch.entrance} (ID: ${exactMatch.id}, Умный дом: ${exactMatch.has_smart_intercom})`);
+        return exactMatch;
+      }
     }
 
-    // 2. Если точный подъезд не найден, но дом есть в базе: ищем подъезд этого дома с привязанными товарами
+    // 2. Если точный подъезд не найден или не указан, но дом есть в базе:
+    // Ищем подъезд этого дома, отдавая приоритет подъезду с умным домофоном или привязанными товарами
     const houseMatches = allEntrances.filter(e => {
       const eStreet = normalizeStreetName(e.street);
       const eHouse = e.house.toLowerCase().replace(/[^а-яa-z0-9]/gi, "").replace(/^д/, "");
@@ -1955,11 +2006,12 @@ const Cabinet = () => {
     });
 
     if (houseMatches.length > 0) {
+      const withSmart = houseMatches.find(e => e.has_smart_intercom === true);
       const withBindings = houseMatches.find(e => 
         Object.values(productBindings).some(eIds => eIds && eIds.includes(e.id))
       );
-      const chosen = withBindings || houseMatches[0];
-      console.log(`[Cabinet] Подъезд подобран по дому: ${chosen.street}, д. ${chosen.house}, п. ${chosen.entrance} (ID: ${chosen.id})`);
+      const chosen = withSmart || withBindings || houseMatches[0];
+      console.log(`[Cabinet] Подъезд подобран по дому: ${chosen.street}, д. ${chosen.house}, п. ${chosen.entrance} (ID: ${chosen.id}, Умный дом: ${chosen.has_smart_intercom})`);
       return chosen;
     }
 
@@ -5242,7 +5294,7 @@ const Cabinet = () => {
                     userId={userId || undefined} 
                     profile={profile}
                     hasSmartIntercom={!!currentMatchedEntrance?.has_smart_intercom}
-                    entranceNumber={currentMatchedEntrance?.entrance}
+                    entranceNumber={currentMatchedEntrance?.entrance || userAccount?.entrance || profile?.entrance || (profile.address?.match(/(?:^|,|\s)(?:п|подъезд|под\.?|п\.)\s*(\d+)/i)?.[1])}
                     onOpenOrderDialog={() => {
                       setOrderType("order");
                       setIsCabinetSetupChecked(true);
@@ -6322,59 +6374,72 @@ const Cabinet = () => {
                       </div>
                     )}
 
-                    {/* 4. БЛОК: ПОДКЛЮЧЕНИЕ ЛИЧНОГО КАБИНЕТА (если есть учетные записи ИЛИ активен Умный дом) */}
+                    {/* 4. БЛОК: ПОДКЛЮЧИТЬ УМНЫЙ ДОМОФОН (если есть учетные записи ИЛИ активен Умный дом) */}
                     {(() => {
                       const canBuyCabinet = hasEntranceCredentials || !!currentMatchedEntrance?.has_smart_intercom;
                       if (!canBuyCabinet) return null;
 
-                      return products
-                        .filter(p => p.name.toLowerCase().includes("кабинет"))
-                        .map((cabinetProduct) => (
-                          <div key={cabinetProduct.id} className="space-y-2">
-                            <div
-                              className="flex items-start gap-3 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/20 dark:bg-slate-900/20 text-left"
-                            >
-                              <input
-                                id="cabinetSetup"
-                                type="checkbox"
-                                checked={isCabinetSetupChecked}
-                                onChange={(e) => {
-                                  console.log("[Заявка] Подключение ЛК:", e.target.checked);
-                                  setIsCabinetSetupChecked(e.target.checked);
-                                }}
-                                className="mt-1 h-4 w-4 rounded border-slate-300 text-amber-500 focus:ring-amber-500/20 shrink-0 cursor-pointer"
-                              />
-                              <div className="flex gap-3 text-left cursor-pointer" onClick={() => setIsCabinetSetupChecked(!isCabinetSetupChecked)}>
-                                {cabinetProduct.image_url && (
-                                  <img 
-                                    src={cabinetProduct.image_url} 
-                                    alt={cabinetProduct.name} 
-                                    className="h-12 w-12 object-cover rounded-lg flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity" 
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setPreviewImage(cabinetProduct.image_url);
-                                    }}
-                                  />
-                                )}
-                                <div>
-                                  <Label htmlFor="cabinetSetup" className="font-semibold text-sm text-foreground cursor-pointer flex items-center gap-1.5">
-                                    📱 {cabinetProduct.name}
-                                  </Label>
-                                  <p className="text-xs text-slate-500 dark:text-slate-450 mt-0.5">{cabinetProduct.description || "Единоразовое подключение и настройка личного кабинета"}</p>
-                                  <p className="text-xs text-amber-500 font-bold mt-1">+{Number(cabinetProduct.price).toFixed(0)} ₽ единоразово</p>
-                                </div>
+                      const cabinetProduct = products.find(p => p.name.toLowerCase().includes("кабинет"));
+                      const cabinetPrice = cabinetProduct ? getEffectiveProductPrice(cabinetProduct) : 300;
+
+                      return (
+                        <div className="space-y-2 text-left">
+                          <Label className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                            <Smartphone className="h-4 w-4 text-amber-500" />
+                            Доступ к умному домофону
+                          </Label>
+
+                          <div
+                            onClick={() => {
+                              console.log("[Заявка] Выбор подключения Умного домофона:", !isCabinetSetupChecked);
+                              setIsCabinetSetupChecked(!isCabinetSetupChecked);
+                            }}
+                            className={`flex items-center justify-between p-3.5 rounded-2xl border transition-all cursor-pointer select-none ${
+                              isCabinetSetupChecked
+                                ? "bg-amber-500/10 border-amber-500 shadow-sm shadow-amber-500/10"
+                                : "bg-white/40 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`h-12 w-12 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                                isCabinetSetupChecked
+                                  ? "bg-amber-500 text-white"
+                                  : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                              }`}>
+                                <Smartphone className="h-6 w-6" />
+                              </div>
+                              <div className="text-left space-y-0.5">
+                                <p className="font-bold text-sm text-foreground">
+                                  Подключить Умный домофон
+                                </p>
+                                <p className="text-xs text-muted-foreground leading-snug">
+                                  Регистрация личного кабинета для доступа к умному дому и мобильному приложению
+                                </p>
+                                <p className="text-sm font-bold text-amber-600 dark:text-amber-400 pt-0.5">
+                                  +{cabinetPrice.toFixed(0)} ₽ <span className="text-[11px] font-normal text-muted-foreground">(единоразово)</span>
+                                </p>
                               </div>
                             </div>
 
-                            {/* Поясняющая плашка при заблаговременной оплате (когда дом умный, но учетки еще заливаются) */}
-                            {!hasEntranceCredentials && currentMatchedEntrance?.has_smart_intercom && isCabinetSetupChecked && (
-                              <div className="p-2.5 px-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-800 dark:text-blue-300 text-xs flex items-center gap-2 animate-in fade-in">
-                                <Info className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
-                                <span>Доступ к приложению и логин/пароль будут автоматически активированы после загрузки базы оператором.</span>
-                              </div>
-                            )}
+                            {/* Индикатор выбора в едином стиле с выбором трубки */}
+                            <div className={`w-5 h-5 rounded-full shrink-0 flex items-center justify-center transition-all ${
+                              isCabinetSetupChecked
+                                ? "bg-amber-500 text-white"
+                                : "border border-slate-300 dark:border-slate-700"
+                            }`}>
+                              {isCabinetSetupChecked && <CheckCircle2 className="w-5 h-5 fill-amber-500 text-white" />}
+                            </div>
                           </div>
-                        ));
+
+                          {/* Поясняющая плашка при заблаговременной оплате (когда дом умный, но учетки еще заливаются) */}
+                          {!hasEntranceCredentials && currentMatchedEntrance?.has_smart_intercom && isCabinetSetupChecked && (
+                            <div className="p-2.5 px-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-800 dark:text-blue-300 text-xs flex items-center gap-2 animate-in fade-in">
+                              <Info className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
+                              <span>Доступ к приложению и логин/пароль будут автоматически активированы после загрузки базы оператором.</span>
+                            </div>
+                          )}
+                        </div>
+                      );
                     })()}
 
                     {/* Комментарий к платному заказу */}
@@ -6466,12 +6531,11 @@ const Cabinet = () => {
                       {/* ЛК */}
                       {isCabinetSetupChecked && (hasEntranceCredentials || !!currentMatchedEntrance?.has_smart_intercom) && (() => {
                         const cp = products.find(p => p.name.toLowerCase().includes("кабинет"));
-                        if (!cp) return null;
-                        const cPrice = getEffectiveProductPrice(cp);
+                        const cPrice = cp ? getEffectiveProductPrice(cp) : 300;
                         return (
                           <div className="flex justify-between items-center text-slate-500 dark:text-slate-400">
                             <div>
-                              <span>📱 {cp.name}</span>
+                              <span>📱 Подключить Умный домофон</span>
                               {!hasEntranceCredentials && currentMatchedEntrance?.has_smart_intercom && (
                                 <div className="text-[10px] text-blue-500">Доступ активируется после загрузки оператором</div>
                               )}
