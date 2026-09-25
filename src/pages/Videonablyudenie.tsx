@@ -103,19 +103,19 @@ const Videonablyudenie = () => {
       <Header />
       <main className="flex-1">
         {/* Hero Section */}
-        <section className="py-8 md:py-12 bg-gradient-to-br from-primary/10 via-background to-primary/5">
-          <div className="container">
+        <section className="py-8 md:py-12 bg-gradient-to-br from-primary/10 via-background to-primary/5 border-b border-border/40">
+          <div className="container px-4">
             <div className="max-w-3xl mx-auto text-center">
-              {/* Унифицированный градиентный заголовок */}
+              {/* Унифицированный переливающийся заголовок */}
               <h1
-                className={`text-3xl sm:text-4xl md:text-5xl section-title-gradient ${
+                className={`text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight hero-title-shimmer ${
                   isVisible.header ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-10'
                 } transition-all duration-700 ease-out`}
               >
                 Видеонаблюдение
               </h1>
               <p
-                className={`text-lg text-muted-foreground mt-4 mb-6 ${
+                className={`text-base sm:text-lg text-muted-foreground mt-4 mb-6 max-w-2xl mx-auto leading-relaxed ${
                   isVisible.header ? 'opacity-100' : 'opacity-0'
                 } transition-opacity duration-700 delay-300`}
               >

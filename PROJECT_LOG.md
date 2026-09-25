@@ -1,6 +1,39 @@
 # PROJECT_LOG.md
 
-## Дата: 2026-09-25 (Automation & CRM: Полная автоматизация данных авторизованного абонента, обязательные контакты гостей и расширенная карточка модератора)
+## Дата: 2026-09-25 (UI/UX & Design System: Единый стиль Hero-шапок на всех страницах, добавление шапки на Контакты и переливание заголовков Shimmer)
+### Изменения:
+- **Дизайн-система (`src/index.css`)** [TYPOGRAPHY & ANIMATION]:
+  * Разработан премиальный класс переливания заголовков `.hero-title-shimmer`:
+    - По буквам заголовков непрерывно и плавно пробегает лазурно-голубой световой луч (shimmer), аналогичный эффекту логотипа «Домофондар» в верхнем тулбаре.
+    - В светлой теме: глубокий сапфирово-синий градиент (`#0f172a` -> `#1e3a8a` -> `#38bdf8` -> `#1e3a8a` -> `#0f172a`).
+    - В темной теме: кристально-чистый белый с неоново-голубым свечением (`#f8fafc` -> `#cbd5e1` -> `#60a5fa` -> `#cbd5e1` -> `#f8fafc`).
+    - Исправлена анимация для класса `.text-shimmer` в темной теме (`.dark .text-shimmer`).
+- **Страница «Контакты» (`src/pages/Kontakty.tsx`)** [PAGES & NAVIGATION]:
+  * Добавлена полноценная Hero-шапка в едином стиле:
+    - Заголовок: **«Контакты и реквизиты»** с эффектом переливания `hero-title-shimmer`.
+    - Подзаголовок: *«Свяжитесь с нами удобным способом, посетите офис в Краснодаре или ознакомьтесь с официальными документами компании.»*
+    - Интерактивные вкладки гармонично размещены под шапкой в общем контейнере.
+- **Унификация и выравнивание размеров Hero-шапок на всех страницах сайта** [CONSISTENCY & RESPONSIVENESS]:
+  * По эталону страницы «Видеонаблюдение» выровнены размеры шрифтов, отступы и стиль описаний на всех страницах:
+    - Обёртка секции: `py-8 md:py-12 bg-gradient-to-br from-primary/10 via-background to-primary/5 border-b border-border/40`.
+    - Контейнер: `max-w-3xl mx-auto text-center` (или `max-w-4xl`).
+    - Заголовок `h1`: `text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight hero-title-shimmer`.
+    - Подзаголовок `p`: `text-base sm:text-lg text-muted-foreground mt-4 mb-6 max-w-2xl mx-auto leading-relaxed`.
+  * **Обновленные страницы:**
+    1) **«Видеонаблюдение» (`src/pages/Videonablyudenie.tsx`)**: эталонный заголовок с эффектом переливания.
+    2) **«Домофонные системы» (`src/pages/Domofony.tsx`)**: заголовок `hero-title-shimmer` и единые размеры текста.
+    3) **«Умный домофон» (`src/pages/SmartIntercom.tsx`)**: заголовок `hero-title-shimmer` и единые размеры текста.
+    4) **«Наши работы и отзывы клиентов» (`src/pages/NashiRaboty.tsx`)**: заголовок `hero-title-shimmer` и единые размеры текста.
+    5) **«Вопросы и ответы» (`src/pages/Voprosy.tsx`)**: заголовок `hero-title-shimmer` и единые размеры текста.
+    6) **«Рассчитайте стоимость обслуживания» (`src/pages/Calculator.tsx`)**: заголовок `hero-title-shimmer` и единые размеры текста.
+    7) **Главная страница (`src/components/Hero.tsx`)**: заголовок «Домофондар: Безопасность дома нового уровня» получил бегущий световой блик `hero-title-shimmer`.
+### Структура:
+- `/src/index.css` — Стилизация и анимация .hero-title-shimmer и .text-shimmer
+- `/src/pages/Kontakty.tsx` — Новая hero-секция страницы контактов
+- `/src/pages/Videonablyudenie.tsx`, `/src/pages/Domofony.tsx`, `/src/pages/SmartIntercom.tsx`, `/src/pages/NashiRaboty.tsx`, `/src/pages/Voprosy.tsx`, `/src/pages/Calculator.tsx`, `/src/components/Hero.tsx` — Приведение к единому стилю
+### Заметки:
+- Все заголовки страниц теперь имеют идентичные пропорции шрифтов, межстрочные интервалы и технологичный перелив.
+
 ### Изменения:
 - **Страница «Наши работы» (`src/pages/NashiRaboty.tsx`)** [UI/UX & AUTOMATION]:
   * **Максимум автоматизации без лишнего интерфейса:**

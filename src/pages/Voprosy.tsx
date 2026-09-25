@@ -31,19 +31,19 @@ const Voprosy = () => {
       <Header />
       <main className="flex-1 overflow-hidden">
         {/* Шапка страницы "Вопросы и ответы" в едином стиле */}
-        <section className="py-8 md:py-12 bg-gradient-to-br from-primary/10 via-background to-primary/5">
-          <div className="container">
+        <section className="py-8 md:py-12 bg-gradient-to-br from-primary/10 via-background to-primary/5 border-b border-border/40">
+          <div className="container px-4">
             <div className="max-w-3xl mx-auto text-center">
-              {/* Унифицированный градиентный заголовок с анимацией появления сверху вниз */}
+              {/* Унифицированный переливающийся заголовок */}
               <h1
-                className={`text-3xl sm:text-4xl md:text-5xl section-title-gradient transition-all duration-700 ease-out ${
+                className={`text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight hero-title-shimmer transition-all duration-700 ease-out ${
                   isVisible.header ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-10'
                 }`}
               >
                 Вопросы и ответы
               </h1>
               <p
-                className={`text-lg text-muted-foreground mt-4 mb-2 transition-all duration-700 delay-200 ease-out ${
+                className={`text-base sm:text-lg text-muted-foreground mt-4 mb-2 max-w-2xl mx-auto leading-relaxed transition-all duration-700 delay-200 ease-out ${
                   isVisible.header ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'
                 }`}
               >

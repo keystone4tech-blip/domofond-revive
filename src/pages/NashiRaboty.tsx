@@ -417,12 +417,12 @@ const NashiRaboty = () => {
       <Header />
       <main className="flex-1">
         {/* Шапка раздела */}
-        <section className="py-10 md:py-16 bg-gradient-to-br from-primary/10 via-background to-primary/5 border-b border-border/50">
-          <div className="container px-4 max-w-5xl mx-auto text-center">
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold section-title-gradient mb-4">
+        <section className="py-8 md:py-12 bg-gradient-to-br from-primary/10 via-background to-primary/5 border-b border-border/40">
+          <div className="container px-4 max-w-4xl mx-auto text-center">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight hero-title-shimmer">
               Наши работы и отзывы клиентов
             </h1>
-            <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed mb-8">
+            <p className="text-base sm:text-lg text-muted-foreground mt-4 mb-6 max-w-2xl mx-auto leading-relaxed">
               Честные примеры установленных систем домофонии, видеонаблюдения и СКУД в Краснодаре с живыми фотографиями и видео от жителей и ТСЖ.
             </p>
 

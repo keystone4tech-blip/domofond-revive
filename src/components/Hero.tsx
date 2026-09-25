@@ -54,8 +54,8 @@ const Hero = () => {
             </div>
 
             <div className="space-y-2 md:space-y-3">
-              {/* h1 заголовок: добавлен класс inline-block, pb-3 md:pb-4 и leading-[1.15] во избежание обрезания букв "у" и "р" */}
-              <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-blue-950 to-blue-800 dark:from-white dark:to-neutral-400 leading-[1.15] pb-3 md:pb-4 inline-block animate-fade-in">
+              {/* h1 заголовок с переливающимся эффектом Shimmer как в тулбаре логотипа */}
+              <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight hero-title-shimmer leading-[1.15] pb-3 md:pb-4 inline-block animate-fade-in">
                 Домофондар: <br />
                 Безопасность дома <br />
                 нового уровня

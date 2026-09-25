@@ -90,12 +90,26 @@ const Kontakty = () => {
   };
 
   return (
-    <div className="min-h-screen transition-colors duration-300">
+    <div className="min-h-screen flex flex-col transition-colors duration-300">
       <Header />
-      <main className="container mx-auto px-4 py-8 md:py-16 max-w-7xl">
-        
-        {/* Интерактивные вкладки на странице контактов с контролируемым значением */}
-        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-8">
+      <main className="flex-1">
+        {/* Шапка страницы "Контакты" в едином стиле */}
+        <section className="py-8 md:py-12 bg-gradient-to-br from-primary/10 via-background to-primary/5 border-b border-border/40">
+          <div className="container px-4">
+            <div className="max-w-3xl mx-auto text-center">
+              <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight hero-title-shimmer">
+                Контакты и реквизиты
+              </h1>
+              <p className="text-base sm:text-lg text-muted-foreground mt-4 mb-2 max-w-2xl mx-auto leading-relaxed">
+                Свяжитесь с нами удобным способом, посетите офис в Краснодаре или ознакомьтесь с официальными документами компании.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <div className="container mx-auto px-4 py-8 md:py-12 max-w-7xl">
+          {/* Интерактивные вкладки на странице контактов с контролируемым значением */}
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-8">
           
           {/* Стилизованная панель переключателей вкладок с плавной анимацией появления сверху вниз */}
           <div
@@ -159,7 +173,7 @@ const Kontakty = () => {
           </div>
 
         </Tabs>
-
+        </div>
       </main>
       <Footer />
     </div>

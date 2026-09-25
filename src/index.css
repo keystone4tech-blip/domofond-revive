@@ -261,7 +261,7 @@
       90deg,
       #ffffff 0%,
       #ffffff 35%,
-      #94a3b8 50%,
+      #60a5fa 50%,
       #ffffff 65%,
       #ffffff 100%
     );
@@ -269,6 +269,43 @@
     color: transparent;
     -webkit-background-clip: text;
     background-clip: text;
+    animation: text-shimmer-wave 4s linear infinite;
+  }
+
+  /* Премиальный класс заголовков страниц с бегущим световым переливом (Shimmer) */
+  .hero-title-shimmer {
+    background: linear-gradient(
+      90deg,
+      #0f172a 0%,
+      #1e3a8a 30%,
+      #38bdf8 50%,
+      #1e3a8a 70%,
+      #0f172a 100%
+    );
+    background-size: 200% auto;
+    color: transparent;
+    -webkit-background-clip: text;
+    background-clip: text;
+    animation: text-shimmer-wave 5s linear infinite;
+    display: inline-block;
+    padding-bottom: 0.25rem;
+    line-height: 1.15;
+  }
+
+  .dark .hero-title-shimmer {
+    background: linear-gradient(
+      90deg,
+      #f8fafc 0%,
+      #cbd5e1 30%,
+      #60a5fa 50%,
+      #cbd5e1 70%,
+      #f8fafc 100%
+    );
+    background-size: 200% auto;
+    color: transparent;
+    -webkit-background-clip: text;
+    background-clip: text;
+    animation: text-shimmer-wave 5s linear infinite;
   }
   
   /* Унифицированный класс для красивых градиентных заголовков разделов (на светлой теме: синий градиент, на темной: белый/серый) */
