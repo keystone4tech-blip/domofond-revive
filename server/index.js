@@ -1288,20 +1288,31 @@ app.post('/api/portfolio', async (req, res) => {
       review_text,
       rating = 5,
       media_files = [],
-      author_phone
+      author_phone,
+      client_info = {}
     } = req.body;
 
     if (!author_display_name || !author_display_name.trim()) {
-      return res.status(400).json({ error: 'Укажите имя/отчество или название организации' });
+      return res.status(400).json({ error: 'Укажите ФИО/имя или название организации' });
     }
     if (!review_text || !review_text.trim()) {
       return res.status(400).json({ error: 'Напишите отзыв или описание работ' });
     }
 
+    // Если пользователь сторонний (не наш зарегистрированный абонент), номер телефона обязателен для связи менеджеров
+    const isRegistered = Boolean(client_info && client_info.is_registered_client);
+    const resolvedPhone = isRegistered ? (client_info.phone || author_phone || null) : (author_phone || '').trim();
+
+    if (!isRegistered && (!resolvedPhone || resolvedPhone.length < 6)) {
+      return res.status(400).json({ 
+        error: 'Пожалуйста, укажите ваш контактный номер телефона, чтобы менеджеры могли связаться при необходимости' 
+      });
+    }
+
     const query = `
       INSERT INTO portfolio_projects 
-      (author_type, author_display_name, project_type, title, review_text, rating, media_files, author_phone, status, created_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', CURRENT_TIMESTAMP)
+      (author_type, author_display_name, project_type, title, review_text, rating, media_files, author_phone, client_info, status, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending', CURRENT_TIMESTAMP)
       RETURNING *;
     `;
     const values = [
@@ -1312,11 +1323,13 @@ app.post('/api/portfolio', async (req, res) => {
       review_text.trim(),
       Math.min(5, Math.max(1, Number(rating) || 5)),
       JSON.stringify(media_files || []),
-      author_phone || null
+      resolvedPhone || null,
+      JSON.stringify(client_info || {})
     ];
 
     const result = await pool.query(query, values);
-    console.log(`[Бэкенд: Портфолио] Поступил новый объект на модерацию от "${author_display_name}": ${result.rows[0].id}`);
+    const clientTypeStr = isRegistered ? 'Зарегистрированный абонент' : 'Сторонний гость';
+    console.log(`[Бэкенд: Портфолио] Поступил новый объект на модерацию [${clientTypeStr}] от "${author_display_name}" (тел: ${resolvedPhone || 'не указан'}): ID ${result.rows[0].id}`);
 
     res.json({
       success: true,

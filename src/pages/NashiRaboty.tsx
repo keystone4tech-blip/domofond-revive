@@ -159,6 +159,10 @@ const NashiRaboty = () => {
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  // Стейты авторизации и расширенных данных абонента для модератора
+  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [clientFullData, setClientFullData] = useState<any>(null);
+
   // Загрузка опубликованных объектов с бэкенда
   const fetchPublishedProjects = async () => {
     try {
@@ -182,34 +186,70 @@ const NashiRaboty = () => {
     loadCurrentUserProfile();
   }, []);
 
-  // Если пользователь авторизован, автоматически подставляем его Имя Отчество из базы
+  // Если пользователь авторизован, автоматически собираем все данные абонента в фоне
   const loadCurrentUserProfile = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
+        setIsAuthorized(true);
+        console.log(`[NashiRaboty] Пользователь авторизован: ${user.id}`);
+
+        // Запрашиваем профиль из БД
         const { data: profile } = await supabase
           .from("profiles")
-          .select("full_name, phone")
+          .select("id, full_name, phone, address, apartment, floor, email, is_verified")
           .eq("id", user.id)
           .maybeSingle();
 
-        if (profile?.full_name) {
-          // Извлекаем Имя и Отчество (без фамилии для конфиденциальности, либо полное имя)
-          const parts = profile.full_name.trim().split(/\s+/);
-          let safeName = profile.full_name;
-          if (parts.length >= 2) {
-            // Например: Иван Иванович
-            safeName = parts.length >= 3 ? `${parts[1]} ${parts[2]}` : `${parts[0]} ${parts[1]}`;
+        if (profile) {
+          let accountNumber = null;
+          // Пытаемся найти привязанный лицевой счет из accounts
+          if (profile.address && profile.apartment) {
+            try {
+              const { data: acc } = await supabase
+                .from("accounts")
+                .select("account_number")
+                .ilike("address", `%${profile.address}%`)
+                .eq("apartment", profile.apartment)
+                .maybeSingle();
+              if (acc?.account_number) accountNumber = acc.account_number;
+            } catch (accErr) {
+              console.warn("[NashiRaboty] Поиск Л/С:", accErr);
+            }
           }
-          console.log(`[NashiRaboty] Подставлено имя авторизованного клиента: ${safeName}`);
-          setDisplayName(safeName);
+
+          setClientFullData({
+            id: profile.id,
+            full_name: profile.full_name,
+            phone: profile.phone,
+            address: profile.address,
+            apartment: profile.apartment,
+            floor: profile.floor,
+            email: profile.email,
+            is_verified: profile.is_verified,
+            account_number: accountNumber
+          });
+
+          if (profile.full_name) {
+            // Для публичного отображения подставляем Имя Отчество
+            const parts = profile.full_name.trim().split(/\s+/);
+            let safeName = profile.full_name;
+            if (parts.length >= 2) {
+              safeName = parts.length >= 3 ? `${parts[1]} ${parts[2]}` : `${parts[0]} ${parts[1]}`;
+            }
+            setDisplayName(safeName);
+          }
+          if (profile.phone) {
+            setAuthorPhone(profile.phone);
+          }
         }
-        if (profile?.phone) {
-          setAuthorPhone(profile.phone);
-        }
+      } else {
+        setIsAuthorized(false);
+        setClientFullData(null);
       }
     } catch (err) {
-      console.warn("[NashiRaboty] Не удалось загрузить профиль текущего пользователя:", err);
+      console.warn("[NashiRaboty] Не удалось определить профиль пользователя:", err);
+      setIsAuthorized(false);
     }
   };
 
@@ -286,9 +326,23 @@ const NashiRaboty = () => {
   // Отправка заявки на модерацию
   const handleSubmitReview = async () => {
     if (!displayName.trim()) {
-      toast({ title: "Укажите ваше имя или ТСЖ", variant: "destructive" });
+      toast({ 
+        title: isAuthorized ? "Укажите имя для публикации" : "Укажите ваше ФИО или Имя Отчество", 
+        variant: "destructive" 
+      });
       return;
     }
+
+    // Если пользователь НЕ авторизован, контактный телефон обязателен для связи менеджеров
+    if (!isAuthorized && (!authorPhone.trim() || authorPhone.trim().length < 6)) {
+      toast({ 
+        title: "Укажите контактный номер телефона", 
+        description: "Номер необходим менеджерам для подтверждения при необходимости",
+        variant: "destructive" 
+      });
+      return;
+    }
+
     if (!reviewText.trim()) {
       toast({ title: "Напишите ваш отзыв или описание", variant: "destructive" });
       return;
@@ -297,6 +351,25 @@ const NashiRaboty = () => {
     setSubmitting(true);
     try {
       console.log("[NashiRaboty] Отправка объекта на модерацию...");
+
+      // Формируем расширенный снимок данных заявителя для CRM модерации
+      const client_info = isAuthorized && clientFullData ? {
+        is_registered_client: true,
+        user_id: clientFullData.id,
+        full_name: clientFullData.full_name || displayName.trim(),
+        phone: clientFullData.phone || authorPhone.trim() || null,
+        email: clientFullData.email || null,
+        address: clientFullData.address || null,
+        apartment: clientFullData.apartment || null,
+        floor: clientFullData.floor || null,
+        account_number: clientFullData.account_number || null,
+        is_verified: clientFullData.is_verified ?? null
+      } : {
+        is_registered_client: false,
+        full_name: displayName.trim(),
+        phone: authorPhone.trim()
+      };
+
       const res = await fetch("/backend-api/api/portfolio", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -308,7 +381,8 @@ const NashiRaboty = () => {
           review_text: reviewText.trim(),
           rating,
           media_files: mediaFiles,
-          author_phone: authorPhone.trim() || null
+          author_phone: isAuthorized ? (clientFullData?.phone || authorPhone.trim() || null) : authorPhone.trim(),
+          client_info
         })
       });
 
@@ -552,7 +626,9 @@ const NashiRaboty = () => {
                   ? "Название ТСЖ / ЖСК / Совета дома *" 
                   : authorType === "company" 
                   ? "Название организации *" 
-                  : "Ваше имя и отчество (без точного адреса) *"}
+                  : !isAuthorized 
+                  ? "Ваше ФИО или Имя Отчество *" 
+                  : "Имя для публикации на сайте (без точного адреса) *"}
               </Label>
               <Input
                 placeholder={
@@ -560,14 +636,14 @@ const NashiRaboty = () => {
                     ? "ТСЖ «Солнечный берег»" 
                     : authorType === "company" 
                     ? "ООО «Техносервис»" 
-                    : "Алексей Михайлович (житель МКД)"
+                    : "Алексей Михайлович"
                 }
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 className="mt-1"
               />
               <p className="text-[11px] text-muted-foreground mt-1">
-                🔒 Для защиты личных данных точный адрес дома и квартиры не требуется.
+                🔒 Для защиты персональных данных точный адрес дома и квартиры указывать не нужно.
               </p>
             </div>
 
@@ -664,17 +740,23 @@ const NashiRaboty = () => {
               )}
             </div>
 
-            {/* Контактный телефон (не публикуется) */}
-            <div>
-              <Label className="text-xs font-semibold">Контактный телефон (для модератора, на сайте не виден)</Label>
-              <Input
-                type="tel"
-                placeholder="+7 (___) ___-__-__"
-                value={authorPhone}
-                onChange={(e) => setAuthorPhone(e.target.value)}
-                className="mt-1"
-              />
-            </div>
+            {/* Контактный телефон: для авторизованных абонентов скрыт (отправляется автоматически), для гостей обязателен для связи */}
+            {!isAuthorized && (
+              <div>
+                <Label className="text-xs font-semibold">Контактный телефон для связи менеджеров *</Label>
+                <Input
+                  type="tel"
+                  placeholder="+7 (___) ___-__-__"
+                  value={authorPhone}
+                  onChange={(e) => setAuthorPhone(e.target.value)}
+                  className="mt-1"
+                  required
+                />
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  🔒 Номер виден только менеджерам компании для связи и на сайте опубликован не будет.
+                </p>
+              </div>
+            )}
           </div>
 
           <DialogFooter className="gap-2 sm:gap-0 pt-2 border-t border-border/40">

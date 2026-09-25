@@ -10,7 +10,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { useToast } from "@/hooks/use-toast";
 import { 
   CheckCircle2, XCircle, Trash2, Eye, Star, Upload, Video, Image as ImageIcon, 
-  Plus, Loader2, Sparkles, Building, User, Building2, Phone, Calendar, RefreshCw
+  Plus, Loader2, Sparkles, Building, User, Building2, Phone, Calendar, RefreshCw,
+  UserCheck, MapPin
 } from "lucide-react";
 
 interface MediaItem {
@@ -30,6 +31,18 @@ interface PortfolioProject {
   media_files: MediaItem[];
   status: "pending" | "approved" | "rejected";
   author_phone: string | null;
+  client_info?: {
+    is_registered_client?: boolean;
+    user_id?: string;
+    full_name?: string;
+    phone?: string;
+    email?: string;
+    address?: string;
+    apartment?: string;
+    floor?: string;
+    account_number?: string;
+    is_verified?: boolean;
+  };
   moderator_comment: string | null;
   created_at: string;
   approved_at: string | null;
@@ -452,18 +465,81 @@ export const PortfolioManager = () => {
                     «{project.review_text}»
                   </p>
 
-                  {/* Дата создания и контактный телефон */}
-                  <div className="text-[11px] text-muted-foreground space-y-1 pt-1 border-t border-border/40">
-                    <div className="flex items-center gap-1">
-                      <Calendar className="h-3 w-3" />
-                      <span>{new Date(project.created_at).toLocaleDateString("ru-RU")}</span>
-                    </div>
-                    {project.author_phone && (
-                      <div className="flex items-center gap-1 text-primary">
-                        <Phone className="h-3 w-3" />
-                        <span>{project.author_phone} (для связи)</span>
+                  {/* Блок информации о заявителе для модератора */}
+                  <div className="pt-2 border-t border-border/40 space-y-1.5 text-[11px]">
+                    {project.client_info?.is_registered_client ? (
+                      <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-950 dark:text-emerald-200 space-y-1">
+                        <div className="flex items-center justify-between font-semibold">
+                          <span className="flex items-center gap-1 text-emerald-700 dark:text-emerald-400">
+                            <UserCheck className="h-3.5 w-3.5" />
+                            <span>Наш абонент (ЛК)</span>
+                          </span>
+                          {project.client_info.account_number && (
+                            <Badge variant="outline" className="text-[10px] h-4 bg-emerald-500/15 border-emerald-500/30 text-emerald-700 dark:text-emerald-300">
+                              Л/С: {project.client_info.account_number}
+                            </Badge>
+                          )}
+                        </div>
+
+                        {project.client_info.full_name && (
+                          <div className="font-medium text-foreground">
+                            ФИО: <span className="font-semibold">{project.client_info.full_name}</span>
+                          </div>
+                        )}
+
+                        {(project.client_info.phone || project.author_phone) && (
+                          <div className="flex items-center gap-1 text-primary font-medium">
+                            <Phone className="h-3 w-3 shrink-0" />
+                            <a href={`tel:${project.client_info.phone || project.author_phone}`} className="hover:underline">
+                              {project.client_info.phone || project.author_phone}
+                            </a>
+                          </div>
+                        )}
+
+                        {project.client_info.address && (
+                          <div className="text-muted-foreground flex items-start gap-1">
+                            <MapPin className="h-3 w-3 shrink-0 mt-0.5 text-muted-foreground" />
+                            <span>
+                              {project.client_info.address}
+                              {project.client_info.apartment ? `, кв. ${project.client_info.apartment}` : ""}
+                              {project.client_info.floor ? `, этаж ${project.client_info.floor}` : ""}
+                            </span>
+                          </div>
+                        )}
+
+                        {project.client_info.email && (
+                          <div className="text-muted-foreground">
+                            Email: {project.client_info.email}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="p-2.5 rounded-lg bg-muted/40 border border-border/50 space-y-1 text-muted-foreground">
+                        <div className="flex items-center gap-1 font-semibold text-foreground">
+                          <User className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span>Сторонний пользователь / Гость</span>
+                        </div>
+                        {project.author_display_name && (
+                          <div>ФИО / Имя: <span className="font-medium text-foreground">{project.author_display_name}</span></div>
+                        )}
+                        {project.author_phone ? (
+                          <div className="flex items-center gap-1 text-primary font-medium">
+                            <Phone className="h-3 w-3" />
+                            <a href={`tel:${project.author_phone}`} className="hover:underline">
+                              {project.author_phone}
+                            </a>
+                            <span className="text-[10px] text-muted-foreground">(для связи)</span>
+                          </div>
+                        ) : (
+                          <div className="text-destructive text-[10px]">Телефон не указан</div>
+                        )}
                       </div>
                     )}
+
+                    <div className="flex items-center gap-1 text-muted-foreground pt-0.5">
+                      <Calendar className="h-3 w-3" />
+                      <span>Дата: {new Date(project.created_at).toLocaleString("ru-RU")}</span>
+                    </div>
                   </div>
                 </CardContent>
               </div>
