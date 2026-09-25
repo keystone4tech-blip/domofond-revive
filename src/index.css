@@ -912,5 +912,20 @@
   background: radial-gradient(circle at 35% 35%, rgba(56, 189, 248, 0.8) 0%, rgba(14, 116, 144, 0.9) 35%, rgba(15, 23, 42, 1) 70%);
 }
 
+/* Мягкое спокойное парение значков без резких скачков (микро-сдвиг 5px) */
+@keyframes gentle-hover {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+.animate-gentle-hover {
+  animation: gentle-hover 7s ease-in-out infinite;
+}
+
+
 
 
