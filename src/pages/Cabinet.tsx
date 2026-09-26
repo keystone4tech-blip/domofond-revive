@@ -1911,7 +1911,11 @@ const Cabinet = () => {
 
 
   const hasAdminConsoleAccess = userRoles.some((role) => ["admin", "director"].includes(role));
-  const isLocked = !!profile?.is_verified && !editing;
+  
+  // RULE 2: Профиль зафиксирован, если сохранены ключевые обязательные реквизиты (ФИО и адрес) 
+  // или профиль уже верифицирован оператором, и при этом пользователь не нажал кнопку редактирования
+  const hasSavedProfile = !!((profile?.full_name?.trim() && profile?.address?.trim()) || profile?.is_verified);
+  const isLocked = hasSavedProfile && !editing;
   const [isConfirmChangeDialogOpen, setIsConfirmChangeDialogOpen] = useState(false); // Открытие диалога подтверждения перед редактированием профиля
 
   // --- СТЕЙТЫ ДЛЯ ФОРМЫ ЗАКАЗА УСЛУГ И ОБОРУДОВАНИЯ ---
@@ -4029,18 +4033,33 @@ const Cabinet = () => {
     if (!displayStreet || !displayStreet.trim()) missingFields.push("Улица");
     if (!displayHouse || !displayHouse.trim()) missingFields.push("Номер дома");
     
+    // Вспомогательная функция строгой проверки служебного email авторизации по телефону
+    const isSystemEmail = (em: string) => {
+      if (!em) return true;
+      const lower = em.toLowerCase().trim();
+      return lower.startsWith("phone_") || lower.endsWith("@domofondar.ru") || lower.endsWith("@домофондар.рф");
+    };
+
     // Номер квартиры, подъезд, этаж и email не являются обязательными полями.
-    // Если пользователь указал email, сохраняем его в стейте
+    // Если пользователь указал email, сохраняем его в стейте, строго исключая синтетический phone_XXXXXXXXXX
     let finalEmail = (emailInput || "").trim();
+    if (isSystemEmail(finalEmail)) {
+      finalEmail = "";
+    }
+
+    // Если поле email не заполнено пользователем, проверяем, был ли у него настоящий личный email
     if (!finalEmail) {
       const storedUser = localStorage.getItem("user") || sessionStorage.getItem("user");
       const parsedUser = storedUser ? JSON.parse(storedUser) : null;
-      finalEmail = (email || parsedUser?.email || "").trim();
-      if (finalEmail) {
-        setEmailInput(finalEmail);
-        setEmail(finalEmail);
+      const candidateEmail = (email || parsedUser?.email || "").trim();
+      if (candidateEmail && !isSystemEmail(candidateEmail)) {
+        finalEmail = candidateEmail;
       }
     }
+
+    // Синхронизируем стейты email (только чистый настоящий email либо пустая строка)
+    setEmailInput(finalEmail);
+    setEmail(finalEmail);
     
     // Проверка согласия с обработкой персональных данных (ФЗ-152 РФ)
     if (!agreedToTerms) {
@@ -5283,7 +5302,7 @@ const Cabinet = () => {
                       >
                         {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin shrink-0" />}
                         <span className="text-center">
-                          {profile?.is_verified ? "Сохранить изменения" : "Сохранить данные профиля"}
+                          {hasSavedProfile ? "Сохранить изменения" : "Сохранить данные профиля"}
                         </span>
                       </Button>
                       {editing && (
@@ -5365,52 +5384,68 @@ const Cabinet = () => {
                   </div>
                 )}
 
-                {/* 10. КНОПКА «ИЗМЕНИТЬ ПЕРСОНАЛЬНЫЕ ДАННЫЕ» (перенесена в нижнюю часть раздела) */}
-                {profile?.is_verified && !editing && (
+                {/* 10. КНОПКА «ИЗМЕНИТЬ ПЕРСОНАЛЬНЫЕ ДАННЫЕ» / «РЕДАКТИРОВАТЬ ДАННЫЕ» */}
+                {hasSavedProfile && !editing && (
                   <div className="pt-4 border-t border-slate-100 dark:border-slate-800/60 flex flex-col items-center gap-2">
-                    <AlertDialog open={isConfirmChangeDialogOpen} onOpenChange={setIsConfirmChangeDialogOpen}>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="rounded-xl font-bold border-amber-500/40 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10 h-10 px-5 gap-2 shadow-xs transition-all"
-                        >
-                          <Pencil className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                          <span>Изменить персональные данные</span>
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent className="glass-premium border-none rounded-3xl shadow-2xl p-6">
-                        <AlertDialogHeader>
-                          <AlertDialogTitle className="text-lg font-bold text-foreground font-display flex items-center gap-2">
-                            <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0" />
-                            <span>Изменение персональных данных</span>
-                          </AlertDialogTitle>
-                          <AlertDialogDescription className="text-xs text-slate-600 dark:text-slate-300 mt-2 leading-relaxed space-y-2 text-left">
-                            <p>
-                              Внимание! Изменение персональных данных (адрес, лицевой счёт, ФИО) потребует обязательной повторной проверки и верификации оператором.
-                            </p>
-                            <p className="text-[11px] text-muted-foreground">
-                              До момента подтверждения оператором продолжают действовать ваши текущие реквизиты, расчет задолженности и доступ.
-                            </p>
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter className="mt-4 gap-2">
-                          <AlertDialogCancel className="font-semibold rounded-xl h-10">
-                            Отмена
-                          </AlertDialogCancel>
-                          <AlertDialogAction 
-                            onClick={() => {
-                              console.log("[Кабинет] Жилец подтвердил предупреждение и открыл форму редактирования профиля");
-                              setEditing(true);
-                              setAgreedToTerms(true);
-                            }} 
-                            className="bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-xl h-10"
+                    {profile?.is_verified ? (
+                      <AlertDialog open={isConfirmChangeDialogOpen} onOpenChange={setIsConfirmChangeDialogOpen}>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="rounded-xl font-bold border-blue-500/40 text-blue-700 dark:text-sky-400 hover:bg-blue-500/10 h-10 px-5 gap-2 shadow-xs transition-all"
                           >
-                            Да, продолжить
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                            <Pencil className="h-4 w-4 text-blue-600 dark:text-sky-400" />
+                            <span>Изменить персональные данные</span>
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent className="glass-premium border-none rounded-3xl shadow-2xl p-6">
+                          <AlertDialogHeader>
+                            <AlertDialogTitle className="text-lg font-bold text-foreground font-display flex items-center gap-2">
+                              <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0" />
+                              <span>Изменение персональных данных</span>
+                            </AlertDialogTitle>
+                            <AlertDialogDescription className="text-xs text-slate-600 dark:text-slate-300 mt-2 leading-relaxed space-y-2 text-left">
+                              <p>
+                                Внимание! Изменение персональных данных (адрес, лицевой счёт, ФИО) потребует обязательной повторной проверки и верификации оператором.
+                              </p>
+                              <p className="text-[11px] text-muted-foreground">
+                                До момента подтверждения оператором продолжают действовать ваши текущие реквизиты, расчет задолженности и доступ.
+                              </p>
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter className="mt-4 gap-2">
+                            <AlertDialogCancel className="font-semibold rounded-xl h-10">
+                              Отмена
+                            </AlertDialogCancel>
+                            <AlertDialogAction 
+                              onClick={() => {
+                                console.log("[Кабинет] Жилец подтвердил предупреждение и открыл форму редактирования профиля");
+                                setEditing(true);
+                                setAgreedToTerms(true);
+                              }} 
+                              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl h-10"
+                            >
+                              Да, продолжить
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          console.log("[Кабинет] Жилец открыл режим редактирования сохраненных данных профиля");
+                          setEditing(true);
+                          setAgreedToTerms(true);
+                        }}
+                        className="rounded-xl font-bold border-blue-500/40 text-blue-700 dark:text-sky-400 hover:bg-blue-500/10 h-10 px-5 gap-2 shadow-xs transition-all"
+                      >
+                        <Pencil className="h-4 w-4 text-blue-600 dark:text-sky-400" />
+                        <span>Редактировать данные</span>
+                      </Button>
+                    )}
                   </div>
                 )}
 
