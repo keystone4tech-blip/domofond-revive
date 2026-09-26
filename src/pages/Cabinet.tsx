@@ -559,7 +559,7 @@ const DebtCard = ({
             <DialogContent className="max-w-md">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2 text-base font-bold">
-                  <div className="h-8 w-8 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                  <div className="h-8 w-8 rounded-full bg-blue-500/10 text-blue-600 dark:text-sky-400 flex items-center justify-center">
                     <Zap className="h-4 w-4 fill-current" />
                   </div>
                   Быстрая оплата ЮKassa
@@ -1646,13 +1646,13 @@ const RemoteAccessCard = ({
     <div className="p-5 rounded-2xl border border-amber-500/40 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent shadow-sm text-left space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          <div className="p-2.5 rounded-xl bg-amber-500 text-white shrink-0 shadow-sm">
+          <div className="p-2.5 rounded-xl bg-blue-600 text-white shrink-0 shadow-sm">
             <Smartphone className="h-5 w-5" />
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <p className="font-bold text-sm text-foreground">Удалённый доступ к домофону</p>
-              <Badge className="bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded-full">
+              <Badge className="bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full">
                 Доступен к подключению
               </Badge>
             </div>
@@ -1701,7 +1701,7 @@ const RemoteAccessCard = ({
         {!profile?.is_verified && profile?.verification_status !== "pending" && onOpenVerification && (
           <button
             onClick={onOpenVerification}
-            className="text-xs text-amber-600 dark:text-amber-400 font-semibold hover:underline shrink-0"
+            className="text-xs text-blue-600 dark:text-sky-400 font-semibold hover:underline shrink-0"
           >
             Подтвердить →
           </button>
@@ -5128,7 +5128,7 @@ const Cabinet = () => {
                               type="button"
                               className={`px-1.5 py-1.5 text-xs text-center rounded-lg border transition-all focus:outline-none font-semibold ${
                                 entrance === ent
-                                  ? "bg-amber-500 text-white border-amber-500 scale-102"
+                                  ? "bg-blue-600 text-white border-amber-500 scale-102"
                                   : "border-slate-200 dark:border-slate-700 hover:bg-amber-500/10 hover:border-amber-500/30 text-foreground"
                               }`}
                               onClick={() => {
@@ -6086,7 +6086,7 @@ const Cabinet = () => {
               <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto p-4 sm:p-6 glass-premium border-none rounded-[24px] shadow-2xl animate-in fade-in duration-200">
                 <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
                   <DialogTitle className="text-xl font-bold flex items-center gap-2 text-foreground font-display">
-                    <Wrench className="h-5 w-5 text-amber-500" />
+                    <Wrench className="h-5 w-5 text-blue-600 dark:text-sky-400" />
                     Создание новой заявки
                   </DialogTitle>
                   <DialogDescription className="text-xs text-slate-500 dark:text-slate-400 mt-1">
@@ -6175,8 +6175,8 @@ const Cabinet = () => {
                               }}
                               className={`px-2.5 py-1 rounded-lg text-xs border transition-all font-medium active:scale-95 flex items-center gap-1 ${
                                 isSelected
-                                  ? "border-amber-500 bg-amber-500/20 text-amber-800 dark:text-amber-200 font-bold shadow-xs"
-                                  : "border-slate-200 dark:border-slate-800 bg-white/40 dark:bg-slate-900/40 hover:border-amber-500/50 hover:bg-amber-500/10 text-slate-700 dark:text-slate-300"
+                                  ? "border-blue-500 bg-blue-500/20 text-blue-800 dark:text-blue-200 font-bold shadow-xs"
+                                  : "border-slate-200 dark:border-slate-800 bg-white/40 dark:bg-slate-900/40 hover:border-blue-500/50 hover:bg-blue-500/10 text-slate-700 dark:text-slate-300"
                               }`}
                             >
                               <span>{isSelected ? "✓" : "+"}</span>
@@ -6195,7 +6195,7 @@ const Cabinet = () => {
                         value={repairProblem}
                         onChange={(e) => setRepairProblem(e.target.value)}
                         rows={4}
-                        className="bg-white/50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 text-sm font-medium rounded-xl transition-all placeholder-slate-400"
+                        className="bg-white/50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-sm font-medium rounded-xl transition-all placeholder-slate-400"
                       />
                     </div>
                   </div>
@@ -6206,12 +6206,12 @@ const Cabinet = () => {
                   <div className="space-y-5 py-1">
                     {/* Если к подъезду не привязано оборудование и услуги — информационный блок связи с диспетчером */}
                     {availableProducts.length === 0 ? (
-                      <div className="py-6 px-4 text-center space-y-4 rounded-2xl bg-amber-500/5 border border-amber-500/20 my-2">
-                        <div className="w-14 h-14 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto shadow-sm">
+                      <div className="py-6 px-4 text-center space-y-4 rounded-2xl bg-blue-500/5 border border-blue-500/20 my-2">
+                        <div className="w-14 h-14 rounded-2xl bg-blue-500/10 text-blue-600 dark:text-sky-400 flex items-center justify-center mx-auto shadow-sm">
                           <Headphones className="w-7 h-7" />
                         </div>
                         <div className="space-y-1.5 max-w-sm mx-auto">
-                          <h4 className="font-bold text-base text-foreground">
+                          <h4 className="font-bold text-base text-foreground font-display">
                             Индивидуальный подбор оборудования
                           </h4>
                           <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
@@ -6223,7 +6223,7 @@ const Cabinet = () => {
                         <div className="pt-1 flex flex-col sm:flex-row items-center justify-center gap-2 max-w-xs mx-auto">
                           <a
                             href="tel:+79034118393"
-                            className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm shadow-md transition-all active:scale-95"
+                            className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-md transition-all active:scale-95"
                           >
                             <Phone className="w-4 h-4" />
                             <span>+7 (903) 411-83-93</span>
@@ -6235,7 +6235,7 @@ const Cabinet = () => {
                         </p>
 
                         {/* Навигационные кнопки перехода в Контакты и переключения на Ремонт */}
-                        <div className="pt-2 border-t border-amber-500/15 flex flex-col sm:flex-row items-center justify-center gap-2">
+                        <div className="pt-2 border-t border-blue-500/15 flex flex-col sm:flex-row items-center justify-center gap-2">
                           <Button
                             type="button"
                             variant="outline"
@@ -6244,9 +6244,9 @@ const Cabinet = () => {
                               setIsOrderDialogOpen(false);
                               navigate("/kontakty");
                             }}
-                            className="w-full sm:w-auto text-xs font-semibold rounded-xl h-9 flex items-center gap-1.5 border-amber-500/30 hover:bg-amber-500/10"
+                            className="w-full sm:w-auto text-xs font-semibold rounded-xl h-9 flex items-center gap-1.5 border-blue-500/30 hover:bg-blue-500/10 text-blue-700 dark:text-blue-300"
                           >
-                            <MapPin className="w-3.5 h-3.5 text-amber-500" />
+                            <MapPin className="w-3.5 h-3.5 text-blue-600 dark:text-sky-400" />
                             <span>Страница «Контакты»</span>
                           </Button>
                           <Button
@@ -6266,14 +6266,14 @@ const Cabinet = () => {
                       <>
                         {/* Баннер льготных цен на этапе монтажа */}
                         {currentMatchedEntrance?.service_type === "installation" && (
-                          <div className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-transparent border border-amber-500/30 text-amber-900 dark:text-amber-200 flex items-start gap-3">
-                        <Sparkles className="h-5 w-5 text-amber-500 shrink-0 mt-0.5 animate-pulse" />
+                          <div className="p-3.5 rounded-2xl bg-gradient-to-r from-blue-500/15 via-sky-500/10 to-transparent border border-blue-500/30 text-blue-900 dark:text-blue-200 flex items-start gap-3">
+                        <Sparkles className="h-5 w-5 text-blue-500 shrink-0 mt-0.5 animate-pulse" />
                         <div>
                           <div className="font-bold text-xs flex items-center gap-1.5">
                             <span>Ваш дом на этапе подключения!</span>
-                            <Badge className="bg-amber-500 text-white font-bold text-[9px] px-1.5 py-0">Льготный прайс</Badge>
+                            <Badge className="bg-blue-600 text-white font-bold text-[9px] px-1.5 py-0">Льготный прайс</Badge>
                           </div>
-                          <p className="text-[11px] text-amber-800/90 dark:text-amber-300/90 mt-0.5 leading-relaxed">
+                          <p className="text-[11px] text-blue-800/90 dark:text-blue-300/90 mt-0.5 leading-relaxed">
                             Для жителей вашего адреса действуют специальные сниженные цены на оборудование и установку на период монтажа.
                           </p>
                         </div>
@@ -6311,7 +6311,7 @@ const Cabinet = () => {
                               <div key={keyProduct.id} className="space-y-2">
                                 {/* Акционный баннер: отображается ТОЛЬКО если дом НЕ на монтаже и акция включена */}
                                 {isPromoActive && (
-                                  <div className="p-2.5 px-3.5 rounded-xl bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-transparent border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-xs text-amber-900 dark:text-amber-200">
+                                  <div className="p-2.5 px-3.5 rounded-xl bg-gradient-to-r from-blue-500/15 via-sky-500/10 to-transparent border border-blue-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-xs text-blue-900 dark:text-blue-200">
                                     <span className="flex items-center gap-1.5 font-semibold">
                                       <span className="text-sm">🎁</span>
                                       <span>Акция на ключи: 1 шт — {tier1} ₽ | 2 шт — по {tier2} ₽/шт | от 3 шт — по {tier3} ₽/шт</span>
@@ -6324,7 +6324,7 @@ const Cabinet = () => {
                                   </div>
                                 )}
 
-                                <div className="flex items-center justify-between p-3.5 rounded-xl border border-amber-500/20 bg-amber-500/5 shadow-sm shadow-amber-500/5">
+                                <div className="flex items-center justify-between p-3.5 rounded-xl border border-blue-500/20 bg-blue-500/5 shadow-sm shadow-blue-500/5">
                                   <div className="flex items-center gap-3 text-left">
                                     {keyProduct.image_url ? (
                                       <img 
@@ -6337,18 +6337,18 @@ const Cabinet = () => {
                                         }}
                                       />
                                     ) : (
-                                      <div className="w-12 h-12 rounded-lg bg-amber-500/10 flex items-center justify-center text-xl shrink-0">
+                                      <div className="w-12 h-12 rounded-lg bg-blue-500/10 text-blue-600 flex items-center justify-center text-xl shrink-0">
                                         🔑
                                       </div>
                                     )}
                                     <div>
                                       <div className="font-semibold text-sm text-foreground">{keyProduct.name.toUpperCase()}</div>
                                       <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Ключ с повышенной защитой от копирования</div>
-                                      <div className="text-xs text-amber-500 font-bold mt-1 flex items-center gap-1.5 flex-wrap">
+                                      <div className="text-xs text-blue-600 dark:text-sky-400 font-bold mt-1 flex items-center gap-1.5 flex-wrap">
                                         {isInstallation ? (
                                           <>
                                             <span className="text-sm">{keyCalc.unitPrice.toFixed(0)} ₽ за шт.</span>
-                                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 font-semibold">
+                                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-700 dark:text-blue-300 font-semibold">
                                               Монтаж
                                             </span>
                                           </>
@@ -6423,7 +6423,7 @@ const Cabinet = () => {
                                 setSelectedServiceId(null);
                                 setSelectedEquipmentId(null);
                               }}
-                              className="text-xs text-amber-600 dark:text-amber-400 font-semibold hover:underline"
+                              className="text-xs text-blue-600 dark:text-sky-400 font-semibold hover:underline"
                             >
                               Изменить выбор
                             </button>
@@ -6461,8 +6461,8 @@ const Cabinet = () => {
                                   }}
                                   className={`p-3.5 rounded-xl border text-left cursor-pointer transition-all flex flex-col justify-between ${
                                     isSelected
-                                      ? "border-amber-500 bg-amber-500/10 shadow-sm ring-1 ring-amber-500/30"
-                                      : "border-slate-200 dark:border-slate-800 bg-white/20 dark:bg-slate-900/20 hover:border-amber-500/50 hover:bg-white/40"
+                                      ? "border-blue-500 bg-blue-500/10 shadow-sm ring-1 ring-blue-500/30"
+                                      : "border-slate-200 dark:border-slate-800 bg-white/20 dark:bg-slate-900/20 hover:border-blue-500/50 hover:bg-white/40"
                                   }`}
                                 >
                                   {service.image_url && (
@@ -6480,13 +6480,13 @@ const Cabinet = () => {
                                     <div className="font-semibold text-sm text-foreground leading-snug">{service.name}</div>
                                     <div className={`w-5 h-5 rounded-full shrink-0 flex items-center justify-center transition-all ${
                                       isSelected
-                                        ? "bg-amber-500 text-white"
+                                        ? "bg-blue-600 text-white"
                                         : "border border-slate-300 dark:border-slate-700"
                                     }`}>
-                                      {isSelected && <CheckCircle2 className="w-5 h-5 fill-amber-500 text-white" />}
+                                      {isSelected && <CheckCircle2 className="w-5 h-5 fill-blue-600 text-white" />}
                                     </div>
                                   </div>
-                                  <div className="text-xs text-amber-500 font-bold mt-2 flex items-center gap-1.5">
+                                  <div className="text-xs text-blue-600 dark:text-sky-400 font-bold mt-2 flex items-center gap-1.5">
                                     {hasDiscount && (
                                       <span className="line-through text-slate-400 font-normal text-[11px]">
                                         {Number(service.price).toFixed(0)} ₽
@@ -6494,7 +6494,7 @@ const Cabinet = () => {
                                     )}
                                     <span className="text-sm">{effPrice === 0 ? "Бесплатно" : `${effPrice.toFixed(0)} ₽`}</span>
                                     {hasDiscount && (
-                                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 font-semibold">
+                                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-700 dark:text-blue-300 font-semibold">
                                         Монтаж
                                       </span>
                                     )}
@@ -6521,7 +6521,7 @@ const Cabinet = () => {
                                 console.log("[Заявка] Сброс трубки абонентом для изменения выбора модели");
                                 setSelectedEquipmentId(null);
                               }}
-                              className="text-xs text-amber-600 dark:text-amber-400 font-semibold hover:underline"
+                              className="text-xs text-blue-600 dark:text-sky-400 font-semibold hover:underline"
                             >
                               Выбрать другую
                             </button>
@@ -6552,8 +6552,8 @@ const Cabinet = () => {
                                   }}
                                   className={`flex items-center justify-between p-3.5 rounded-xl border cursor-pointer transition-all ${
                                     isSelected
-                                      ? "border-amber-500 bg-amber-500/10 shadow-sm ring-1 ring-amber-500/30"
-                                      : "border-slate-200 dark:border-slate-800 bg-white/20 dark:bg-slate-900/20 hover:border-amber-500/50 hover:bg-white/40"
+                                      ? "border-blue-500 bg-blue-500/10 shadow-sm ring-1 ring-blue-500/30"
+                                      : "border-slate-200 dark:border-slate-800 bg-white/20 dark:bg-slate-900/20 hover:border-blue-500/50 hover:bg-white/40"
                                   }`}
                                 >
                                   <div className="flex items-center gap-3">
@@ -6571,7 +6571,7 @@ const Cabinet = () => {
                                     <div className="text-left">
                                       <div className="font-semibold text-sm text-foreground">{equip.name.toUpperCase()}</div>
                                       <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{equip.description || "Абонентская трубка домофона"}</div>
-                                      <div className="text-xs text-amber-500 font-bold mt-1 flex items-center gap-1.5">
+                                      <div className="text-xs text-blue-600 dark:text-sky-400 font-bold mt-1 flex items-center gap-1.5">
                                         {hasDiscount && (
                                           <span className="line-through text-slate-400 font-normal text-[11px]">
                                             {Number(equip.price).toFixed(0)} ₽
@@ -6579,7 +6579,7 @@ const Cabinet = () => {
                                         )}
                                         <span className="text-sm">{effPrice.toFixed(0)} ₽</span>
                                         {hasDiscount && (
-                                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 font-semibold">
+                                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-700 dark:text-blue-300 font-semibold">
                                             Монтаж
                                           </span>
                                         )}
@@ -6590,10 +6590,10 @@ const Cabinet = () => {
                                   {/* Индикатор выбора трубки (одиночный выбор) */}
                                   <div className={`w-5 h-5 rounded-full shrink-0 flex items-center justify-center transition-all ${
                                     isSelected
-                                      ? "bg-amber-500 text-white"
+                                      ? "bg-blue-600 text-white"
                                       : "border border-slate-300 dark:border-slate-700"
                                   }`}>
-                                    {isSelected && <CheckCircle2 className="w-5 h-5 fill-amber-500 text-white" />}
+                                    {isSelected && <CheckCircle2 className="w-5 h-5 fill-blue-600 text-white" />}
                                   </div>
                                 </div>
                               );
@@ -6616,7 +6616,7 @@ const Cabinet = () => {
                       return (
                         <div className="space-y-2 text-left">
                           <Label className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-                            <Smartphone className="h-4 w-4 text-amber-500" />
+                            <Smartphone className="h-4 w-4 text-blue-600 dark:text-sky-400" />
                             Доступ к умному домофону
                           </Label>
 
@@ -6627,15 +6627,15 @@ const Cabinet = () => {
                             }}
                             className={`flex items-center justify-between p-3.5 rounded-2xl border transition-all cursor-pointer select-none ${
                               isCabinetSetupChecked
-                                ? "bg-amber-500/10 border-amber-500 shadow-sm shadow-amber-500/10"
+                                ? "bg-blue-500/10 border-blue-500 shadow-sm shadow-blue-500/10"
                                 : "bg-white/40 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
                             }`}
                           >
                             <div className="flex items-center gap-3">
                               <div className={`h-12 w-12 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
                                 isCabinetSetupChecked
-                                  ? "bg-amber-500 text-white"
-                                  : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                                  ? "bg-blue-600 text-white"
+                                  : "bg-blue-500/10 text-blue-600 dark:text-sky-400"
                               }`}>
                                 <Smartphone className="h-6 w-6" />
                               </div>
@@ -6646,7 +6646,7 @@ const Cabinet = () => {
                                 <p className="text-xs text-muted-foreground leading-snug">
                                   Регистрация личного кабинета для доступа к умному дому и мобильному приложению
                                 </p>
-                                <p className="text-sm font-bold text-amber-600 dark:text-amber-400 pt-0.5">
+                                <p className="text-sm font-bold text-blue-600 dark:text-sky-400 pt-0.5">
                                   +{cabinetPrice.toFixed(0)} ₽ <span className="text-[11px] font-normal text-muted-foreground">(единоразово)</span>
                                 </p>
                               </div>
@@ -6655,10 +6655,10 @@ const Cabinet = () => {
                             {/* Индикатор выбора в едином стиле с выбором трубки */}
                             <div className={`w-5 h-5 rounded-full shrink-0 flex items-center justify-center transition-all ${
                               isCabinetSetupChecked
-                                ? "bg-amber-500 text-white"
+                                ? "bg-blue-600 text-white"
                                 : "border border-slate-300 dark:border-slate-700"
                             }`}>
-                              {isCabinetSetupChecked && <CheckCircle2 className="w-5 h-5 fill-amber-500 text-white" />}
+                              {isCabinetSetupChecked && <CheckCircle2 className="w-5 h-5 fill-blue-600 text-white" />}
                             </div>
                           </div>
 
@@ -6675,14 +6675,14 @@ const Cabinet = () => {
 
                     {/* Комментарий к платному заказу */}
                     <div className="space-y-2 text-left">
-                      <Label htmlFor="orderComment" className="text-sm font-semibold text-foreground">Желаемое время и примечания</Label>
+                      <Label htmlFor="orderComment" className="text-sm font-semibold text-foreground">Дополнительная информация или номер телефона для связи</Label>
                       <Textarea
                         id="orderComment"
-                        placeholder="Укажите желаемое время визита мастера или любые дополнительные пожелания..."
+                        placeholder="Укажите дополнительную информацию или номер телефона для связи..."
                         value={orderComment}
                         onChange={(e) => setOrderComment(e.target.value)}
                         rows={2}
-                        className="bg-white/50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 text-xs font-medium rounded-xl placeholder-slate-450"
+                        className="bg-white/50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-xs font-medium rounded-xl placeholder-slate-450"
                       />
                     </div>
 
@@ -6783,7 +6783,7 @@ const Cabinet = () => {
                           <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5 text-left">
                             <div className="flex justify-between font-bold text-base text-foreground pt-1">
                               <span>Итого к оплате:</span>
-                              <span className="text-amber-500 font-mono text-lg font-black">{base.toFixed(2)} ₽</span>
+                              <span className="text-blue-600 dark:text-sky-400 font-mono text-xl font-black">{base.toFixed(2)} ₽</span>
                             </div>
                             <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-snug">
                               💡 Возможна оплата за транзакцию. Оплата производится онлайн через ЮKassa.
