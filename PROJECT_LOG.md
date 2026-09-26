@@ -1,5 +1,22 @@
 # PROJECT_LOG.md
 
+## Дата: 2026-09-26 (SSL / Production Domain: Выпуск официального SSL-сертификата Let's Encrypt для домофондар.рф и настройка HTTPS)
+### Изменения:
+- **Выпуск SSL-сертификата Let's Encrypt**:
+  * Через Certbot успешно выпущен официальный SSL-сертификат для домена `домофондар.рф` (Punycode: `xn--80aha5afebav9a.xn--p1ai`) и субдомена `www.домофондар.рф`.
+  * Сертификат сохранен в `/etc/letsencrypt/live/xn--80aha5afebav9a.xn--p1ai/` (полная цепочка доверия `fullchain.pem` и закрытый ключ `privkey.pem`).
+- **Конфигурация Nginx (`nginx.conf`)** [HTTPS & 301 REDIRECT]:
+  * Настроен блок на портах 80 и 8080 с автоматическим постоянным перенаправлением (301 Moved Permanently) всех незащищенных HTTP-запросов на безопасный HTTPS.
+  * Сохранен открытый путь `/.well-known/acme-challenge/` для верификации ACME-запросов.
+  * Основной блок переведен на порт 443 с подключением новых сертификатов Let's Encrypt.
+  * Добавлен строгий заголовок безопасности HSTS (`Strict-Transport-Security: max-age=31536000; includeSubDomains`).
+  * Конфигурация Nginx обновлена в контейнере `domofondar_frontend` и на хосте `/opt/domofondar/nginx.conf`.
+- **Автоматическое продление (Cron)**:
+  * В системный планировщик `crontab` на боевом сервере добавлена автоматическая проверка и продление сертификата каждые 12 часов с перезагрузкой Nginx без остановки сервиса.
+### Структура:
+- `/nginx.conf` — Конфигурация веб-сервера Nginx с 301 редиректом и SSL-сертификатами
+- `/opt/domofondar/certbot/conf/live/xn--80aha5afebav9a.xn--p1ai/` — Директория действующих SSL-сертификатов на сервере
+
 ## Дата: 2026-09-26 (Payment Gateway: Подключение боевых реквизитов ЮKassa live ShopId 1372116)
 ### Изменения:
 - **Бэкенд сервера (`server/index.js`)** [YOOKASSA LIVE KEYS]:
