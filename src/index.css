@@ -926,64 +926,6 @@
   animation: gentle-hover 7s ease-in-out infinite;
 }
 
-/* Контейнер динамического слова с плавной вертикальной маской растворения */
-.word-rotator-mask {
-  display: inline-block;
-  vertical-align: baseline;
-  overflow: hidden;
-  position: relative;
-  mask-image: linear-gradient(
-    to bottom,
-    transparent 0%,
-    black 18%,
-    black 82%,
-    transparent 100%
-  );
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    transparent 0%,
-    black 18%,
-    black 82%,
-    transparent 100%
-  );
-}
-
-/* Плавный вертикальный слайд для смены ключевых слов через маску */
-@keyframes word-slide-in {
-  0% {
-    transform: translateY(115%);
-    opacity: 0;
-  }
-  50% {
-    opacity: 0.8;
-  }
-  100% {
-    transform: translateY(0%);
-    opacity: 1;
-  }
-}
-
-@keyframes word-slide-out {
-  0% {
-    transform: translateY(0%);
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.6;
-  }
-  100% {
-    transform: translateY(-115%);
-    opacity: 0;
-  }
-}
-
-.animate-word-in {
-  animation: word-slide-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-.animate-word-out {
-  animation: word-slide-out 0.4s cubic-bezier(0.7, 0, 0.84, 0) forwards;
-}
 
 
 

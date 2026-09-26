@@ -40,20 +40,20 @@ const Hero = () => {
 
   // Состояние текущего отображаемого слова
   const [targetIndex, setTargetIndex] = useState(0);
-  // Флаг анимации выхода (улетания слова вверх)
-  const [isExiting, setIsExiting] = useState(false);
+  // Флаг плавного перехода (растворение / появление)
+  const [isFading, setIsFading] = useState(false);
 
-  // Циклическая плавная смена ключевого слова каждые 3.8 секунды (на 1 секунду дольше для комфортного чтения)
+  // Циклическая плавная смена ключевого слова каждые 3.8 секунды
   useEffect(() => {
     const timer = setInterval(() => {
-      // Шаг 1: Запуск ухода текущего слова вверх с размытием
-      setIsExiting(true);
+      // Шаг 1: Плавное растворение текущего слова
+      setIsFading(true);
 
-      // Шаг 2: Через 350 мс смена слова и плавный выезд нового слова снизу
+      // Шаг 2: Через 280 мс смена слова и плавное появление
       setTimeout(() => {
         setTargetIndex((prev) => (prev + 1) % ROTATING_TARGETS.length);
-        setIsExiting(false);
-      }, 350);
+        setIsFading(false);
+      }, 280);
     }, 3800);
 
     return () => clearInterval(timer);
@@ -103,19 +103,18 @@ const Hero = () => {
 
             {/* Главный заголовок с бегущим лучом Shimmer и динамической сменой объекта */}
             <div className="space-y-1 md:space-y-2">
-              <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-5xl font-extrabold tracking-tight hero-title-shimmer leading-[1.25] pb-1 inline-block animate-fade-in">
+              <h1 className="text-[1.75rem] xs:text-3xl sm:text-4xl md:text-5xl lg:text-5xl font-extrabold tracking-tight hero-title-shimmer leading-[1.18] pb-1 inline-block animate-fade-in">
                 Домофондар: <br />
-                <span className="whitespace-nowrap inline-flex items-baseline">
-                  <span>Безопасность&nbsp;</span>
-                  <span className="word-rotator-mask inline-block min-w-[5.2ch] sm:min-w-[6.2ch] h-[1.3em] overflow-hidden text-left align-baseline">
-                    <span
-                      key={targetIndex}
-                      className={`inline-block ${
-                        isExiting ? "animate-word-out" : "animate-word-in"
-                      }`}
-                    >
-                      {ROTATING_TARGETS[targetIndex].word}
-                    </span>
+                <span className="whitespace-nowrap">
+                  Безопасность{" "}
+                  <span
+                    className={`inline-block hero-title-shimmer transition-all duration-300 ease-in-out ${
+                      isFading
+                        ? "opacity-0 -translate-y-1.5"
+                        : "opacity-100 translate-y-0"
+                    }`}
+                  >
+                    {ROTATING_TARGETS[targetIndex].word}
                   </span>
                 </span>
                 <br />
