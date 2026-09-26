@@ -30,9 +30,11 @@ const port = process.env.PORT || 5000;
 const SUPERADMIN_EMAIL = 'viruscorp4@gmail.com';
 const SUPERADMIN_ROLE = 'superadmin';
 
-// Настройки интеграции с платежным шлюзом ЮKassa
-const YOOKASSA_SHOP_ID = process.env.YOOKASSA_SHOP_ID || '1473762';
-const YOOKASSA_SECRET_KEY = process.env.YOOKASSA_SECRET_KEY || 'test_rh-f_OecOdzqszNPJlKtW87-pnZ4bEmDKdGM6WdbxJ0';
+// Настройки интеграции с платежным шлюзом ЮKassa (Боевой режим / Live)
+// Shop ID: 1372116 — идентификатор магазина компании ООО «ДомофонДар» в сервисе ЮKassa
+// Secret Key: боевой секретный ключ live_... для подписания платежных запросов API v3
+const YOOKASSA_SHOP_ID = process.env.YOOKASSA_SHOP_ID || '1372116';
+const YOOKASSA_SECRET_KEY = process.env.YOOKASSA_SECRET_KEY || 'live_Cb0x2CAkErTmi3y5V_9pnVFf8MRb0mu4sxU3lAo-hlI';
 
 // Директория для резервных копий базы данных
 const BACKUP_DIR = process.env.BACKUP_DIR || (fs.existsSync('/backups') ? '/backups' : path.join(__dirname, '../backups'));
