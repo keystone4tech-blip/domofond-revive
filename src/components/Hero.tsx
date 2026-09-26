@@ -103,17 +103,19 @@ const Hero = () => {
 
             {/* Главный заголовок с бегущим лучом Shimmer и динамической сменой объекта */}
             <div className="space-y-1 md:space-y-2">
-              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-5xl font-extrabold tracking-tight hero-title-shimmer leading-[1.22] pb-1 inline-block animate-fade-in">
+              <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-5xl font-extrabold tracking-tight hero-title-shimmer leading-[1.25] pb-1 inline-block animate-fade-in">
                 Домофондар: <br />
-                <span>Безопасность </span>
-                <span className="relative inline-flex items-baseline overflow-hidden transition-all duration-300">
-                  <span
-                    key={targetIndex}
-                    className={`inline-block ${
-                      isExiting ? "animate-word-out" : "animate-word-in"
-                    }`}
-                  >
-                    {ROTATING_TARGETS[targetIndex].word}
+                <span className="whitespace-nowrap inline-flex items-baseline">
+                  <span>Безопасность&nbsp;</span>
+                  <span className="word-rotator-mask inline-block min-w-[5.2ch] sm:min-w-[6.2ch] h-[1.3em] overflow-hidden text-left align-baseline">
+                    <span
+                      key={targetIndex}
+                      className={`inline-block ${
+                        isExiting ? "animate-word-out" : "animate-word-in"
+                      }`}
+                    >
+                      {ROTATING_TARGETS[targetIndex].word}
+                    </span>
                   </span>
                 </span>
                 <br />
