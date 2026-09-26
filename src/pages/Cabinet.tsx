@@ -380,6 +380,8 @@ const DebtCard = ({
           accountNumber: account.account_number,
           user_id: userId || undefined,
           userId: userId || undefined,
+          customer_phone: phone || undefined,
+          customerPhone: phone || undefined,
           return_url: `${window.location.origin}/cabinet?check_payment=1&account=${account.account_number}`,
           returnUrl: `${window.location.origin}/cabinet?check_payment=1&account=${account.account_number}`,
         }),

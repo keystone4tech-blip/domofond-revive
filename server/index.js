@@ -895,12 +895,94 @@ app.post('/api/payments/yookassa/create', async (req, res) => {
     const authHeader = 'Basic ' + Buffer.from(`${YOOKASSA_SHOP_ID}:${YOOKASSA_SECRET_KEY}`).toString('base64');
 
     // Формируем URL возврата абонента после завершения оплаты
-    const origin = req.headers.origin || 'https://45.8.99.238.sslip.io';
+    const origin = req.headers.origin || 'https://xn--80aha5afebav9a.xn--p1ai';
     const redirectUrl = return_url || `${origin}/cabinet?check_payment=1&account=${encodeURIComponent(account_number || '')}&amount=${formattedAmount}`;
 
-    const desc = description || (account_number 
+    const desc = (description || (account_number 
       ? `Оплата ТО домофона по л/с ${account_number}` 
-      : 'Оплата услуг компании Домофондар');
+      : 'Оплата услуг компании Домофондар')).substring(0, 128);
+
+    // 1. Определение контактных данных плательщика для фискального чека (54-ФЗ)
+    let customerPhone = req.body.customer_phone || req.body.customerPhone || req.body.phone || null;
+    let customerEmail = req.body.customer_email || req.body.customerEmail || req.body.email || null;
+
+    // Если контакты не переданы явно в теле запроса, но есть user_id — подтягиваем из профиля пользователя
+    if ((!customerPhone || !customerEmail) && user_id) {
+      try {
+        const uRes = await pool.query(
+          `SELECT u.email as user_email, p.phone as profile_phone, p.email as profile_email 
+           FROM users u 
+           LEFT JOIN profiles p ON p.id = u.id 
+           WHERE u.id = $1 LIMIT 1`,
+          [user_id]
+        );
+        if (uRes.rows.length > 0) {
+          const row = uRes.rows[0];
+          if (!customerPhone && row.profile_phone) customerPhone = row.profile_phone;
+          if (!customerEmail && row.profile_email) customerEmail = row.profile_email;
+          if (!customerEmail && row.user_email && row.user_email.includes('@')) customerEmail = row.user_email;
+          // Если логин сохранен как номер телефона
+          if (!customerPhone && row.user_email && !row.user_email.includes('@')) customerPhone = row.user_email;
+        }
+      } catch (profileErr) {
+        console.warn('[Бэкенд: ЮKassa Чек] Предупреждение поиска профиля для чека:', profileErr.message);
+      }
+    }
+
+    // Очистка и нормализация номера телефона (формат 7XXXXXXXXXX, 11 цифр)
+    let cleanPhone = null;
+    if (customerPhone) {
+      const digits = String(customerPhone).replace(/\D/g, '');
+      if (digits.length === 11 && (digits.startsWith('7') || digits.startsWith('8'))) {
+        cleanPhone = '7' + digits.substring(1);
+      } else if (digits.length === 10) {
+        cleanPhone = '7' + digits;
+      }
+    }
+
+    // Проверка и нормализация email
+    let cleanEmail = null;
+    if (customerEmail && typeof customerEmail === 'string' && customerEmail.includes('@') && customerEmail.includes('.')) {
+      cleanEmail = customerEmail.trim().toLowerCase();
+    }
+
+    // Формируем объект customer (ЮKassa требует обязательного наличия phone или email)
+    const customerObj = {};
+    if (cleanPhone) {
+      customerObj.phone = cleanPhone;
+    }
+    if (cleanEmail) {
+      customerObj.email = cleanEmail;
+    }
+    // Защитный резерв абонентской службы ООО «ДомофонДар»
+    if (!customerObj.phone && !customerObj.email) {
+      customerObj.phone = '79034118393';
+      customerObj.email = 'domofondar@mail.ru';
+    }
+
+    // Наименование предмета расчета в чеке (до 128 символов)
+    const itemTitle = (is_order 
+      ? `Оплата оборудования/услуг (${account_number ? 'л/с ' + account_number : 'заказ'})`
+      : `ТО домофона (${account_number ? 'л/с ' + account_number : 'услуга'})`
+    ).substring(0, 128);
+
+    // Фискальный чек в соответствии с 54-ФЗ (обязателен для боевого магазина ЮKassa)
+    const receiptObj = {
+      customer: customerObj,
+      items: [
+        {
+          description: itemTitle,
+          quantity: '1.00',
+          amount: {
+            value: formattedAmount,
+            currency: 'RUB',
+          },
+          vat_code: 1, // 1 — без НДС (для плательщиков УСН)
+          payment_mode: 'full_payment', // Полный расчет
+          payment_subject: is_order ? 'commodity' : 'service', // Товар или услуга
+        }
+      ]
+    };
 
     // Метаданные для внешнего шлюза ЮKassa (компактные поля)
     const yooMetadata = {
@@ -923,10 +1005,11 @@ app.post('/api/payments/yookassa/create', async (req, res) => {
         return_url: redirectUrl,
       },
       description: desc,
+      receipt: receiptObj,
       metadata: yooMetadata,
     };
 
-    console.log(`[Бэкенд: ЮKassa] Запрос создания платежа на ${formattedAmount} ₽ (заказ: ${is_order ? 'ДА' : 'НЕТ'})...`);
+    console.log(`[Бэкенд: ЮKassa] Запрос создания платежа на ${formattedAmount} ₽ (заказ: ${is_order ? 'ДА' : 'НЕТ'}, чек для: ${customerObj.phone || customerObj.email})...`);
 
     const yooRes = await fetch('https://api.yookassa.ru/v3/payments', {
       method: 'POST',
