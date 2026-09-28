@@ -115,3 +115,27 @@ jobs:
           name: domofondar-android-apk
           path: mobile-artifacts/domofondar-app.apk
           retention-days: 30
+
+      # 10. Выкладка APK на боевой сервер — прямая ссылка на скачивание
+      #     Итоговый адрес: https://домофондар.рф/media/app/domofondar-app.apk
+      - name: 📲 Загрузка APK на сервер (папка /media/app)
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          source: "mobile-artifacts/domofondar-app.apk"
+          target: "/opt/domofondar/public/media/app"
+          strip_components: 1
+
+      # 11. Проверяем, что APK опубликован и доступен веб-серверу
+      - name: 📂 Проверка публикации APK на сервере
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          script: |
+            mkdir -p /opt/domofondar/public/media/app
+            ls -lh /opt/domofondar/public/media/app/domofondar-app.apk || echo "APK ещё не загружен"
+            echo "APK доступен по адресу: https://домофондар.рф/media/app/domofondar-app.apk"
