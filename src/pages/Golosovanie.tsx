@@ -89,9 +89,18 @@ const Golosovanie = () => {
       return toast({ title: "Введите телефон", variant: "destructive" });
     }
     setRequestingCode(true);
-    const { data, error } = await supabase.functions.invoke("voting-submit", {
-      body: { action: "request_code", voting_id: voting?.id, phone },
-    });
+    let data: any = null, error: any = null;
+    try {
+      const resp = await fetch("/backend-api/api/voting/request-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ voting_id: voting?.id, phone }),
+      });
+      data = await resp.json();
+      if (!resp.ok) error = { message: data?.error };
+    } catch (e: any) {
+      error = { message: e?.message || "Сеть недоступна" };
+    }
     setRequestingCode(false);
     if (error || (data as any)?.error) {
       return toast({ title: "Ошибка", description: error?.message || (data as any)?.error, variant: "destructive" });
@@ -111,18 +120,26 @@ const Golosovanie = () => {
     if (questions.some((q) => !answers[q.id])) return toast({ title: "Ответьте на все вопросы", variant: "destructive" });
 
     setSubmitting(true);
-    const { data, error } = await supabase.functions.invoke("voting-submit", {
-      body: {
-        action: "verify_and_submit",
-        voting_id: voting?.id,
-        phone, code,
-        full_name: fullName,
-        apartment,
-        area_sqm: areaSqm || null,
-        is_owner_confirmed: true,
-        answers: Object.entries(answers).map(([question_id, selected_option]) => ({ question_id, selected_option })),
-      },
-    });
+    let data: any = null, error: any = null;
+    try {
+      const resp = await fetch("/backend-api/api/voting/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          voting_id: voting?.id,
+          phone, code,
+          full_name: fullName,
+          apartment,
+          area_sqm: areaSqm || null,
+          is_owner_confirmed: true,
+          answers: Object.entries(answers).map(([question_id, selected_option]) => ({ question_id, selected_option })),
+        }),
+      });
+      data = await resp.json();
+      if (!resp.ok) error = { message: data?.error };
+    } catch (e: any) {
+      error = { message: e?.message || "Сеть недоступна" };
+    }
     setSubmitting(false);
     if (error || (data as any)?.error) {
       return toast({ title: "Ошибка", description: error?.message || (data as any)?.error, variant: "destructive" });

@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { ShinyButton } from "@/components/ui/shiny-button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
+import { uploadFile } from "@/lib/upload";
 import { useToast } from "@/hooks/use-toast";
 import { downloadProposal, generateProposalDocx } from "@/utils/docxGenerator";
 import { saveAs } from "file-saver";
@@ -338,22 +339,14 @@ export default function Calculator() {
       const filePath = `${Date.now()}_${fileName}`;
       console.log("[Calculator] DOCX документ успешно сгенерирован, размер:", blob.size, "байт"); // Логирование размера
 
-      // 2. Загружаем в Storage (безопасно: если хранилище не настроено, не блокируем пользователя)
+      // 2. Загружаем на собственный бэкенд (замена Supabase Storage; при ошибке не блокируем пользователя)
       let publicUrl = "";
       try {
-        const { error: uploadError, data: uploadData } = await supabase.storage
-          .from("proposals")
-          .upload(filePath, blob);
-
-        if (!uploadError && uploadData) {
-          const { data: { publicUrl: url } } = supabase.storage
-            .from("proposals")
-            .getPublicUrl(filePath);
-          publicUrl = url;
-          console.log("[Calculator] Документ сохранен в хранилище Supabase Storage:", publicUrl);
-        }
+        const namedBlob = new File([blob], filePath, { type: blob.type || "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+        publicUrl = await uploadFile(namedBlob, "calculations");
+        console.log("[Calculator] Документ КП сохранён на сервере:", publicUrl);
       } catch (storageErr) {
-        console.warn("[Calculator] Supabase Storage не подключен, продолжаем локальную отдачу:", storageErr);
+        console.warn("[Calculator] Загрузка КП на сервер не удалась, продолжаем локальную отдачу:", storageErr);
       }
 
       // 3. Обновляем запись в БД, привязывая адрес к сохраненному расчету

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { uploadFile } from "@/lib/upload";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -131,21 +132,12 @@ const TaskDetails = ({ task, onBack, isManager }: TaskDetailsProps) => {
   const uploadPhotoMutation = useMutation({
     mutationFn: async (file: File) => {
       const { data: userData } = await supabase.auth.getUser();
-      const fileName = `${task.id}/${Date.now()}_${file.name}`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from("news")
-        .upload(fileName, file);
-      
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage
-        .from("news")
-        .getPublicUrl(fileName);
+      // Загрузка на собственный бэкенд (замена Supabase Storage)
+      const publicUrl = await uploadFile(file, "tasks");
 
       const { error: dbError } = await supabase.from("task_photos").insert({
         task_id: task.id,
-        photo_url: urlData.publicUrl,
+        photo_url: publicUrl,
         uploaded_by: userData.user?.id,
       });
       

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { uploadFile } from "@/lib/upload";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,22 +62,8 @@ export const PromotionsManager = () => {
 
   const uploadImage = async () => {
     if (!imageFile) return null;
-
-    const fileExt = imageFile.name.split(".").pop();
-    const fileName = `${Math.random()}.${fileExt}`;
-    const filePath = `${fileName}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from("promotions")
-      .upload(filePath, imageFile);
-
-    if (uploadError) throw uploadError;
-
-    const { data: { publicUrl } } = supabase.storage
-      .from("promotions")
-      .getPublicUrl(filePath);
-
-    return publicUrl;
+    // Загрузка на собственный бэкенд (замена Supabase Storage)
+    return await uploadFile(imageFile, "promotions");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

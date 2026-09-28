@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo, useRef, Component, ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { notify } from "@/lib/notify";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { ShinyButton } from "@/components/ui/shiny-button";
@@ -443,12 +444,7 @@ const DebtCard = ({
       });
       if (error) throw error;
       try {
-        await supabase.functions.invoke("notify", {
-          body: {
-            event: "request_created",
-            data: { name: fullName, phone, address: fullAddress, message: requestText },
-          },
-        });
+        await notify("request_created", { name: fullName, phone, address: fullAddress, message: requestText });
       } catch (e) { console.error(e); }
       toast({ title: "Заявка отправлена", description: "Мы свяжемся с вами в ближайшее время" });
       setRequestText("");
@@ -3632,16 +3628,11 @@ const Cabinet = () => {
 
         console.log(`[Заявка: Ремонт] Успешно создан наряд с ID: ${requestData?.id}`);
 
-        // Отправка уведомления диспетчерам в Telegram
+        // Отправка уведомления диспетчерам
         try {
-          await supabase.functions.invoke("notify", {
-            body: {
-              event: "request_created",
-              data: { name: fullName || orderName, phone: orderPhone, address: orderFullAddress, message: messageText },
-            },
-          });
+          await notify("request_created", { name: fullName || orderName, phone: orderPhone, address: orderFullAddress, message: messageText });
         } catch (e) {
-          console.error("[Заявка: Ремонт] Ошибка отправки уведомления в Telegram:", e);
+          console.error("[Заявка: Ремонт] Ошибка отправки уведомления:", e);
         }
 
         if (refetchUserRequests) {

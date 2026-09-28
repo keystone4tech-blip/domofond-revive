@@ -1627,6 +1627,267 @@ app.get('/api/public-stats', async (req, res) => {
   }
 });
 
+// ------------------------------------------------------------------------------
+// МОДУЛЬ ЗАГРУЗКИ ФАЙЛОВ (замена Supabase Storage после переезда на PostgreSQL)
+// POST /api/upload  { fileBase64, fileName, fileType, folder } -> { url }
+// ------------------------------------------------------------------------------
+const ALLOWED_UPLOAD_FOLDERS = ['news', 'promotions', 'tasks', 'requests', 'calculations', 'portfolio', 'misc'];
+const MEDIA_ROOT = path.join(__dirname, '../public/media');
+
+app.post('/api/upload', async (req, res) => {
+  try {
+    const { fileBase64, fileName, fileType } = req.body;
+    let { folder } = req.body;
+    if (!fileBase64 || !fileName) {
+      return res.status(400).json({ error: 'Файл или имя файла не переданы' });
+    }
+    if (!ALLOWED_UPLOAD_FOLDERS.includes(folder)) folder = 'misc';
+
+    // Извлекаем чистый base64
+    const matches = String(fileBase64).match(/^data:([A-Za-z0-9-+\/.]+);base64,(.+)$/);
+    const buffer = matches && matches.length === 3
+      ? Buffer.from(matches[2], 'base64')
+      : Buffer.from(String(fileBase64), 'base64');
+
+    // Ограничение размера — 25 МБ
+    if (buffer.length > 25 * 1024 * 1024) {
+      return res.status(413).json({ error: 'Файл слишком большой (максимум 25 МБ)' });
+    }
+
+    // Разрешаем только изображения, видео и документы
+    const ext = (path.extname(fileName).toLowerCase() || '.bin');
+    const allowedExt = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.svg', '.mp4', '.mov', '.webm', '.pdf', '.doc', '.docx'];
+    if (!allowedExt.includes(ext)) {
+      return res.status(415).json({ error: `Недопустимый тип файла: ${ext}` });
+    }
+
+    const safeBase = path.basename(fileName, ext).replace(/[^a-zA-Z0-9а-яА-Я_-]/g, '_').slice(0, 40);
+    const uniqueName = `${Date.now()}_${crypto.randomBytes(4).toString('hex')}_${safeBase}${ext}`;
+
+    const targetDir = path.join(MEDIA_ROOT, folder);
+    if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
+    fs.writeFileSync(path.join(targetDir, uniqueName), buffer);
+
+    const url = `/media/${folder}/${uniqueName}`;
+    console.log(`[Бэкенд: Upload] Файл сохранён: ${url} (${(buffer.length / 1024).toFixed(0)} КБ)`);
+    res.json({ success: true, url });
+  } catch (err) {
+    console.error('[Бэкенд: Upload] Ошибка загрузки файла:', err.message);
+    res.status(500).json({ error: 'Ошибка сохранения файла на сервере' });
+  }
+});
+
+// ------------------------------------------------------------------------------
+// МОДУЛЬ ГОЛОСОВАНИЙ ЖИТЕЛЕЙ (замена Supabase Edge Function voting-submit)
+// ------------------------------------------------------------------------------
+
+// Шаг 1: запрос кода подтверждения по телефону
+app.post('/api/voting/request-code', async (req, res) => {
+  try {
+    const { voting_id, phone } = req.body;
+    if (!voting_id || !phone) return res.status(400).json({ error: 'voting_id и phone обязательны' });
+
+    const normalized = String(phone).replace(/[^\d+]/g, '');
+    if (normalized.replace(/\D/g, '').length < 10) return res.status(400).json({ error: 'Некорректный номер' });
+
+    const vRes = await pool.query('SELECT status, ends_at FROM votings WHERE id = $1 LIMIT 1', [voting_id]);
+    const voting = vRes.rows[0];
+    if (!voting || voting.status !== 'active') return res.status(400).json({ error: 'Голосование не активно' });
+    if (voting.ends_at && new Date(voting.ends_at) < new Date()) return res.status(400).json({ error: 'Голосование завершено' });
+
+    // Анти-спам: не чаще 1 кода в минуту
+    const recentRes = await pool.query(
+      'SELECT created_at FROM voting_phone_codes WHERE voting_id = $1 AND phone = $2 ORDER BY created_at DESC LIMIT 1',
+      [voting_id, normalized]
+    );
+    const recent = recentRes.rows[0];
+    if (recent && Date.now() - new Date(recent.created_at).getTime() < 60000) {
+      return res.status(429).json({ error: 'Подождите минуту перед повторной отправкой' });
+    }
+
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const expires_at = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    await pool.query(
+      'INSERT INTO voting_phone_codes (voting_id, phone, code, expires_at) VALUES ($1, $2, $3, $4)',
+      [voting_id, normalized, code, expires_at]
+    );
+
+    // TODO: подключить реальный SMS-провайдер (SMS.RU / Twilio). Пока код возвращается как dev_code.
+    console.log(`[Бэкенд: Голосование] Код для ${normalized}: ${code}`);
+    const smsConfigured = !!process.env.SMSRU_API_KEY;
+    res.json({ ok: true, ...(smsConfigured ? {} : { dev_code: code }) });
+  } catch (err) {
+    console.error('[Бэкенд: Голосование] Ошибка запроса кода:', err.message);
+    res.status(500).json({ error: 'Ошибка отправки кода' });
+  }
+});
+
+// Шаг 2: проверка кода и приём бюллетеня
+app.post('/api/voting/submit', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { voting_id, phone, code, full_name, apartment, area_sqm, is_owner_confirmed, answers } = req.body;
+    if (!voting_id || !phone || !code || !full_name || !apartment || !answers?.length) {
+      return res.status(400).json({ error: 'Не все обязательные поля заполнены' });
+    }
+    if (!is_owner_confirmed) return res.status(400).json({ error: 'Подтвердите статус собственника' });
+
+    const normalized = String(phone).replace(/[^\d+]/g, '');
+
+    const recRes = await client.query(
+      `SELECT * FROM voting_phone_codes WHERE voting_id = $1 AND phone = $2 AND is_used = false
+       ORDER BY created_at DESC LIMIT 1`,
+      [voting_id, normalized]
+    );
+    const rec = recRes.rows[0];
+    if (!rec) return res.status(400).json({ error: 'Запросите код заново' });
+    if (new Date(rec.expires_at) < new Date()) return res.status(400).json({ error: 'Код просрочен' });
+    if ((rec.attempts || 0) >= 5) return res.status(429).json({ error: 'Превышено число попыток' });
+    if (String(rec.code) !== String(code)) {
+      await client.query('UPDATE voting_phone_codes SET attempts = COALESCE(attempts,0) + 1 WHERE id = $1', [rec.id]);
+      return res.status(400).json({ error: 'Неверный код' });
+    }
+
+    const vRes = await client.query('SELECT status, ends_at FROM votings WHERE id = $1 LIMIT 1', [voting_id]);
+    const voting = vRes.rows[0];
+    if (!voting || voting.status !== 'active') return res.status(400).json({ error: 'Голосование не активно' });
+    if (voting.ends_at && new Date(voting.ends_at) < new Date()) return res.status(400).json({ error: 'Голосование завершено' });
+
+    const existRes = await client.query(
+      `SELECT id, is_revoked FROM voting_ballots WHERE voting_id = $1 AND voter_phone = $2 AND voter_apartment = $3 LIMIT 1`,
+      [voting_id, normalized, String(apartment)]
+    );
+    if (existRes.rows[0] && !existRes.rows[0].is_revoked) {
+      return res.status(409).json({ error: 'Бюллетень от этой квартиры уже принят' });
+    }
+
+    await client.query('BEGIN');
+    const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || null;
+    const ua = req.headers['user-agent'] || null;
+    const ballotRes = await client.query(
+      `INSERT INTO voting_ballots
+        (voting_id, voter_full_name, voter_phone, voter_apartment, voter_area_sqm, is_owner_confirmed, phone_verified_at, ip_address, user_agent)
+       VALUES ($1, $2, $3, $4, $5, true, CURRENT_TIMESTAMP, $6, $7) RETURNING id`,
+      [voting_id, String(full_name).trim(), normalized, String(apartment).trim(), area_sqm ? Number(area_sqm) : null, ip, ua]
+    );
+    const ballotId = ballotRes.rows[0].id;
+
+    for (const a of answers) {
+      await client.query(
+        'INSERT INTO voting_answers (ballot_id, question_id, selected_option) VALUES ($1, $2, $3)',
+        [ballotId, a.question_id, String(a.selected_option)]
+      );
+    }
+    await client.query('UPDATE voting_phone_codes SET is_used = true WHERE id = $1', [rec.id]);
+    await client.query('COMMIT');
+
+    console.log(`[Бэкенд: Голосование] Принят бюллетень ${ballotId} (кв. ${apartment})`);
+    res.json({ ok: true, ballot_id: ballotId });
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch { /* ignore */ }
+    console.error('[Бэкенд: Голосование] Ошибка приёма бюллетеня:', err.message);
+    res.status(500).json({ error: 'Ошибка сохранения бюллетеня' });
+  } finally {
+    client.release();
+  }
+});
+
+// ------------------------------------------------------------------------------
+// МОДУЛЬ УВЕДОМЛЕНИЙ (замена Supabase Edge Functions notify + send-push)
+// POST /api/notify { event, data } — web-push администраторам/адресатам.
+// Работает при заданных VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY в .env; иначе просто логирует.
+// ------------------------------------------------------------------------------
+let webpush = null;
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || 'BKnzAAYc68ghFIetuQXHvo4e2qRUzBmbrQ1xUs_GQsahkrVZd3JX3rCfxUnTah0rRwwzu6xNN-ibL5KoH6UdkSg';
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || '';
+try {
+  webpush = require('web-push');
+  if (VAPID_PRIVATE_KEY) {
+    webpush.setVapidDetails('mailto:domofondar@mail.ru', VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+    console.log('[Бэкенд: Push] Web-Push настроен (VAPID ключи заданы)');
+  } else {
+    console.warn('[Бэкенд: Push] VAPID_PRIVATE_KEY не задан — push отключён (только лог)');
+  }
+} catch {
+  console.warn('[Бэкенд: Push] Пакет web-push не установлен — push отключён');
+}
+
+function buildNotification(event, data = {}) {
+  switch (event) {
+    case 'request_created':
+      return { roles: ['admin', 'director', 'dispatcher', 'manager'], title: '🔔 Новая заявка',
+        body: `👤 ${data.name}\n📍 ${data.address}\n📞 ${data.phone}`, url: '/fsm' };
+    case 'request_accepted':
+      return { roles: ['admin', 'director', 'dispatcher'], title: '✅ Заявка принята',
+        body: `👷 ${data.employee_name}\n👤 ${data.client_name}\n📍 ${data.address}`, url: '/fsm' };
+    case 'request_completed':
+      return { roles: ['admin', 'director', 'dispatcher'], title: '🎉 Заявка выполнена',
+        body: `👷 ${data.employee_name}\n📍 ${data.address}`, url: '/fsm' };
+    case 'request_cancelled':
+      return { roles: ['admin', 'director', 'dispatcher'], title: '❌ Заявка отменена',
+        body: `👤 ${data.client_name}\n📍 ${data.address}`, url: '/fsm' };
+    case 'request_declined':
+      return { roles: ['admin', 'director', 'dispatcher', 'master', 'engineer'], title: '🔄 Заявка возвращена',
+        body: `👤 ${data.client_name}\n📍 ${data.address}`, url: '/fsm' };
+    case 'task_assigned':
+      return { user_ids: data.assigned_user_id ? [data.assigned_user_id] : [], title: '📋 Новая задача',
+        body: `${data.title}\n📅 ${data.scheduled_date || 'Без даты'}`, url: '/fsm' };
+    case 'verification_request':
+      return { roles: ['admin', 'director'], title: '👤 Запрос на верификацию',
+        body: `${data.full_name || 'Пользователь'} отправил данные на проверку`, url: '/fsm' };
+    case 'verification_approved':
+      return { user_ids: data.user_id ? [data.user_id] : [], title: '✅ Верификация одобрена',
+        body: 'Ваш профиль успешно верифицирован!', url: '/cabinet' };
+    default:
+      return null;
+  }
+}
+
+app.post('/api/notify', async (req, res) => {
+  try {
+    const { event, data } = req.body || {};
+    const n = buildNotification(event, data || {});
+    if (!n) return res.status(400).json({ error: 'Неизвестное событие уведомления' });
+
+    console.log(`[Бэкенд: Уведомление] event=${event} -> ${n.title}`);
+
+    // Если push не настроен — просто подтверждаем приём (заявки/верификация не должны падать)
+    if (!webpush || !VAPID_PRIVATE_KEY) return res.json({ ok: true, delivered: 0, note: 'push_disabled' });
+
+    // Определяем список user_id получателей
+    let userIds = Array.isArray(n.user_ids) ? [...n.user_ids] : [];
+    if (Array.isArray(n.roles) && n.roles.length > 0) {
+      const roleRes = await pool.query('SELECT DISTINCT user_id FROM user_roles WHERE role = ANY($1)', [n.roles]);
+      userIds.push(...roleRes.rows.map((r) => r.user_id));
+    }
+    userIds = [...new Set(userIds.filter(Boolean))];
+    if (userIds.length === 0) return res.json({ ok: true, delivered: 0 });
+
+    const subsRes = await pool.query(
+      'SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = ANY($1)',
+      [userIds]
+    );
+
+    const payload = JSON.stringify({ title: n.title, body: n.body, url: n.url, data: { event, ...(data || {}) } });
+    let delivered = 0;
+    await Promise.all(subsRes.rows.map(async (s) => {
+      try {
+        await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload);
+        delivered++;
+      } catch (e) {
+        if (e.statusCode === 404 || e.statusCode === 410) {
+          await pool.query('DELETE FROM push_subscriptions WHERE endpoint = $1', [s.endpoint]);
+        }
+      }
+    }));
+
+    res.json({ ok: true, delivered });
+  } catch (err) {
+    console.error('[Бэкенд: Уведомление] Ошибка:', err.message);
+    res.json({ ok: false, error: err.message });
+  }
+});
+
 // Запуск сервера
 app.listen(port, () => {
   console.log(`[Бэкенд: Domofondar] Сервер успешно запущен на порту ${port}`);

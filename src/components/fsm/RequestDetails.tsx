@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { notify } from "@/lib/notify";
+import { uploadFile } from "@/lib/upload";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -259,7 +261,7 @@ const RequestDetails = ({ request: initialRequest, onBack, isManager }: RequestD
   // Helper to send notification
   const sendNotification = async (event: string, data: Record<string, unknown>) => {
     try {
-      await supabase.functions.invoke("notify", { body: { event, data } });
+      await notify(event, data);
     } catch (e) {
       console.error("Notification error:", e);
     }
@@ -548,21 +550,12 @@ const RequestDetails = ({ request: initialRequest, onBack, isManager }: RequestD
   const uploadPhotoMutation = useMutation({
     mutationFn: async (file: File) => {
       const { data: userData } = await supabase.auth.getUser();
-      const fileName = `requests/${request?.id}/${Date.now()}_${file.name}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("news")
-        .upload(fileName, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage
-        .from("news")
-        .getPublicUrl(fileName);
+      // Загрузка на собственный бэкенд (замена Supabase Storage)
+      const publicUrl = await uploadFile(file, "requests");
 
       const { error: dbError } = await supabase.from("task_photos").insert({
         task_id: request?.id,
-        photo_url: urlData.publicUrl,
+        photo_url: publicUrl,
         uploaded_by: userData.user?.id,
       });
 
