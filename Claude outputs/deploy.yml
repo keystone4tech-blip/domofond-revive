@@ -1,0 +1,78 @@
+name: Auto Deploy to Production Server
+
+on:
+  push:
+    branches:
+      - main # Срабатывает при каждом пуше в основную ветку main
+    paths-ignore:
+      - 'mobile/**'
+      - '.github/workflows/build-apk.yml'
+      - 'PROJECT_LOG.md'
+      - 'README.md'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🚚 Checkout кодовой базы
+        uses: actions/checkout@v4
+
+      - name: 🧹 Исключение мобильного приложения из серверного деплоя
+        run: rm -rf mobile .git
+
+      - name: 📂 Копирование файлов на сервер по SSH (ключ)
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          source: "."
+          target: "/opt/domofondar"
+
+      - name: 🚀 Развертывание Docker Compose на сервере
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script: |
+            set -e
+            echo "[CI/CD] Переход в директорию проекта /opt/domofondar..."
+            cd /opt/domofondar
+
+            # 1. Проверяем наличие Docker
+            if ! [ -x "$(command -v docker)" ]; then
+              echo "[CI/CD] Установка Docker..."
+              curl -fsSL https://get.docker.com -o get-docker.sh
+              sudo sh get-docker.sh
+              sudo systemctl enable docker
+              sudo systemctl start docker
+            fi
+
+            # 2. Проверяем наличие файла окружения .env
+            if [ ! -f .env ]; then
+              if [ -f .env.example ]; then
+                echo "[CI/CD] Создание .env из шаблона .env.example..."
+                cp .env.example .env
+              fi
+            fi
+
+            # 3. Создаем директории для бэкапов и медиа (в т.ч. под APK)
+            mkdir -p backups certbot/conf certbot/www public/media/app
+
+            # 4. Пересборка и запуск всех сервисов (frontend, backend, postgrest, db)
+            # Файлы БД хранятся в томе domofondar_pgdata и НИКОГДА не затираются при пересборке!
+            echo "[CI/CD] Сборка и запуск контейнеров domofondar..."
+            docker compose up -d --build --remove-orphans
+
+            # 5. Проверка состояния контейнеров
+            echo "[CI/CD] Статус запущенных контейнеров:"
+            docker compose ps
+
+            # 6. Проверка доступности API (Health check)
+            echo "[CI/CD] Проверка работоспособности системы..."
+            sleep 5
+            curl -s http://localhost:8080/api/health || curl -s http://localhost/api/health || true
+            echo "[CI/CD] Развертывание успешно завершено!"

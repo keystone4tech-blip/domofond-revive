@@ -4153,9 +4153,11 @@ const Cabinet = () => {
         throw new Error("Сессия пользователя не найдена. Пожалуйста, авторизуйтесь заново.");
       }
 
-      // Если профиль уже верифицирован, формируем заявку на согласование изменения данных!
-      // Основные боевые реквизиты профиля НЕ перезаписываются, чтобы абонент сохранил старый доступ, начисления и оплату
-      if (profile?.is_verified) {
+      // Изменение уже сохранённого профиля (верифицированного ИЛИ неверифицированного) идёт через
+      // согласование оператором: боевые реквизиты НЕ перезаписываются сразу, а сохраняются в
+      // pending_data_change и применяются только после подтверждения в CRM.
+      // Первичное сохранение (когда профиль ещё пустой) выполняется напрямую в ветке ниже.
+      if (profile?.is_verified || hasSavedProfile) {
         const isDataChanged = 
           fullName.trim() !== (profile.full_name || "").trim() ||
           phone.trim() !== (profile.phone || "").trim() ||
@@ -4343,8 +4345,9 @@ const Cabinet = () => {
           verification_document_type: null,
           verification_reject_reason: null,
           verification_submitted_at: null,
-          verified_at: null,
-          verified_by: null,
+          verification_reviewed_at: null,
+          pending_data_change: null,
+          data_change_notification: null,
         })
         .eq("id", session.user.id);
         
@@ -4366,8 +4369,9 @@ const Cabinet = () => {
         verification_document_type: null,
         verification_reject_reason: null,
         verification_submitted_at: null,
-        verified_at: null,
-        verified_by: null,
+        verification_reviewed_at: null,
+        pending_data_change: null,
+        data_change_notification: null,
       } : prev);
       
       // Сбрасываем поля формы
@@ -5456,68 +5460,52 @@ const Cabinet = () => {
                   </div>
                 )}
 
-                {/* 10. КНОПКА «ИЗМЕНИТЬ ПЕРСОНАЛЬНЫЕ ДАННЫЕ» / «РЕДАКТИРОВАТЬ ДАННЫЕ» */}
+                {/* 10. КНОПКА «ИЗМЕНИТЬ ПЕРСОНАЛЬНЫЕ ДАННЫЕ» — единый вид и поведение (через одобрение оператора) */}
                 {hasSavedProfile && !editing && (
                   <div className="pt-4 border-t border-slate-100 dark:border-slate-800/60 flex flex-col items-center gap-2">
-                    {profile?.is_verified ? (
-                      <AlertDialog open={isConfirmChangeDialogOpen} onOpenChange={setIsConfirmChangeDialogOpen}>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="rounded-xl font-bold border-blue-500/40 text-blue-700 dark:text-sky-400 hover:bg-blue-500/10 h-10 px-5 gap-2 shadow-xs transition-all"
+                    <AlertDialog open={isConfirmChangeDialogOpen} onOpenChange={setIsConfirmChangeDialogOpen}>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="rounded-xl font-bold border-blue-500/40 text-blue-700 dark:text-sky-400 hover:bg-blue-500/10 h-10 px-5 gap-2 shadow-xs transition-all"
+                        >
+                          <Pencil className="h-4 w-4 text-blue-600 dark:text-sky-400" />
+                          <span>Изменить персональные данные</span>
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="glass-premium border-none rounded-3xl shadow-2xl p-6">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle className="text-lg font-bold text-foreground font-display flex items-center gap-2">
+                            <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0" />
+                            <span>Изменение персональных данных</span>
+                          </AlertDialogTitle>
+                          <AlertDialogDescription className="text-xs text-slate-600 dark:text-slate-300 mt-2 leading-relaxed space-y-2 text-left">
+                            <p>
+                              Внимание! Изменение персональных данных (адрес, лицевой счёт, ФИО) потребует обязательной проверки и подтверждения оператором.
+                            </p>
+                            <p className="text-[11px] text-muted-foreground">
+                              До момента подтверждения оператором продолжают действовать ваши текущие реквизиты, расчет задолженности и доступ.
+                            </p>
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter className="mt-4 gap-2">
+                          <AlertDialogCancel className="font-semibold rounded-xl h-10">
+                            Отмена
+                          </AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => {
+                              console.log("[Кабинет] Жилец подтвердил предупреждение и открыл форму редактирования профиля");
+                              setEditing(true);
+                              setAgreedToTerms(true);
+                            }}
+                            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl h-10"
                           >
-                            <Pencil className="h-4 w-4 text-blue-600 dark:text-sky-400" />
-                            <span>Изменить персональные данные</span>
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent className="glass-premium border-none rounded-3xl shadow-2xl p-6">
-                          <AlertDialogHeader>
-                            <AlertDialogTitle className="text-lg font-bold text-foreground font-display flex items-center gap-2">
-                              <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0" />
-                              <span>Изменение персональных данных</span>
-                            </AlertDialogTitle>
-                            <AlertDialogDescription className="text-xs text-slate-600 dark:text-slate-300 mt-2 leading-relaxed space-y-2 text-left">
-                              <p>
-                                Внимание! Изменение персональных данных (адрес, лицевой счёт, ФИО) потребует обязательной повторной проверки и верификации оператором.
-                              </p>
-                              <p className="text-[11px] text-muted-foreground">
-                                До момента подтверждения оператором продолжают действовать ваши текущие реквизиты, расчет задолженности и доступ.
-                              </p>
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter className="mt-4 gap-2">
-                            <AlertDialogCancel className="font-semibold rounded-xl h-10">
-                              Отмена
-                            </AlertDialogCancel>
-                            <AlertDialogAction 
-                              onClick={() => {
-                                console.log("[Кабинет] Жилец подтвердил предупреждение и открыл форму редактирования профиля");
-                                setEditing(true);
-                                setAgreedToTerms(true);
-                              }} 
-                              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl h-10"
-                            >
-                              Да, продолжить
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    ) : (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          console.log("[Кабинет] Жилец открыл режим редактирования сохраненных данных профиля");
-                          setEditing(true);
-                          setAgreedToTerms(true);
-                        }}
-                        className="rounded-xl font-bold border-blue-500/40 text-blue-700 dark:text-sky-400 hover:bg-blue-500/10 h-10 px-5 gap-2 shadow-xs transition-all"
-                      >
-                        <Pencil className="h-4 w-4 text-blue-600 dark:text-sky-400" />
-                        <span>Редактировать данные</span>
-                      </Button>
-                    )}
+                            Да, продолжить
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 )}
 

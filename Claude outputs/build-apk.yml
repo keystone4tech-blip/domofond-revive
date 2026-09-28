@@ -1,0 +1,143 @@
+# .github/workflows/build-apk.yml
+# Автоматическая сборка APK файла мобильного приложения «Домофондар» для Android
+# Сборка выполняется на облачных серверах GitHub Actions с сохранением готового .apk в артефактах
+
+name: 📱 Сборка Android APK (Домофондар)
+
+on:
+  # Возможность запускать сборку вручную во вкладке Actions
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Тип сборки (debug - для прямого тестирования на любых телефонах / release - релиз)'
+        required: true
+        default: 'debug'
+        type: choice
+        options:
+          - debug
+          - release
+
+  # Автоматическая сборка при изменении файлов мобильного приложения
+  push:
+    branches:
+      - main
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/build-apk.yml'
+
+concurrency:
+  group: android-build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ANDROID_HOME: /usr/local/lib/android/sdk
+  ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+
+jobs:
+  build-apk:
+    name: Сборка установочного APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      # 1. Клонирование репозитория
+      - name: 📥 Получение исходного кода
+        uses: actions/checkout@v4
+
+      # 2. Настройка Node.js (современная стабильная версия 22)
+      - name: 🟢 Настройка Node.js (v22)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # 3. Настройка Java JDK 17
+      - name: ☕ Настройка Java JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      # 4. Установка npm зависимостей мобильного приложения
+      - name: 📦 Установка зависимостей мобильного приложения
+        run: |
+          echo "[CI/CD] Переход в директорию mobile..."
+          cd mobile
+          npm install --legacy-peer-deps
+
+      # 5. Генерация нативного проекта Android через Expo
+      - name: ⚙️ Генерация нативного Android проекта (Expo Prebuild)
+        run: |
+          echo "[CI/CD] Запуск Expo Prebuild..."
+          cd mobile
+          npx expo prebuild --platform android --clean
+
+      # 6. Выдача прав на выполнение скрипта сборки Gradle
+      - name: 🔑 Выдача прав на gradlew
+        run: |
+          cd mobile/android
+          chmod +x gradlew
+
+      # 7. Компиляция установочного APK файла
+      - name: 🔨 Компиляция APK через Gradle
+        run: |
+          cd mobile/android
+          BUILD_TYPE="${{ github.event.inputs.build_type || 'debug' }}"
+          echo "[CI/CD] Запуск компиляции APK (тип сборки: $BUILD_TYPE)..."
+
+          if [ "$BUILD_TYPE" = "release" ]; then
+            ./gradlew assembleRelease --no-daemon
+          else
+            ./gradlew assembleDebug --no-daemon
+          fi
+
+      # 8. Поиск и сохранение готового APK
+      - name: 🔍 Поиск скомпилированного APK файла
+        run: |
+          mkdir -p mobile-artifacts
+          echo "[CI/CD] Поиск всех сгенерированных .apk файлов:"
+          find mobile/android/app/build/outputs/apk -name "*.apk"
+
+          # Копируем найденный APK файл
+          APK_FILE=$(find mobile/android/app/build/outputs/apk -name "*.apk" | head -n 1)
+          if [ -n "$APK_FILE" ]; then
+            echo "[CI/CD] Скопирован файл: $APK_FILE"
+            cp "$APK_FILE" mobile-artifacts/domofondar-app.apk
+            ls -lh mobile-artifacts/
+          else
+            echo "[CI/CD] ОШИБКА: Файл APK не найден!"
+            exit 1
+          fi
+
+      # 9. Загрузка готового APK в артефакты сборки GitHub для прямого скачивания
+      - name: 🚀 Сохранение APK в артефакты GitHub
+        uses: actions/upload-artifact@v4
+        with:
+          name: domofondar-android-apk
+          path: mobile-artifacts/domofondar-app.apk
+          retention-days: 30
+
+      # 10. Выкладка APK на боевой сервер — прямая ссылка на скачивание
+      #     Итоговый адрес: https://домофондар.рф/media/app/domofondar-app.apk
+      - name: 📲 Загрузка APK на сервер (папка /media/app)
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          source: "mobile-artifacts/domofondar-app.apk"
+          target: "/opt/domofondar/public/media/app"
+          strip_components: 1
+
+      # 11. Проверяем, что APK опубликован и доступен веб-серверу
+      - name: 📂 Проверка публикации APK на сервере
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script: |
+            mkdir -p /opt/domofondar/public/media/app
+            ls -lh /opt/domofondar/public/media/app/domofondar-app.apk || echo "APK ещё не загружен"
+            echo "APK доступен по адресу: https://домофондар.рф/media/app/domofondar-app.apk"
