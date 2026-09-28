@@ -115,10 +115,10 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   },
 
   extra: {
-    // URL основного API сервера (бэкенд Домофондар)
-    apiUrl: process.env.EXPO_PUBLIC_API_URL || 'http://45.8.99.238/backend-api',
-    // URL WebSocket сервера (для чата)
-    wsUrl: process.env.EXPO_PUBLIC_WS_URL || 'ws://45.8.99.238/ws',
+    // URL основного API сервера (бэкенд Домофондар, HTTPS через домен домофондар.рф / punycode)
+    apiUrl: process.env.EXPO_PUBLIC_API_URL || 'https://xn--80aha5afebav9a.xn--p1ai/backend-api',
+    // URL WebSocket сервера (для чата, защищённый wss)
+    wsUrl: process.env.EXPO_PUBLIC_WS_URL || 'wss://xn--80aha5afebav9a.xn--p1ai/ws',
   },
   };
 

@@ -1,5 +1,22 @@
 # PROJECT_LOG.md
 
+## Дата: 2026-09-28 (APK на боевой HTTPS + отдача /media в nginx + автовыкладка APK на сервер)
+
+### Изменения:
+- **Мобильное приложение (`mobile/src/config/constants.ts`, `mobile/app.config.ts`)** [APK FIX]:
+  * `API_URL` переведён с `http://45.8.99.238/backend-api` на `https://xn--80aha5afebav9a.xn--p1ai/backend-api` (боевой домен домофондар.рф, punycode — под него выдан SSL). Это устраняет причину «APK не работает»: раньше запросы по IP/HTTP ломались о 301-редирект и TLS.
+  * `WS_URL` → `wss://xn--80aha5afebav9a.xn--p1ai/ws`. `extra.apiUrl/wsUrl` в app.config — то же.
+- **nginx (`nginx.conf`)** [MEDIA SERVING FIX]:
+  * Добавлена локация `location ^~ /media/` с проксированием на бэкенд (`http://backend:5000/media/`). Раньше `/media/...` перехватывался SPA/regex-локациями и отдавал 404 — из-за этого не открывались загруженные файлы (портфолио, а также новый аплоад фото и APK). Префикс `^~` имеет приоритет над regex `~* \.(jpg|pdf|…)`.
+- **CI (`.github/workflows/build-apk.yml`)** [APK DEPLOY]:
+  * После сборки APK автоматически выкладывается на сервер в `/opt/domofondar/public/media/app/` (scp), доступен по прямой ссылке **https://домофондар.рф/media/app/domofondar-app.apk**.
+
+### Осталось:
+- На сервере создать папку `public/media/app` (workflow создаёт сам) и убедиться, что `/media/` отдаётся после обновления nginx (пересборка frontend-контейнера).
+- Подписать релизный APK собственным keystore (сейчас debug-ключ) — для Google Play.
+
+---
+
 ## Дата: 2026-09-28 (Аудит проекта + устранение наследия Supabase: загрузка файлов, голосования, уведомления, роли CRM)
 
 ### Контекст:

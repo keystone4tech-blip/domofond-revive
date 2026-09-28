@@ -2,11 +2,12 @@
  * Глобальные константы приложения Домофондар
  */
 
-// Базовый URL для API бэкенда (боевой сервер Domofondar)
-export const API_URL = 'http://45.8.99.238/backend-api';
+// Базовый URL для API бэкенда (боевой сервер Domofondar, HTTPS через домен домофондар.рф)
+// Используется punycode-хост, т.к. SSL-сертификат Let's Encrypt выдан именно на него.
+export const API_URL = 'https://xn--80aha5afebav9a.xn--p1ai/backend-api';
 
-// WebSocket URL
-export const WS_URL = 'ws://45.8.99.238/ws';
+// WebSocket URL (защищённый wss)
+export const WS_URL = 'wss://xn--80aha5afebav9a.xn--p1ai/ws';
 
 // Текущая версия приложения
 export const APP_VERSION = '1.0.0';
