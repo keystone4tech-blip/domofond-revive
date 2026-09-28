@@ -11,7 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useUserRole } from "@/hooks/useUserRole";
-import { Loader2, LogOut, CheckCircle, AlertCircle, AlertTriangle, ClipboardList, Calendar, Shield, CreditCard, Wallet, Pencil, Trash2, UserCheck, Plus, Minus, Clock, Wrench, CheckCircle2, XCircle, Send, Smartphone, KeyRound, PhoneCall, Headphones, DoorOpen, DoorClosed, Info, User, Phone, Mail, Lock, Lightbulb, Hash, MapPin, Building, Home, Building2, History, FileSpreadsheet, Copy, Eye, EyeOff, ShieldCheck, Sparkles, LayoutDashboard, Zap, Printer, Receipt, FileText, ShoppingBag } from "lucide-react";
+import { Loader2, LogOut, CheckCircle, Check, AlertCircle, AlertTriangle, ClipboardList, Calendar, Shield, CreditCard, Wallet, Pencil, Trash2, UserCheck, Plus, Minus, Clock, Wrench, CheckCircle2, XCircle, Send, Smartphone, KeyRound, PhoneCall, Headphones, DoorOpen, DoorClosed, Info, User, Phone, Mail, Lock, Lightbulb, Hash, MapPin, Building, Home, Building2, History, FileSpreadsheet, Copy, Eye, EyeOff, ShieldCheck, Sparkles, LayoutDashboard, Zap, Printer, Receipt, FileText, ShoppingBag } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -198,6 +199,9 @@ const DebtCard = ({
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [accountHistory, setAccountHistory] = useState<any[]>([]);
   const [onlinePayments, setOnlinePayments] = useState<any[]>([]);
+  // true, если по улице+дому в базе есть лицевые счета, но именно эта квартира не найдена
+  // (дом на обслуживании — не показываем «частный клиент», а просим уточнить квартиру/счёт)
+  const [houseServed, setHouseServed] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<any | null>(null);
 
@@ -212,6 +216,7 @@ const DebtCard = ({
   useEffect(() => {
     const loadDebt = async () => {
       setLoading(true);
+      setHouseServed(false); // сбрасываем перед каждым поиском
       // RULE 2: Запоминаем факт возврата со шлюза ЮKassa до любых асинхронных операций
       const initialParams = new URLSearchParams(window.location.search);
       const isReturningFromPayment = initialParams.get("check_payment") === "1" || initialParams.get("payment") === "success";
@@ -337,7 +342,24 @@ const DebtCard = ({
           }
         } else {
           console.log(`[Баланс] Адрес совпал по улице и дому, но квартира ${apartment} не найдена в обслуживаемых лицевых счетах`);
+          // Проверяем: есть ли по этой улице+дому вообще обслуживаемые счета (дом на обслуживании)
+          const houseMatch = data.some((a: any) => {
+            const dbParts = (a.address || "").split(",");
+            if (dbParts.length < 3) return false;
+            const dbStreetNorm = normalizeStreet(dbParts[1]);
+            const dbHouseFull = dbParts.slice(2).join(", ")
+              .replace(/,\s*(?:п(?:одъезд)?\.?\s*\d+).*$/i, "")
+              .replace(/,\s*(?:кв\.?\s*[а-яa-z0-9-+]+).*$/i, "");
+            const dbHouseNorm = normalizeHouse(dbHouseFull);
+            return dbStreetNorm === userStreetNorm && dbHouseNorm === userHouseNorm;
+          });
+          setHouseServed(houseMatch);
+          if (houseMatch) {
+            console.log(`[Баланс] Дом на обслуживании, но квартира ${apartment} не сопоставлена. Показываем подсказку вместо «частный клиент».`);
+          }
         }
+      } else {
+        setHouseServed(false);
       }
       setAccount(best);
       if (setParentAccount) {
@@ -951,6 +973,66 @@ const DebtCard = ({
         <CardContent className="pt-6">{inner}</CardContent>
       </Card>
     );
+  }
+
+  // Дом на обслуживании, но квартира не сопоставлена автоматически — не пугаем «частным клиентом»
+  if (houseServed) {
+    const houseServedInner = (
+      <>
+        <div className="flex items-start gap-3 mb-3">
+          <div className="p-2 rounded-lg bg-blue-500/10">
+            <Building2 className="h-5 w-5 text-blue-600 dark:text-sky-400" />
+          </div>
+          <div>
+            <p className="font-semibold">Ваш дом на обслуживании ✅</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Мы обслуживаем этот дом, но не смогли автоматически определить ваш лицевой счёт
+              по квартире. Уточните номер квартиры выше или введите номер лицевого счёта
+              (он указан в квитанции) — баланс и оплата появятся сразу.
+            </p>
+          </div>
+        </div>
+        <Dialog open={requestOpen} onOpenChange={setRequestOpen}>
+          <Button variant="outline" className="w-full rounded-xl" onClick={() => setRequestOpen(true)}>
+            <Send className="mr-2 h-4 w-4" />
+            Не нашли счёт? Оставить заявку
+          </Button>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Заявка на уточнение лицевого счёта</DialogTitle>
+              <DialogDescription>
+                Опишите ситуацию — оператор проверит данные и привяжет ваш лицевой счёт.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 py-2">
+              <div className="text-sm text-muted-foreground space-y-1">
+                <div>👤 {fullName}</div>
+                <div>📞 {phone}</div>
+                <div>📍 {address}{apartment ? `, кв. ${apartment}` : ""}</div>
+              </div>
+              <Textarea
+                placeholder="Например: не находит мой лицевой счёт по квартире 45..."
+                value={requestText}
+                onChange={(e) => setRequestText(e.target.value)}
+                rows={4}
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setRequestOpen(false)}>Отмена</Button>
+              <Button onClick={handleCreateRequest} disabled={creating}>
+                {creating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                <Send className="h-4 w-4 mr-2" />
+                Отправить
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </>
+    );
+    if (embedded) {
+      return <div className="p-4 rounded-lg border border-blue-500/30 bg-card">{houseServedInner}</div>;
+    }
+    return <Card className="border-blue-500/30"><CardContent className="pt-6">{houseServedInner}</CardContent></Card>;
   }
 
   // Not found — private client
@@ -2326,8 +2408,8 @@ const Cabinet = () => {
         setApartment(apt);
 
         if (found.street) setDisplayStreet(found.street);
-        if (found.house) setDisplayHouse(found.house);
-        if (found.housing) setDisplayHousing(found.housing);
+        // Корпус (housing) склеиваем с номером дома, отдельного поля displayHousing нет
+        if (found.house) setDisplayHouse(found.housing ? `${found.house} к${found.housing}` : found.house);
         if (found.entrance) setEntrance(found.entrance);
 
         parseAndSetAddress(found.address || "");
@@ -4309,7 +4391,6 @@ const Cabinet = () => {
       setAccountSearchInput("");
       setAccountSearchFound(false);
       setAccountSearchError(null);
-      setOnlinePayments([]);
 
       // Очищаем кэш запросов истории, чтобы новый профиль отображался с чистого листа
       queryClient.removeQueries({ queryKey: ["user-requests"] });

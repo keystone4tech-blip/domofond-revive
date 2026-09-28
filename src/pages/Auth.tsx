@@ -101,33 +101,32 @@ const Auth = () => {
     if (!rawLogin) {
       toast({
         title: "Заполните поле",
-        description: "Пожалуйста, укажите адрес электронной почты или номер телефона.",
+        description: "Пожалуйста, укажите ваш номер телефона.",
         variant: "destructive",
       });
       setLoading(false);
       return;
     }
 
-    const isEmail = rawLogin.includes("@");
-    // RULE 2: Строго очищаем Email от пробелов
-    const cleanLogin = isEmail ? rawLogin.toLowerCase().replace(/\s+/g, "") : rawLogin;
+    // Регистрация только по номеру телефона (email при регистрации не принимается)
+    const isEmail = false;
+    const cleanLogin = rawLogin;
     const digits = cleanLogin.replace(/\D/g, "");
 
-    if (isEmail) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(cleanLogin)) {
-        toast({
-          title: "Некорректный Email",
-          description: "Пожалуйста, проверьте правильность написания адреса почты (например, name@mail.ru).",
-          variant: "destructive",
-        });
-        setLoading(false);
-        return;
-      }
-    } else if (digits.length < 10) {
+    if (rawLogin.includes("@") || /[a-zA-Zа-яА-Я]/.test(rawLogin)) {
+      toast({
+        title: "Введите номер телефона",
+        description: "Регистрация выполняется только по номеру телефона. Email можно добавить позже в личном кабинете.",
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
+
+    if (digits.length < 10) {
       toast({
         title: "Некорректный номер телефона",
-        description: "Пожалуйста, укажите полный номер телефона (не менее 10 цифр) или действующий email.",
+        description: "Пожалуйста, укажите полный номер телефона в формате +7 (999) 000-00-00.",
         variant: "destructive",
       });
       setLoading(false);
@@ -358,18 +357,23 @@ const Auth = () => {
 
               <TabsContent value="signup">
                 <form onSubmit={handleSignUp} className="space-y-4">
-                  {/* Единое поле: Email или Номер телефона */}
+                  {/* Регистрация только по номеру телефона */}
                   <div className="space-y-2 text-left">
-                    <Label htmlFor="signup-login">Почта или номер телефона</Label>
+                    <Label htmlFor="signup-login">Номер телефона</Label>
                     <Input
                       id="signup-login"
-                      type="text"
-                      placeholder="your@email.com или +7 (999) 000-00-00"
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="tel"
+                      placeholder="+7 (999) 000-00-00"
                       value={signupLogin}
                       onChange={(e) => handleSmartInputChange(e.target.value, setSignupLogin)}
                       required
                       className="bg-background/50 border-border/80 focus:border-primary/50 transition-all font-medium"
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Регистрация выполняется по номеру телефона. Email можно будет добавить позже в личном кабинете.
+                    </p>
                   </div>
 
                   {/* Поле первого ввода Пароля */}
