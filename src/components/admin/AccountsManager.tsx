@@ -59,7 +59,24 @@ export interface Account {
   street?: string | null;
   house?: string | null;
   housing?: string | null;
+  status?: string | null;
+  is_smart_home?: boolean | null;
+  tariff_name?: string | null;
+  tariff_price?: number | null;
+  contract_terminated?: boolean | null;
 }
+
+// Статусы лицевого счёта (единый справочник для UI)
+export const ACCOUNT_STATUSES: { value: string; label: string; className: string }[] = [
+  { value: "new",        label: "Новый",      className: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" },
+  { value: "active",     label: "Активен",    className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300" },
+  { value: "to",         label: "ТО",         className: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" },
+  { value: "montazh",    label: "Монтаж",     className: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300" },
+  { value: "arenda",     label: "Аренда",     className: "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300" },
+  { value: "terminated", label: "Расторгнут", className: "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300" },
+];
+export const statusLabel = (v?: string | null) => ACCOUNT_STATUSES.find(s => s.value === v)?.label || "—";
+export const statusClass = (v?: string | null) => ACCOUNT_STATUSES.find(s => s.value === v)?.className || "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300";
 
 // Интерфейс разобранной строки реестра начислений
 export interface ParsedRegistryRow {
@@ -246,6 +263,78 @@ export const AccountsManager: React.FC = () => {
   useEffect(() => {
     loadData();
   }, []);
+
+  // ==========================================================================
+  // Управление статусом лицевых счетов (Новый / Активен / ТО / Монтаж / Аренда / Расторгнут)
+  // ==========================================================================
+  const [statusUpdating, setStatusUpdating] = useState(false);
+  const [bulkStatus, setBulkStatus] = useState<string>("terminated");
+
+  // Локальное обновление статуса в стейте, чтобы дерево сразу перерисовалось.
+  const applyStatusLocally = (accountNumbers: string[], newStatus: string) => {
+    const set = new Set(accountNumbers);
+    setAccounts(prev => prev.map(a =>
+      set.has(a.account_number)
+        ? { ...a, status: newStatus, contract_terminated: newStatus === "terminated" }
+        : a
+    ));
+  };
+
+  // Смена статуса одного счёта.
+  const updateAccountStatus = async (acc: Account, newStatus: string) => {
+    setStatusUpdating(true);
+    try {
+      const { error } = await supabase
+        .from("accounts")
+        .update({ status: newStatus, contract_terminated: newStatus === "terminated", updated_at: new Date().toISOString() })
+        .eq("account_number", acc.account_number);
+      if (error) throw error;
+      applyStatusLocally([acc.account_number], newStatus);
+      toast({ title: "Статус обновлён", description: `Счёт ${acc.account_number} → «${statusLabel(newStatus)}»` });
+    } catch (err: any) {
+      console.error("[AccountsManager] Ошибка смены статуса:", err);
+      toast({ title: "Ошибка", description: err.message || "Не удалось изменить статус", variant: "destructive" });
+    } finally {
+      setStatusUpdating(false);
+    }
+  };
+
+  // Массовая смена статуса всем счетам выбранного подъезда.
+  const bulkSetEntranceStatus = async (newStatus: string) => {
+    const city = selectedCity || "Краснодар";
+    if (!selectedHouse || selectedEntrance === null || !addressTree[city]?.[selectedHouse]) {
+      toast({ title: "Выберите подъезд", description: "Сначала выберите дом и конкретный подъезд слева.", variant: "destructive" });
+      return;
+    }
+    const entAccounts = addressTree[city][selectedHouse].entrances[selectedEntrance] || [];
+    const accountNumbers = entAccounts.map(a => a.account_number);
+    if (accountNumbers.length === 0) {
+      toast({ title: "Нет счетов", description: "В этом подъезде нет лицевых счетов.", variant: "destructive" });
+      return;
+    }
+    setStatusUpdating(true);
+    try {
+      // Обновляем батчами по 200 (ограничение длины URL PostgREST при .in()).
+      for (let i = 0; i < accountNumbers.length; i += 200) {
+        const chunk = accountNumbers.slice(i, i + 200);
+        const { error } = await supabase
+          .from("accounts")
+          .update({ status: newStatus, contract_terminated: newStatus === "terminated", updated_at: new Date().toISOString() })
+          .in("account_number", chunk);
+        if (error) throw error;
+      }
+      applyStatusLocally(accountNumbers, newStatus);
+      toast({
+        title: "Статус подъезда обновлён",
+        description: `${selectedHouse}, подъезд ${selectedEntrance}: ${accountNumbers.length} счетов → «${statusLabel(newStatus)}»`,
+      });
+    } catch (err: any) {
+      console.error("[AccountsManager] Ошибка массовой смены статуса:", err);
+      toast({ title: "Ошибка", description: err.message || "Не удалось изменить статус подъезда", variant: "destructive" });
+    } finally {
+      setStatusUpdating(false);
+    }
+  };
 
   // --- Построение дерева адресов: Город -> Дом -> Подъезды со счетчиками ---
   const addressTree = useMemo(() => {
@@ -1487,6 +1576,36 @@ export const AccountsManager: React.FC = () => {
                   })}
                 </div>
               )}
+
+              {/* Массовая смена статуса всем счетам выбранного подъезда */}
+              {selectedHouse && selectedEntrance !== null && (
+                <div className="pt-2.5 mt-1 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center gap-2 text-xs">
+                  <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider shrink-0">
+                    Статус подъезда {selectedEntrance}:
+                  </span>
+                  <select
+                    value={bulkStatus}
+                    onChange={e => setBulkStatus(e.target.value)}
+                    disabled={statusUpdating}
+                    className="h-7 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 text-xs"
+                  >
+                    {ACCOUNT_STATUSES.map(s => (
+                      <option key={s.value} value={s.value}>{s.label}</option>
+                    ))}
+                  </select>
+                  <Button
+                    size="sm"
+                    onClick={() => bulkSetEntranceStatus(bulkStatus)}
+                    disabled={statusUpdating}
+                    className="h-7 px-3 rounded-lg text-xs bg-slate-800 hover:bg-slate-900 text-white dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-white font-semibold"
+                  >
+                    {statusUpdating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Применить ко всему подъезду"}
+                  </Button>
+                  <span className="text-[10px] text-muted-foreground">
+                    Изменит статус всем счетам подъезда (напр. «Расторгнут» скроет их из кабинетов жильцов).
+                  </span>
+                </div>
+              )}
             </CardHeader>
 
             <CardContent className="p-4">
@@ -1532,6 +1651,21 @@ export const AccountsManager: React.FC = () => {
                               >
                                 <Copy className="h-3 w-3" />
                               </Button>
+                              {/* Статус счёта: бейдж + выпадающий выбор */}
+                              <span className={`text-[9px] px-1.5 py-0.5 rounded font-semibold ${statusClass(acc.status)}`}>
+                                {statusLabel(acc.status)}
+                              </span>
+                              <select
+                                value={acc.status || "new"}
+                                onChange={e => updateAccountStatus(acc, e.target.value)}
+                                disabled={statusUpdating}
+                                title="Изменить статус счёта"
+                                className="h-6 rounded border border-slate-200 dark:border-slate-700 bg-transparent text-[10px] text-muted-foreground px-1"
+                              >
+                                {ACCOUNT_STATUSES.map(s => (
+                                  <option key={s.value} value={s.value}>{s.label}</option>
+                                ))}
+                              </select>
                             </div>
                             <div className="text-[11px] text-muted-foreground truncate max-w-[240px] mt-0.5" title={acc.address}>
                               {acc.address}
