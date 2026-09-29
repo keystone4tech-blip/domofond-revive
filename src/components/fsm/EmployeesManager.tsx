@@ -123,10 +123,14 @@ const EmployeesManager = () => {
 
       const existingUserIds = employees?.map((e) => e.user_id) || [];
 
+      // Поиск сотрудника и по ФИО, и по номеру телефона (регистрация идёт по телефону)
+      const digits = searchQuery.replace(/\D/g, "");
+      const orParts = [`full_name.ilike.%${searchQuery}%`];
+      if (digits.length >= 3) orParts.push(`phone_clean.ilike.%${digits}%`);
       const { data, error } = await supabase
         .from("profiles")
         .select("id, full_name, phone, address")
-        .ilike("full_name", `%${searchQuery}%`)
+        .or(orParts.join(","))
         .limit(10);
 
       if (error) throw error;

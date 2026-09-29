@@ -4863,36 +4863,7 @@ const Cabinet = () => {
                       }}
                     />
                   </div>
-                ) : (
-                  <div className="p-4 mb-2 rounded-2xl bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-500/5 border border-amber-500/30 shadow-sm text-left space-y-3 animate-in fade-in duration-300">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="flex items-start gap-2.5">
-                        <div className="h-8 w-8 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 mt-0.5">
-                          <Wrench className="h-4 w-4" />
-                        </div>
-                        <div>
-                          <p className="font-bold text-xs sm:text-sm text-foreground flex items-center gap-1.5">
-                            ⚡ Быстрый старт: подайте заявку сразу!
-                          </p>
-                          <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
-                            Вы можете сразу оставить заявку на вызов мастера или заказ оборудования — введённый адрес и имя сохранятся в вашем профиле автоматически.
-                          </p>
-                        </div>
-                      </div>
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          setOrderType("repair");
-                          setIsOrderDialogOpen(true);
-                        }}
-                        className="btn-premium-gold shrink-0 h-9 px-3.5 text-xs font-bold rounded-xl shadow-md shadow-amber-500/15 self-start sm:self-auto"
-                      >
-                        <Wrench className="h-3.5 w-3.5 mr-1.5" />
-                        Оставить заявку ➔
-                      </Button>
-                    </div>
-                  </div>
-                )}
+                ) : null}
 
                 {/* Пошаговый мастер заполнения (первичное заполнение или редактирование через диспетчера) */}
                 {!isLocked ? (

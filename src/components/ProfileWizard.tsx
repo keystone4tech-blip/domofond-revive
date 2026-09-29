@@ -75,7 +75,9 @@ export const ProfileWizard: React.FC<Props> = ({ userId, phone, initialFullName,
 
   // Собираемые данные
   const [fullName, setFullName] = useState(initialFullName || existingProfile?.full_name || "");
+  const [phoneNum, setPhoneNum] = useState(phone || existingProfile?.phone || "");
   const [accountNumber, setAccountNumber] = useState<string>(existingProfile?.account_number || "");
+  const [manualMode, setManualMode] = useState(false); // ручной ввод адреса (для новых клиентов не из базы)
   const [street, setStreet] = useState("");
   const [house, setHouse] = useState("");
   const [housing, setHousing] = useState("");
@@ -191,7 +193,7 @@ export const ProfileWizard: React.FC<Props> = ({ userId, phone, initialFullName,
       if (mode === "edit" && existingProfile) {
         // Изменение сохранённого профиля — через диспетчера (pending_data_change)
         const pending = {
-          full_name: fullName.trim(), phone: phone,
+          full_name: fullName.trim(), phone: (phoneNum || phone || "").trim(),
           address: finalAddress, apartment: apartment.trim(), floor: floor.trim(),
           account_number: accountNumber || null,
           submitted_at: new Date().toISOString(),
@@ -218,7 +220,7 @@ export const ProfileWizard: React.FC<Props> = ({ userId, phone, initialFullName,
       } else {
         // Первичное заполнение — сохраняем сразу
         const { error } = await supabase.from("profiles").update({
-          full_name: fullName.trim(), phone,
+          full_name: fullName.trim(), phone: (phoneNum || phone || "").trim() || null,
           address: finalAddress, apartment: apartment.trim() || null, floor: floor.trim() || null,
           account_number: accountNumber || null,
         }).eq("id", userId);
@@ -268,11 +270,29 @@ export const ProfileWizard: React.FC<Props> = ({ userId, phone, initialFullName,
         </div>
       </div>
 
-      {/* ШАГ: ФИО */}
+      {/* Дружелюбное приглашение — заметный выделенный блок */}
+      {step === "name" && (
+        <div className="mb-5 p-4 rounded-2xl bg-gradient-to-r from-blue-500/15 via-sky-500/10 to-blue-500/5 border border-blue-500/30 text-center">
+          <p className="text-base sm:text-lg font-extrabold text-blue-700 dark:text-sky-300">
+            👋 Давайте мы поможем вам заполнить ваши данные
+          </p>
+          <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+            Это займёт меньше минуты — просто отвечайте по шагам.
+          </p>
+        </div>
+      )}
+
+      {/* ШАГ: ФИО + телефон */}
       {step === "name" && (
         <StepShell icon={<User className="h-5 w-5" />} title="Как вас зовут?" subtitle="Укажите фамилию, имя и отчество">
           <Input autoFocus value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Иванов Иван Иванович"
             className="h-12 rounded-xl text-base" />
+          <div className="mt-4">
+            <Label className="text-xs font-semibold text-slate-500 dark:text-slate-400">📞 Контактный телефон</Label>
+            <Input value={phoneNum} onChange={(e) => setPhoneNum(e.target.value)} placeholder="+7 (999) 000-00-00"
+              type="tel" inputMode="tel" className="h-12 rounded-xl text-base mt-1" />
+            <p className="text-[11px] text-muted-foreground mt-1">Подставлен из вашей регистрации — при необходимости поправьте.</p>
+          </div>
           <div className="flex justify-end mt-5">
             <Button disabled={!fullName.trim()} onClick={() => go("method")} className="rounded-xl h-11 px-6 gap-2 bg-blue-600 hover:bg-blue-700">
               Далее <ArrowRight className="h-4 w-4" />
@@ -351,9 +371,17 @@ export const ProfileWizard: React.FC<Props> = ({ userId, phone, initialFullName,
               </button>
             ))}
             {!loadingList && streetQuery.trim().length >= 2 && streetOpts.length === 0 && (
-              <p className="p-3 text-sm text-muted-foreground">Ничего не найдено. Проверьте написание.</p>
+              <p className="p-3 text-sm text-muted-foreground">Такой улицы нет среди обслуживаемых. Вы можете ввести адрес вручную ниже.</p>
             )}
           </div>
+          {/* Для новых клиентов, чьего адреса ещё нет в нашей базе */}
+          {streetQuery.trim().length >= 2 && (
+            <button type="button"
+              onClick={() => { setManualMode(true); setStreet(streetQuery.trim()); setHouse(""); setHousing(""); setEntrance(""); setApartment(""); go("house"); }}
+              className="w-full mt-2 p-3 rounded-xl border border-dashed border-blue-400/50 text-blue-700 dark:text-sky-300 text-sm font-semibold hover:bg-blue-500/5 flex items-center justify-center gap-1.5">
+              <Home className="h-4 w-4" /> Моего адреса нет в списке — ввести вручную
+            </button>
+          )}
           <div className="flex justify-start mt-5">
             <Button variant="ghost" onClick={back} className="rounded-xl h-10 gap-2 text-muted-foreground"><ArrowLeft className="h-4 w-4" /> Назад</Button>
           </div>
@@ -363,21 +391,40 @@ export const ProfileWizard: React.FC<Props> = ({ userId, phone, initialFullName,
       {/* ШАГ: дом */}
       {step === "house" && (
         <StepShell icon={<Home className="h-5 w-5" />} title="Номер дома" subtitle={street}>
-          <Input autoFocus value={houseQuery} onChange={(e) => setHouseQuery(e.target.value)} placeholder="например, 50"
-            className="h-12 rounded-xl text-base" />
-          <div className="mt-3 flex flex-wrap gap-2">
-            {loadingList && <div className="p-1 text-sm text-muted-foreground flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Загрузка…</div>}
-            {!loadingList && houseOpts
-              .filter((h) => !houseQuery.trim() || h.label.toLowerCase().includes(houseQuery.trim().toLowerCase()))
-              .map((h) => (
-                <Tile key={h.label} onClick={() => { setHouse(h.house); setHousing(h.housing || ""); setEntranceOpts([]); loadEntrances(street, h.house, h.housing || ""); go("entrance"); }}>
-                  {h.label}
-                </Tile>
-              ))}
-          </div>
-          <div className="flex justify-start mt-5">
-            <Button variant="ghost" onClick={back} className="rounded-xl h-10 gap-2 text-muted-foreground"><ArrowLeft className="h-4 w-4" /> Назад</Button>
-          </div>
+          {manualMode ? (
+            <div>
+              <div className="flex gap-2">
+                <Input autoFocus value={house} onChange={(e) => setHouse(e.target.value)} placeholder="дом, напр. 50" className="h-12 rounded-xl text-base" />
+                <Input value={housing} onChange={(e) => setHousing(e.target.value)} placeholder="корпус (если есть)" className="h-12 rounded-xl text-base w-40" />
+              </div>
+              <div className="flex justify-between mt-5">
+                <Button variant="ghost" onClick={back} className="rounded-xl h-10 gap-2 text-muted-foreground"><ArrowLeft className="h-4 w-4" /> Назад</Button>
+                <Button disabled={!house.trim()} onClick={() => { setManualEntrance(true); setEntranceOpts([]); go("entrance"); }} className="rounded-xl h-11 px-6 gap-2 bg-blue-600 hover:bg-blue-700">Далее <ArrowRight className="h-4 w-4" /></Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <Input autoFocus value={houseQuery} onChange={(e) => setHouseQuery(e.target.value)} placeholder="например, 50"
+                className="h-12 rounded-xl text-base" />
+              <div className="mt-3 flex flex-wrap gap-2">
+                {loadingList && <div className="p-1 text-sm text-muted-foreground flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Загрузка…</div>}
+                {!loadingList && houseOpts
+                  .filter((h) => !houseQuery.trim() || h.label.toLowerCase().includes(houseQuery.trim().toLowerCase()))
+                  .map((h) => (
+                    <Tile key={h.label} onClick={() => { setHouse(h.house); setHousing(h.housing || ""); setEntranceOpts([]); loadEntrances(street, h.house, h.housing || ""); go("entrance"); }}>
+                      {h.label}
+                    </Tile>
+                  ))}
+              </div>
+              <button type="button" onClick={() => { setManualMode(true); setHouse(houseQuery.trim()); setHousing(""); }}
+                className="w-full mt-3 p-2.5 rounded-xl border border-dashed border-blue-400/50 text-blue-700 dark:text-sky-300 text-xs font-semibold hover:bg-blue-500/5">
+                Моего дома нет в списке — ввести вручную
+              </button>
+              <div className="flex justify-start mt-4">
+                <Button variant="ghost" onClick={back} className="rounded-xl h-10 gap-2 text-muted-foreground"><ArrowLeft className="h-4 w-4" /> Назад</Button>
+              </div>
+            </>
+          )}
         </StepShell>
       )}
 
@@ -460,7 +507,7 @@ export const ProfileWizard: React.FC<Props> = ({ userId, phone, initialFullName,
         <StepShell icon={<CheckCircle2 className="h-5 w-5" />} title="Проверьте данные" subtitle="Всё верно? Тогда сохраняем">
           <div className="rounded-2xl border border-slate-200 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-800 overflow-hidden">
             <Row label="ФИО" value={fullName} onEdit={() => setStep("name")} />
-            <Row label="Телефон" value={phone} />
+            <Row label="Телефон" value={phoneNum || phone} onEdit={() => setStep("name")} />
             {accountNumber && <Row label="Лицевой счёт" value={accountNumber} mono />}
             <Row label="Адрес" value={finalAddress} onEdit={() => { setStreetQuery(""); setStep("street"); }} />
             {apartment && <Row label="Квартира" value={apartment} onEdit={() => setStep("apartment")} />}
