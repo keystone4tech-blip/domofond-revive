@@ -52,6 +52,22 @@ async function getJSON(url: string) {
   return r.json();
 }
 
+// Подсказки адресов по Краснодару из справочника DaData/КЛАДР (чтобы жильцы выбирали из списка,
+// а не плодили опечатки). Ключ вшит в бандл (VITE_DADATA_API_KEY).
+const DADATA_KEY = ((import.meta as any).env?.VITE_DADATA_API_KEY as string) || "e2f68637298d357a2555d582480cddb18e671f6a";
+async function dadataSuggest(query: string, bound: "street" | "house") {
+  try {
+    const r = await fetch("https://suggestions.dadata.ru/suggestions/api/4_1/rs/suggest/address", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Accept": "application/json", "Authorization": `Token ${DADATA_KEY}` },
+      body: JSON.stringify({ query, count: 8, from_bound: { value: bound }, to_bound: { value: bound }, locations: [{ region: "краснодарский", city: "краснодар" }] }),
+    });
+    const j = await r.json();
+    return (j.suggestions || []) as any[];
+  } catch { return []; }
+}
+const normStreet = (s: string) => (s || "").toLowerCase().replace(/[^а-яё0-9]/gi, "");
+
 // Красивый номер лицевого счёта → нормализованный вид для показа
 const composeAddress = (street: string, house: string, housing: string, entrance: string) => {
   let a = street.trim();
@@ -77,7 +93,10 @@ export const ProfileWizard: React.FC<Props> = ({ userId, phone, initialFullName,
   const [fullName, setFullName] = useState(initialFullName || existingProfile?.full_name || "");
   const [phoneNum, setPhoneNum] = useState(phone || existingProfile?.phone || "");
   const [accountNumber, setAccountNumber] = useState<string>(existingProfile?.account_number || "");
-  const [manualMode, setManualMode] = useState(false); // ручной ввод адреса (для новых клиентов не из базы)
+  const [streetServed, setStreetServed] = useState(true); // выбрана ли обслуживаемая улица (из нашей базы)
+  const [dadataStreetOpts, setDadataStreetOpts] = useState<any[]>([]); // подсказки улиц из справочника
+  const [dadataStreetValue, setDadataStreetValue] = useState(""); // полный контекст улицы DaData (для поиска домов)
+  const [dadataHouseOpts, setDadataHouseOpts] = useState<any[]>([]); // подсказки домов из справочника
   const [street, setStreet] = useState("");
   const [house, setHouse] = useState("");
   const [housing, setHousing] = useState("");
@@ -124,20 +143,41 @@ export const ProfileWizard: React.FC<Props> = ({ userId, phone, initialFullName,
       .catch(() => {});
   }, [step, phone, phoneChecked]);
 
-  // Загрузка улиц по вводу
+  // Загрузка улиц: НАШИ обслуживаемые (приоритет) + подсказки по Краснодару из справочника
   useEffect(() => {
     if (step !== "street") return;
     const q = streetQuery.trim();
-    if (q.length < 2) { setStreetOpts([]); return; }
+    if (q.length < 2) { setStreetOpts([]); setDadataStreetOpts([]); return; }
     setLoadingList(true);
-    const t = setTimeout(() => {
-      getJSON(api(`streets?q=${encodeURIComponent(q)}`))
-        .then((rows: string[]) => setStreetOpts(rows))
-        .catch(() => setStreetOpts([]))
-        .finally(() => setLoadingList(false));
-    }, 250);
+    const t = setTimeout(async () => {
+      const [served, dd] = await Promise.all([
+        getJSON(api(`streets?q=${encodeURIComponent(q)}`)).catch(() => []),
+        dadataSuggest(q, "street"),
+      ]);
+      setStreetOpts(served);
+      const servedNorm = new Set((served as string[]).map(normStreet));
+      // Оставляем из справочника только те улицы, которых нет среди обслуживаемых
+      setDadataStreetOpts(dd.filter((x) => {
+        const sw = x.data?.street_with_type || x.data?.settlement_with_type || x.value;
+        return !servedNorm.has(normStreet(sw));
+      }));
+      setLoadingList(false);
+    }, 300);
     return () => clearTimeout(t);
   }, [streetQuery, step]);
+
+  // Дома из справочника DaData (для домов, которых нет в нашей базе / новых клиентов)
+  useEffect(() => {
+    if (step !== "house") return;
+    const q = houseQuery.trim();
+    if (q.length < 1) { setDadataHouseOpts([]); return; }
+    const ctx = streetServed ? `Краснодар, ${street.replace(/\s*\(ул\)\s*/i, "")}` : (dadataStreetValue || `Краснодар, ${street}`);
+    const t = setTimeout(async () => {
+      const dd = await dadataSuggest(`${ctx}, ${q}`, "house");
+      setDadataHouseOpts(dd);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [houseQuery, step, streetServed, dadataStreetValue, street]);
 
   const loadHouses = async (st: string) => {
     setLoadingList(true);
@@ -357,74 +397,85 @@ export const ProfileWizard: React.FC<Props> = ({ userId, phone, initialFullName,
         </StepShell>
       )}
 
-      {/* ШАГ: улица */}
+      {/* ШАГ: улица (наши обслуживаемые — первыми, затем справочник Краснодара) */}
       {step === "street" && (
-        <StepShell icon={<MapPin className="h-5 w-5" />} title="Улица" subtitle="Начните вводить название">
-          <Input autoFocus value={streetQuery} onChange={(e) => setStreetQuery(e.target.value)} placeholder="например, Душистая"
+        <StepShell icon={<MapPin className="h-5 w-5" />} title="Улица" subtitle="Начните вводить — выберите из списка">
+          <Input autoFocus value={streetQuery} onChange={(e) => setStreetQuery(e.target.value)} placeholder="например, Главная"
             className="h-12 rounded-xl text-base" />
-          <div className="mt-2 max-h-56 overflow-auto rounded-xl">
+          <div className="mt-2 max-h-72 overflow-auto rounded-xl">
             {loadingList && <div className="p-3 text-sm text-muted-foreground flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Поиск…</div>}
+            {/* Обслуживаемые улицы — приоритет */}
             {!loadingList && streetOpts.map((s) => (
-              <button key={s} type="button" onClick={() => { setStreet(s); setHouseQuery(""); setHouseOpts([]); loadHouses(s); go("house"); }}
-                className="w-full text-left px-4 py-3 rounded-lg hover:bg-blue-500/10 text-sm border-b border-slate-100 dark:border-slate-800 last:border-0">
-                {s}
+              <button key={"srv-" + s} type="button"
+                onClick={() => { setStreet(s); setStreetServed(true); setDadataStreetValue(""); setHouseQuery(""); setHouseOpts([]); setDadataHouseOpts([]); loadHouses(s); go("house"); }}
+                className="w-full text-left px-4 py-3 rounded-lg hover:bg-blue-500/10 text-sm border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
+                <span>{s}</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-bold shrink-0">✓ обслуживаем</span>
               </button>
             ))}
-            {!loadingList && streetQuery.trim().length >= 2 && streetOpts.length === 0 && (
-              <p className="p-3 text-sm text-muted-foreground">Такой улицы нет среди обслуживаемых. Вы можете ввести адрес вручную ниже.</p>
+            {/* Остальные улицы Краснодара из справочника */}
+            {!loadingList && dadataStreetOpts.map((x, i) => {
+              const settlement = x.data?.settlement_with_type ? `${x.data.settlement_with_type}, ` : "";
+              const label = (settlement + (x.data?.street_with_type || "")).trim() || x.value.replace(/^г\s+Краснодар,\s*/i, "");
+              return (
+                <button key={"dd-" + i} type="button"
+                  onClick={() => { setStreet(label); setStreetServed(false); setDadataStreetValue(x.value); setHouseQuery(""); setHouse(""); setHousing(""); setEntrance(""); setApartment(""); setDadataHouseOpts([]); go("house"); }}
+                  className="w-full text-left px-4 py-3 rounded-lg hover:bg-blue-500/10 text-sm border-b border-slate-100 dark:border-slate-800 last:border-0 text-slate-600 dark:text-slate-300">
+                  {label}
+                </button>
+              );
+            })}
+            {!loadingList && streetQuery.trim().length >= 2 && streetOpts.length === 0 && dadataStreetOpts.length === 0 && (
+              <p className="p-3 text-sm text-muted-foreground">Ничего не найдено. Проверьте написание.</p>
             )}
           </div>
-          {/* Для новых клиентов, чьего адреса ещё нет в нашей базе */}
-          {streetQuery.trim().length >= 2 && (
-            <button type="button"
-              onClick={() => { setManualMode(true); setStreet(streetQuery.trim()); setHouse(""); setHousing(""); setEntrance(""); setApartment(""); go("house"); }}
-              className="w-full mt-2 p-3 rounded-xl border border-dashed border-blue-400/50 text-blue-700 dark:text-sky-300 text-sm font-semibold hover:bg-blue-500/5 flex items-center justify-center gap-1.5">
-              <Home className="h-4 w-4" /> Моего адреса нет в списке — ввести вручную
-            </button>
-          )}
           <div className="flex justify-start mt-5">
             <Button variant="ghost" onClick={back} className="rounded-xl h-10 gap-2 text-muted-foreground"><ArrowLeft className="h-4 w-4" /> Назад</Button>
           </div>
         </StepShell>
       )}
 
-      {/* ШАГ: дом */}
+      {/* ШАГ: дом (наши дома плитками; при вводе — подсказки домов из справочника) */}
       {step === "house" && (
         <StepShell icon={<Home className="h-5 w-5" />} title="Номер дома" subtitle={street}>
-          {manualMode ? (
-            <div>
-              <div className="flex gap-2">
-                <Input autoFocus value={house} onChange={(e) => setHouse(e.target.value)} placeholder="дом, напр. 50" className="h-12 rounded-xl text-base" />
-                <Input value={housing} onChange={(e) => setHousing(e.target.value)} placeholder="корпус (если есть)" className="h-12 rounded-xl text-base w-40" />
-              </div>
-              <div className="flex justify-between mt-5">
-                <Button variant="ghost" onClick={back} className="rounded-xl h-10 gap-2 text-muted-foreground"><ArrowLeft className="h-4 w-4" /> Назад</Button>
-                <Button disabled={!house.trim()} onClick={() => { setManualEntrance(true); setEntranceOpts([]); go("entrance"); }} className="rounded-xl h-11 px-6 gap-2 bg-blue-600 hover:bg-blue-700">Далее <ArrowRight className="h-4 w-4" /></Button>
+          <Input autoFocus value={houseQuery} onChange={(e) => setHouseQuery(e.target.value)} placeholder="например, 50"
+            className="h-12 rounded-xl text-base" />
+          {/* Наши дома — плитки (для обслуживаемой улицы) */}
+          {streetServed && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {loadingList && <div className="p-1 text-sm text-muted-foreground flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Загрузка…</div>}
+              {!loadingList && houseOpts
+                .filter((h) => !houseQuery.trim() || h.label.toLowerCase().includes(houseQuery.trim().toLowerCase()))
+                .map((h) => (
+                  <Tile key={h.label} onClick={() => { setHouse(h.house); setHousing(h.housing || ""); setEntranceOpts([]); loadEntrances(street, h.house, h.housing || ""); go("entrance"); }}
+                    badge={<span className="absolute -top-1.5 -right-1.5 text-[9px]" title="Обслуживаем">✓</span>}>
+                    {h.label}
+                  </Tile>
+                ))}
+            </div>
+          )}
+          {/* Дома из справочника (для новых адресов / если дома нет среди наших) */}
+          {dadataHouseOpts.length > 0 && (
+            <div className="mt-3">
+              <p className="text-[11px] text-muted-foreground mb-1.5">Из справочника Краснодара:</p>
+              <div className="flex flex-wrap gap-2">
+                {dadataHouseOpts.map((x, i) => {
+                  const hn = x.data?.house || "";
+                  const bl = x.data?.block || "";
+                  const lbl = bl ? `${hn} к${bl}` : hn;
+                  if (!hn) return null;
+                  return (
+                    <Tile key={"ddh-" + i} onClick={() => { setHouse(hn); setHousing(bl || ""); setManualEntrance(true); setEntranceOpts([]); go("entrance"); }}>
+                      {lbl}
+                    </Tile>
+                  );
+                })}
               </div>
             </div>
-          ) : (
-            <>
-              <Input autoFocus value={houseQuery} onChange={(e) => setHouseQuery(e.target.value)} placeholder="например, 50"
-                className="h-12 rounded-xl text-base" />
-              <div className="mt-3 flex flex-wrap gap-2">
-                {loadingList && <div className="p-1 text-sm text-muted-foreground flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Загрузка…</div>}
-                {!loadingList && houseOpts
-                  .filter((h) => !houseQuery.trim() || h.label.toLowerCase().includes(houseQuery.trim().toLowerCase()))
-                  .map((h) => (
-                    <Tile key={h.label} onClick={() => { setHouse(h.house); setHousing(h.housing || ""); setEntranceOpts([]); loadEntrances(street, h.house, h.housing || ""); go("entrance"); }}>
-                      {h.label}
-                    </Tile>
-                  ))}
-              </div>
-              <button type="button" onClick={() => { setManualMode(true); setHouse(houseQuery.trim()); setHousing(""); }}
-                className="w-full mt-3 p-2.5 rounded-xl border border-dashed border-blue-400/50 text-blue-700 dark:text-sky-300 text-xs font-semibold hover:bg-blue-500/5">
-                Моего дома нет в списке — ввести вручную
-              </button>
-              <div className="flex justify-start mt-4">
-                <Button variant="ghost" onClick={back} className="rounded-xl h-10 gap-2 text-muted-foreground"><ArrowLeft className="h-4 w-4" /> Назад</Button>
-              </div>
-            </>
           )}
+          <div className="flex justify-start mt-5">
+            <Button variant="ghost" onClick={back} className="rounded-xl h-10 gap-2 text-muted-foreground"><ArrowLeft className="h-4 w-4" /> Назад</Button>
+          </div>
         </StepShell>
       )}
 
