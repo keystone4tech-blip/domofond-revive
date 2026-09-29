@@ -44,7 +44,10 @@ interface Props {
 const api = (path: string) => `/backend-api/api/lookup/${path}`;
 
 async function getJSON(url: string) {
-  const r = await fetch(url);
+  // Эндпоинты поиска требуют авторизации — передаём JWT абонента
+  let token = "";
+  try { token = localStorage.getItem("auth_token") || sessionStorage.getItem("auth_token") || ""; } catch { /* ignore */ }
+  const r = await fetch(url, token ? { headers: { Authorization: `Bearer ${token}` } } : {});
   if (!r.ok) throw new Error("Ошибка запроса");
   return r.json();
 }

@@ -1899,8 +1899,20 @@ app.post('/api/notify', async (req, res) => {
 // ORDER BY по выражению вместе с SELECT DISTINCT).
 const natOrder = (col) => `ORDER BY NULLIF(regexp_replace(COALESCE(${col},''),'[^0-9]','','g'),'')::bigint NULLS LAST, ${col}`;
 
+// Лёгкая проверка авторизации (валидность JWT, без обращения к БД) — для эндпоинтов поиска.
+// Закрывает анонимный доступ к адресной базе абонентов.
+const requireAuthLite = (req, res, next) => {
+  const h = req.headers['authorization'];
+  const token = h && h.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'Требуется авторизация' });
+  jwt.verify(token, ACTIVE_JWT_SECRET, (err) => {
+    if (err) return res.status(403).json({ error: 'Недействительный токен сессии' });
+    next();
+  });
+};
+
 // 1. Подсказки улиц
-app.get('/api/lookup/streets', async (req, res) => {
+app.get('/api/lookup/streets', requireAuthLite, async (req, res) => {
   try {
     const q = String(req.query.q || '').trim();
     if (q.length < 1) return res.json([]);
@@ -1918,7 +1930,7 @@ app.get('/api/lookup/streets', async (req, res) => {
 });
 
 // 2. Дома на улице (с корпусом)
-app.get('/api/lookup/houses', async (req, res) => {
+app.get('/api/lookup/houses', requireAuthLite, async (req, res) => {
   try {
     const street = String(req.query.street || '').trim();
     if (!street) return res.json([]);
@@ -1942,7 +1954,7 @@ app.get('/api/lookup/houses', async (req, res) => {
 });
 
 // 3. Подъезды дома (плитки). Флаг умного домофона — из таблицы entrances.
-app.get('/api/lookup/entrances', async (req, res) => {
+app.get('/api/lookup/entrances', requireAuthLite, async (req, res) => {
   try {
     const street = String(req.query.street || '').trim();
     const house = String(req.query.house || '').trim();
@@ -1977,7 +1989,7 @@ app.get('/api/lookup/entrances', async (req, res) => {
 });
 
 // 4. Квартиры в подъезде (плитки)
-app.get('/api/lookup/apartments', async (req, res) => {
+app.get('/api/lookup/apartments', requireAuthLite, async (req, res) => {
   try {
     const street = String(req.query.street || '').trim();
     const house = String(req.query.house || '').trim();
@@ -2000,13 +2012,13 @@ app.get('/api/lookup/apartments', async (req, res) => {
 });
 
 // 5. Поиск лицевого счёта по номеру (с квитанции) — нормализуем до 10 цифр
-app.get('/api/lookup/account', async (req, res) => {
+app.get('/api/lookup/account', requireAuthLite, async (req, res) => {
   try {
     const raw = String(req.query.number || '').replace(/\D/g, '');
     if (!raw) return res.json(null);
     const padded = raw.padStart(10, '0');
     const r = await pool.query(
-      `SELECT account_number, address, street, house, housing, entrance, apartment, full_name, phone, debt_amount, period
+      `SELECT account_number, address, street, house, housing, entrance, apartment
        FROM accounts WHERE account_number = $1 OR account_number = $2 OR account_number ILIKE '%' || $3
        ORDER BY period DESC LIMIT 1`,
       [padded, raw, raw]
@@ -2019,13 +2031,13 @@ app.get('/api/lookup/account', async (req, res) => {
 });
 
 // 6. Поиск абонента по номеру телефона (последние 10 цифр) — поле phone_clean индексировано
-app.get('/api/lookup/by-phone', async (req, res) => {
+app.get('/api/lookup/by-phone', requireAuthLite, async (req, res) => {
   try {
     const digits = String(req.query.phone || '').replace(/\D/g, '');
     if (digits.length < 10) return res.json(null);
     const last10 = digits.slice(-10);
     const r = await pool.query(
-      `SELECT account_number, address, street, house, housing, entrance, apartment, full_name, phone, debt_amount, period
+      `SELECT account_number, address, street, house, housing, entrance, apartment
        FROM accounts WHERE phone_clean LIKE '%' || $1 ORDER BY debt_amount DESC NULLS LAST LIMIT 1`,
       [last10]
     );
