@@ -194,7 +194,7 @@ const DebtCard = ({
   accountNumber?: string | null;
   onOpenOrderDialog?: (type?: "repair" | "order") => void;
 }) => {
-  const [account, setAccount] = useState<{ account_number: string; period: string; debt_amount: number; address: string } | null>(null);
+  const [account, setAccount] = useState<{ account_number: string; period: string; debt_amount: number; address: string; tariff_name?: string | null; tariff_price?: number | null; has_handset?: boolean; has_lk?: boolean; is_smart_home?: boolean; status?: string | null; contract_terminated?: boolean } | null>(null);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [requestOpen, setRequestOpen] = useState(false);
@@ -230,7 +230,7 @@ const DebtCard = ({
         try {
           const { data: accByNum } = await supabase
             .from("accounts")
-            .select("account_number, period, debt_amount, address, apartment")
+            .select("account_number, period, debt_amount, address, apartment, tariff_name, tariff_price, has_handset, has_lk, is_smart_home, status, contract_terminated")
             .eq("account_number", String(accountNumber).trim())
             .order("period", { ascending: false })
             .limit(1);
@@ -265,7 +265,7 @@ const DebtCard = ({
       console.log(`[Баланс: БД Запрос] Отправка запроса к accounts с ilike по адресу: "%${cleanStreetQuery}%${house}%"`); // Подробное логирование запроса
       let query = supabase
         .from("accounts")
-        .select("account_number, period, debt_amount, address, apartment")
+        .select("account_number, period, debt_amount, address, apartment, tariff_name, tariff_price, has_handset, has_lk, is_smart_home, status, contract_terminated")
         .ilike("address", `%${cleanStreetQuery}%${house}%`);
         
       const { data, error } = await query.order("period", { ascending: false }).limit(300);
@@ -531,6 +531,52 @@ const DebtCard = ({
         <p className="text-xs text-muted-foreground mb-3">
           Лицевой счёт: <span className="font-mono font-medium text-foreground">{account.account_number}</span>
         </p>
+
+        {/* Договор расторгнут — показываем предупреждение вместо активной информации */}
+        {account.contract_terminated || account.status === "terminated" ? (
+          <div className="mb-3 p-3 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 text-sm text-amber-800 dark:text-amber-200">
+            Договор по этому адресу расторгнут. Если это ошибка — свяжитесь с диспетчером.
+          </div>
+        ) : null}
+
+        {/* Полная карточка абонента: тариф, трубка, ЛК умного домофона */}
+        {(account.tariff_name || account.tariff_price || account.has_handset || account.has_lk || account.is_smart_home) && (
+          <div className="mb-3 p-3 rounded-lg border bg-muted/20 space-y-2">
+            <div className="text-xs font-semibold text-muted-foreground">Ваше обслуживание</div>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              {(account.tariff_name || account.tariff_price) && (
+                <div className="col-span-2 flex items-center justify-between">
+                  <span className="text-muted-foreground">Тариф</span>
+                  <span className="font-medium text-right">
+                    {account.tariff_name || "—"}
+                    {account.tariff_price ? <span className="text-primary font-bold ml-1">· {Number(account.tariff_price)} ₽/мес</span> : null}
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Трубка</span>
+                <span className={`font-medium ${account.has_handset ? "text-green-600" : "text-muted-foreground"}`}>
+                  {account.has_handset ? "Есть" : "Нет"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Умный домофон</span>
+                <span className={`font-medium ${account.is_smart_home ? "text-indigo-600" : "text-muted-foreground"}`}>
+                  {account.is_smart_home ? "Да" : "Нет"}
+                </span>
+              </div>
+              {account.is_smart_home && (
+                <div className="col-span-2 flex items-center justify-between">
+                  <span className="text-muted-foreground">Личный кабинет умного домофона</span>
+                  <span className={`font-medium ${account.has_lk ? "text-green-600" : "text-amber-600"}`}>
+                    {account.has_lk ? "Подключён" : "Не подключён"}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="space-y-3">
           <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
             <span className="text-sm text-muted-foreground">Период начисления</span>

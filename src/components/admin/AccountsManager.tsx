@@ -185,6 +185,7 @@ export const AccountsManager: React.FC = () => {
   const [isSubscribersUploadOpen, setIsSubscribersUploadOpen] = useState(false);
   const [subscribersFile, setSubscribersFile] = useState<File | null>(null);
   const [parsedSubscribers, setParsedSubscribers] = useState<any[]>([]);
+  const [subscribersMalformed, setSubscribersMalformed] = useState<{ line: number; reason: string; raw: string }[]>([]);
   const [isProcessingSubscribersFile, setIsProcessingSubscribersFile] = useState(false);
   const [isSavingSubscribers, setIsSavingSubscribers] = useState(false);
   const [subscribersProgress, setSubscribersProgress] = useState(0);
@@ -712,6 +713,50 @@ export const AccountsManager: React.FC = () => {
     }
   };
 
+  // ==========================================================================
+  // Нормализация адреса из файла 1С (дом / корпус пишутся в 5+ форматах)
+  // ПРАВИЛА (подтверждены заказчиком):
+  //  • "31/2"  — это НОМЕР ДОМА целиком; корпус берётся отдельно из колонки "Корпус".
+  //  • "29/1А" — правильный номер дома С литерой и БЕЗ корпуса.
+  //  • Корпус выделяем ТОЛЬКО из явных токенов "кN" / "к N" / "корп N" / "корпус N"
+  //    внутри поля "Дом" (напр. "56к1", "19 к2", "21/1 корпус 2"), либо из колонки "Корпус".
+  //  • Дробь "/N", "/NА" и литеры остаются частью номера дома, корпусом НЕ становятся.
+  // --------------------------------------------------------------------------
+  const normalizeHouseKorpus = (rawHouse: string, rawKorpus: string | null): { house: string; housing: string | null } => {
+    let house = (rawHouse || "").trim().replace(/\s+/g, " ");
+    let korp: string | null = (rawKorpus || "").trim() || null;
+
+    // Явный токен корпуса внутри поля "Дом": <что-то с цифрой> (к|корп|корпус) <N[литера]>
+    // m[1] обязан содержать цифру (иначе это не дом, а, например, "к1" целиком).
+    const m = house.match(/^(.*\d.*?)\s*(?:корп(?:ус)?\.?|к)\s*\.?\s*(\d+[а-яёА-ЯЁ]?)\s*$/i);
+    if (m) {
+      house = m[1].trim();
+      if (!korp) korp = m[2].trim();
+    }
+
+    house = house.replace(/\s+/g, " ").trim();
+    if (korp) {
+      korp = korp.replace(/^корп(ус)?\.?\s*/i, "").replace(/^к\.?\s*/i, "").trim();
+      korp = korp.replace(/^0+(?=\d)/, "") || korp; // без ведущих нулей
+      if (!korp) korp = null;
+    }
+    return { house, housing: korp };
+  };
+
+  // Умный домофон определяем по тарифу: "УфаНет" / "УФА НЕТ" / "ufanet" / "умный".
+  const detectSmartHome = (paymentType: string | null): boolean => {
+    const s = (paymentType || "").toLowerCase();
+    return /уфа\s*нет|уфанет|ufanet|умн(ый|ого|ом)/.test(s);
+  };
+
+  // Цена тарифа — последнее целое число в строке ("УФА НЕТ 60 р" → 60; "СОД+ камеры 200" → 200).
+  const parseTariffPrice = (paymentType: string | null): number | null => {
+    const nums = (paymentType || "").match(/\d+/g);
+    if (!nums || nums.length === 0) return null;
+    const v = Number(nums[nums.length - 1]);
+    return Number.isFinite(v) ? v : null;
+  };
+
   // --- Чтение и разбор файла "Список всех абонентов .txt" (TSV) ---
   const handleSubscribersFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -760,33 +805,64 @@ export const AccountsManager: React.FC = () => {
       console.log(`[AccountsManager: Абоненты] Всего строк в файле: ${lines.length}`);
 
       const recordsMap = new Map<string, any>();
+      const malformed: { line: number; reason: string; raw: string }[] = []; // проблемные строки
 
       for (let i = 1; i < lines.length; i++) {
         // Очищаем строку от символов возврата каретки Windows \r
         const cleanLine = lines[i].replace(/\r$/, "");
         const p = cleanLine.split("\t");
-        if (p.length < 5 || !p[0].trim()) continue;
+        if (p.length < 5 || !p[0].trim()) {
+          if (cleanLine.trim()) malformed.push({ line: i + 1, reason: "мало колонок (нужно ≥5, разделитель — табуляция)", raw: cleanLine.slice(0, 120) });
+          continue;
+        }
 
         const accNum = p[0].trim().replace(/\D/g, "").padStart(10, "0");
-        if (!accNum || accNum === "0000000000") continue;
+        if (!accNum || accNum === "0000000000") {
+          malformed.push({ line: i + 1, reason: "пустой/нулевой лицевой счёт", raw: cleanLine.slice(0, 120) });
+          continue;
+        }
+
+        // Часть строк 1С имеет ЛИШНЮЮ 12-ю колонку (второй телефон/служебное поле),
+        // из-за чего улица «съезжает» в поле Дом. Считаем сдвиг: базовый формат — 11 колонок.
+        const off = Math.max(0, p.length - 11);
 
         const fullName = p[1]?.trim() || null;
-        const phone = p[2]?.trim() || null;
-        
+        let phone = p[2]?.trim() || null;
+        // При сдвиге во «вставленной» колонке [3] может лежать второй телефон — добавим,
+        // только если это действительно похоже на номер (≥7 цифр), иначе игнорируем ("300" и т.п.).
+        if (off > 0) {
+          const extra = p[3]?.trim() || "";
+          if ((extra.match(/\d/g) || []).length >= 7) {
+            phone = phone ? `${phone}, ${extra}` : extra;
+          }
+        }
+
         // Гибкое определение наличия трубки: "Да", "да", "1", "+", "true", "есть"
-        const rawHandset = p[3]?.trim().toLowerCase() || "";
+        const rawHandset = p[3 + off]?.trim().toLowerCase() || "";
         const hasHandset = rawHandset === "да" || rawHandset === "1" || rawHandset === "+" || rawHandset === "true" || rawHandset === "есть" || rawHandset.includes("да");
 
-        // Определение наличия ЛК (колонка 4 «Есть ЛК»): "Да", "да", "1", "+", "true", "есть"
-        const rawLk = p[4]?.trim().toLowerCase() || "";
+        // Определение наличия ЛК (колонка «Есть ЛК»): "Да", "да", "1", "+", "true", "есть"
+        const rawLk = p[4 + off]?.trim().toLowerCase() || "";
         const hasLk = rawLk === "да" || rawLk === "1" || rawLk === "+" || rawLk === "true" || rawLk === "есть" || rawLk.includes("да");
-        
-        const street = p[5]?.trim() || "";
-        const house = p[6]?.trim() || "";
-        const housing = p[7]?.trim() || null;
-        const entrance = p[8]?.trim() || null;
-        const apartment = p[9]?.trim() || null;
-        const paymentType = p[10]?.trim() || null;
+
+        const street = p[5 + off]?.trim() || "";
+        const rawHouse = p[6 + off]?.trim() || "";
+        const rawKorpus = p[7 + off]?.trim() || null;
+        const entrance = p[8 + off]?.trim() || null;
+        const apartment = p[9 + off]?.trim() || null;
+        const paymentType = p[10 + off]?.trim() || null;
+
+        // Нормализуем дом/корпус по подтверждённым правилам.
+        const { house, housing } = normalizeHouseKorpus(rawHouse, rawKorpus);
+
+        // Тариф и умный дом.
+        const isSmartHome = detectSmartHome(paymentType);
+        const tariffPrice = parseTariffPrice(paymentType);
+        const tariffName = paymentType; // строка тарифа как в файле
+
+        // Помечаем строки с сомнительным адресом, но НЕ выкидываем (грузим как есть).
+        if (!street) malformed.push({ line: i + 1, reason: "нет улицы", raw: cleanLine.slice(0, 120) });
+        else if (!house) malformed.push({ line: i + 1, reason: "нет номера дома", raw: cleanLine.slice(0, 120) });
 
         let fullAddr = `Краснодар, ${street}`;
         if (house) fullAddr += `, д. ${house}`;
@@ -806,6 +882,9 @@ export const AccountsManager: React.FC = () => {
           entrance: entrance,
           apartment: apartment,
           payment_type: paymentType,
+          tariff_name: tariffName,
+          tariff_price: tariffPrice,
+          is_smart_home: isSmartHome,
           address: fullAddr,
         };
 
@@ -824,14 +903,22 @@ export const AccountsManager: React.FC = () => {
       const parsed = Array.from(recordsMap.values());
       const handsetsCount = parsed.filter(s => s.has_handset).length;
       const lkCount = parsed.filter(s => s.has_lk).length;
-      console.log(`[AccountsManager: Абоненты] Распознано уникальных счетов: ${parsed.length}, с трубками: ${handsetsCount}, с ЛК: ${lkCount}`);
+      const smartCount = parsed.filter(s => s.is_smart_home).length;
+      const korpCount = parsed.filter(s => s.housing).length;
+      console.log(`[AccountsManager: Абоненты] Распознано уникальных счетов: ${parsed.length}, с трубками: ${handsetsCount}, с ЛК: ${lkCount}, умный дом: ${smartCount}, с корпусом: ${korpCount}, проблемных строк: ${malformed.length}`);
       setParsedSubscribers(parsed);
+      setSubscribersMalformed(malformed);
 
       if (parsed.length === 0) {
         toast({
           title: "Ошибка формата",
           description: "Не удалось распознать строки с табуляцией в файле абонентов.",
           variant: "destructive",
+        });
+      } else if (malformed.length > 0) {
+        toast({
+          title: `Файл разобран: ${parsed.length} счетов`,
+          description: `Внимание: ${malformed.length} строк с проблемами адреса — см. отчёт под таблицей перед сохранением.`,
         });
       }
     } catch (err: any) {
@@ -875,8 +962,15 @@ export const AccountsManager: React.FC = () => {
               housing: c.housing,
               entrance: c.entrance,
               payment_type: c.payment_type,
+              tariff_name: c.tariff_name,
+              tariff_price: c.tariff_price,
+              is_smart_home: c.is_smart_home,
               period: "",
+              last_import_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
+              // ВАЖНО: поле status НЕ передаём — новые счета получают DEFAULT 'new',
+              // а существующие сохраняют свой статус (ТО/Монтаж/Аренда/Расторгнут),
+              // выставленный диспетчером вручную.
             })),
             { onConflict: "account_number" }
           );
@@ -919,6 +1013,7 @@ export const AccountsManager: React.FC = () => {
       setIsSubscribersUploadOpen(false);
       setSubscribersFile(null);
       setParsedSubscribers([]);
+      setSubscribersMalformed([]);
       await loadData();
     } catch (err: any) {
       console.error("[AccountsManager: Абоненты] Ошибка сохранения:", err);
@@ -1868,14 +1963,51 @@ export const AccountsManager: React.FC = () => {
                         {parsedSubscribers.filter(s => s.has_lk).length}
                       </strong>
                     </div>
-                    <div className="p-2 rounded-xl bg-white/70 dark:bg-slate-900/70 border border-emerald-100 dark:border-slate-800 col-span-2 sm:col-span-1">
+                    <div className="p-2 rounded-xl bg-white/70 dark:bg-slate-900/70 border border-emerald-100 dark:border-slate-800">
                       <span className="text-[10px] text-muted-foreground block">С тарифом</span>
                       <strong className="text-sm font-mono text-foreground">
                         {parsedSubscribers.filter(s => !!s.payment_type).length}
                       </strong>
                     </div>
+                    <div className="p-2 rounded-xl bg-white/70 dark:bg-slate-900/70 border border-emerald-100 dark:border-slate-800">
+                      <span className="text-[10px] text-muted-foreground block">Умный дом</span>
+                      <strong className="text-sm font-mono text-indigo-600">
+                        {parsedSubscribers.filter(s => s.is_smart_home).length}
+                      </strong>
+                    </div>
+                    <div className="p-2 rounded-xl bg-white/70 dark:bg-slate-900/70 border border-emerald-100 dark:border-slate-800">
+                      <span className="text-[10px] text-muted-foreground block">С корпусом</span>
+                      <strong className="text-sm font-mono text-foreground">
+                        {parsedSubscribers.filter(s => !!s.housing).length}
+                      </strong>
+                    </div>
                   </div>
                 </div>
+
+                {/* Отчёт о проблемных строках адреса */}
+                {subscribersMalformed.length > 0 && (
+                  <div className="p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 text-xs">
+                    <div className="font-bold text-sm text-amber-900 dark:text-amber-100">
+                      ⚠ Проблемных строк с адресом: {subscribersMalformed.length}
+                    </div>
+                    <div className="mt-1 text-[11px] text-amber-800/80 dark:text-amber-200/70">
+                      Такие строки загрузятся, но проверьте адреса вручную — возможно, в файле пропущена улица или дом.
+                    </div>
+                    <div className="mt-2 space-y-1 max-h-[140px] overflow-y-auto">
+                      {subscribersMalformed.slice(0, 50).map((mrow, idx) => (
+                        <div key={idx} className="p-1.5 rounded-lg bg-white/60 dark:bg-slate-900/60 border border-amber-100 dark:border-slate-800">
+                          <span className="font-mono text-amber-700 dark:text-amber-300">стр. {mrow.line}</span>
+                          <span className="mx-1 text-muted-foreground">·</span>
+                          <span className="text-foreground">{mrow.reason}</span>
+                          <span className="block text-[10px] text-muted-foreground font-mono truncate">{mrow.raw}</span>
+                        </div>
+                      ))}
+                      {subscribersMalformed.length > 50 && (
+                        <div className="text-[10px] text-muted-foreground">…и ещё {subscribersMalformed.length - 50}. Полный список — в консоли браузера (F12).</div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Превью первых 3 строк */}
                 <div className="text-xs font-semibold text-muted-foreground">
@@ -1894,7 +2026,11 @@ export const AccountsManager: React.FC = () => {
                       </div>
                       <div className="text-right text-[11px] shrink-0 text-muted-foreground">
                         {sub.phone && <div className="font-mono">{sub.phone}</div>}
-                        {sub.payment_type && <div className="text-emerald-600 font-medium">{sub.payment_type}</div>}
+                        {sub.payment_type && <div className="text-emerald-600 font-medium">{sub.payment_type}{sub.tariff_price ? ` · ${sub.tariff_price}₽` : ""}</div>}
+                        <div className="flex gap-1 justify-end mt-0.5">
+                          {sub.is_smart_home && <span className="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 text-[10px]">умный дом</span>}
+                          {sub.has_handset && <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 text-[10px]">трубка</span>}
+                        </div>
                       </div>
                     </div>
                   ))}
