@@ -24,6 +24,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { VerificationUploadDialog } from "@/components/VerificationUploadDialog";
 import { LegalDocumentsModal } from "@/components/LegalDocumentsModal";
+import { ProfileWizard } from "@/components/ProfileWizard";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 import { calculateKeyPriceDetails, parseTieredPricing } from "@/utils/pricing";
@@ -179,16 +180,18 @@ const DebtCard = ({
   setParentAccount,
   isVerified = false,
   userId = null,
+  accountNumber = null,
   onOpenOrderDialog,
-}: { 
-  address: string; 
-  apartment: string; 
-  fullName: string; 
-  phone: string; 
-  embedded?: boolean; 
+}: {
+  address: string;
+  apartment: string;
+  fullName: string;
+  phone: string;
+  embedded?: boolean;
   setParentAccount?: (acc: any) => void;
   isVerified?: boolean;
   userId?: string | null;
+  accountNumber?: string | null;
   onOpenOrderDialog?: (type?: "repair" | "order") => void;
 }) => {
   const [account, setAccount] = useState<{ account_number: string; period: string; debt_amount: number; address: string } | null>(null);
@@ -220,6 +223,38 @@ const DebtCard = ({
       // RULE 2: Запоминаем факт возврата со шлюза ЮKassa до любых асинхронных операций
       const initialParams = new URLSearchParams(window.location.search);
       const isReturningFromPayment = initialParams.get("check_payment") === "1" || initialParams.get("payment") === "success";
+
+      // БЫСТРЫЙ ПУТЬ: если у профиля есть привязанный лицевой счёт — грузим долг по нему НАПРЯМУЮ,
+      // без тяжёлого перебора адресов (это и снимает нагрузку на БД, и убирает ложный «частный клиент»).
+      if (accountNumber && String(accountNumber).trim()) {
+        try {
+          const { data: accByNum } = await supabase
+            .from("accounts")
+            .select("account_number, period, debt_amount, address, apartment")
+            .eq("account_number", String(accountNumber).trim())
+            .order("period", { ascending: false })
+            .limit(1);
+          if (accByNum && accByNum.length > 0) {
+            const found: any = accByNum[0];
+            try {
+              const syncRes = await fetch(`/backend-api/api/payments/yookassa/sync/${found.account_number}`);
+              const syncData = await syncRes.json();
+              if (syncData.success && syncData.account) {
+                found.debt_amount = Number(syncData.account.debt_amount);
+                if (syncData.payments) setOnlinePayments(syncData.payments);
+              }
+            } catch (e) { /* синхронизация не критична */ }
+            const cd = Number(found.debt_amount) || 0;
+            setPayAmount(cd > 0 ? cd.toFixed(2) : "300");
+            setAccount(found);
+            if (setParentAccount) setParentAccount(found);
+            setLoading(false);
+            return;
+          }
+        } catch (e) {
+          console.warn("[Баланс] Прямая загрузка по лицевому счёту не удалась, откат к поиску по адресу:", e);
+        }
+      }
 
       const { street, house } = parseAddressParts(address);
       const cleanStreetQuery = street.replace(/(?:\b(?:ул\.?|улица)\b|\(ул\))\s*/gi, "").trim();
@@ -368,7 +403,7 @@ const DebtCard = ({
       setLoading(false);
     };
     loadDebt();
-  }, [address, apartment, setParentAccount]);
+  }, [address, apartment, accountNumber, setParentAccount]);
 
   // Обработчик создания платежа через шлюз ЮKassa с комиссией эквайринга 5%
   const handleYooKassaPay = async () => {
@@ -4817,10 +4852,11 @@ const Cabinet = () => {
                       apartment={profile.apartment || ""} 
                       fullName={profile.full_name || fullName} 
                       phone={profile.phone || phone} 
-                      embedded 
+                      embedded
                       setParentAccount={setUserAccount}
                       isVerified={profile?.is_verified === true || profile?.verification_status === "verified"}
                       userId={userId}
+                      accountNumber={profile?.account_number}
                       onOpenOrderDialog={(type) => {
                         setOrderType(type || "repair");
                         setIsOrderDialogOpen(true);
@@ -4858,6 +4894,18 @@ const Cabinet = () => {
                   </div>
                 )}
 
+                {/* Пошаговый мастер заполнения (первичное заполнение или редактирование через диспетчера) */}
+                {!isLocked ? (
+                  <ProfileWizard
+                    userId={userId as string}
+                    phone={phone || profile?.phone || ""}
+                    initialFullName={fullName || profile?.full_name || ""}
+                    mode={hasSavedProfile ? "edit" : "create"}
+                    existingProfile={profile}
+                    onDone={() => { setEditing(false); checkUser(); }}
+                    onCancel={hasSavedProfile ? () => setEditing(false) : undefined}
+                  />
+                ) : (<>
                 {/* 1. ФИО Абонента */}
                 <div className="space-y-2 text-left">
                   <div className="flex justify-between items-center">
@@ -5408,6 +5456,8 @@ const Cabinet = () => {
                     </div>
                   );
                 })()}
+                </>
+                )}
 
                 {/* 10. Кнопка подтверждения данных для не верифицированного профиля */}
                 {!profile?.is_verified && (

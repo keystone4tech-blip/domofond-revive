@@ -1888,6 +1888,154 @@ app.post('/api/notify', async (req, res) => {
   }
 });
 
+// ------------------------------------------------------------------------------
+// МОДУЛЬ ПОШАГОВОГО ПОИСКА АДРЕСА И ЛИЦЕВОГО СЧЁТА (для мастера заполнения ЛК)
+// Работает по индексированным полям accounts (street/house/account_number/phone_clean),
+// без тяжёлого ILIKE по всему адресу — не создаёт нагрузку на БД.
+// ------------------------------------------------------------------------------
+
+// Натуральная сортировка выражением (число, затем строка): «2 < 10 < 10а».
+// Используется во ВНЕШНЕМ запросе над подзапросом с DISTINCT (иначе Postgres запрещает
+// ORDER BY по выражению вместе с SELECT DISTINCT).
+const natOrder = (col) => `ORDER BY NULLIF(regexp_replace(COALESCE(${col},''),'[^0-9]','','g'),'')::bigint NULLS LAST, ${col}`;
+
+// 1. Подсказки улиц
+app.get('/api/lookup/streets', async (req, res) => {
+  try {
+    const q = String(req.query.q || '').trim();
+    if (q.length < 1) return res.json([]);
+    const r = await pool.query(
+      `SELECT DISTINCT street FROM accounts
+       WHERE street IS NOT NULL AND street ILIKE '%' || $1 || '%'
+       ORDER BY street LIMIT 20`,
+      [q]
+    );
+    res.json(r.rows.map((x) => x.street));
+  } catch (err) {
+    console.error('[Бэкенд: Lookup улицы]', err.message);
+    res.status(500).json({ error: 'Ошибка поиска улиц' });
+  }
+});
+
+// 2. Дома на улице (с корпусом)
+app.get('/api/lookup/houses', async (req, res) => {
+  try {
+    const street = String(req.query.street || '').trim();
+    if (!street) return res.json([]);
+    const r = await pool.query(
+      `SELECT house, housing FROM (
+         SELECT DISTINCT house, housing FROM accounts
+         WHERE street = $1 AND house IS NOT NULL
+       ) t ${natOrder('house')}, housing`,
+      [street]
+    );
+    // Возвращаем красивую метку дома (дом + корпус) и составные части
+    res.json(r.rows.map((x) => ({
+      house: x.house,
+      housing: x.housing || null,
+      label: x.housing ? `${x.house} к${x.housing}` : x.house,
+    })));
+  } catch (err) {
+    console.error('[Бэкенд: Lookup дома]', err.message);
+    res.status(500).json({ error: 'Ошибка поиска домов' });
+  }
+});
+
+// 3. Подъезды дома (плитки). Флаг умного домофона — из таблицы entrances.
+app.get('/api/lookup/entrances', async (req, res) => {
+  try {
+    const street = String(req.query.street || '').trim();
+    const house = String(req.query.house || '').trim();
+    const housing = String(req.query.housing || '').trim();
+    if (!street || !house) return res.json([]);
+    const r = await pool.query(
+      `SELECT entrance FROM (
+         SELECT DISTINCT entrance FROM accounts
+         WHERE street = $1 AND house = $2 AND COALESCE(housing,'') = $3 AND entrance IS NOT NULL
+       ) t ${natOrder('entrance')}`,
+      [street, house, housing]
+    );
+    // Подтягиваем флаги умного домофона по этому дому (в entrances корпус вшит в house)
+    const houseVariants = [house, housing ? `${house} к${housing}` : house, housing ? `${house}к${housing}` : house];
+    let smart = {};
+    try {
+      const e = await pool.query(
+        `SELECT entrance, has_smart_intercom FROM entrances
+         WHERE street ILIKE '%' || $1 || '%' AND house = ANY($2)`,
+        [street.replace(/\s*\(ул\)\s*/i, '').trim(), houseVariants]
+      );
+      e.rows.forEach((row) => { smart[String(row.entrance)] = !!row.has_smart_intercom; });
+    } catch (e2) { /* entrances может отсутствовать — не критично */ }
+    res.json(r.rows.map((x) => ({
+      entrance: x.entrance,
+      has_smart_intercom: !!smart[String(x.entrance)],
+    })));
+  } catch (err) {
+    console.error('[Бэкенд: Lookup подъезды]', err.message);
+    res.status(500).json({ error: 'Ошибка поиска подъездов' });
+  }
+});
+
+// 4. Квартиры в подъезде (плитки)
+app.get('/api/lookup/apartments', async (req, res) => {
+  try {
+    const street = String(req.query.street || '').trim();
+    const house = String(req.query.house || '').trim();
+    const housing = String(req.query.housing || '').trim();
+    const entrance = String(req.query.entrance || '').trim();
+    if (!street || !house || !entrance) return res.json([]);
+    const r = await pool.query(
+      `SELECT apartment, account_number FROM (
+         SELECT DISTINCT ON (apartment) apartment, account_number FROM accounts
+         WHERE street = $1 AND house = $2 AND COALESCE(housing,'') = $3 AND entrance = $4 AND apartment IS NOT NULL
+         ORDER BY apartment, period DESC
+       ) t ${natOrder('apartment')}`,
+      [street, house, housing, entrance]
+    );
+    res.json(r.rows.map((x) => ({ apartment: x.apartment, account_number: x.account_number })));
+  } catch (err) {
+    console.error('[Бэкенд: Lookup квартиры]', err.message);
+    res.status(500).json({ error: 'Ошибка поиска квартир' });
+  }
+});
+
+// 5. Поиск лицевого счёта по номеру (с квитанции) — нормализуем до 10 цифр
+app.get('/api/lookup/account', async (req, res) => {
+  try {
+    const raw = String(req.query.number || '').replace(/\D/g, '');
+    if (!raw) return res.json(null);
+    const padded = raw.padStart(10, '0');
+    const r = await pool.query(
+      `SELECT account_number, address, street, house, housing, entrance, apartment, full_name, phone, debt_amount, period
+       FROM accounts WHERE account_number = $1 OR account_number = $2 OR account_number ILIKE '%' || $3
+       ORDER BY period DESC LIMIT 1`,
+      [padded, raw, raw]
+    );
+    res.json(r.rows[0] || null);
+  } catch (err) {
+    console.error('[Бэкенд: Lookup счёт]', err.message);
+    res.status(500).json({ error: 'Ошибка поиска лицевого счёта' });
+  }
+});
+
+// 6. Поиск абонента по номеру телефона (последние 10 цифр) — поле phone_clean индексировано
+app.get('/api/lookup/by-phone', async (req, res) => {
+  try {
+    const digits = String(req.query.phone || '').replace(/\D/g, '');
+    if (digits.length < 10) return res.json(null);
+    const last10 = digits.slice(-10);
+    const r = await pool.query(
+      `SELECT account_number, address, street, house, housing, entrance, apartment, full_name, phone, debt_amount, period
+       FROM accounts WHERE phone_clean LIKE '%' || $1 ORDER BY debt_amount DESC NULLS LAST LIMIT 1`,
+      [last10]
+    );
+    res.json(r.rows[0] || null);
+  } catch (err) {
+    console.error('[Бэкенд: Lookup по телефону]', err.message);
+    res.status(500).json({ error: 'Ошибка поиска по телефону' });
+  }
+});
+
 // Запуск сервера
 app.listen(port, () => {
   console.log(`[Бэкенд: Domofondar] Сервер успешно запущен на порту ${port}`);

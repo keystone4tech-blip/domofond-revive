@@ -207,6 +207,7 @@ const VerificationManager: React.FC = () => {
           address: change.address?.trim() || profile.address,
           apartment: change.apartment !== undefined ? change.apartment?.trim() : profile.apartment,
           floor: change.floor !== undefined ? change.floor?.trim() : profile.floor,
+          account_number: change.account_number !== undefined ? (change.account_number || null) : (profile as any).account_number,
           pending_data_change: null, // Очищаем заявку, так как она одобрена
           data_change_notification: {
             type: "approved",
