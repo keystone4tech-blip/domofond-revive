@@ -1,0 +1,1 @@
+CREATE OR REPLACE FUNCTION public.setup_legacy_jwt_claims() RETURNS void AS 'BEGIN PERFORM set_config(''request.jwt.claim.sub'', current_setting(''request.jwt.claims'', true)::jsonb->>''sub'', true); END;' LANGUAGE plpgsql;

@@ -54,6 +54,8 @@ backups/
 scratch_*.*
 *.sql
 !init-scripts/*.sql
+!migration_*.sql
+!fix_*.sql
 
 # Mobile App (React Native / Expo / Android Build)
 mobile/node_modules/
