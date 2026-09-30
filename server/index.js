@@ -2018,11 +2018,15 @@ app.get('/api/lookup/account', requireAuthLite, async (req, res) => {
     const raw = String(req.query.number || '').replace(/\D/g, '');
     if (!raw) return res.json(null);
     const padded = raw.padStart(10, '0');
+    // ТОЛЬКО точное совпадение (номер, дополненный нулями до 10 цифр, или как ввели).
+    // Раньше был `ILIKE '%'||raw`, из-за чего «654» совпадало со ВСЕМИ счетами, оканчивающимися
+    // на 654 (0000000654 … 0000009654), и бралось не то. Теперь — строго точный счёт.
     const r = await pool.query(
       `SELECT account_number, address, street, house, housing, entrance, apartment
-       FROM accounts WHERE account_number = $1 OR account_number = $2 OR account_number ILIKE '%' || $3
-       ORDER BY period DESC LIMIT 1`,
-      [padded, raw, raw]
+       FROM accounts WHERE account_number = $1 OR account_number = $2
+       ORDER BY (account_number = $1) DESC, period DESC
+       LIMIT 1`,
+      [padded, raw]
     );
     res.json(r.rows[0] || null);
   } catch (err) {
