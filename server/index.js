@@ -1997,14 +1997,15 @@ app.get('/api/lookup/apartments', requireAuthLite, async (req, res) => {
     const entrance = String(req.query.entrance || '').trim();
     if (!street || !house || !entrance) return res.json([]);
     const r = await pool.query(
-      `SELECT apartment, account_number FROM (
-         SELECT DISTINCT ON (apartment) apartment, account_number FROM accounts
+      `SELECT apartment, account_number, address FROM (
+         SELECT DISTINCT ON (apartment) apartment, account_number, address FROM accounts
          WHERE street = $1 AND house = $2 AND COALESCE(housing,'') = $3 AND entrance = $4 AND apartment IS NOT NULL
          ORDER BY apartment, period DESC
        ) t ${natOrder('apartment')}`,
       [street, house, housing, entrance]
     );
-    res.json(r.rows.map((x) => ({ apartment: x.apartment, account_number: x.account_number })));
+    // Возвращаем и полный адрес абонента (с реальным городом/районом) — визард сохранит именно его.
+    res.json(r.rows.map((x) => ({ apartment: x.apartment, account_number: x.account_number, address: x.address })));
   } catch (err) {
     console.error('[Бэкенд: Lookup квартиры]', err.message);
     res.status(500).json({ error: 'Ошибка поиска квартир' });

@@ -901,6 +901,31 @@ export const AccountsManager: React.FC = () => {
       const lines = text.split("\n").filter(l => l.trim());
       console.log(`[AccountsManager: Абоненты] Всего строк в файле: ${lines.length}`);
 
+      // КАРТА «улица → город/район». Файл абонентов НЕ содержит города, поэтому берём его из уже
+      // существующих адресов в accounts (там город приходит из реестра начислений: Краснодар,
+      // пос. Южный, Новая Адыгея и т.д.). Связь улица→город однозначная. Это не даёт импорту
+      // затирать районы жёстким «Краснодар».
+      const normStreetKey = (s: string) => (s || "").toLowerCase().replace(/\(ул\)|улица|ул\.?/g, "").replace(/[^а-яё0-9]/g, "").trim();
+      const streetCityMap: Record<string, string> = {};
+      try {
+        const { data: existAddr } = await supabase.from("accounts").select("street,address").limit(100000);
+        const votes: Record<string, Record<string, number>> = {};
+        (existAddr || []).forEach((a: any) => {
+          const k = normStreetKey(a.street);
+          if (!k) return;
+          const city = String(a.address || "").split(",")[0].trim();
+          if (!city) return;
+          (votes[k] = votes[k] || {})[city] = (votes[k][city] || 0) + 1;
+        });
+        // выбираем самый частый город на улицу
+        Object.entries(votes).forEach(([k, cities]) => {
+          streetCityMap[k] = Object.entries(cities).sort((a, b) => b[1] - a[1])[0][0];
+        });
+        console.log(`[AccountsManager: Абоненты] Карта улица→город построена: ${Object.keys(streetCityMap).length} улиц`);
+      } catch (e) {
+        console.warn("[AccountsManager: Абоненты] Не удалось построить карту улица→город (город будет Краснодар):", e);
+      }
+
       const recordsMap = new Map<string, any>();
       const malformed: { line: number; reason: string; raw: string }[] = []; // проблемные строки
 
@@ -961,7 +986,10 @@ export const AccountsManager: React.FC = () => {
         if (!street) malformed.push({ line: i + 1, reason: "нет улицы", raw: cleanLine.slice(0, 120) });
         else if (!house) malformed.push({ line: i + 1, reason: "нет номера дома", raw: cleanLine.slice(0, 120) });
 
-        let fullAddr = `Краснодар, ${street}`;
+        // Город берём по карте улица→город (Краснодар / пос. Южный / Новая Адыгея и т.д.),
+        // по умолчанию — Краснодар для новых улиц, которых ещё нет в базе.
+        const city = streetCityMap[normStreetKey(street)] || "Краснодар";
+        let fullAddr = `${city}, ${street}`;
         if (house) fullAddr += `, д. ${house}`;
         if (housing) fullAddr += `, корп. ${housing}`;
         if (entrance) fullAddr += `, п. ${entrance}`;

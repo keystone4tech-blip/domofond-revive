@@ -60,7 +60,9 @@ async function dadataSuggest(query: string, bound: "street" | "house") {
     const r = await fetch("https://suggestions.dadata.ru/suggestions/api/4_1/rs/suggest/address", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Accept": "application/json", "Authorization": `Token ${DADATA_KEY}` },
-      body: JSON.stringify({ query, count: 8, from_bound: { value: bound }, to_bound: { value: bound }, locations: [{ region: "краснодарский", city: "краснодар" }] }),
+      // Ограничиваем регионом, но НЕ городом — чтобы показывались и Краснодар, и пос. Южный,
+      // и Республика Адыгея (Новая Адыгея и т.п.), а не только Краснодар.
+      body: JSON.stringify({ query, count: 10, from_bound: { value: bound }, to_bound: { value: bound }, locations: [{ region: "краснодарский" }, { region: "адыгея" }] }),
     });
     const j = await r.json();
     return (j.suggestions || []) as any[];
@@ -147,7 +149,7 @@ export const ProfileWizard: React.FC<Props> = ({ userId, phone, initialFullName,
   const [houseQuery, setHouseQuery] = useState("");
   const [houseOpts, setHouseOpts] = useState<{ house: string; housing: string | null; label: string }[]>([]);
   const [entranceOpts, setEntranceOpts] = useState<{ entrance: string; has_smart_intercom: boolean }[]>([]);
-  const [apartmentOpts, setApartmentOpts] = useState<{ apartment: string; account_number: string }[]>([]);
+  const [apartmentOpts, setApartmentOpts] = useState<{ apartment: string; account_number: string; address?: string }[]>([]);
   const [manualEntrance, setManualEntrance] = useState(false);
   const [manualApartment, setManualApartment] = useState(false);
   const [loadingList, setLoadingList] = useState(false);
@@ -211,9 +213,36 @@ export const ProfileWizard: React.FC<Props> = ({ userId, phone, initialFullName,
     return () => clearTimeout(t);
   }, [houseQuery, step, streetServed, dadataStreetValue, street]);
 
+  // Чистим и дедуплицируем список домов, чтобы не было дублей вида «3к1 к1», «3 к2 к2».
+  // В части данных корпус вписан И в поле «дом» («3к1»), И в поле «корпус» («1») — тогда
+  // не приписываем корпус второй раз. Сырые house/housing сохраняем для запросов подъездов.
+  const cleanHouseOpts = (raw: { house: string; housing: string | null; label?: string }[]) => {
+    const normKey = (s: string) => (s || "").toLowerCase().replace(/(корп\.?|корпус)/g, "к").replace(/[^а-яё0-9]/g, "");
+    const seen = new Map<string, { house: string; housing: string | null; label: string }>();
+    for (const o of raw || []) {
+      const h = (o.house || "").trim();
+      const hg = (o.housing ?? "").toString().trim();
+      const corpusInHouse = /к\s*\d/i.test(h) || /корп/i.test(h);
+      let label: string;
+      if (corpusInHouse) {
+        label = h.replace(/\s*(?:корп(?:ус)?\.?|к)\s*(\d+[а-яё]?)/i, " к$1").replace(/\s+/g, " ").trim();
+      } else {
+        label = hg ? `${h} к${hg}` : h;
+      }
+      const key = normKey(label);
+      if (!seen.has(key)) seen.set(key, { house: h, housing: o.housing ?? null, label });
+    }
+    // сортировка по номеру дома, затем по корпусу
+    return [...seen.values()].sort((a, b) => {
+      const na = parseInt(a.house, 10) || 0, nb = parseInt(b.house, 10) || 0;
+      if (na !== nb) return na - nb;
+      return a.label.localeCompare(b.label, "ru");
+    });
+  };
+
   const loadHouses = async (st: string) => {
     setLoadingList(true);
-    try { setHouseOpts(await getJSON(api(`houses?street=${encodeURIComponent(st)}`))); }
+    try { setHouseOpts(cleanHouseOpts(await getJSON(api(`houses?street=${encodeURIComponent(st)}`)))); }
     catch { setHouseOpts([]); } finally { setLoadingList(false); }
   };
   const loadEntrances = async (st: string, ho: string, hg: string) => {
@@ -530,7 +559,14 @@ export const ProfileWizard: React.FC<Props> = ({ userId, phone, initialFullName,
             <div className="flex flex-wrap gap-2 max-h-64 overflow-auto">
               {apartmentOpts.map((a) => (
                 <Tile key={a.apartment} active={apartment === a.apartment}
-                  onClick={() => { setApartment(a.apartment); setAccountNumber(a.account_number || ""); go("floor"); }}>
+                  onClick={() => {
+                    setApartment(a.apartment);
+                    setAccountNumber(a.account_number || "");
+                    // Сохраняем ИМЕННО адрес абонента из базы (с реальным городом/районом и корпусом),
+                    // чтобы в профиле не оказался неверный город и улица не «показывала корпус».
+                    if (a.address) setAddressText(a.address);
+                    go("floor");
+                  }}>
                   {a.apartment}
                 </Tile>
               ))}
