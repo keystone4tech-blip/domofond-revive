@@ -553,39 +553,27 @@ const DebtCard = ({
           </div>
         ) : null}
 
-        {/* Полная карточка абонента: тариф, трубка, ЛК умного домофона */}
-        {(account.tariff_name || account.tariff_price || account.has_handset || account.has_lk || account.is_smart_home) && (
-          <div className="mb-3 p-3 rounded-lg border bg-muted/20 space-y-2">
-            <div className="text-xs font-semibold text-muted-foreground">Ваше обслуживание</div>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              {(account.tariff_name || account.tariff_price) && (
-                <div className="col-span-2 flex items-center justify-between">
-                  <span className="text-muted-foreground">Тариф</span>
-                  <span className="font-medium text-right">
-                    {account.tariff_name || "—"}
-                    {account.tariff_price ? <span className="text-primary font-bold ml-1">· {Number(account.tariff_price)} ₽/мес</span> : null}
-                  </span>
-                </div>
+        {/* Обслуживание — компактно, в одну строку. Название тарифа (внутреннее) скрыто, показываем только ₽/мес. */}
+        {(account.tariff_price != null || account.has_handset != null || account.is_smart_home != null) && (
+          <div className="mb-3 p-2.5 rounded-lg border bg-muted/20">
+            <div className="text-[11px] font-semibold text-muted-foreground mb-1.5">Ваше обслуживание</div>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+              {account.tariff_price != null && (
+                <span><span className="text-muted-foreground">Тариф: </span><span className="font-bold text-primary">{Number(account.tariff_price)} ₽/мес</span></span>
               )}
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Трубка</span>
-                <span className={`font-medium ${account.has_handset ? "text-green-600" : "text-muted-foreground"}`}>
-                  {account.has_handset ? "Есть" : "Нет"}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Умный домофон</span>
-                <span className={`font-medium ${account.is_smart_home ? "text-indigo-600" : "text-muted-foreground"}`}>
-                  {account.is_smart_home ? "Да" : "Нет"}
-                </span>
-              </div>
+              <span>
+                <span className="text-muted-foreground">Трубка: </span>
+                <span className={`font-medium ${account.has_handset ? "text-green-600" : "text-muted-foreground"}`}>{account.has_handset ? "Есть" : "Нет"}</span>
+              </span>
+              <span>
+                <span className="text-muted-foreground">Умный домофон: </span>
+                <span className={`font-medium ${account.is_smart_home ? "text-indigo-600" : "text-muted-foreground"}`}>{account.is_smart_home ? "Да" : "Нет"}</span>
+              </span>
               {account.is_smart_home && (
-                <div className="col-span-2 flex items-center justify-between">
-                  <span className="text-muted-foreground">Личный кабинет умного домофона</span>
-                  <span className={`font-medium ${account.has_lk ? "text-green-600" : "text-amber-600"}`}>
-                    {account.has_lk ? "Подключён" : "Не подключён"}
-                  </span>
-                </div>
+                <span>
+                  <span className="text-muted-foreground">ЛК: </span>
+                  <span className={`font-medium ${account.has_lk ? "text-green-600" : "text-amber-600"}`}>{account.has_lk ? "Подключён" : "Не подключён"}</span>
+                </span>
               )}
             </div>
           </div>
@@ -7163,14 +7151,17 @@ const Cabinet = () => {
                   <span className="text-slate-500 dark:text-slate-400 text-[11px] block">Лицевой счёт:</span>
                   <span className="font-mono font-bold text-foreground text-sm">{matchedSubscriberData?.account_number}</span>
                 </div>
-                {matchedSubscriberData?.payment_type && (
-                  <div>
-                    <span className="text-slate-500 dark:text-slate-400 text-[11px] block">Тариф:</span>
-                    <span className="font-semibold text-emerald-600 dark:text-emerald-400 truncate block">
-                      {matchedSubscriberData?.payment_type}
-                    </span>
-                  </div>
-                )}
+                {matchedSubscriberData?.payment_type && (() => {
+                  // Скрываем внутреннее название тарифа, показываем только сумму в месяц.
+                  const nums = String(matchedSubscriberData.payment_type).match(/\d+/g);
+                  const price = nums && nums.length ? nums[nums.length - 1] : null;
+                  return price ? (
+                    <div>
+                      <span className="text-slate-500 dark:text-slate-400 text-[11px] block">Тариф:</span>
+                      <span className="font-semibold text-emerald-600 dark:text-emerald-400 block">{price} ₽/мес</span>
+                    </div>
+                  ) : null;
+                })()}
               </div>
             </div>
 
