@@ -2042,6 +2042,15 @@ const Cabinet = () => {
   const [orderApartment, setOrderApartment] = useState("");
   const [orderPremiseType, setOrderPremiseType] = useState<"apartment" | "private">("apartment");
   const [allEntrances, setAllEntrances] = useState<any[]>([]); // Кэш подъездов из БД
+  // Справочник типов устройств: id -> slug (handset/monitor/…). Нужен для автоподбора услуг по анкете.
+  const [deviceTypeSlug, setDeviceTypeSlug] = useState<Record<string, string>>({});
+  useEffect(() => {
+    supabase.from("device_types").select("id,slug").then(({ data }) => {
+      const m: Record<string, string> = {};
+      (data || []).forEach((d: any) => { m[d.id] = d.slug; });
+      setDeviceTypeSlug(m);
+    }).catch(() => {});
+  }, []);
   const [productBindings, setProductBindings] = useState<Record<string, string[]>>({}); // product_id -> entrance_id[]
   const [entrancePricingMap, setEntrancePricingMap] = useState<Record<string, Record<string, { price_type: string; custom_price: number | null }>>>({}); // entrance_id -> product_id -> pricing
   
@@ -2268,6 +2277,36 @@ const Cabinet = () => {
     console.log("[Cabinet] К данному подъезду оператор пока не привязал оборудование. Выдача пуста.");
     return [];
   }, [products, productBindings, currentMatchedEntrance]);
+
+  // ==========================================================================
+  // АВТОПОДБОР УСЛУГ ПО АНКЕТЕ (что установлено у жильца)
+  //  • нет оборудования  → только услуги-УСТАНОВКИ (любой тип);
+  //  • трубка            → замена ТКП  + установка видеомонитора;
+  //  • видеомонитор      → установка видеомонитора + замена на ТКП;
+  //  • анкета не заполнена / услуга без типа-действия → показываем как есть (обратная совместимость).
+  // ==========================================================================
+  const currentEquipSlug: "none" | "handset" | "monitor" | null = (() => {
+    if (profile?.has_intercom === false) return "none";
+    const id = profile?.current_device_type_id;
+    if (id && deviceTypeSlug[id]) {
+      const s = deviceTypeSlug[id];
+      if (s === "handset" || s === "monitor") return s;
+    }
+    return null; // не заполнял анкету или тип не распознан — не фильтруем
+  })();
+
+  const serviceMatchesEquipment = (service: any): boolean => {
+    if (!currentEquipSlug) return true;                 // анкета не заполнена — показываем все услуги
+    const svcSlug = service?.device_type_id ? deviceTypeSlug[service.device_type_id] : null;
+    const act = service?.service_action;                // install | replace | null
+    if (!svcSlug || !act) return true;                  // услуга без типа/действия — показываем всегда
+    if (currentEquipSlug === "none") return act === "install";
+    if (currentEquipSlug === "handset")
+      return (svcSlug === "handset" && act === "replace") || (svcSlug === "monitor" && act === "install");
+    if (currentEquipSlug === "monitor")
+      return (svcSlug === "monitor") || (svcSlug === "handset" && act === "replace");
+    return true;
+  };
 
   // Проверка наличия загруженных логопасов (учетных записей) для текущего подъезда
   useEffect(() => {
@@ -6573,7 +6612,7 @@ const Cabinet = () => {
                     )}
 
                     {/* 2. БЛОК: ВЫБОР УСЛУГИ (установка / замена) */}
-                    {availableProducts.some(p => p.category === "service" && !p.name.toLowerCase().includes("кабинет")) && (
+                    {availableProducts.some(p => p.category === "service" && !p.name.toLowerCase().includes("кабинет") && serviceMatchesEquipment(p)) && (
                       <div className="space-y-2 text-left">
                         <div className="flex items-center justify-between">
                           <Label className="text-sm font-semibold text-foreground flex items-center gap-1.5 font-display">
@@ -6597,6 +6636,7 @@ const Cabinet = () => {
                         <div className={`grid gap-2.5 ${selectedServiceId ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2"}`}>
                           {availableProducts
                             .filter(p => p.category === "service" && !p.name.toLowerCase().includes("кабинет"))
+                            .filter(service => serviceMatchesEquipment(service))
                             .filter(service => !selectedServiceId || service.id === selectedServiceId)
                             .map((service) => {
                               const effPrice = getEffectiveProductPrice(service);
