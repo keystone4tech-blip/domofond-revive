@@ -268,6 +268,24 @@ export const ProductsManager: React.FC = () => {
     if (error) { toast({ title: "Ошибка", description: error.message, variant: "destructive" }); return; }
     refetchDeviceTypes();
   };
+  // Переименование (инлайн-редактирование) справочников.
+  const renameCategory = async (id: string, name: string) => {
+    if (!name.trim()) return;
+    const { error } = await supabase.from("product_categories").update({ name: name.trim() }).eq("id", id);
+    if (error) { toast({ title: "Ошибка", description: error.message, variant: "destructive" }); return; }
+    refetchCategories();
+  };
+  const toggleCategoryService = async (id: string, is_service: boolean) => {
+    const { error } = await supabase.from("product_categories").update({ is_service }).eq("id", id);
+    if (error) { toast({ title: "Ошибка", description: error.message, variant: "destructive" }); return; }
+    refetchCategories();
+  };
+  const renameDeviceType = async (id: string, name: string) => {
+    if (!name.trim()) return;
+    const { error } = await supabase.from("device_types").update({ name: name.trim() }).eq("id", id);
+    if (error) { toast({ title: "Ошибка", description: error.message, variant: "destructive" }); return; }
+    refetchDeviceTypes();
+  };
 
   // ============================================================================
   // Запрос списка товаров
@@ -790,6 +808,16 @@ export const ProductsManager: React.FC = () => {
           >
             <FolderPlus className="h-4 w-4 mr-2 text-amber-500" />
             Новая папка
+          </Button>
+
+          {/* Справочники: категории и типы устройств — на видном месте в панели */}
+          <Button
+            variant="outline"
+            className="border-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/30 text-blue-700 dark:text-blue-300 font-medium"
+            onClick={() => setIsDictOpen(true)}
+          >
+            <Tag className="h-4 w-4 mr-2" />
+            Справочники
           </Button>
 
           {/* Кнопка создания единичного товара */}
@@ -1810,18 +1838,24 @@ export const ProductsManager: React.FC = () => {
             {/* Категории */}
             <div className="space-y-2">
               <Label className="font-semibold">Категории товаров и услуг</Label>
-              <div className="space-y-1.5 max-h-[160px] overflow-y-auto">
-                {categoryOptions.map((c) => {
-                  const row = dbCategories.find((x) => x.slug === c.value);
-                  return (
-                    <div key={c.value} className="flex items-center justify-between text-sm border rounded-lg px-3 py-1.5">
-                      <span>{c.label} {c.is_service && <span className="text-[10px] text-amber-600">(услуга)</span>}</span>
-                      {row && (
-                        <button type="button" onClick={() => deleteCategory(row.id)} className="text-destructive text-xs hover:underline">Удалить</button>
-                      )}
-                    </div>
-                  );
-                })}
+              <div className="space-y-1.5 max-h-[180px] overflow-y-auto">
+                {dbCategories.length === 0 && (
+                  <p className="text-xs text-muted-foreground">Справочник пуст (миграция не применена) — используются встроенные категории.</p>
+                )}
+                {dbCategories.map((row) => (
+                  <div key={row.id} className="flex items-center gap-2 text-sm border rounded-lg px-2 py-1.5">
+                    <Input
+                      defaultValue={row.name}
+                      onBlur={(e) => { if (e.target.value.trim() && e.target.value.trim() !== row.name) renameCategory(row.id, e.target.value); }}
+                      onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                      className="h-8 flex-1"
+                    />
+                    <label className="flex items-center gap-1 text-[11px] whitespace-nowrap">
+                      <Switch checked={row.is_service} onCheckedChange={(v) => toggleCategoryService(row.id, v)} /> услуга
+                    </label>
+                    <button type="button" onClick={() => deleteCategory(row.id)} className="text-destructive text-xs hover:underline shrink-0">Удалить</button>
+                  </div>
+                ))}
               </div>
               <div className="flex items-center gap-2">
                 <Input value={newCatName} onChange={(e) => setNewCatName(e.target.value)} placeholder="Новая категория" className="h-9" />
@@ -1835,11 +1869,16 @@ export const ProductsManager: React.FC = () => {
             {/* Типы устройств */}
             <div className="space-y-2">
               <Label className="font-semibold">Типы устройств</Label>
-              <div className="space-y-1.5 max-h-[160px] overflow-y-auto">
+              <div className="space-y-1.5 max-h-[180px] overflow-y-auto">
                 {deviceTypes.map((d) => (
-                  <div key={d.id} className="flex items-center justify-between text-sm border rounded-lg px-3 py-1.5">
-                    <span>{d.name}</span>
-                    <button type="button" onClick={() => deleteDeviceType(d.id)} className="text-destructive text-xs hover:underline">Удалить</button>
+                  <div key={d.id} className="flex items-center gap-2 text-sm border rounded-lg px-2 py-1.5">
+                    <Input
+                      defaultValue={d.name}
+                      onBlur={(e) => { if (e.target.value.trim() && e.target.value.trim() !== d.name) renameDeviceType(d.id, e.target.value); }}
+                      onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                      className="h-8 flex-1"
+                    />
+                    <button type="button" onClick={() => deleteDeviceType(d.id)} className="text-destructive text-xs hover:underline shrink-0">Удалить</button>
                   </div>
                 ))}
                 {deviceTypes.length === 0 && <p className="text-xs text-muted-foreground">Пока нет типов. Добавьте «Трубка», «Видеомонитор» и т.д.</p>}
