@@ -130,6 +130,7 @@ const getHouseNumberFromDaData = (h: any): string => {
 // Формат: "Город, Улица, д. 9, корп. 2, п 6, кв. 332" → "9, корп. 2"
 // Формат: "Город, Улица, д. 6а" → "6а"
 const extractHousePartFromCacheAddr = (cacheAddr: string): string => {
+  cacheAddr = ensureCityPrefix(cacheAddr);
   const parts = cacheAddr.split(",");
   if (parts.length < 3) return "";
   // Берём ВСЕ части начиная с 3-й (индекс 2) и объединяем обратно через запятую
@@ -145,8 +146,21 @@ const extractHousePartFromCacheAddr = (cacheAddr: string): string => {
   return fullHousePart;
 };
 
+// Гарантируем префикс города. Все парсеры адреса ниже считают parts[0] городом, parts[1] улицей.
+// Профили, сохранённые старым визардом без города ("Улица, д. Дом, п N"), из-за этого читались
+// со сдвигом (в улицу попадал корпус). Эта функция добавляет "Краснодар," если города нет —
+// и старые, и новые адреса парсятся одинаково правильно.
+const ensureCityPrefix = (addr: string): string => {
+  if (!addr) return addr;
+  const first = (addr.split(",")[0] || "").trim().toLowerCase();
+  if (/краснодар|^город\b|^г\.?\s/.test(first)) return addr;               // город уже есть
+  if (/^(пос|посёлок|поселок|ст-ца|станица|хутор|х\.|аул|снт|днт|тер)\b/.test(first)) return addr; // иной нас. пункт
+  return `Краснодар, ${addr}`;
+};
+
 const parseAddressParts = (fullAddr: string) => {
   if (!fullAddr) return { street: "", house: "" };
+  fullAddr = ensureCityPrefix(fullAddr);
   
   // Очищаем адрес от подъезда и квартиры
   // Заменяем \d+ на [а-яa-z0-9-+]+ для корректного вырезания квартир с литерами (например, "15а")
@@ -2631,6 +2645,7 @@ const Cabinet = () => {
       return;
     }
     console.log(`[Адрес] Парсинг адреса из профиля: "${fullAddr}"`);
+    fullAddr = ensureCityPrefix(fullAddr);
     const parts = fullAddr.split(",");
     if (parts.length >= 3) {
       const streetPart = parts[1].trim();

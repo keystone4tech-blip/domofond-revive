@@ -68,11 +68,17 @@ async function dadataSuggest(query: string, bound: "street" | "house") {
 }
 const normStreet = (s: string) => (s || "").toLowerCase().replace(/[^а-яё0-9]/gi, "");
 
-// Красивый номер лицевого счёта → нормализованный вид для показа
+// Собираем адрес в КАНОНИЧЕСКОМ формате базы: "Краснодар, Улица, д. Дом, корп. N, п. N".
+// Это КРИТИЧНО: все парсеры адреса в кабинете (parseAddressParts, extractHousePartFromCacheAddr,
+// parseAndSetAddress) считают, что parts[0] = город, parts[1] = улица, дом = parts[2..].
+// Раньше composeAddress не добавлял город → улица «съезжала» и в поле улицы попадал корпус,
+// из-за чего не подтягивалось привязанное оборудование.
 const composeAddress = (street: string, house: string, housing: string, entrance: string) => {
-  let a = street.trim();
-  if (house) a += `, д. ${house.trim()}${housing ? ` к${housing.trim()}` : ""}`;
-  if (entrance) a += `, п ${entrance.trim()}`;
+  const st = (street || "").trim();
+  let a = `Краснодар, ${st}`;
+  if (house) a += `, д. ${house.trim()}`;
+  if (housing) a += `, корп. ${housing.trim()}`;
+  if (entrance) a += `, п. ${entrance.trim()}`;
   return a;
 };
 
@@ -81,6 +87,32 @@ type Step =
   | "account"
   | "street" | "house" | "entrance" | "apartment" | "floor"
   | "review";
+
+// ВАЖНО: StepShell и Tile объявлены НА УРОВНЕ МОДУЛЯ, а не внутри компонента.
+// Если объявить их внутри ProfileWizard, при каждом нажатии клавиши (изменение стейта)
+// они получают новую идентичность → React размонтирует и монтирует поддерево заново,
+// из-за чего повторно проигрывается анимация (карточка «мигает») и поле теряет фокус.
+const StepShell: React.FC<{ icon: React.ReactNode; title: string; subtitle?: string; children: React.ReactNode }> = ({ icon, title, subtitle, children }) => (
+  <div>
+    <div className="flex items-center gap-3 mb-4">
+      <div className="p-2.5 rounded-2xl bg-blue-500/10 text-blue-600 dark:text-sky-400">{icon}</div>
+      <div>
+        <h3 className="font-bold text-lg text-slate-800 dark:text-slate-100">{title}</h3>
+        {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
+      </div>
+    </div>
+    {children}
+  </div>
+);
+
+const Tile: React.FC<{ active?: boolean; onClick: () => void; children: React.ReactNode; badge?: React.ReactNode }> = ({ active, onClick, children, badge }) => (
+  <button type="button" onClick={onClick}
+    className={cn("relative h-12 min-w-[3.5rem] px-3 rounded-xl border font-semibold text-sm transition-all",
+      active ? "border-blue-500 bg-blue-500/10 text-blue-700 dark:text-sky-300 ring-1 ring-blue-500/30"
+             : "border-slate-200 dark:border-slate-700 hover:border-blue-400 hover:bg-blue-500/5")}>
+    {children}{badge}
+  </button>
+);
 
 export const ProfileWizard: React.FC<Props> = ({ userId, phone, initialFullName, mode, existingProfile, onDone, onCancel }) => {
   const { toast } = useToast();
@@ -274,28 +306,6 @@ export const ProfileWizard: React.FC<Props> = ({ userId, phone, initialFullName,
   };
 
   // ---- UI ----
-  const StepShell: React.FC<{ icon: React.ReactNode; title: string; subtitle?: string; children: React.ReactNode }> = ({ icon, title, subtitle, children }) => (
-    <div className="animate-in fade-in slide-in-from-right-2 duration-300">
-      <div className="flex items-center gap-3 mb-4">
-        <div className="p-2.5 rounded-2xl bg-blue-500/10 text-blue-600 dark:text-sky-400">{icon}</div>
-        <div>
-          <h3 className="font-bold text-lg text-slate-800 dark:text-slate-100">{title}</h3>
-          {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
-        </div>
-      </div>
-      {children}
-    </div>
-  );
-
-  const Tile: React.FC<{ active?: boolean; onClick: () => void; children: React.ReactNode; badge?: React.ReactNode }> = ({ active, onClick, children, badge }) => (
-    <button type="button" onClick={onClick}
-      className={cn("relative h-12 min-w-[3.5rem] px-3 rounded-xl border font-semibold text-sm transition-all",
-        active ? "border-blue-500 bg-blue-500/10 text-blue-700 dark:text-sky-300 ring-1 ring-blue-500/30"
-               : "border-slate-200 dark:border-slate-700 hover:border-blue-400 hover:bg-blue-500/5")}>
-      {children}{badge}
-    </button>
-  );
-
   return (
     <div className="glass-premium rounded-[24px] border-none shadow-lg p-5 sm:p-6">
       {/* Прогресс */}
@@ -329,9 +339,12 @@ export const ProfileWizard: React.FC<Props> = ({ userId, phone, initialFullName,
             className="h-12 rounded-xl text-base" />
           <div className="mt-4">
             <Label className="text-xs font-semibold text-slate-500 dark:text-slate-400">📞 Контактный телефон</Label>
-            <Input value={phoneNum} onChange={(e) => setPhoneNum(e.target.value)} placeholder="+7 (999) 000-00-00"
-              type="tel" inputMode="tel" className="h-12 rounded-xl text-base mt-1" />
-            <p className="text-[11px] text-muted-foreground mt-1">Подставлен из вашей регистрации — при необходимости поправьте.</p>
+            <Input value={phoneNum || phone} readOnly disabled placeholder="+7 (999) 000-00-00"
+              type="tel" inputMode="tel"
+              className="h-12 rounded-xl text-base mt-1 bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 cursor-not-allowed" />
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Берётся из вашей регистрации и не редактируется. Изменить номер можно через диспетчера.
+            </p>
           </div>
           <div className="flex justify-end mt-5">
             <Button disabled={!fullName.trim()} onClick={() => go("method")} className="rounded-xl h-11 px-6 gap-2 bg-blue-600 hover:bg-blue-700">
@@ -558,7 +571,7 @@ export const ProfileWizard: React.FC<Props> = ({ userId, phone, initialFullName,
         <StepShell icon={<CheckCircle2 className="h-5 w-5" />} title="Проверьте данные" subtitle="Всё верно? Тогда сохраняем">
           <div className="rounded-2xl border border-slate-200 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-800 overflow-hidden">
             <Row label="ФИО" value={fullName} onEdit={() => setStep("name")} />
-            <Row label="Телефон" value={phoneNum || phone} onEdit={() => setStep("name")} />
+            <Row label="Телефон" value={phoneNum || phone} />
             {accountNumber && <Row label="Лицевой счёт" value={accountNumber} mono />}
             <Row label="Адрес" value={finalAddress} onEdit={() => { setStreetQuery(""); setStep("street"); }} />
             {apartment && <Row label="Квартира" value={apartment} onEdit={() => setStep("apartment")} />}
