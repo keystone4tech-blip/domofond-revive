@@ -861,6 +861,10 @@ export const AccountsManager: React.FC = () => {
       let text = "";
 
       try {
+        // BOM EF BB BF → это гарантированно UTF-8.
+        const bytes = new Uint8Array(buffer);
+        const hasBOM = bytes.length >= 3 && bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF;
+
         // Декодируем в Windows-1251 (основная кодировка выгрузок 1С на Windows)
         const decoder1251 = new TextDecoder("windows-1251");
         const text1251 = decoder1251.decode(buffer);
@@ -876,14 +880,18 @@ export const AccountsManager: React.FC = () => {
 
         console.log(`[AccountsManager: Кодировка] Cyrillic 1251: ${cyr1251}, Cyrillic UTF-8: ${cyrUtf8}, UTF-8 Errors: ${utf8Errors}`);
 
-        // Если в UTF-8 обнаружены спецсимволы ошибок или в Windows-1251 кириллицы значительно больше
-        if (utf8Errors > 0 || cyr1251 > cyrUtf8) {
+        // Windows-1251 берём ТОЛЬКО если нет BOM И UTF-8 дал реальные ошибки декодирования.
+        // Иначе — UTF-8 (в т.ч. UTF-8 с BOM). Старое сравнение «кириллицы 1251 vs UTF-8» ломало
+        // UTF-8-файлы (напр. «Список 09»): при чтении UTF-8 как 1251 каждый символ давал 2 знака
+        // крякозябр, счётчик 1251 «побеждал», и трубки/ЛК/тариф не распознавались.
+        if (!hasBOM && utf8Errors > 0) {
           text = text1251;
           console.log("[AccountsManager: Абоненты] Использована кодировка Windows-1251 (1C)");
         } else {
           text = textUtf8;
           console.log("[AccountsManager: Абоненты] Использована кодировка UTF-8");
         }
+        text = text.replace(/^﻿/, ""); // на случай остаточного BOM
       } catch (decErr) {
         console.warn("[AccountsManager: Кодировка] Ошибка декодера, fallback на file.text():", decErr);
         text = await file.text();
@@ -1031,6 +1039,22 @@ export const AccountsManager: React.FC = () => {
     console.log(`[AccountsManager: Абоненты] Старт сохранения ${parsedSubscribers.length} абонентов в базу данных...`);
 
     try {
+      // ПРОВЕРКА перед сохранением: какие счета новые, а какие уже есть в базе.
+      // Тянем только столбец account_number всех существующих счетов (быстро, одним запросом).
+      let existingSet = new Set<string>();
+      try {
+        const { data: existing } = await supabase
+          .from("accounts")
+          .select("account_number")
+          .limit(100000);
+        existingSet = new Set((existing || []).map((r: any) => String(r.account_number)));
+      } catch (e) {
+        console.warn("[AccountsManager: Абоненты] Не удалось получить список существующих счетов (не критично):", e);
+      }
+      const newCount = parsedSubscribers.filter(c => !existingSet.has(String(c.account_number))).length;
+      const updatedCount = parsedSubscribers.length - newCount;
+      console.log(`[AccountsManager: Абоненты] Проверка: новых счетов ${newCount}, обновляется существующих ${updatedCount}`);
+
       const batchSize = 200;
       for (let i = 0; i < parsedSubscribers.length; i += batchSize) {
         const chunk = parsedSubscribers.slice(i, i + batchSize);
@@ -1095,8 +1119,8 @@ export const AccountsManager: React.FC = () => {
       }
 
       toast({
-        title: "База абонентов успешно сохранена!",
-        description: `Синхронизировано ${parsedSubscribers.length} абонентов со всеми контактами и тарифами.`,
+        title: "База абонентов актуализирована ✅",
+        description: `Всего ${parsedSubscribers.length}: новых ${newCount}, обновлено ${updatedCount}. Трубки, ЛК и тарифы синхронизированы.`,
       });
 
       setIsSubscribersUploadOpen(false);
