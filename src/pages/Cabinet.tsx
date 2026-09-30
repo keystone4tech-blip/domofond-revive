@@ -3319,7 +3319,25 @@ const Cabinet = () => {
       console.log("[Cabinet Auth] Профиль пользователя успешно загружен, инициализируем стейты...");
       setProfile(data);
       setFullName(data.full_name || ""); // Инициализируем ФИО абонента
-      setPhone(data.phone || ""); // Инициализируем контактный телефон
+
+      // ВОССТАНОВЛЕНИЕ ТЕЛЕФОНА: при регистрации по телефону логин хранится как
+      // "phone_<10 цифр>@domofondar.ru" (в users.email / JWT). Это постоянный идентификатор —
+      // даже если profiles.phone очистили («Сбросить данные»), номер всегда извлекается отсюда.
+      const loginEmail = String(session.user.email || data.email || "");
+      const pm = loginEmail.match(/^phone_(\d{10})@domofondar\.ru$/i);
+      let registrationPhone = "";
+      if (pm) {
+        const d = pm[1];
+        registrationPhone = `+7 (${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6, 8)}-${d.slice(8, 10)}`;
+      }
+      const effectivePhone = (data.phone && data.phone.trim()) ? data.phone : registrationPhone;
+      setPhone(effectivePhone || ""); // Инициализируем контактный телефон
+      // Если в профиле телефон пуст, а из регистрации восстановился — тихо возвращаем его в профиль.
+      if ((!data.phone || !data.phone.trim()) && registrationPhone) {
+        supabase.from("profiles").update({ phone: registrationPhone }).eq("id", session.user.id)
+          .then(() => console.log("[Cabinet Auth] Телефон восстановлен из регистрации:", registrationPhone))
+          .catch(() => {});
+      }
       setAddress(data.address || ""); // Инициализируем полный адрес
       
       // Разделяем адрес на улицу и дом с помощью кастомного парсера
@@ -5599,49 +5617,11 @@ const Cabinet = () => {
                   </div>
                 )}
 
-                {/* 11. Маленькая неброская кнопка сброса профиля */}
-                {(profile?.is_verified || profile?.full_name || profile?.address) && (
-                  <div className="pt-2 flex justify-center">
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <button
-                          type="button"
-                          className="text-[11px] text-muted-foreground/50 hover:text-destructive/80 transition-colors inline-flex items-center gap-1 cursor-pointer py-1 px-2.5 rounded-lg hover:bg-slate-100/60 dark:hover:bg-slate-800/60 select-none font-normal"
-                        >
-                          <Trash2 className="h-3 w-3 opacity-60" />
-                          <span>Сбросить данные профиля</span>
-                        </button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent className="glass-premium border-none rounded-3xl shadow-2xl p-6">
-                        <AlertDialogHeader>
-                          <AlertDialogTitle className="text-lg font-bold text-foreground font-display flex items-center gap-2">
-                            <AlertTriangle className="h-5 w-5 text-destructive shrink-0" />
-                            <span>Удалить данные из личного кабинета?</span>
-                          </AlertDialogTitle>
-                          <AlertDialogDescription className="text-xs text-slate-500 dark:text-slate-400 mt-2 leading-relaxed space-y-2 text-left">
-                            <p>
-                              Внимание! Все привязанные данные профиля (ФИО, адрес, телефон, помещение) будут безвозвратно удалены из вашего личного кабинета, а статус верификации аннулирован.
-                            </p>
-                            <p className="text-[11px] text-muted-foreground">
-                              Все ранее проведённые транзакции, наряды и документы сохраняются в архиве системы «Домофондар».
-                            </p>
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter className="mt-4 gap-2">
-                          <AlertDialogCancel className="font-semibold rounded-xl h-10 border border-slate-200 hover:bg-slate-50 dark:hover:bg-slate-900">
-                            Отмена
-                          </AlertDialogCancel>
-                          <AlertDialogAction 
-                            onClick={handleClearData} 
-                            className="bg-destructive hover:bg-destructive/90 text-destructive-foreground font-semibold rounded-xl h-10"
-                          >
-                            Да, удалить данные
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                )}
+                {/* Кнопка «Сбросить данные профиля» УДАЛЕНА намеренно:
+                    - она затирала телефон (идентификатор регистрации) и оставляла жильца
+                      без возможности заполнить кабинет заново;
+                    - её роль полностью закрывает кнопка «Изменить данные» (через диспетчера).
+                    Логика handleClearData сохранена в коде на случай использования оператором. */}
               </CardContent>
             </Card>
 
