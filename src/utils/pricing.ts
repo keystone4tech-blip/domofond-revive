@@ -71,15 +71,24 @@ export const calculateKeyPriceDetails = (
   isTieredPromoEnabled: boolean = true,
   tiers: KeyPriceTier[] = DEFAULT_KEY_TIERS
 ): KeyPriceCalculation => {
-  // Если количество 0 или меньше — возвращаем нулевые значения
+  // Если количество 0 или меньше — сумма 0, но unitPrice для ПРЕДПРОСМОТРА показываем
+  // ту же, что реально спишется: на монтаже — льготную цену монтажа, при акции — цену за 1 шт,
+  // иначе базовую. Иначе карточка показывала бы 300, а при добавлении 1 шт цена «прыгала» на 200.
   if (quantity <= 0) {
+    let previewUnit = basePrice;
+    if (isInstallation) {
+      previewUnit = installationPrice != null && Number(installationPrice) > 0 ? Number(installationPrice) : 200;
+    } else if (isTieredPromoEnabled && tiers && tiers.length > 0) {
+      const t1 = tiers.find((t) => t.min_qty === 1);
+      previewUnit = t1 ? t1.price : basePrice;
+    }
     return {
-      unitPrice: basePrice,
+      unitPrice: previewUnit,
       totalPrice: 0,
-      discountPerUnit: 0,
+      discountPerUnit: Math.max(0, basePrice - previewUnit),
       totalSavings: 0,
       isPromoApplied: false,
-      isInstallationApplied: false,
+      isInstallationApplied: isInstallation,
       tierText: "",
     };
   }
