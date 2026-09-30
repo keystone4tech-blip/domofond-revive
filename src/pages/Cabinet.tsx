@@ -6676,7 +6676,7 @@ const Cabinet = () => {
                       <div ref={equipmentSectionRef} className="space-y-2 text-left animate-in fade-in slide-in-from-top-2 duration-300">
                         <div className="flex items-center justify-between">
                           <Label className="text-sm font-semibold text-foreground flex items-center gap-1.5 font-display">
-                            🏢 Выберите трубку (ТКП) под ваш домофон
+                            🏢 Выберите оборудование под вашу услугу
                           </Label>
                           {selectedEquipmentId && (
                             <button
@@ -6695,6 +6695,15 @@ const Cabinet = () => {
                         <div className="space-y-2">
                           {availableProducts
                             .filter(p => p.category === "equipment" && !isKeyProduct(p))
+                            .filter(equip => {
+                              // ПРИВЯЗКА ОБОРУДОВАНИЯ К УСЛУГЕ: если у выбранной услуги задан тип
+                              // устройства, показываем ТОЛЬКО оборудование того же типа (мониторы к
+                              // «установке видеомонитора», трубки к «замене ТКП» и т.д.).
+                              const svc = availableProducts.find(p => p.id === selectedServiceId) || products.find(p => p.id === selectedServiceId);
+                              const svcType = (svc as any)?.device_type_id;
+                              if (svcType) return (equip as any).device_type_id === svcType;
+                              return true; // у услуги тип не задан — показываем всё (обратная совместимость)
+                            })
                             .filter(equip => !selectedEquipmentId || equip.id === selectedEquipmentId)
                             .map((equip) => {
                               const effPrice = getEffectiveProductPrice(equip);

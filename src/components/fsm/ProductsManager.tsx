@@ -84,6 +84,8 @@ interface Product {
   unit: string;
   category: string | null;
   folder_id: string | null; // ID родительской папки
+  device_type_id?: string | null; // Тип устройства (трубка/видеомонитор/…)
+  service_action?: string | null; // Для услуг: install | replace
   image_url?: string | null; // Фото товара/услуги
   is_active: boolean;
   created_at: string;
@@ -164,6 +166,8 @@ export const ProductsManager: React.FC = () => {
     unit: "шт",
     category: "equipment",
     folder_id: "none",
+    device_type_id: "none",   // тип устройства (трубка/видеомонитор/…)
+    service_action: "none",   // для услуг: install (установка) | replace (замена)
     image_url: "",
     is_active: true,
     is_tiered_promo: false,
@@ -199,6 +203,71 @@ export const ProductsManager: React.FC = () => {
       return (data || []) as ProductFolder[];
     },
   });
+
+  // ============================================================================
+  // Справочники: КАТЕГОРИИ и ТИПЫ УСТРОЙСТВ (управляемые заказчиком)
+  // ============================================================================
+  const { data: dbCategories = [], refetch: refetchCategories } = useQuery({
+    queryKey: ["product_categories"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("product_categories").select("*").order("sort_order");
+      if (error) { console.warn("[ProductsManager] Категории не загружены:", error.message); return [] as any[]; }
+      return (data || []) as { id: string; name: string; slug: string; is_service: boolean; sort_order: number }[];
+    },
+  });
+  const { data: deviceTypes = [], refetch: refetchDeviceTypes } = useQuery({
+    queryKey: ["device_types"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("device_types").select("*").order("sort_order");
+      if (error) { console.warn("[ProductsManager] Типы устройств не загружены:", error.message); return [] as any[]; }
+      return (data || []) as { id: string; name: string; slug: string; sort_order: number }[];
+    },
+  });
+  // Список категорий для селектов: из БД, а если пусто (миграция не применена) — запасной хардкод.
+  const categoryOptions = (dbCategories.length > 0)
+    ? dbCategories.map((c) => ({ value: c.slug, label: c.name, is_service: c.is_service }))
+    : categories.map((c) => ({ value: c.value, label: c.label, is_service: c.value === "service" }));
+  const isServiceCategory = (slug: string) => {
+    const c = dbCategories.find((x) => x.slug === slug);
+    if (c) return c.is_service;
+    return slug === "service";
+  };
+
+  // Состояние диалога управления справочниками
+  const [isDictOpen, setIsDictOpen] = useState(false);
+  const [newCatName, setNewCatName] = useState("");
+  const [newCatIsService, setNewCatIsService] = useState(false);
+  const [newDevName, setNewDevName] = useState("");
+  const slugify = (s: string) =>
+    s.toLowerCase().trim().replace(/[^a-zа-я0-9]+/gi, "_").replace(/^_+|_+$/g, "") ||
+    ("t_" + Math.random().toString(36).slice(2, 8));
+
+  const addCategory = async () => {
+    const name = newCatName.trim();
+    if (!name) return;
+    const { error } = await supabase.from("product_categories").insert({ name, slug: slugify(name), is_service: newCatIsService, sort_order: 100 });
+    if (error) { toast({ title: "Ошибка", description: error.message, variant: "destructive" }); return; }
+    setNewCatName(""); setNewCatIsService(false); refetchCategories();
+    toast({ title: "Категория добавлена", description: name });
+  };
+  const deleteCategory = async (id: string) => {
+    const { error } = await supabase.from("product_categories").delete().eq("id", id);
+    if (error) { toast({ title: "Ошибка", description: error.message, variant: "destructive" }); return; }
+    refetchCategories();
+  };
+  const addDeviceType = async () => {
+    const name = newDevName.trim();
+    if (!name) return;
+    const { error } = await supabase.from("device_types").insert({ name, slug: slugify(name), sort_order: 100 });
+    if (error) { toast({ title: "Ошибка", description: error.message, variant: "destructive" }); return; }
+    setNewDevName(""); refetchDeviceTypes();
+    toast({ title: "Тип устройства добавлен", description: name });
+  };
+  const deleteDeviceType = async (id: string) => {
+    const { error } = await supabase.from("device_types").delete().eq("id", id);
+    if (error) { toast({ title: "Ошибка", description: error.message, variant: "destructive" }); return; }
+    refetchDeviceTypes();
+  };
 
   // ============================================================================
   // Запрос списка товаров
@@ -391,6 +460,8 @@ export const ProductsManager: React.FC = () => {
         unit: data.unit,
         category: data.category,
         folder_id: data.folder_id === "none" ? null : data.folder_id,
+        device_type_id: data.device_type_id === "none" ? null : data.device_type_id,
+        service_action: data.service_action === "none" ? null : data.service_action,
         image_url: data.image_url.trim() ? data.image_url : null,
         is_active: data.is_active,
         is_tiered_promo: data.is_tiered_promo,
@@ -561,6 +632,8 @@ export const ProductsManager: React.FC = () => {
       unit: "шт",
       category: "equipment",
       folder_id: selectedFolderId !== "all" ? selectedFolderId : "none",
+      device_type_id: "none",
+      service_action: "none",
       image_url: "",
       is_active: true,
       is_tiered_promo: false,
@@ -590,6 +663,8 @@ export const ProductsManager: React.FC = () => {
       unit: product.unit,
       category: product.category || "equipment",
       folder_id: product.folder_id || "none",
+      device_type_id: (product as any).device_type_id || "none",
+      service_action: (product as any).service_action || "none",
       image_url: product.image_url || "",
       is_active: product.is_active,
       is_tiered_promo: !!product.is_tiered_promo,
@@ -620,6 +695,8 @@ export const ProductsManager: React.FC = () => {
         unit: productForm.unit,
         category: productForm.category,
         folder_id: productForm.folder_id === "none" ? null : productForm.folder_id,
+        device_type_id: productForm.device_type_id === "none" ? null : productForm.device_type_id,
+        service_action: productForm.service_action === "none" ? null : productForm.service_action,
         image_url: productForm.image_url.trim() ? productForm.image_url : null,
         is_active: productForm.is_active,
         is_tiered_promo: productForm.is_tiered_promo,
@@ -943,7 +1020,7 @@ export const ProductsManager: React.FC = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Все категории</SelectItem>
-                  {categories.map((cat) => (
+                  {categoryOptions.map((cat) => (
                     <SelectItem key={cat.value} value={cat.value}>
                       {cat.label}
                     </SelectItem>
@@ -1440,7 +1517,11 @@ export const ProductsManager: React.FC = () => {
             {/* Категория и единица измерения */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Категория</Label>
+                <div className="flex items-center justify-between">
+                  <Label>Категория</Label>
+                  <button type="button" onClick={() => setIsDictOpen(true)}
+                    className="text-[11px] text-blue-600 hover:underline">Справочники</button>
+                </div>
                 <Select
                   value={productForm.category}
                   onValueChange={(v) => setProductForm({ ...productForm, category: v })}
@@ -1449,7 +1530,7 @@ export const ProductsManager: React.FC = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {categories.map((c) => (
+                    {categoryOptions.map((c) => (
                       <SelectItem key={c.value} value={c.value}>
                         {c.label}
                       </SelectItem>
@@ -1476,6 +1557,53 @@ export const ProductsManager: React.FC = () => {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            {/* Тип устройства + (для услуг) действие. Именно это связывает оборудование с услугой:
+                при заказе услуги «Установка видеомонитора» показываются только товары типа «Видеомонитор». */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Тип устройства</Label>
+                <Select
+                  value={productForm.device_type_id}
+                  onValueChange={(v) => setProductForm({ ...productForm, device_type_id: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="— не задан —" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">— не задан —</SelectItem>
+                    {deviceTypes.map((d) => (
+                      <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground">
+                  У товара — что это (трубка/монитор). У услуги — на какое устройство она рассчитана.
+                </p>
+              </div>
+
+              {isServiceCategory(productForm.category) && (
+                <div className="space-y-2">
+                  <Label>Действие услуги</Label>
+                  <Select
+                    value={productForm.service_action}
+                    onValueChange={(v) => setProductForm({ ...productForm, service_action: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="— не задано —" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">— не задано —</SelectItem>
+                      <SelectItem value="install">Установка</SelectItem>
+                      <SelectItem value="replace">Замена</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[11px] text-muted-foreground">
+                    Влияет на автоподбор в заказе по данным анкеты (установлено/не установлено).
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Секция ступенчатой акции от количества (для категории Ключи или товаров со словом ключ) */}
@@ -1671,6 +1799,59 @@ export const ProductsManager: React.FC = () => {
           refetchFolders();
         }}
       />
+
+      {/* СПРАВОЧНИКИ: категории и типы устройств (заказчик управляет сам) */}
+      <Dialog open={isDictOpen} onOpenChange={setIsDictOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Справочники</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-6">
+            {/* Категории */}
+            <div className="space-y-2">
+              <Label className="font-semibold">Категории товаров и услуг</Label>
+              <div className="space-y-1.5 max-h-[160px] overflow-y-auto">
+                {categoryOptions.map((c) => {
+                  const row = dbCategories.find((x) => x.slug === c.value);
+                  return (
+                    <div key={c.value} className="flex items-center justify-between text-sm border rounded-lg px-3 py-1.5">
+                      <span>{c.label} {c.is_service && <span className="text-[10px] text-amber-600">(услуга)</span>}</span>
+                      {row && (
+                        <button type="button" onClick={() => deleteCategory(row.id)} className="text-destructive text-xs hover:underline">Удалить</button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex items-center gap-2">
+                <Input value={newCatName} onChange={(e) => setNewCatName(e.target.value)} placeholder="Новая категория" className="h-9" />
+                <label className="flex items-center gap-1.5 text-xs whitespace-nowrap">
+                  <Switch checked={newCatIsService} onCheckedChange={setNewCatIsService} /> услуга
+                </label>
+                <Button type="button" onClick={addCategory} className="h-9">Добавить</Button>
+              </div>
+            </div>
+
+            {/* Типы устройств */}
+            <div className="space-y-2">
+              <Label className="font-semibold">Типы устройств</Label>
+              <div className="space-y-1.5 max-h-[160px] overflow-y-auto">
+                {deviceTypes.map((d) => (
+                  <div key={d.id} className="flex items-center justify-between text-sm border rounded-lg px-3 py-1.5">
+                    <span>{d.name}</span>
+                    <button type="button" onClick={() => deleteDeviceType(d.id)} className="text-destructive text-xs hover:underline">Удалить</button>
+                  </div>
+                ))}
+                {deviceTypes.length === 0 && <p className="text-xs text-muted-foreground">Пока нет типов. Добавьте «Трубка», «Видеомонитор» и т.д.</p>}
+              </div>
+              <div className="flex items-center gap-2">
+                <Input value={newDevName} onChange={(e) => setNewDevName(e.target.value)} placeholder="Новый тип устройства" className="h-9" />
+                <Button type="button" onClick={addDeviceType} className="h-9">Добавить</Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

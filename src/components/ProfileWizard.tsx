@@ -88,6 +88,7 @@ type Step =
   | "name" | "method"
   | "account"
   | "street" | "house" | "entrance" | "apartment" | "floor"
+  | "has_equip" | "equip_type"
   | "review";
 
 // ВАЖНО: StepShell и Tile объявлены НА УРОВНЕ МОДУЛЯ, а не внутри компонента.
@@ -139,6 +140,20 @@ export const ProfileWizard: React.FC<Props> = ({ userId, phone, initialFullName,
   const [floor, setFloor] = useState("");
   const [addressText, setAddressText] = useState("");
 
+  // Анкета об оборудовании: установлен ли домофон и что именно (тип устройства).
+  const [hasIntercom, setHasIntercom] = useState<boolean | null>(
+    existingProfile?.has_intercom ?? null
+  );
+  const [currentDeviceTypeId, setCurrentDeviceTypeId] = useState<string>(
+    existingProfile?.current_device_type_id || ""
+  );
+  const [deviceTypeOpts, setDeviceTypeOpts] = useState<{ id: string; name: string }[]>([]);
+  useEffect(() => {
+    supabase.from("device_types").select("id,name").order("sort_order")
+      .then(({ data }) => setDeviceTypeOpts((data as any) || []))
+      .catch(() => setDeviceTypeOpts([]));
+  }, []);
+
   // Поиск по телефону (автоподстановка)
   const [phoneMatch, setPhoneMatch] = useState<AccountRow | null>(null);
   const [phoneChecked, setPhoneChecked] = useState(false);
@@ -162,11 +177,11 @@ export const ProfileWizard: React.FC<Props> = ({ userId, phone, initialFullName,
 
   // Прогресс (для шкалы)
   const stepIndex = useMemo(() => {
-    const order: Step[] = ["name", "method", "street", "house", "entrance", "apartment", "floor", "review"];
+    const order: Step[] = ["name", "method", "street", "house", "entrance", "apartment", "floor", "has_equip", "equip_type", "review"];
     const i = order.indexOf(step === "account" ? "review" : step);
     return i < 0 ? 1 : i + 1;
   }, [step]);
-  const totalSteps = 8;
+  const totalSteps = 10;
 
   // Автопоиск по телефону при входе на шаг «method»
   useEffect(() => {
@@ -269,7 +284,7 @@ export const ProfileWizard: React.FC<Props> = ({ userId, phone, initialFullName,
     setEntrance(row.entrance || "");
     setApartment(row.apartment || "");
     setAddressText(row.address || composeAddress(row.street || "", row.house || "", row.housing || "", row.entrance || ""));
-    go("review");
+    go("has_equip");
   };
 
   const findAccount = async () => {
@@ -306,6 +321,13 @@ export const ProfileWizard: React.FC<Props> = ({ userId, phone, initialFullName,
         };
         const { error } = await supabase.from("profiles").update({ pending_data_change: pending, data_change_notification: null }).eq("id", userId);
         if (error) throw error;
+        // Данные анкеты об оборудовании — информационные, применяем сразу (не через диспетчера).
+        try {
+          await supabase.from("profiles").update({
+            has_intercom: hasIntercom,
+            current_device_type_id: currentDeviceTypeId || null,
+          }).eq("id", userId);
+        } catch { /* не критично */ }
         try {
           await supabase.from("requests").insert({
             client_id: userId, name: fullName.trim(), phone,
@@ -324,6 +346,8 @@ export const ProfileWizard: React.FC<Props> = ({ userId, phone, initialFullName,
           full_name: fullName.trim(), phone: (phoneNum || phone || "").trim() || null,
           address: finalAddress, apartment: apartment.trim() || null, floor: floor.trim() || null,
           account_number: accountNumber || null,
+          has_intercom: hasIntercom,
+          current_device_type_id: currentDeviceTypeId || null,
         }).eq("id", userId);
         if (error) throw error;
         toast({ title: "Данные сохранены ✅", description: "Профиль заполнен. Для доступа к домофону подтвердите проживание." });
@@ -595,9 +619,57 @@ export const ProfileWizard: React.FC<Props> = ({ userId, phone, initialFullName,
           <div className="flex justify-between mt-5">
             <Button variant="ghost" onClick={back} className="rounded-xl h-10 gap-2 text-muted-foreground"><ArrowLeft className="h-4 w-4" /> Назад</Button>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => go("review")} className="rounded-xl h-11 px-5">Пропустить</Button>
-              <Button onClick={() => go("review")} className="rounded-xl h-11 px-6 gap-2 bg-blue-600 hover:bg-blue-700">Далее <ArrowRight className="h-4 w-4" /></Button>
+              <Button variant="outline" onClick={() => go("has_equip")} className="rounded-xl h-11 px-5">Пропустить</Button>
+              <Button onClick={() => go("has_equip")} className="rounded-xl h-11 px-6 gap-2 bg-blue-600 hover:bg-blue-700">Далее <ArrowRight className="h-4 w-4" /></Button>
             </div>
+          </div>
+        </StepShell>
+      )}
+
+      {/* ШАГ: установлен ли домофон сейчас */}
+      {step === "has_equip" && (
+        <StepShell icon={<Home className="h-5 w-5" />} title="Домофон в квартире" subtitle="Установлена ли сейчас у вас трубка или видеодомофон?">
+          <div className="grid gap-3">
+            <button type="button"
+              onClick={() => { setHasIntercom(true); go("equip_type"); }}
+              className={cn("flex items-center gap-3 p-4 rounded-2xl border text-left transition-all",
+                hasIntercom === true ? "border-blue-500 bg-blue-500/10" : "border-slate-200 dark:border-slate-700 hover:border-blue-400 hover:bg-blue-500/5")}>
+              <CheckCircle2 className="h-5 w-5 text-blue-600 dark:text-sky-400 shrink-0" />
+              <div><div className="font-semibold text-sm">Да, установлен</div>
+                <div className="text-[11px] text-muted-foreground">Есть трубка или видеодомофон</div></div>
+            </button>
+            <button type="button"
+              onClick={() => { setHasIntercom(false); setCurrentDeviceTypeId(""); go("review"); }}
+              className={cn("flex items-center gap-3 p-4 rounded-2xl border text-left transition-all",
+                hasIntercom === false ? "border-blue-500 bg-blue-500/10" : "border-slate-200 dark:border-slate-700 hover:border-blue-400 hover:bg-blue-500/5")}>
+              <Home className="h-5 w-5 text-blue-600 dark:text-sky-400 shrink-0" />
+              <div><div className="font-semibold text-sm">Нет, не установлен</div>
+                <div className="text-[11px] text-muted-foreground">Оборудования в квартире нет</div></div>
+            </button>
+          </div>
+          <div className="flex justify-start mt-5">
+            <Button variant="ghost" onClick={back} className="rounded-xl h-10 gap-2 text-muted-foreground"><ArrowLeft className="h-4 w-4" /> Назад</Button>
+          </div>
+        </StepShell>
+      )}
+
+      {/* ШАГ: что именно установлено (тип устройства) */}
+      {step === "equip_type" && (
+        <StepShell icon={<Building2 className="h-5 w-5" />} title="Что установлено?" subtitle="Выберите тип устройства">
+          <div className="flex flex-wrap gap-2">
+            {deviceTypeOpts.map((d) => (
+              <Tile key={d.id} active={currentDeviceTypeId === d.id}
+                onClick={() => { setCurrentDeviceTypeId(d.id); go("review"); }}>
+                {d.name}
+              </Tile>
+            ))}
+            {deviceTypeOpts.length === 0 && (
+              <p className="text-sm text-muted-foreground">Типы устройств не заданы. Можно пропустить.</p>
+            )}
+          </div>
+          <div className="flex justify-between mt-5">
+            <Button variant="ghost" onClick={back} className="rounded-xl h-10 gap-2 text-muted-foreground"><ArrowLeft className="h-4 w-4" /> Назад</Button>
+            <Button variant="outline" onClick={() => go("review")} className="rounded-xl h-10">Пропустить</Button>
           </div>
         </StepShell>
       )}
@@ -612,6 +684,15 @@ export const ProfileWizard: React.FC<Props> = ({ userId, phone, initialFullName,
             <Row label="Адрес" value={finalAddress} onEdit={() => { setStreetQuery(""); setStep("street"); }} />
             {apartment && <Row label="Квартира" value={apartment} onEdit={() => setStep("apartment")} />}
             {floor && <Row label="Этаж" value={floor} onEdit={() => setStep("floor")} />}
+            {hasIntercom !== null && (
+              <Row
+                label="Домофон в квартире"
+                value={hasIntercom === false
+                  ? "Не установлен"
+                  : (deviceTypeOpts.find((d) => d.id === currentDeviceTypeId)?.name || "Установлен")}
+                onEdit={() => setStep("has_equip")}
+              />
+            )}
           </div>
           {mode === "edit" && (
             <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-3 flex items-start gap-1.5">
