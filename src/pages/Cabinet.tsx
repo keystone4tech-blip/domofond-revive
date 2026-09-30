@@ -1323,21 +1323,26 @@ const RemoteAccessCard = ({
           if (m) ent = m[1];
         }
 
-        if (cleanStreetQuery && house) {
-          console.log(`[Умный домофон] Прямой запрос к entrances: улица "${cleanStreetQuery}", дом "${house}", подъезд "${ent || 'любой'}"`);
+        // Ключ дома с корпусом в едином виде ("3, корп. 2" и "3 к2" → "3к2"), т.к. в entrances
+        // корпус пишется по-разному ("3к1", "3 к2"), а из адреса приходит "3, корп. 2".
+        const houseKey = normalizeHouse(house);
+        if (cleanStreetQuery && houseKey) {
+          console.log(`[Умный домофон] Прямой запрос к entrances: улица "${cleanStreetQuery}", домКлюч "${houseKey}", подъезд "${ent || 'любой'}"`);
+          // НЕ фильтруем по house на стороне БД (форматы корпуса не совпадают) —
+          // тянем по улице (+подъезд) и сопоставляем дом нормализованно в JS.
           let q = supabase
             .from("entrances")
-            .select("id, entrance, has_smart_intercom")
-            .ilike("street", `%${cleanStreetQuery}%`)
-            .eq("house", house);
+            .select("id, entrance, house, has_smart_intercom")
+            .ilike("street", `%${cleanStreetQuery}%`);
 
           if (ent) {
-            q = q.eq("entrance", ent);
+            q = q.eq("entrance", String(ent));
           }
 
           const { data: entList } = await q;
-          if (entList && entList.length > 0) {
-            const hasSmart = entList.some((e: any) => e.has_smart_intercom === true);
+          const matched = (entList || []).filter((e: any) => normalizeHouse(e.house) === houseKey);
+          if (matched.length > 0) {
+            const hasSmart = matched.some((e: any) => e.has_smart_intercom === true);
             if (hasSmart) {
               console.log("[Умный домофон] ✅ Подтверждено наличие умного домофона в таблице entrances");
               setSmartIntercomAvailable(true);
@@ -2189,14 +2194,17 @@ const Cabinet = () => {
     };
 
     const cleanStreet = normalizeStreetName(effStreet);
-    const cleanHouse = effHouse.toLowerCase().replace(/[^а-яa-z0-9]/gi, "").replace(/^д/, "");
+    // Единая нормализация дома с унификацией корпуса ("3, корп. 2"/"3 к2"/"3корп2" → "3к2").
+    // Раньше здесь корпус НЕ приводился к "к", поэтому "3корп2" ≠ "3к2" из таблицы entrances,
+    // и оборудование/подъезд для адресов с корпусом не находились.
+    const cleanHouse = normalizeHouse(effHouse);
     const cleanEnt = effEntrance ? String(effEntrance).replace(/[^0-9]/g, "") : "";
 
     // 1. Попытка точного совпадения: улица + дом + подъезд (если подъезд известен)
     if (cleanEnt) {
       const exactMatch = allEntrances.find(e => {
         const eStreet = normalizeStreetName(e.street);
-        const eHouse = e.house.toLowerCase().replace(/[^а-яa-z0-9]/gi, "").replace(/^д/, "");
+        const eHouse = normalizeHouse(e.house);
         const eEnt = String(e.entrance).replace(/[^0-9]/g, "");
 
         const streetMatch = eStreet.includes(cleanStreet) || cleanStreet.includes(eStreet);
@@ -2216,7 +2224,7 @@ const Cabinet = () => {
     // Ищем подъезд этого дома, отдавая приоритет подъезду с умным домофоном или привязанными товарами
     const houseMatches = allEntrances.filter(e => {
       const eStreet = normalizeStreetName(e.street);
-      const eHouse = e.house.toLowerCase().replace(/[^а-яa-z0-9]/gi, "").replace(/^д/, "");
+      const eHouse = normalizeHouse(e.house);
       return (eStreet.includes(cleanStreet) || cleanStreet.includes(eStreet)) && eHouse === cleanHouse;
     });
 
