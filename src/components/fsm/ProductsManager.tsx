@@ -251,9 +251,11 @@ export const ProductsManager: React.FC = () => {
     setNewCatName(""); setNewCatIsService(false); refetchCategories();
     toast({ title: "Категория добавлена", description: name });
   };
-  const deleteCategory = async (id: string) => {
+  const deleteCategory = async (id: string, name?: string) => {
+    if (!confirm(`Удалить категорию "${name || id}"?`)) return;
     const { error } = await supabase.from("product_categories").delete().eq("id", id);
     if (error) { toast({ title: "Ошибка", description: error.message, variant: "destructive" }); return; }
+    await logDeletion("category", id, name);
     refetchCategories();
   };
   const addDeviceType = async () => {
@@ -264,9 +266,11 @@ export const ProductsManager: React.FC = () => {
     setNewDevName(""); refetchDeviceTypes();
     toast({ title: "Тип устройства добавлен", description: name });
   };
-  const deleteDeviceType = async (id: string) => {
+  const deleteDeviceType = async (id: string, name?: string) => {
+    if (!confirm(`Удалить тип устройства "${name || id}"?`)) return;
     const { error } = await supabase.from("device_types").delete().eq("id", id);
     if (error) { toast({ title: "Ошибка", description: error.message, variant: "destructive" }); return; }
+    await logDeletion("device_type", id, name);
     refetchDeviceTypes();
   };
   // Переименование (инлайн-редактирование) справочников.
@@ -595,8 +599,10 @@ export const ProductsManager: React.FC = () => {
   const deleteFolderMutation = useMutation({
     mutationFn: async (folderId: string) => {
       console.log("[ProductsManager] Удаление папки id:", folderId);
+      const { data: folderRow } = await supabase.from("product_folders").select("*").eq("id", folderId).maybeSingle();
       const { error } = await supabase.from("product_folders").delete().eq("id", folderId);
       if (error) throw error;
+      await logDeletion("folder", folderId, (folderRow as any)?.name, folderRow);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["product_folders"] });
@@ -1856,7 +1862,7 @@ export const ProductsManager: React.FC = () => {
                     <label className="flex items-center gap-1 text-[11px] whitespace-nowrap">
                       <Switch checked={row.is_service} onCheckedChange={(v) => toggleCategoryService(row.id, v)} /> услуга
                     </label>
-                    <button type="button" onClick={() => deleteCategory(row.id)} className="text-destructive text-xs hover:underline shrink-0">Удалить</button>
+                    <button type="button" onClick={() => deleteCategory(row.id, row.name)} className="text-destructive text-xs hover:underline shrink-0">Удалить</button>
                   </div>
                 ))}
               </div>
@@ -1881,7 +1887,7 @@ export const ProductsManager: React.FC = () => {
                       onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
                       className="h-8 flex-1"
                     />
-                    <button type="button" onClick={() => deleteDeviceType(d.id)} className="text-destructive text-xs hover:underline shrink-0">Удалить</button>
+                    <button type="button" onClick={() => deleteDeviceType(d.id, d.name)} className="text-destructive text-xs hover:underline shrink-0">Удалить</button>
                   </div>
                 ))}
                 {deviceTypes.length === 0 && <p className="text-xs text-muted-foreground">Пока нет типов. Добавьте «Трубка», «Видеомонитор» и т.д.</p>}

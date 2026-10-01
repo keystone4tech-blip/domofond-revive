@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { uploadFile } from "@/lib/upload";
+import { logDeletion } from "@/lib/audit";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -131,12 +132,15 @@ export const NewsManager = () => {
     if (!confirm("Удалить эту новость?")) return;
 
     try {
+      // Фиксируем в журнал удалений: что, кто и когда
+      const { data: row } = await supabase.from("news").select("*").eq("id", id).maybeSingle();
       const { error } = await supabase
         .from("news")
         .delete()
         .eq("id", id);
 
       if (error) throw error;
+      await logDeletion("news", id, (row as any)?.title, row);
       toast({ title: "Новость удалена" });
       fetchNews();
     } catch (error) {

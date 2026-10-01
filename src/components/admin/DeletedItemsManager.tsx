@@ -21,6 +21,9 @@ const TYPE_LABELS: Record<string, string> = {
   login: "Логопас",
   category: "Категория",
   device_type: "Тип устройства",
+  folder: "Папка товаров",
+  news: "Новость",
+  promotion: "Акция",
 };
 
 export const DeletedItemsManager: React.FC = () => {

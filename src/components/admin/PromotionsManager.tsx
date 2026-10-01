@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { uploadFile } from "@/lib/upload";
+import { logDeletion } from "@/lib/audit";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -129,12 +130,15 @@ export const PromotionsManager = () => {
     if (!confirm("Удалить эту акцию?")) return;
 
     try {
+      // Фиксируем в журнал удалений: что, кто и когда
+      const { data: row } = await supabase.from("promotions").select("*").eq("id", id).maybeSingle();
       const { error } = await supabase
         .from("promotions")
         .delete()
         .eq("id", id);
 
       if (error) throw error;
+      await logDeletion("promotion", id, (row as any)?.title, row);
       toast({ title: "Акция удалена" });
       fetchPromotions();
     } catch (error) {
