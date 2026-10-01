@@ -545,7 +545,7 @@ app.post('/api/employees/complete-profile', authenticateToken, async (req, res) 
     return res.status(401).json({ error: 'Требуется авторизация' });
   }
 
-  const { full_name, contact_phone, date_of_birth, residence_address } = req.body || {};
+  const { full_name, contact_phone, date_of_birth, residence_address, photo_url } = req.body || {};
 
   // Валидация обязательных полей анкеты
   if (!full_name || !String(full_name).trim()) {
@@ -582,12 +582,13 @@ app.post('/api/employees/complete-profile', authenticateToken, async (req, res) 
              phone = COALESCE($3, phone),
              date_of_birth = $4,
              residence_address = $5,
+             photo_url = COALESCE($6, photo_url),
              profile_completed = true,
              is_active = true,
              activated_at = CURRENT_TIMESTAMP
        WHERE user_id = $1
-       RETURNING id, full_name, is_active, profile_completed`,
-      [userId, String(full_name).trim(), contact_phone ? String(contact_phone).trim() : null, date_of_birth, String(residence_address).trim()]
+       RETURNING id, full_name, is_active, profile_completed, photo_url`,
+      [userId, String(full_name).trim(), contact_phone ? String(contact_phone).trim() : null, date_of_birth, String(residence_address).trim(), photo_url ? String(photo_url).trim() : null]
     );
 
     // Телефон полезно продублировать в профиль, если его там нет
@@ -1766,7 +1767,7 @@ app.get('/api/public-stats', async (req, res) => {
 // МОДУЛЬ ЗАГРУЗКИ ФАЙЛОВ (замена Supabase Storage после переезда на PostgreSQL)
 // POST /api/upload  { fileBase64, fileName, fileType, folder } -> { url }
 // ------------------------------------------------------------------------------
-const ALLOWED_UPLOAD_FOLDERS = ['news', 'promotions', 'tasks', 'requests', 'calculations', 'portfolio', 'misc'];
+const ALLOWED_UPLOAD_FOLDERS = ['news', 'promotions', 'tasks', 'requests', 'calculations', 'portfolio', 'employees', 'misc'];
 const MEDIA_ROOT = path.join(__dirname, '../public/media');
 
 app.post('/api/upload', async (req, res) => {

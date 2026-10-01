@@ -56,6 +56,7 @@ interface Employee {
   contact_phone?: string | null;
   profile_completed?: boolean | null;
   activated_at?: string | null;
+  photo_url?: string | null;
 }
 
 interface Profile {
@@ -718,7 +719,18 @@ const EmployeesManager = () => {
 
                         return (
                           <TableRow key={emp.id} className="hover:bg-muted/40 cursor-pointer" onClick={() => setDetailEmployee(emp)}>
-                            <TableCell className="font-semibold">{emp.full_name}</TableCell>
+                            <TableCell className="font-semibold">
+                              <div className="flex items-center gap-2.5">
+                                {emp.photo_url ? (
+                                  <img src={emp.photo_url} alt={emp.full_name} className="w-8 h-8 rounded-full object-cover shrink-0" />
+                                ) : (
+                                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                    <User className="h-4 w-4 text-primary/60" />
+                                  </div>
+                                )}
+                                <span>{emp.full_name}</span>
+                              </div>
+                            </TableCell>
                             <TableCell className="text-muted-foreground">{emp.contact_phone || emp.phone || "—"}</TableCell>
                             <TableCell>
                               <Badge variant="outline" className="font-medium bg-primary/5 border-primary/20 text-foreground">
@@ -820,8 +832,23 @@ const EmployeesManager = () => {
               </DialogHeader>
 
               <div className="space-y-3">
+                {/* Фотография сотрудника */}
+                <div className="flex justify-center">
+                  {detailEmployee.photo_url ? (
+                    <img
+                      src={detailEmployee.photo_url}
+                      alt={detailEmployee.full_name}
+                      className="w-24 h-24 rounded-full object-cover border-2 border-primary/20 shadow-sm"
+                    />
+                  ) : (
+                    <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center border-2 border-primary/10">
+                      <User className="h-10 w-10 text-primary/50" />
+                    </div>
+                  )}
+                </div>
+
                 {/* Статус и роль */}
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap justify-center">
                   <Badge variant="outline" className="bg-primary/5 border-primary/20">{getRoleDisplayName(detailEmployee)}</Badge>
                   {getEmployeeStatus(detailEmployee) === "pending" ? (
                     <Badge variant="outline" className="border-amber-300 text-amber-700 bg-amber-50 gap-1"><Clock className="h-3 w-3" /> Ожидает анкету</Badge>

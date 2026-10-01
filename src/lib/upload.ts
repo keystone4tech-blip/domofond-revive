@@ -13,6 +13,7 @@ export type UploadFolder =
   | "requests"
   | "calculations"
   | "portfolio"
+  | "employees"
   | "misc";
 
 /**
