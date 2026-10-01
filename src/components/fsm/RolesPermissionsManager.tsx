@@ -73,9 +73,12 @@ export const RolesPermissionsManager = () => {
     },
   });
 
-  // 2. Загрузка сотрудников для подсчета количества привязанных к ролям
+  // 2. Загрузка сотрудников для подсчета количества привязанных к ролям.
+  // ВАЖНО: отдельный ключ кэша, НЕ ["employees"] — иначе этот усечённый select
+  // (без ФИО и телефона) затирал бы общий кэш сотрудников, и при возврате
+  // на вкладку «Сотрудники» ФИО/телефоны пропадали до перезагрузки страницы.
   const { data: employees = [] } = useQuery({
-    queryKey: ["employees"],
+    queryKey: ["employees-role-counts"],
     queryFn: async () => {
       const { data, error } = await supabase.from("employees").select("id, role, position");
       if (error) throw error;

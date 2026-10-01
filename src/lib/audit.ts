@@ -1,5 +1,24 @@
 import { supabase } from "@/integrations/supabase/client";
 
+// Кто сейчас действует: id и человекочитаемое имя (ФИО из профиля, иначе email).
+// Используется для «кто назначил» и «кто удалил».
+export async function getCurrentUserIdentity(): Promise<{ id: string | null; name: string }> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const uid = session?.user?.id || null;
+    let name = session?.user?.email || "";
+    if (uid) {
+      try {
+        const { data } = await supabase.from("profiles").select("full_name").eq("id", uid).single();
+        if (data?.full_name && data.full_name.trim()) name = data.full_name.trim();
+      } catch { /* имя не критично */ }
+    }
+    return { id: uid, name };
+  } catch {
+    return { id: null, name: "" };
+  }
+}
+
 // Единый помощник журналирования удалений. Вызывается из всех мест, где что-то удаляют,
 // чтобы в журнале осталось: что удалили, снимок, и КТО из сотрудников удалил.
 export async function logDeletion(

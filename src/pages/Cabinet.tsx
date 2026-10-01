@@ -11,7 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useUserRole } from "@/hooks/useUserRole";
-import { Loader2, LogOut, CheckCircle, Check, AlertCircle, AlertTriangle, ClipboardList, Calendar, Shield, CreditCard, Wallet, Pencil, Trash2, UserCheck, Plus, Minus, Clock, Wrench, CheckCircle2, XCircle, Send, Smartphone, KeyRound, PhoneCall, Headphones, DoorOpen, DoorClosed, Info, User, Phone, Mail, Lock, Lightbulb, Hash, MapPin, Building, Home, Building2, History, FileSpreadsheet, Copy, Eye, EyeOff, ShieldCheck, Sparkles, LayoutDashboard, Zap, Printer, Receipt, FileText, ShoppingBag } from "lucide-react";
+import EmployeeOnboarding from "@/components/EmployeeOnboarding";
+import { Loader2, LogOut, CheckCircle, Check, AlertCircle, AlertTriangle, ClipboardList, Calendar, Shield, CreditCard, Wallet, Pencil, Trash2, UserCheck, Plus, Minus, Clock, Wrench, CheckCircle2, XCircle, Send, Smartphone, KeyRound, PhoneCall, Headphones, DoorOpen, DoorClosed, Info, User, Phone, Mail, Lock, Lightbulb, Hash, MapPin, Building, Home, Building2, History, FileSpreadsheet, Copy, Eye, EyeOff, ShieldCheck, Sparkles, LayoutDashboard, Zap, Printer, Receipt, FileText, ShoppingBag, HeartHandshake } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -1987,6 +1988,33 @@ const Cabinet = () => {
   const [profile, setProfile] = useState<any>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [userRoles, setUserRoles] = useState<string[]>([]);
+  // Приглашение сотрудника: если пользователь назначен сотрудником и не заполнил анкету
+  const [employeeInvite, setEmployeeInvite] = useState<{ pending: boolean } | null>(null);
+  const [showEmployeeAnketa, setShowEmployeeAnketa] = useState(false);
+
+  // Проверяем, назначен ли пользователь сотрудником и заполнил ли анкету о себе
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: emp } = await supabase
+          .from("employees")
+          .select("id, profile_completed")
+          .eq("user_id", userId)
+          .maybeSingle();
+        if (cancelled) return;
+        if (emp && !(emp as any).profile_completed) {
+          setEmployeeInvite({ pending: true });
+        } else {
+          setEmployeeInvite(null);
+        }
+      } catch (e) {
+        console.warn("[Cabinet] Проверка статуса сотрудника не удалась:", e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [userId]);
   // Проверяем права пользователя: администратор, директор, сотрудник FSM
   const { isFSMUser, isAdmin } = useUserRole();
   const [fullName, setFullName] = useState("");
@@ -4881,7 +4909,35 @@ const Cabinet = () => {
                 </div>
               </CardHeader>
               <CardContent className="space-y-5 pt-5">
-                
+
+                {/* ПРИГЛАШЕНИЕ СОТРУДНИКА: назначен, но не заполнил анкету о себе */}
+                {employeeInvite?.pending && (
+                  <div className="p-4 rounded-2xl border border-primary/30 bg-primary/5 flex items-start gap-3.5 text-left animate-in fade-in slide-in-from-top-2 duration-300 shadow-sm">
+                    <div className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center shrink-0">
+                      <HeartHandshake className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-sm">Вас назначили сотрудником Домофондар 🎉</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Чтобы активировать доступ к рабочей панели, заполните короткую анкету о себе — это займёт меньше минуты.
+                      </p>
+                      <Button size="sm" className="mt-3" onClick={() => setShowEmployeeAnketa(true)}>
+                        Заполнить анкету
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {userId && showEmployeeAnketa && (
+                  <EmployeeOnboarding
+                    userId={userId}
+                    open={showEmployeeAnketa}
+                    blocking={false}
+                    onClose={() => setShowEmployeeAnketa(false)}
+                    onCompleted={() => { setShowEmployeeAnketa(false); setEmployeeInvite(null); }}
+                  />
+                )}
+
                 {/* 0. СИСТЕМНОЕ ПИСЬМО-УВЕДОМЛЕНИЕ: Ответ оператора CRM по заявке на изменение данных */}
                 {profile?.data_change_notification && (
                   <div className={cn(

@@ -30,12 +30,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Plus, Edit, UserCheck, UserX, Loader2, 
-  Search, User, Users, Shield, ShieldCheck 
+import {
+  Plus, Edit, UserCheck, UserX, Loader2,
+  Search, User, Users, Shield, ShieldCheck,
+  Trash2, Filter, Phone, Cake, MapPin, CalendarClock, ClipboardCheck, Clock, Info
 } from "lucide-react";
 import { CRMRole } from "@/types/crmRoles";
 import { RolesPermissionsManager } from "./RolesPermissionsManager";
+import { logDeletion, getCurrentUserIdentity } from "@/lib/audit";
 
 interface Employee {
   id: string;
@@ -46,6 +48,14 @@ interface Employee {
   role: string | null;
   is_active: boolean;
   created_at: string;
+  assigned_by?: string | null;
+  assigned_by_name?: string | null;
+  assigned_at?: string | null;
+  date_of_birth?: string | null;
+  residence_address?: string | null;
+  contact_phone?: string | null;
+  profile_completed?: boolean | null;
+  activated_at?: string | null;
 }
 
 interface Profile {
@@ -70,6 +80,14 @@ const EmployeesManager = () => {
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
+
+  // Фильтры и поиск по списку сотрудников
+  const [listSearch, setListSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all"); // all | active | pending | inactive
+
+  // Карточка сотрудника (детальная информация)
+  const [detailEmployee, setDetailEmployee] = useState<Employee | null>(null);
   
   // Форма сотрудника (использует ID роли из таблицы crm_roles)
   const [formData, setFormData] = useState({
@@ -155,6 +173,35 @@ const EmployeesManager = () => {
     return emp.role || "Мастер";
   };
 
+  // Статус сотрудника: pending (ожидает анкету) / active / inactive
+  const getEmployeeStatus = (emp: Employee): "pending" | "active" | "inactive" => {
+    if (!emp.profile_completed) return "pending";
+    return emp.is_active ? "active" : "inactive";
+  };
+
+  // Фильтрация и поиск по списку сотрудников
+  const filteredEmployees = (employees || []).filter((emp) => {
+    // Фильтр по роли
+    if (roleFilter !== "all") {
+      const rid = emp.role || "";
+      const byPos = crmRoles.find((r) => r.name.toLowerCase() === emp.position?.toLowerCase());
+      if (rid !== roleFilter && byPos?.id !== roleFilter) return false;
+    }
+    // Фильтр по статусу
+    if (statusFilter !== "all" && getEmployeeStatus(emp) !== statusFilter) return false;
+    // Поиск по ФИО / телефону
+    const q = listSearch.trim().toLowerCase();
+    if (q) {
+      const hay = [emp.full_name, emp.phone, emp.contact_phone, emp.assigned_by_name]
+        .map((x) => String(x || "").toLowerCase()).join(" ");
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  const fmtDate = (d?: string | null) => d ? new Date(d).toLocaleDateString("ru-RU") : "—";
+  const fmtDateTime = (d?: string | null) => d ? new Date(d).toLocaleString("ru-RU") : "—";
+
   // Мутация: Назначение нового сотрудника
   const createEmployeeMutation = useMutation({
     mutationFn: async (data: { userId: string; full_name: string; phone: string; roleId: string }) => {
@@ -183,13 +230,22 @@ const EmployeesManager = () => {
       const targetRole = crmRoles.find((r) => r.id === data.roleId);
       const positionName = targetRole?.name || data.roleId;
 
-      // Создаем запись сотрудника (заполняем ОБЕ колонки: role и position)
+      // Кто назначает (для карточки сотрудника)
+      const me = await getCurrentUserIdentity();
+
+      // Создаем запись сотрудника. ВАЖНО: is_active=false и profile_completed=false —
+      // сотрудник активируется только после заполнения анкеты о себе.
       const { error: empError } = await supabase.from("employees").insert({
         user_id: data.userId,
         full_name: data.full_name,
         phone: data.phone || null,
         role: data.roleId,
         position: positionName,
+        assigned_by: me.id,
+        assigned_by_name: me.name || null,
+        assigned_at: new Date().toISOString(),
+        is_active: false,
+        profile_completed: false,
       });
 
       if (empError) {
@@ -219,7 +275,10 @@ const EmployeesManager = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       queryClient.invalidateQueries({ queryKey: ["crm_roles"] });
-      toast({ title: "Сотрудник успешно добавлен" });
+      toast({
+        title: "Сотрудник назначен",
+        description: "Статус «Ожидает анкету». Сотрудник увидит приглашение в личном кабинете и активируется после заполнения данных о себе.",
+      });
       setIsDialogOpen(false);
       resetForm();
     },
@@ -313,6 +372,39 @@ const EmployeesManager = () => {
       toast({ title: "Статус сотрудника обновлен" });
     },
   });
+
+  // Мутация: снятие с должности. Удаляем запись сотрудника и его рабочую роль,
+  // но САМ АККАУНТ пользователя остаётся. Пишем в журнал «Удалённые».
+  const deleteEmployeeMutation = useMutation({
+    mutationFn: async (emp: Employee) => {
+      // Снимок для журнала
+      await logDeletion("employee", emp.id, emp.full_name, emp);
+      // Удаляем рабочую роль (доступ к CRM), аккаунт пользователя не трогаем
+      if (emp.user_id) {
+        await supabase.from("user_roles").delete().eq("user_id", emp.user_id);
+      }
+      const { error } = await supabase.from("employees").delete().eq("id", emp.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["employees-role-counts"] });
+      setDetailEmployee(null);
+      toast({ title: "Сотрудник снят с должности", description: "Учётная запись пользователя сохранена." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Ошибка удаления", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleDeleteEmployee = (emp: Employee) => {
+    if (!window.confirm(
+      `Снять «${emp.full_name}» с должности?\n\n` +
+      `Будет удалена запись сотрудника и его доступ к CRM. ` +
+      `Учётная запись пользователя сохранится. Действие попадёт в журнал «Удалённые».`
+    )) return;
+    deleteEmployeeMutation.mutate(emp);
+  };
 
   const resetForm = () => {
     setFormData({
@@ -557,12 +649,54 @@ const EmployeesManager = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
+              {/* Панель фильтров и поиска */}
+              <div className="flex flex-col lg:flex-row gap-2 mb-4">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    value={listSearch}
+                    onChange={(e) => setListSearch(e.target.value)}
+                    placeholder="Поиск по ФИО, телефону, кто назначил…"
+                    className="pl-10 h-9"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Select value={roleFilter} onValueChange={setRoleFilter}>
+                    <SelectTrigger className="h-9 w-[180px]">
+                      <div className="flex items-center gap-1.5 text-sm">
+                        <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+                        <SelectValue />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Все роли</SelectItem>
+                      {crmRoles.map((r) => (
+                        <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="h-9 w-[170px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Любой статус</SelectItem>
+                      <SelectItem value="active">Активные</SelectItem>
+                      <SelectItem value="pending">Ожидают анкету</SelectItem>
+                      <SelectItem value="inactive">Неактивные</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
               {isLoadingEmployees ? (
                 <div className="flex justify-center py-12">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 </div>
               ) : employees?.length === 0 ? (
                 <p className="text-center text-muted-foreground py-10">Сотрудники еще не добавлены</p>
+              ) : filteredEmployees.length === 0 ? (
+                <p className="text-center text-muted-foreground py-10">По заданным фильтрам ничего не найдено</p>
               ) : (
                 <div className="w-full overflow-x-auto">
                   <Table>
@@ -572,28 +706,39 @@ const EmployeesManager = () => {
                         <TableHead>Телефон</TableHead>
                         <TableHead>Должность / Роль</TableHead>
                         <TableHead>Статус</TableHead>
+                        <TableHead>Кто назначил</TableHead>
+                        <TableHead>Когда</TableHead>
                         <TableHead className="text-right">Действия</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {employees?.map((emp) => {
+                      {filteredEmployees.map((emp) => {
                         const roleName = getRoleDisplayName(emp);
+                        const status = getEmployeeStatus(emp);
 
                         return (
-                          <TableRow key={emp.id} className="hover:bg-muted/40">
+                          <TableRow key={emp.id} className="hover:bg-muted/40 cursor-pointer" onClick={() => setDetailEmployee(emp)}>
                             <TableCell className="font-semibold">{emp.full_name}</TableCell>
-                            <TableCell className="text-muted-foreground">{emp.phone || "—"}</TableCell>
+                            <TableCell className="text-muted-foreground">{emp.contact_phone || emp.phone || "—"}</TableCell>
                             <TableCell>
                               <Badge variant="outline" className="font-medium bg-primary/5 border-primary/20 text-foreground">
                                 {roleName}
                               </Badge>
                             </TableCell>
                             <TableCell>
-                              <Badge variant={emp.is_active ? "default" : "secondary"}>
-                                {emp.is_active ? "Активен" : "Неактивен"}
-                              </Badge>
+                              {status === "pending" ? (
+                                <Badge variant="outline" className="border-amber-300 text-amber-700 bg-amber-50 gap-1">
+                                  <Clock className="h-3 w-3" /> Ожидает анкету
+                                </Badge>
+                              ) : status === "active" ? (
+                                <Badge variant="default" className="gap-1"><UserCheck className="h-3 w-3" /> Активен</Badge>
+                              ) : (
+                                <Badge variant="secondary">Неактивен</Badge>
+                              )}
                             </TableCell>
-                            <TableCell className="text-right space-x-1">
+                            <TableCell className="text-muted-foreground text-sm">{emp.assigned_by_name || "—"}</TableCell>
+                            <TableCell className="text-muted-foreground text-sm whitespace-nowrap">{fmtDate(emp.assigned_at)}</TableCell>
+                            <TableCell className="text-right space-x-1" onClick={(e) => e.stopPropagation()}>
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -636,6 +781,14 @@ const EmployeesManager = () => {
                                   <UserCheck className="h-4 w-4 text-green-600" />
                                 )}
                               </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Снять с должности"
+                                onClick={() => handleDeleteEmployee(emp)}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
                             </TableCell>
                           </TableRow>
                         );
@@ -653,6 +806,123 @@ const EmployeesManager = () => {
           <RolesPermissionsManager />
         </TabsContent>
       </Tabs>
+
+      {/* Карточка сотрудника: вся информация по выбранному сотруднику */}
+      <Dialog open={!!detailEmployee} onOpenChange={(open) => { if (!open) setDetailEmployee(null); }}>
+        <DialogContent className="max-w-lg">
+          {detailEmployee && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-lg font-bold flex items-center gap-2">
+                  <User className="h-5 w-5 text-primary" />
+                  {detailEmployee.full_name}
+                </DialogTitle>
+              </DialogHeader>
+
+              <div className="space-y-3">
+                {/* Статус и роль */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="outline" className="bg-primary/5 border-primary/20">{getRoleDisplayName(detailEmployee)}</Badge>
+                  {getEmployeeStatus(detailEmployee) === "pending" ? (
+                    <Badge variant="outline" className="border-amber-300 text-amber-700 bg-amber-50 gap-1"><Clock className="h-3 w-3" /> Ожидает анкету</Badge>
+                  ) : getEmployeeStatus(detailEmployee) === "active" ? (
+                    <Badge variant="default" className="gap-1"><UserCheck className="h-3 w-3" /> Активен</Badge>
+                  ) : (
+                    <Badge variant="secondary">Неактивен</Badge>
+                  )}
+                </div>
+
+                {!detailEmployee.profile_completed && (
+                  <div className="flex items-start gap-2 text-xs rounded-lg bg-amber-50 border border-amber-200 text-amber-800 p-2.5">
+                    <Info className="h-4 w-4 shrink-0 mt-0.5" />
+                    Сотрудник ещё не заполнил анкету о себе. Данные ниже появятся после заполнения в личном кабинете.
+                  </div>
+                )}
+
+                {/* Контакты и личные данные */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-sm">
+                  <div className="flex items-start gap-2">
+                    <Phone className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-[11px] text-muted-foreground">Телефон для связи</p>
+                      <p className="font-medium">{detailEmployee.contact_phone || detailEmployee.phone || "—"}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <Cake className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-[11px] text-muted-foreground">Дата рождения</p>
+                      <p className="font-medium">{fmtDate(detailEmployee.date_of_birth)}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2 sm:col-span-2">
+                    <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-[11px] text-muted-foreground">Адрес проживания</p>
+                      <p className="font-medium">{detailEmployee.residence_address || "—"}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t pt-3 grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-sm">
+                  <div className="flex items-start gap-2">
+                    <ClipboardCheck className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-[11px] text-muted-foreground">Кто назначил</p>
+                      <p className="font-medium">{detailEmployee.assigned_by_name || "—"}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <CalendarClock className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-[11px] text-muted-foreground">Дата назначения</p>
+                      <p className="font-medium">{fmtDate(detailEmployee.assigned_at)}</p>
+                    </div>
+                  </div>
+                  {detailEmployee.activated_at && (
+                    <div className="flex items-start gap-2">
+                      <UserCheck className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                      <div>
+                        <p className="text-[11px] text-muted-foreground">Активирован</p>
+                        <p className="font-medium">{fmtDateTime(detailEmployee.activated_at)}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1 gap-1.5"
+                    onClick={() => {
+                      const emp = detailEmployee;
+                      setDetailEmployee(null);
+                      let matchedRoleId = emp.role;
+                      if (!matchedRoleId && emp.position) {
+                        const byPos = crmRoles.find((r) => r.name.toLowerCase() === emp.position?.toLowerCase() || r.id === emp.position?.toLowerCase());
+                        matchedRoleId = byPos?.id || "master";
+                      }
+                      if (!matchedRoleId) matchedRoleId = "master";
+                      setEditingEmployee(emp);
+                      setFormData({ full_name: emp.full_name, phone: emp.phone || "", roleId: matchedRoleId });
+                      setIsDialogOpen(true);
+                    }}
+                  >
+                    <Edit className="h-4 w-4" /> Редактировать
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="flex-1 gap-1.5 text-destructive border-destructive/40 hover:bg-destructive/10"
+                    onClick={() => handleDeleteEmployee(detailEmployee)}
+                  >
+                    <Trash2 className="h-4 w-4" /> Снять с должности
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

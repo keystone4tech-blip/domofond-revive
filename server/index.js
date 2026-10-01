@@ -536,6 +536,79 @@ app.delete('/api/admin/users/:id/purge', authenticateToken, requireAdmin, async 
 });
 
 // ------------------------------------------------------------------------------
+// АНКЕТА СОТРУДНИКА: сотрудник заполняет данные о себе и этим активирует назначение.
+// Обновляем ТОЛЬКО собственную запись (по user_id из токена) — защита от подмены.
+// ------------------------------------------------------------------------------
+app.post('/api/employees/complete-profile', authenticateToken, async (req, res) => {
+  const userId = req.user?.id;
+  if (!userId) {
+    return res.status(401).json({ error: 'Требуется авторизация' });
+  }
+
+  const { full_name, contact_phone, date_of_birth, residence_address } = req.body || {};
+
+  // Валидация обязательных полей анкеты
+  if (!full_name || !String(full_name).trim()) {
+    return res.status(400).json({ error: 'Укажите полное ФИО' });
+  }
+  if (!date_of_birth) {
+    return res.status(400).json({ error: 'Укажите дату рождения' });
+  }
+  // Проверка корректности даты рождения (не в будущем, возраст 14..100 лет)
+  const dob = new Date(date_of_birth);
+  if (isNaN(dob.getTime())) {
+    return res.status(400).json({ error: 'Некорректная дата рождения' });
+  }
+  const now = new Date();
+  const age = (now - dob) / (365.25 * 24 * 3600 * 1000);
+  if (dob > now || age < 14 || age > 100) {
+    return res.status(400).json({ error: 'Проверьте дату рождения' });
+  }
+  if (!residence_address || !String(residence_address).trim()) {
+    return res.status(400).json({ error: 'Укажите адрес проживания' });
+  }
+
+  try {
+    // Сотрудник должен существовать
+    const emp = await pool.query('SELECT id FROM employees WHERE user_id = $1', [userId]);
+    if (emp.rowCount === 0) {
+      return res.status(404).json({ error: 'Вы не являетесь сотрудником' });
+    }
+
+    const result = await pool.query(
+      `UPDATE employees
+         SET full_name = $2,
+             contact_phone = $3,
+             phone = COALESCE($3, phone),
+             date_of_birth = $4,
+             residence_address = $5,
+             profile_completed = true,
+             is_active = true,
+             activated_at = CURRENT_TIMESTAMP
+       WHERE user_id = $1
+       RETURNING id, full_name, is_active, profile_completed`,
+      [userId, String(full_name).trim(), contact_phone ? String(contact_phone).trim() : null, date_of_birth, String(residence_address).trim()]
+    );
+
+    // Телефон полезно продублировать в профиль, если его там нет
+    if (contact_phone) {
+      try {
+        await pool.query(
+          `UPDATE profiles SET phone = COALESCE(NULLIF(phone, ''), $2) WHERE id = $1`,
+          [userId, String(contact_phone).trim()]
+        );
+      } catch (_) { /* профиль мог отсутствовать — не критично */ }
+    }
+
+    console.log(`[Бэкенд: Анкета] Сотрудник ${userId} заполнил анкету и активирован`);
+    res.json({ success: true, employee: result.rows[0] });
+  } catch (err) {
+    console.error('[Бэкенд: Анкета] Ошибка сохранения анкеты сотрудника:', err.message);
+    res.status(500).json({ error: 'Ошибка сохранения анкеты: ' + err.message });
+  }
+});
+
+// ------------------------------------------------------------------------------
 // МОДУЛЬ УПРАВЛЕНИЯ РЕЗЕРВНЫМИ КОПИЯМИ (БЭКАПЫ БД DOMOFONDAR)
 // ------------------------------------------------------------------------------
 

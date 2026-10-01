@@ -2,6 +2,8 @@ import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import EmployeeOnboarding from "@/components/EmployeeOnboarding";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import {
   LayoutDashboard,
@@ -57,6 +59,11 @@ const FSM = () => {
   // Открытие мобильного сайдбара
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
+  // Анкета сотрудника: показываем при входе в CRM, если данные о себе не заполнены.
+  // Новым назначенным (is_active=false) — обязательно; действующим — как напоминание.
+  const [onboarding, setOnboarding] = useState<{ show: boolean; blocking: boolean; userId: string } | null>(null);
+  const [onboardingDismissed, setOnboardingDismissed] = useState(false);
+
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, isFSMUser, isManager, isLoading, roles, permissions, hasPermission } = useUserRole();
@@ -92,6 +99,31 @@ const FSM = () => {
       }
     }
   }, [user, isFSMUser, isLoading, roles, navigate, toast]);
+
+  // Проверка анкеты сотрудника при входе в CRM
+  useEffect(() => {
+    if (isLoading || !user || !isFSMUser) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (!authUser || cancelled) return;
+        const { data: emp } = await supabase
+          .from("employees")
+          .select("id, is_active, profile_completed")
+          .eq("user_id", authUser.id)
+          .maybeSingle();
+        if (cancelled || !emp) return;
+        if (!(emp as any).profile_completed) {
+          // Новый назначенный (ещё не активирован) — обязательная анкета; действующий — напоминание
+          setOnboarding({ show: true, blocking: !(emp as any).is_active, userId: authUser.id });
+        }
+      } catch (e) {
+        console.warn("[FSM] Проверка анкеты сотрудника не удалась:", e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isLoading, user, isFSMUser]);
 
   // Автоматическая корректировка активной вкладки: если у роли нет доступа к текущей вкладке, переключаем на первую разрешенную
   useEffect(() => {
@@ -361,11 +393,22 @@ const FSM = () => {
       </div>
 
       {/* Мобильная нижняя навигация */}
-      <FSMBottomNav 
-        activeTab={activeTab} 
-        onTabChange={handleTabChange} 
-        isManager={isManager} 
+      <FSMBottomNav
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        isManager={isManager}
       />
+
+      {/* Анкета сотрудника при входе в CRM */}
+      {onboarding?.show && !onboardingDismissed && (
+        <EmployeeOnboarding
+          userId={onboarding.userId}
+          open={true}
+          blocking={onboarding.blocking}
+          onClose={() => setOnboardingDismissed(true)}
+          onCompleted={() => { setOnboarding(null); setOnboardingDismissed(true); }}
+        />
+      )}
     </div>
   );
 };
