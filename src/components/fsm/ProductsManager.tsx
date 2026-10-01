@@ -15,6 +15,7 @@
 import React, { useState, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { logDeletion } from "@/lib/audit";
 import { useToast } from "@/hooks/use-toast";
 import { useUserRole } from "@/hooks/useUserRole";
 import { Button } from "@/components/ui/button";
@@ -521,8 +522,10 @@ export const ProductsManager: React.FC = () => {
   const deleteProductMutation = useMutation({
     mutationFn: async (id: string) => {
       console.log("[ProductsManager] Удаление товара id:", id);
+      const { data: prodRow } = await supabase.from("products").select("*").eq("id", id).single();
       const { error } = await supabase.from("products").delete().eq("id", id);
       if (error) throw error;
+      await logDeletion("product", id, (prodRow as any)?.name || id, prodRow || null);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] });

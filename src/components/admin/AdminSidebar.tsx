@@ -5,7 +5,7 @@ import {
   Calculator, Sparkles, Newspaper, Vote, BarChart3, Tag, 
   FileText, Crown, MessageSquare, Hash, Grid, CreditCard, 
   Bot, History, Home, LogOut, Shield, ChevronLeft, ChevronRight, Database,
-  LayoutDashboard, User, Camera
+  LayoutDashboard, User, Camera, Trash2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +35,7 @@ const menuItems = [
   { id: "blocks", label: "Блоки", icon: Grid },
   { id: "chatwidget", label: "AI-чат", icon: Bot },
   { id: "chathistory", label: "История чатов", icon: History },
+  { id: "deleted", label: "🗑️ Удалённые", icon: Trash2 },
 ];
 
 export const AdminSidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }: AdminSidebarProps) => {

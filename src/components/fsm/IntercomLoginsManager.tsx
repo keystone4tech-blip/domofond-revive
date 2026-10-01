@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { logDeletion } from "@/lib/audit";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -536,12 +537,14 @@ export const IntercomLoginsManager: React.FC = () => {
     if (!confirm(`Вы действительно хотите удалить логопас для квартиры № ${apt}?`)) return;
 
     try {
+      const { data: credRow } = await supabase.from("intercom_credentials" as any).select("*").eq("id", id).single();
       const { error } = await supabase
         .from("intercom_credentials" as any)
         .delete()
         .eq("id", id);
 
       if (error) throw error;
+      await logDeletion("login", id, (credRow as any)?.account_number ? `Логопас ${(credRow as any).account_number} (кв. ${apt})` : `кв. ${apt}`, credRow || null);
 
       setCredentials(prev => prev.filter(c => c.id !== id));
       toast({ title: "Запись удалена", description: `Квартира ${apt} успешно удалена` });

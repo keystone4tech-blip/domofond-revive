@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { logDeletion } from "@/lib/audit";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -116,12 +117,14 @@ const ClientsManager = () => {
 
   const deleteClientMutation = useMutation({
     mutationFn: async (id: string) => {
+      const { data: row } = await supabase.from("clients").select("*").eq("id", id).single();
       const { error } = await supabase
         .from("clients")
         .delete()
         .eq("id", id);
 
       if (error) throw error;
+      await logDeletion("client", id, (row as any)?.name || (row as any)?.full_name || id, row || null);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clients"] });
@@ -308,7 +311,7 @@ const ClientsManager = () => {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => deleteClientMutation.mutate(client.id)}
+                        onClick={() => { if (window.confirm("Удалить клиента? Действие попадёт в журнал удалений (кто удалил).")) deleteClientMutation.mutate(client.id); }}
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>

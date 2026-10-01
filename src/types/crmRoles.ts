@@ -88,10 +88,16 @@ export const FSM_TABS: FSMTabDefinition[] = [
     description: "Кадровый состав, создание ролей и гибкая настройка прав доступа",
     category: "management"
   },
-  { 
-    id: "clients", 
-    label: "Клиенты / Объекты", 
+  {
+    id: "clients",
+    label: "Клиенты / Объекты",
     description: "База абонентов, жильцов и обслуживаемых объектов",
+    category: "management"
+  },
+  {
+    id: "cabinets",
+    label: "Личные кабинеты",
+    description: "Зарегистрированные пользователи: поиск, фильтры, удаление кабинетов",
     category: "management"
   },
   { 

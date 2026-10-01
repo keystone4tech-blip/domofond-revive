@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { logDeletion } from "@/lib/audit";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -252,8 +253,10 @@ export const AddressesManager: React.FC = () => {
 
     try {
       console.log("[AddressesManager] Удаление подъезда ID:", entranceId);
+      const { data: entRow } = await supabase.from("entrances" as any).select("*").eq("id", entranceId).single();
       const { error } = await supabase.from("entrances" as any).delete().eq("id", entranceId);
       if (error) throw error;
+      await logDeletion("address", entranceId, (entRow as any) ? `${(entRow as any).street||""}, д.${(entRow as any).house||""}, п.${(entRow as any).entrance||""}` : entranceId, entRow || null);
 
       toast({ title: "Удалено", description: "Подъезд успешно удален" });
       if (selectedEntrance?.id === entranceId) {

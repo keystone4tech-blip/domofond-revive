@@ -28,6 +28,7 @@ import FSMReports from "@/components/fsm/FSMReports";
 import RequestsManager from "@/components/fsm/RequestsManager";
 import ProductsManager from "@/components/fsm/ProductsManager";
 import EquipmentMatchingManager from "@/components/fsm/EquipmentMatchingManager";
+import UsersManager from "@/components/fsm/UsersManager";
 import AddressesManager from "@/components/fsm/AddressesManager";
 import { AccountsManager } from "@/components/admin/AccountsManager";
 import IntercomLoginsManager from "@/components/fsm/IntercomLoginsManager";
@@ -325,6 +326,13 @@ const FSM = () => {
             {hasPermission("clients") && (
               <TabsContent value="clients" className="mt-0 outline-none">
                 <ClientsManager />
+              </TabsContent>
+            )}
+
+            {/* 10b. Личные кабинеты (зарегистрированные пользователи) */}
+            {hasPermission("cabinets") && (
+              <TabsContent value="cabinets" className="mt-0 outline-none">
+                <UsersManager />
               </TabsContent>
             )}
 

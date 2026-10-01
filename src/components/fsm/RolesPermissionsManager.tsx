@@ -2,6 +2,11 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { logDeletion } from "@/lib/audit";
+
+// Защищена только системная роль «Директор» (id='director'). Остальные роли — даже помеченные
+// is_system — можно полностью редактировать и удалять.
+const isProtectedRole = (role: any): boolean => role?.id === "director";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -247,8 +252,10 @@ export const RolesPermissionsManager = () => {
   const deleteRoleMutation = useMutation({
     mutationFn: async (roleId: string) => {
       console.log(`[RolesPermissionsManager] Удаление роли ${roleId}...`);
+      const { data: roleRow } = await supabase.from("crm_roles").select("*").eq("id", roleId).single();
       const { error } = await supabase.from("crm_roles").delete().eq("id", roleId);
       if (error) throw error;
+      await logDeletion("role", roleId, (roleRow as any)?.name || roleId, roleRow || null);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["crm_roles"] });
@@ -323,9 +330,9 @@ export const RolesPermissionsManager = () => {
                     <div>
                       <CardTitle className="text-base font-bold flex items-center gap-2">
                         {role.name}
-                        {role.is_system ? (
+                        {isProtectedRole(role) ? (
                           <Badge variant="secondary" className="text-[10px] uppercase font-semibold">
-                            Системная
+                            Директор
                           </Badge>
                         ) : (
                           <Badge className="bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-200 text-[10px] uppercase font-semibold">
@@ -399,7 +406,7 @@ export const RolesPermissionsManager = () => {
                       Настроить права
                     </Button>
 
-                    {!role.is_system && (
+                    {!isProtectedRole(role) && (
                       <Button
                         variant="ghost"
                         size="icon"
@@ -463,14 +470,14 @@ export const RolesPermissionsManager = () => {
                   id="role_id"
                   placeholder="senior_dispatcher"
                   value={formId}
-                  disabled={!!editingRole?.is_system}
+                  disabled={isProtectedRole(editingRole)}
                   onChange={(e) => {
                     setIsIdManuallyEdited(true);
                     setFormId(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""));
                   }}
                 />
-                {editingRole?.is_system && (
-                  <p className="text-[10px] text-muted-foreground">Идентификатор системной роли изменить нельзя</p>
+                {isProtectedRole(editingRole) && (
+                  <p className="text-[10px] text-muted-foreground">Идентификатор роли «Директор» изменить нельзя</p>
                 )}
               </div>
             </div>

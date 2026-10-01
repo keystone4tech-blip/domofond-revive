@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { logDeletion } from "@/lib/audit";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -292,8 +293,10 @@ const TasksManager = ({
 
   const deleteTaskMutation = useMutation({
     mutationFn: async (id: string) => {
+      const { data: row } = await supabase.from("tasks").select("*").eq("id", id).single();
       const { error } = await supabase.from("tasks").delete().eq("id", id);
       if (error) throw error;
+      await logDeletion("task", id, (row as any)?.title || (row as any)?.name || id, row || null);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
@@ -668,7 +671,7 @@ const TasksManager = ({
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => deleteTaskMutation.mutate(task.id)}
+                          onClick={() => { if (window.confirm("Удалить задачу? Действие попадёт в журнал удалений (кто удалил).")) deleteTaskMutation.mutate(task.id); }}
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>

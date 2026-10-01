@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { logDeletion } from "@/lib/audit";
 import { useToast } from "@/hooks/use-toast";
 import { useUserRole } from "@/hooks/useUserRole";
 import { cn } from "@/lib/utils";
@@ -471,8 +472,10 @@ const RequestsManager = ({
   // Delete request mutation
   const deleteRequestMutation = useMutation({
     mutationFn: async (id: string) => {
+      const { data: row } = await supabase.from("requests").select("*").eq("id", id).single();
       const { error } = await supabase.from("requests").delete().eq("id", id);
       if (error) throw error;
+      await logDeletion("request", id, (row as any)?.name || (row as any)?.address || id, row || null);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["requests"] });
@@ -772,7 +775,7 @@ const RequestsManager = ({
                     className="text-destructive"
                     onClick={(e) => {
                       e.stopPropagation();
-                      deleteRequestMutation.mutate(request.id);
+                      if (window.confirm("Удалить заявку? Действие попадёт в журнал удалений (кто удалил).")) deleteRequestMutation.mutate(request.id);
                     }}
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
@@ -994,7 +997,7 @@ const RequestsManager = ({
                           {isManager && (
                             <DropdownMenuItem 
                               className="text-destructive"
-                              onClick={() => deleteRequestMutation.mutate(request.id)}
+                              onClick={() => { if (window.confirm("Удалить заявку? Действие попадёт в журнал удалений (кто удалил).")) deleteRequestMutation.mutate(request.id); }}
                             >
                               <Trash2 className="h-4 w-4 mr-2" />
                               Удалить

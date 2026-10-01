@@ -19,6 +19,7 @@ import { NewsAutomation } from "@/components/admin/NewsAutomation";
 import { VotingManager } from "@/components/admin/VotingManager";
 import { BackupsManager } from "@/components/admin/BackupsManager";
 import { PortfolioManager } from "@/components/admin/PortfolioManager";
+import { DeletedItemsManager } from "@/components/admin/DeletedItemsManager";
 import { Loader2, Shield, Menu, ChevronRight } from "lucide-react";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -249,6 +250,10 @@ const Admin = () => {
 
             <TabsContent value="chathistory" className="mt-0 outline-none">
               <ChatHistoryManager />
+            </TabsContent>
+
+            <TabsContent value="deleted" className="mt-0 outline-none">
+              <DeletedItemsManager />
             </TabsContent>
           </Tabs>
         </main>

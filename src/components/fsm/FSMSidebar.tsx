@@ -106,6 +106,8 @@ export const FSMSidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }: FSMSi
     // Раздел кадрового состава и прав доступа
     { id: "employees", label: "Сотрудники и роли", icon: Users },
     { id: "clients", label: "Клиенты / Объекты", icon: Building2 },
+    // Личные кабинеты зарегистрированных пользователей (поиск, фильтры, удаление)
+    { id: "cabinets", label: "Личные кабинеты", icon: User },
     { id: "map", label: "Карта мастеров", icon: MapPin },
     { id: "reports", label: "Финансовые отчеты", icon: BarChart3 },
     { 
