@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -16,9 +17,12 @@ import {
 } from "@/components/ui/select";
 import {
   Search, Filter, User, UserMinus, Loader2, RefreshCw,
-  Phone, Cake, MapPin, CalendarClock, ClipboardCheck, UserCheck, LogOut, Clock, ListChecks,
+  Phone, Cake, MapPin, CalendarClock, ClipboardCheck, UserCheck, LogOut, Clock, ListChecks, RotateCcw,
 } from "lucide-react";
 import { CRMRole } from "@/types/crmRoles";
+
+// Допустимые системные enum-роли в таблице user_roles (как в EmployeesManager)
+const VALID_SYSTEM_APP_ROLES = ["admin", "superadmin", "director", "manager", "dispatcher", "master", "engineer"];
 
 // ============================================================================
 // Вкладка «Бывшие сотрудники» — архив уволенных (снятых с должности).
@@ -58,6 +62,8 @@ const tenure = (from?: string | null, to?: string | null): string => {
 };
 
 export const FormerEmployeesManager = () => {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [detail, setDetail] = useState<FormerRow | null>(null);
@@ -86,6 +92,83 @@ export const FormerEmployeesManager = () => {
       return (data || []) as FormerRow[];
     },
   });
+
+  // Мутация: вернуть бывшего сотрудника в штат (восстановление из архива).
+  // Пересоздаём запись сотрудника из снимка и возвращаем доступ к CRM.
+  // Анкета сохраняется — повторно заполнять не нужно. Запись из архива удаляется.
+  const rehireMutation = useMutation({
+    mutationFn: async (r: FormerRow) => {
+      const s = r.snapshot || {};
+      const userId = s.user_id;
+      if (!userId) throw new Error("В снимке нет user_id — восстановить нельзя");
+
+      // Если вдруг уже есть активная запись сотрудника — не дублируем
+      const { data: exists } = await supabase.from("employees").select("id").eq("user_id", userId).maybeSingle();
+      if (exists) throw new Error("Этот пользователь уже числится сотрудником");
+
+      // Восстанавливаем запись сотрудника из снимка (по возможности с прежним id,
+      // чтобы сохранить связь со старыми задачами и статистикой)
+      const insertRow: any = {
+        user_id: userId,
+        full_name: s.full_name || r.entity_label || "",
+        phone: s.phone ?? null,
+        role: s.role ?? null,
+        position: s.position ?? null,
+        assigned_by: s.assigned_by ?? null,
+        assigned_by_name: s.assigned_by_name ?? null,
+        assigned_at: s.assigned_at ?? null,
+        date_of_birth: s.date_of_birth ?? null,
+        residence_address: s.residence_address ?? null,
+        contact_phone: s.contact_phone ?? null,
+        photo_url: s.photo_url ?? null,
+        profile_completed: !!s.profile_completed,
+        is_active: !!s.profile_completed, // если анкета была заполнена — сразу активен
+        activated_at: s.activated_at ?? null,
+      };
+      if (s.id) insertRow.id = s.id;
+      if (s.created_at) insertRow.created_at = s.created_at;
+
+      const { error: insErr } = await supabase.from("employees").insert(insertRow);
+      if (insErr) {
+        // Если не удалось вставить с прежним id — пробуем без него
+        if (s.id) {
+          delete insertRow.id;
+          const { error: insErr2 } = await supabase.from("employees").insert(insertRow);
+          if (insErr2) throw insErr2;
+        } else {
+          throw insErr;
+        }
+      }
+
+      // Возвращаем рабочую роль (доступ к CRM)
+      const sysRole = VALID_SYSTEM_APP_ROLES.includes(s.role) ? s.role : "manager";
+      await supabase.from("user_roles").delete().eq("user_id", userId);
+      await supabase.from("user_roles").insert([{ user_id: userId, role: sysRole as any }]);
+
+      // Убираем запись из архива (он снова в штате)
+      await supabase.from("deletion_log").delete().eq("id", r.id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["employees-role-counts"] });
+      queryClient.invalidateQueries({ queryKey: ["former_employees"] });
+      queryClient.invalidateQueries({ queryKey: ["former_employees_count"] });
+      setDetail(null);
+      toast({ title: "Сотрудник возвращён в штат", description: "Данные и доступ восстановлены. Анкету заполнять заново не нужно." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Не удалось вернуть в штат", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleRehire = (r: FormerRow) => {
+    if (!window.confirm(
+      `Вернуть «${r.entity_label}» в штат?\n\n` +
+      `Будет восстановлена запись сотрудника со всеми данными анкеты и доступом к CRM. ` +
+      `Запись из архива «Бывшие» будет убрана.`
+    )) return;
+    rehireMutation.mutate(r);
+  };
 
   const roleName = (snap: any): string => {
     if (!snap) return "—";
@@ -310,9 +393,19 @@ export const FormerEmployeesManager = () => {
                   </div>
                 </div>
 
-                <p className="text-[11px] text-muted-foreground border-t pt-2">
-                  Это архивная запись. Учётная запись пользователя на сайте сохранена — при необходимости сотрудника можно назначить заново во вкладке «Сотрудники».
-                </p>
+                <div className="border-t pt-3">
+                  <Button
+                    className="w-full gap-1.5"
+                    onClick={() => handleRehire(detail)}
+                    disabled={rehireMutation.isPending}
+                  >
+                    {rehireMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+                    Вернуть в штат
+                  </Button>
+                  <p className="text-[11px] text-muted-foreground mt-2 text-center">
+                    Восстановит запись сотрудника с данными анкеты и доступом к CRM. Повторная анкета не требуется.
+                  </p>
+                </div>
               </div>
             </>
           )}
