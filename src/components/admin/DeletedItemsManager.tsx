@@ -52,6 +52,8 @@ export const DeletedItemsManager: React.FC = () => {
     });
   }, [rows, search, typeFilter]);
 
+  const [purgingId, setPurgingId] = useState<string | null>(null);
+
   const restoreUser = async (r: any) => {
     try {
       const { error } = await supabase.from("profiles").update({ deleted_at: null, deleted_by: null }).eq("id", r.entity_id);
@@ -61,6 +63,39 @@ export const DeletedItemsManager: React.FC = () => {
       refetch();
     } catch (e: any) {
       toast({ title: "Ошибка восстановления", description: e.message, variant: "destructive" });
+    }
+  };
+
+  // Полное (безвозвратное) удаление пользователя через серверный эндпоинт.
+  // Двойное подтверждение: удаляются профиль, учётка, ПЛАТЕЖИ, заявки, роли —
+  // пользователь полностью исчезает из статистики.
+  const purgeUser = async (r: any) => {
+    const label = r.entity_label || r.entity_id;
+    if (!window.confirm(
+      `ПОЛНОЕ УДАЛЕНИЕ без возможности восстановления.\n\n` +
+      `Пользователь «${label}» и ВСЕ его данные (профиль, учётная запись, платежи, заявки, роли) будут удалены навсегда и исчезнут из статистики.\n\n` +
+      `Это действие необратимо. Продолжить?`
+    )) return;
+    if (!window.confirm(`Подтвердите ещё раз: удалить «${label}» НАВСЕГДА?`)) return;
+
+    setPurgingId(r.id);
+    try {
+      let token = "";
+      try { token = localStorage.getItem("auth_token") || sessionStorage.getItem("auth_token") || ""; } catch { /* ignore */ }
+      const resp = await fetch(`/backend-api/api/admin/users/${r.entity_id}/purge`, {
+        method: "DELETE",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const json = await resp.json().catch(() => ({}));
+      if (!resp.ok) throw new Error(json?.error || `Ошибка ${resp.status}`);
+      // Журнал мог ещё содержать запись (если удаляли не из журнала) — подчищаем на всякий случай
+      try { await supabase.from("deletion_log").delete().eq("id", r.id); } catch { /* ignore */ }
+      toast({ title: "Удалено полностью", description: `«${label}» и связанные данные удалены навсегда` });
+      refetch();
+    } catch (e: any) {
+      toast({ title: "Ошибка полного удаления", description: e.message, variant: "destructive" });
+    } finally {
+      setPurgingId(null);
     }
   };
 
@@ -111,9 +146,14 @@ export const DeletedItemsManager: React.FC = () => {
                     </div>
                   </div>
                   {r.entity_type === "user" && (
-                    <Button variant="outline" size="sm" onClick={() => restoreUser(r)} className="shrink-0 h-8 gap-1 text-emerald-700 border-emerald-300 hover:bg-emerald-50">
-                      <RotateCcw className="h-4 w-4" /> Восстановить
-                    </Button>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Button variant="outline" size="sm" onClick={() => restoreUser(r)} className="h-8 gap-1 text-emerald-700 border-emerald-300 hover:bg-emerald-50">
+                        <RotateCcw className="h-4 w-4" /> Восстановить
+                      </Button>
+                      <Button variant="outline" size="sm" disabled={purgingId === r.id} onClick={() => purgeUser(r)} className="h-8 gap-1 text-destructive border-destructive/40 hover:bg-destructive/10">
+                        <Trash2 className="h-4 w-4" /> {purgingId === r.id ? "Удаление…" : "Удалить полностью"}
+                      </Button>
+                    </div>
                   )}
                 </div>
               ))}

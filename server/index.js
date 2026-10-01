@@ -474,6 +474,68 @@ app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) =>
 });
 
 // ------------------------------------------------------------------------------
+// ПОЛНОЕ (БЕЗВОЗВРАТНОЕ) УДАЛЕНИЕ ПОЛЬЗОВАТЕЛЯ И ВСЕХ СВЯЗАННЫХ ДАННЫХ
+// Используется для удаления тестовых регистраций, чтобы они полностью
+// исчезли из статистики вместе со своими платежами. Операция НЕОБРАТИМА.
+// ------------------------------------------------------------------------------
+app.delete('/api/admin/users/:id/purge', authenticateToken, requireAdmin, async (req, res) => {
+  const userId = req.params.id;
+  if (!userId) {
+    return res.status(400).json({ error: 'Не указан пользователь' });
+  }
+
+  const client = await pool.connect();
+  try {
+    // Проверяем, что это не суперпользователь-разработчик — его удалять нельзя
+    const u = await client.query('SELECT email, role FROM users WHERE id = $1', [userId]);
+    if (u.rowCount === 0) {
+      client.release();
+      return res.status(404).json({ error: 'Пользователь не найден' });
+    }
+    const target = u.rows[0];
+    if (
+      (target.email && target.email.toLowerCase() === String(SUPERADMIN_EMAIL).toLowerCase()) ||
+      target.role === SUPERADMIN_ROLE
+    ) {
+      client.release();
+      return res.status(403).json({ error: 'Нельзя удалить суперпользователя' });
+    }
+
+    await client.query('BEGIN');
+    const counts = {};
+    const del = async (label, sql, params) => {
+      try {
+        const r = await client.query(sql, params);
+        counts[label] = r.rowCount;
+      } catch (e) {
+        // Таблица/колонка может отсутствовать — не прерываем всю операцию
+        counts[label] = `skip: ${e.message}`;
+      }
+    };
+
+    // Порядок важен: сначала зависимые записи, затем сам пользователь
+    await del('payments', 'DELETE FROM payments WHERE user_id = $1', [userId]);
+    await del('requests', 'DELETE FROM requests WHERE client_id = $1', [userId]);
+    await del('push_subscriptions', 'DELETE FROM push_subscriptions WHERE user_id = $1', [userId]);
+    await del('user_roles', 'DELETE FROM user_roles WHERE user_id = $1', [userId]);
+    await del('profiles', 'DELETE FROM profiles WHERE id = $1', [userId]);
+    await del('users', 'DELETE FROM users WHERE id = $1', [userId]);
+    // Чистим и журнал удалений, чтобы запись исчезла и из вкладки «Удалённые»
+    await del('deletion_log', "DELETE FROM deletion_log WHERE entity_type = 'user' AND entity_id = $1", [userId]);
+
+    await client.query('COMMIT');
+    console.log(`[Бэкенд: Админка] Полное удаление пользователя ${userId} выполнено:`, counts);
+    res.json({ success: true, counts });
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch (_) {}
+    console.error('[Бэкенд: Админка] Ошибка полного удаления пользователя:', err.message);
+    res.status(500).json({ error: 'Ошибка полного удаления: ' + err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// ------------------------------------------------------------------------------
 // МОДУЛЬ УПРАВЛЕНИЯ РЕЗЕРВНЫМИ КОПИЯМИ (БЭКАПЫ БД DOMOFONDAR)
 // ------------------------------------------------------------------------------
 
