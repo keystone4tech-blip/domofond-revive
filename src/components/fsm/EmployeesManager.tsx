@@ -35,8 +35,10 @@ import {
   Search, User, Users, Shield, ShieldCheck,
   Trash2, Filter, Phone, Cake, MapPin, CalendarClock, ClipboardCheck, Clock, Info
 } from "lucide-react";
+import { UserMinus } from "lucide-react";
 import { CRMRole } from "@/types/crmRoles";
 import { RolesPermissionsManager } from "./RolesPermissionsManager";
+import { FormerEmployeesManager } from "./FormerEmployeesManager";
 import { logDeletion, getCurrentUserIdentity } from "@/lib/audit";
 
 interface Employee {
@@ -73,8 +75,8 @@ const EmployeesManager = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Активная вкладка: 'employees' (сотрудники) или 'roles' (роли и права)
-  const [activeTab, setActiveTab] = useState<"employees" | "roles">("employees");
+  // Активная вкладка: 'employees' (сотрудники), 'former' (бывшие) или 'roles' (роли и права)
+  const [activeTab, setActiveTab] = useState<"employees" | "former" | "roles">("employees");
 
   // Состояния для диалога сотрудника
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -112,6 +114,18 @@ const EmployeesManager = () => {
         throw error;
       }
       return data as Employee[];
+    },
+  });
+
+  // Счётчик бывших сотрудников (для бейджа на вкладке «Бывшие»)
+  const { data: formerCount = 0 } = useQuery<number>({
+    queryKey: ["former_employees_count"],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("deletion_log")
+        .select("id", { count: "exact", head: true })
+        .eq("entity_type", "employee");
+      return count ?? 0;
     },
   });
 
@@ -390,8 +404,10 @@ const EmployeesManager = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       queryClient.invalidateQueries({ queryKey: ["employees-role-counts"] });
+      queryClient.invalidateQueries({ queryKey: ["former_employees"] });
+      queryClient.invalidateQueries({ queryKey: ["former_employees_count"] });
       setDetailEmployee(null);
-      toast({ title: "Сотрудник снят с должности", description: "Учётная запись пользователя сохранена." });
+      toast({ title: "Сотрудник снят с должности", description: "Данные сохранены во вкладке «Бывшие». Учётная запись пользователя сохранена." });
     },
     onError: (error: Error) => {
       toast({ title: "Ошибка удаления", description: error.message, variant: "destructive" });
@@ -451,16 +467,20 @@ const EmployeesManager = () => {
   return (
     <div className="space-y-6">
       {/* Главные вкладки раздела: Сотрудники / Роли и права */}
-      <Tabs 
-        value={activeTab} 
-        onValueChange={(v) => setActiveTab(v as "employees" | "roles")}
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => setActiveTab(v as "employees" | "former" | "roles")}
         className="w-full"
       >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-          <TabsList className="bg-muted/60 p-1 rounded-xl">
+          <TabsList className="bg-muted/60 p-1 rounded-xl flex-wrap h-auto">
             <TabsTrigger value="employees" className="rounded-lg gap-2 text-xs sm:text-sm font-semibold">
               <Users className="h-4 w-4" />
               Сотрудники ({employees?.length || 0})
+            </TabsTrigger>
+            <TabsTrigger value="former" className="rounded-lg gap-2 text-xs sm:text-sm font-semibold">
+              <UserMinus className="h-4 w-4" />
+              Бывшие{formerCount > 0 ? ` (${formerCount})` : ""}
             </TabsTrigger>
             <TabsTrigger value="roles" className="rounded-lg gap-2 text-xs sm:text-sm font-semibold">
               <ShieldCheck className="h-4 w-4" />
@@ -813,7 +833,12 @@ const EmployeesManager = () => {
           </Card>
         </TabsContent>
 
-        {/* Вкладка 2: Конструктор ролей и разграничение прав доступа */}
+        {/* Вкладка 2: Бывшие сотрудники (архив уволенных) */}
+        <TabsContent value="former" className="mt-0 outline-none">
+          <FormerEmployeesManager />
+        </TabsContent>
+
+        {/* Вкладка 3: Конструктор ролей и разграничение прав доступа */}
         <TabsContent value="roles" className="mt-0 outline-none">
           <RolesPermissionsManager />
         </TabsContent>
