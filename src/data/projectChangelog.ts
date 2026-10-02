@@ -16,17 +16,35 @@
 export const SUPERADMIN_EMAIL = "viruscorp4@gmail.com";
 export const OWNER = "Можнов Владимир Сергеевич";
 
-// Средняя ставка на рынке заказной enterprise-разработки в РФ (2025–2026 гг.)
-export const HOURLY_RATE = 2500; // ₽/час
+// ==============================================================================
+// ЭКОНОМИЧЕСКИЕ ПАРАМЕТРЫ И СТАВКИ ОЦЕНКИ
+// ==============================================================================
+
+// Минимальная ставка начинающего разработчика (Junior / стажер на фрилансе в РФ)
+export const JUNIOR_HOURLY_RATE = 750; // ₽/час (минимальная планка входа)
+
+// Среднерыночная ставка коммерческой разработки (Middle+/Senior Fullstack / Студия)
+export const MARKET_HOURLY_RATE = 2500; // ₽/час
+
+// Минимальная себестоимость разработки базового каркаса и архитектуры БД (начинающий уровень)
+export const JUNIOR_BASE_COST = 350000; // 350 000 ₽
 
 // Оценка проектирования и создания базовой программной платформы студией «с нуля»
-export const BASE_PLATFORM_COST = 2000000; // 2 000 000 ₽
-export const BASE_PLATFORM_RANGE = "1 500 000 – 2 500 000 ₽";
+export const MARKET_BASE_COST = 2000000; // 2 000 000 ₽
 
-// Хронология проекта по данным Git-репозитория
-export const PROJECT_START = "Октябрь 2025 г.";
-export const TOTAL_GIT_COMMITS = 540;
-export const TOTAL_MONTHS_DEV = 12;
+// Для обратной совместимости
+export const HOURLY_RATE = MARKET_HOURLY_RATE;
+export const BASE_PLATFORM_COST = MARKET_BASE_COST;
+
+// Хронология проекта: полный цикл разработки
+export const PROJECT_START_PRE_GIT = "Осень 2024 г."; // Начало проектирования (закрытый этап)
+export const GITHUB_FIRST_COMMIT_DATE = "13 октября 2025 г. 23:26"; // Дата заливки на GitHub
+export const GITHUB_FIRST_COMMIT_HASH = "c2cfbfc"; // Первый коммит в репозитории
+export const TOTAL_GIT_COMMITS = 541; // Всего коммитов в Git
+export const GIT_MONTHS_DEV = 12; // Месяцев фиксации в Git (октябрь 2025 – октябрь 2026)
+export const PRE_GIT_MONTHS_DEV = 12; // Месяцев разработки до выгрузки в Git (октябрь 2024 – октябрь 2025)
+export const TOTAL_MONTHS_DEV = 24; // Общий жизненный цикл платформы (~2 года)
+export const PROJECT_START = GITHUB_FIRST_COMMIT_DATE;
 
 export type Kind = "feature" | "fix" | "improvement" | "infra";
 export type ProjectModule = 
@@ -73,6 +91,16 @@ export const KIND_META: Record<Kind, { label: string; badgeCls: string }> = {
  * Записи добавляются сверху вниз (самые свежие первыми).
  */
 export const PROJECT_CHANGELOG: ProjectEntry[] = [
+  {
+    id: "stage-2026-10-02-2135",
+    datetime: "2026-10-02 21:35",
+    title: "Аналитический дашборд инженера, сравнение Junior vs Рынок и фиксация первого коммита GitHub",
+    description: "Персонализация дашборда для автора: устранение корпоративного контекста, внедрение расчета себестоимости по минимальной ставке Junior (750 ₽/ч) против рынка (2 500 ₽/ч) с расчетом экономии, фиксация года предварительной разработки до Git и первой точки на GitHub (коммит c2cfbfc от 13.10.2025), интерактивный калькулятор ставки.",
+    module: "security_audit",
+    kind: "improvement",
+    hours: 8,
+    difficulty: "Средняя",
+  },
   {
     id: "stage-2026-10-02-2115",
     datetime: "2026-10-02 21:15",
@@ -264,13 +292,23 @@ export const PROJECT_CHANGELOG: ProjectEntry[] = [
     difficulty: "Высокая",
   },
   {
-    id: "stage-2025-10-13-1800",
-    datetime: "2025-10-13 18:00",
-    title: "Проектирование и создание фундаментальной архитектуры платформы",
-    description: "Старт разработки (первый коммит c2cfbfc от 13.10.2025). Проектирование схемы БД PostgreSQL на 50+ таблиц, RLS-политики безопасности, Docker-контейнеризация, сборка Vite+React+TypeScript.",
-    module: "security_audit",
+    id: "stage-2025-10-13-2326",
+    datetime: "2025-10-13 23:26",
+    title: "Публикация на GitHub (коммит c2cfbfc): переход на непрерывный контроль версий",
+    description: "Первая точка фиксации в Git-репозитории. Проект к этому моменту уже разрабатывался около 1 года в закрытом режиме. На GitHub залита базовая кодовая база современного стека (Vite + React + TypeScript + Tailwind CSS + Supabase/PostgreSQL). Начат детальный учёт всех доработок и коммитов.",
+    module: "infra_mobile",
     kind: "infra",
-    hours: 320,
+    hours: 80,
+    difficulty: "Комплексная",
+  },
+  {
+    id: "stage-2024-10-01-0000",
+    datetime: "2024-10-01 10:00",
+    title: "Проектирование и предварительная разработка платформы (до выгрузки в Git)",
+    description: "Начальный закрытый этап разработки (осень 2024 — октябрь 2025 г., около года работы). Исследование бизнес-процессов домофонной компании, составление структуры данных на 50+ таблиц, проектирование логики распределения нарядов FSM, безопасности ПДн и архитектурного каркаса.",
+    module: "security_audit",
+    kind: "feature",
+    hours: 380,
     difficulty: "Комплексная",
   },
 ];

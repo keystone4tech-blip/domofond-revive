@@ -4852,14 +4852,14 @@ const Cabinet = () => {
                   Админ панель
                 </ShinyButton>
               )}
-              {/* Кнопка паспорта и коммерческой оценки проекта — СТРОГО для суперадмина viruscorp4@gmail.com */}
+              {/* Кнопка дневника и технического паспорта разработки — СТРОГО для суперадмина viruscorp4@gmail.com */}
               {isSuperadminUser && (
                 <ShinyButton 
                   onClick={() => navigate("/project")} 
                   className="py-1 px-3 text-xs rounded-xl h-9 bg-gradient-to-r from-amber-500/15 via-primary/20 to-amber-500/15 text-amber-700 dark:text-amber-300 hover:bg-amber-500/25 border border-amber-500/35 font-bold shadow-xs transition-all"
                 >
                   <ShieldCheck className="h-3.5 w-3.5 mr-1 text-amber-600 dark:text-amber-400" />
-                  Паспорт проекта
+                  Дневник разработки
                 </ShinyButton>
               )}
               {/* Кнопка выхода из системы */}
