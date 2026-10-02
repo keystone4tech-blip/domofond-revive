@@ -846,192 +846,133 @@ const RequestsManager = ({
     }
 
     return (
-      <div className="w-full overflow-x-auto rounded-xl border border-slate-200/60 dark:border-slate-800/60 bg-white/50 dark:bg-slate-900/40 backdrop-blur-md">
-        <table className="w-full text-sm text-left border-collapse">
-          <thead className="text-xs font-bold uppercase bg-slate-50/80 dark:bg-slate-800/60 text-muted-foreground border-b border-slate-200 dark:border-slate-800">
-            <tr>
-              <th className="px-4 py-3">Дата</th>
-              <th className="px-4 py-3">Клиент</th>
-              <th className="px-4 py-3">Адрес</th>
-              <th className="px-4 py-3">Описание</th>
-              <th className="px-4 py-3 text-center">Состояние</th>
-              <th className="px-4 py-3">Мастер / Исполнитель</th>
-              <th className="px-4 py-3 text-right">Сумма</th>
-              <th className="px-4 py-3 text-center">Действия</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-            {requestsList.map((request) => {
-              const { total } = getRequestSum(request.id);
-              return (
-                <tr 
-                  key={request.id} 
-                  className={cn(
-                    "hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-all cursor-pointer",
-                    request.priority === 'urgent' && "bg-red-500/[0.02] dark:bg-red-500/[0.01]"
-                  )}
-                  onClick={() => setSelectedRequest(request)}
-                >
-                  {/* Дата создания заявки */}
-                  <td className="px-4 py-3 whitespace-nowrap text-xs text-muted-foreground">
-                    <div className="flex items-center gap-1.5">
-                      <Calendar className="h-3.5 w-3.5 text-muted-foreground/70 shrink-0" />
-                      <span>{format(new Date(request.created_at), "dd.MM.yy HH:mm")}</span>
-                    </div>
-                  </td>
-                  
-                  {/* Информация о клиенте (Имя, Телефон) */}
-                  <td className="px-4 py-3">
-                    <div className="space-y-0.5">
-                      <div className="font-bold text-foreground flex items-center gap-1.5">
-                        <User className="h-3.5 w-3.5 text-primary shrink-0" />
-                        <span>{request.name}</span>
-                      </div>
-                      <div className="flex items-center gap-1 text-xs">
-                        <Phone className="h-3 w-3 text-muted-foreground shrink-0" />
-                        <a
-                          href={`tel:${request.phone}`}
-                          className="text-primary hover:underline font-medium"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {request.phone}
-                        </a>
-                      </div>
-                    </div>
-                  </td>
-                  
-                  {/* Адрес объекта */}
-                  <td className="px-4 py-3 max-w-[180px]">
-                    <div className="flex items-start gap-1.5">
-                      <MapPin className="h-3.5 w-3.5 text-primary/70 shrink-0 mt-0.5" />
-                      <span className="truncate block font-medium" title={request.address}>{request.address}</span>
-                    </div>
-                  </td>
-                  
-                  {/* Краткое описание неисправности/проблемы */}
-                  <td className="px-4 py-3 max-w-[220px]">
-                    <p className="text-xs text-muted-foreground truncate" title={request.message}>
+      <div className="space-y-2">
+        {requestsList.map((request) => {
+          const { total } = getRequestSum(request.id);
+          return (
+            <div
+              key={request.id}
+              onClick={() => setSelectedRequest(request)}
+              className={cn(
+                "rounded-xl border border-slate-200/60 dark:border-slate-800/60 bg-white/60 dark:bg-slate-900/40 px-3 py-2.5 cursor-pointer hover:border-primary/40 hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors",
+                request.priority === 'urgent' && "border-l-2 border-l-red-500"
+              )}
+            >
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 sm:gap-3">
+                {/* Левая часть: клиент, телефон, адрес, описание, мастер */}
+                <div className="min-w-0 flex-1 space-y-1">
+                  <div className="flex items-center gap-x-2 gap-y-0.5 flex-wrap">
+                    <span className="font-bold text-sm text-foreground flex items-center gap-1 min-w-0">
+                      <User className="h-3.5 w-3.5 text-primary shrink-0" />
+                      <span className="truncate">{request.name}</span>
+                    </span>
+                    {request.phone && (
+                      <a
+                        href={`tel:${request.phone}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-xs text-primary hover:underline flex items-center gap-0.5 shrink-0"
+                      >
+                        <Phone className="h-3 w-3" />{request.phone}
+                      </a>
+                    )}
+                  </div>
+                  <div className="flex items-start gap-1 text-xs text-foreground/80">
+                    <MapPin className="h-3.5 w-3.5 text-primary/70 shrink-0 mt-0.5" />
+                    <span className="truncate" title={request.address}>{request.address}</span>
+                  </div>
+                  {request.message && (
+                    <p className="text-[11px] text-muted-foreground truncate" title={request.message}>
                       {request.message}
                     </p>
-                  </td>
-                  
-                  {/* Состояние (приоритет + тип заявки + статус выполнения + статус оплаты) */}
-                  <td className="px-4 py-3">
-                    <div className="flex flex-col items-center gap-1">
-                      <div className="flex gap-1 flex-wrap justify-center">
-                        {isEquipmentOrder(request) ? (
-                          <Badge variant="outline" className="bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-200 text-[10px] h-4 py-0 px-1.5 font-bold flex items-center gap-1">
-                            <Package className="h-2.5 w-2.5" />
-                            <span>Заказ оборудования</span>
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-200 text-[10px] h-4 py-0 px-1.5 font-semibold flex items-center gap-1">
-                            <Wrench className="h-2.5 w-2.5" />
-                            <span>Ремонт</span>
-                          </Badge>
-                        )}
-                        {getPriorityBadge(request.priority)}
-                        {getStatusBadge(request.status)}
-                      </div>
-                      {request.payment_amount && Number(request.payment_amount) > 0 && (
-                        <div className="mt-0.5">
-                          {request.payment_status === "paid" ? (
-                            <Badge className="bg-emerald-600 hover:bg-emerald-600 dark:bg-emerald-700 text-white border-none text-[9px] h-4 py-0 px-1.5 font-bold">✓ Оплачено</Badge>
-                          ) : request.payment_status === "on_site" ? (
-                            <Badge className="bg-blue-600 hover:bg-blue-600 dark:bg-blue-700 text-white border-none text-[9px] h-4 py-0 px-1.5 font-bold">💵 На месте</Badge>
-                          ) : (
-                            <Badge className="bg-orange-500 hover:bg-orange-500 dark:bg-orange-600 text-white border-none text-[9px] h-4 py-0 px-1.5 font-bold animate-pulse">⏳ Ожидает</Badge>
-                          )}
-                        </div>
+                  )}
+                  {(request.accepted_employee || request.assigned_employee) && (
+                    <div className="text-[11px]">
+                      {request.accepted_employee ? (
+                        <span className="text-green-700 dark:text-green-400 inline-flex items-center gap-1">
+                          <HandMetal className="h-3 w-3" />{request.accepted_employee.full_name}
+                          {request.accepted_at && <span className="text-muted-foreground">· {format(new Date(request.accepted_at), "dd.MM HH:mm")}</span>}
+                        </span>
+                      ) : (
+                        <span className="text-blue-600 dark:text-blue-400 inline-flex items-center gap-1">
+                          <User className="h-3 w-3" />Назначен: {request.assigned_employee?.full_name}
+                        </span>
                       )}
                     </div>
-                  </td>
-                  
-                  {/* Исполнитель (Мастер) */}
-                  <td className="px-4 py-3">
-                    {request.accepted_employee ? (
-                      <div className="space-y-0.5">
-                        <div className="font-semibold text-xs text-green-700 dark:text-green-400 flex items-center gap-1">
-                          <HandMetal className="h-3 w-3 shrink-0" />
-                          <span>{request.accepted_employee.full_name}</span>
-                        </div>
-                        {request.accepted_at && (
-                          <div className="text-[10px] text-muted-foreground">
-                            Принял: {format(new Date(request.accepted_at), "dd.MM HH:mm")}
-                          </div>
-                        )}
-                      </div>
-                    ) : request.assigned_employee ? (
-                      <div className="space-y-0.5">
-                        <div className="font-semibold text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1">
-                          <User className="h-3 w-3 shrink-0" />
-                          <span>Назначен: {request.assigned_employee.full_name}</span>
-                        </div>
-                      </div>
+                  )}
+                </div>
+
+                {/* Правая часть: бейджи, сумма, дата, действия */}
+                <div className="flex flex-row sm:flex-col sm:items-end items-center gap-x-3 gap-y-1.5 shrink-0 flex-wrap">
+                  <div className="flex gap-1 flex-wrap sm:justify-end">
+                    {isEquipmentOrder(request) ? (
+                      <Badge variant="outline" className="bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-200 text-[10px] h-4 py-0 px-1.5 font-bold flex items-center gap-1">
+                        <Package className="h-2.5 w-2.5" /> Заказ
+                      </Badge>
                     ) : (
-                      <span className="text-xs text-muted-foreground italic">Не назначен</span>
+                      <Badge variant="outline" className="bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-200 text-[10px] h-4 py-0 px-1.5 font-semibold flex items-center gap-1">
+                        <Wrench className="h-2.5 w-2.5" /> Ремонт
+                      </Badge>
                     )}
-                  </td>
-                  
-                  {/* Финансовая сумма товаров/услуг */}
-                  <td className="px-4 py-3 text-right font-bold text-foreground whitespace-nowrap">
-                    {total > 0 ? (
-                      <div className="flex items-center justify-end gap-0.5 text-xs text-blue-700 dark:text-blue-400 font-bold">
-                        <Banknote className="h-3 w-3 shrink-0" />
-                        <span>{total.toFixed(0)} ₽</span>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
+                    {getPriorityBadge(request.priority)}
+                    {getStatusBadge(request.status)}
+                    {request.payment_amount && Number(request.payment_amount) > 0 && (
+                      request.payment_status === "paid" ? (
+                        <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white border-none text-[9px] h-4 py-0 px-1.5 font-bold">✓ Оплачено</Badge>
+                      ) : request.payment_status === "on_site" ? (
+                        <Badge className="bg-blue-600 hover:bg-blue-600 text-white border-none text-[9px] h-4 py-0 px-1.5 font-bold">💵 На месте</Badge>
+                      ) : (
+                        <Badge className="bg-orange-500 hover:bg-orange-500 text-white border-none text-[9px] h-4 py-0 px-1.5 font-bold">⏳ Ожидает</Badge>
+                      )
                     )}
-                  </td>
-                  
-                  {/* Кнопка "Подробнее" и Dropdown действий */}
-                  <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex items-center justify-center gap-1">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 px-2 text-xs font-semibold"
-                        onClick={() => setSelectedRequest(request)}
-                      >
-                        <Eye className="h-3.5 w-3.5 mr-1" />
-                        Подробнее
-                      </Button>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-7 w-7">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {request.status === "pending" && (
-                            <DropdownMenuItem onClick={() => acceptRequestMutation.mutate(request.id)}>
-                              <HandMetal className="h-4 w-4 mr-2 text-green-600" />
-                              Принять в работу
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem onClick={() => startEdit(request)}>
-                            <Edit className="h-4 w-4 mr-2" />
-                            Редактировать
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {total > 0 && (
+                      <span className="text-xs font-bold text-blue-700 dark:text-blue-400 inline-flex items-center gap-0.5">
+                        <Banknote className="h-3 w-3" />{total.toFixed(0)} ₽
+                      </span>
+                    )}
+                    <span className="text-[10px] text-muted-foreground inline-flex items-center gap-1 whitespace-nowrap">
+                      <Calendar className="h-3 w-3" />{format(new Date(request.created_at), "dd.MM.yy HH:mm")}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                    <Button size="sm" variant="outline" className="h-7 px-2 text-xs font-semibold" onClick={() => setSelectedRequest(request)}>
+                      <Eye className="h-3.5 w-3.5 mr-1" /> Подробнее
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-7 w-7">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {request.status === "pending" && (
+                          <DropdownMenuItem onClick={() => acceptRequestMutation.mutate(request.id)}>
+                            <HandMetal className="h-4 w-4 mr-2 text-green-600" />
+                            Принять в работу
                           </DropdownMenuItem>
-                          {isManager && (
-                            <DropdownMenuItem 
-                              className="text-destructive"
-                              onClick={() => { if (window.confirm("Удалить заявку? Действие попадёт в журнал удалений (кто удалил).")) deleteRequestMutation.mutate(request.id); }}
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Удалить
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                        )}
+                        <DropdownMenuItem onClick={() => startEdit(request)}>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Редактировать
+                        </DropdownMenuItem>
+                        {isManager && (
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={() => { if (window.confirm("Удалить заявку? Действие попадёт в журнал удалений (кто удалил).")) deleteRequestMutation.mutate(request.id); }}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Удалить
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
     );
   };

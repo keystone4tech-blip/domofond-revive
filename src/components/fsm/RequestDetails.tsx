@@ -627,7 +627,7 @@ const RequestDetails = ({ request: initialRequest, onBack, isManager }: RequestD
   if (!request) return null;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Header with back button */}
       <div className="flex items-center justify-between">
         <Button variant="ghost" onClick={onBack} className="p-2">
@@ -638,51 +638,51 @@ const RequestDetails = ({ request: initialRequest, onBack, isManager }: RequestD
 
       {/* Main Info Card */}
       <Card className="border-border/50">
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-2">
           <div className="flex flex-wrap items-center gap-2">
             {getStatusBadge(request.status)}
             {getPriorityBadge(request.priority)}
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Client Info */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1">
+        <CardContent className="space-y-3">
+          {/* Client Info + Address в одной плотной сетке */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2.5">
+            <div className="space-y-0.5">
               <Label className="text-xs text-muted-foreground">Клиент</Label>
-              <p className="font-semibold text-lg flex items-center gap-2">
-                <User className="h-4 w-4 text-primary" />
+              <p className="font-semibold text-base flex items-center gap-1.5">
+                <User className="h-4 w-4 text-primary shrink-0" />
                 {request.name}
               </p>
             </div>
-            <div className="space-y-1">
+            <div className="space-y-0.5">
               <Label className="text-xs text-muted-foreground">Телефон</Label>
               <a
                 href={`tel:${request.phone}`}
-                className="font-semibold text-lg text-primary flex items-center gap-2 hover:underline"
+                className="font-semibold text-base text-primary flex items-center gap-1.5 hover:underline"
               >
-                <Phone className="h-4 w-4" />
+                <Phone className="h-4 w-4 shrink-0" />
                 {request.phone}
               </a>
             </div>
+            <div className="space-y-0.5 sm:col-span-2">
+              <Label className="text-xs text-muted-foreground">Адрес</Label>
+              <p className="flex items-start gap-1.5 text-sm">
+                <MapPin className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                {request.address}
+              </p>
+            </div>
           </div>
 
-          {/* Address */}
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Адрес</Label>
-            <p className="flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-primary" />
-              {request.address}
-            </p>
-          </div>
-
-          {/* Description */}
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Описание проблемы</Label>
-            <p className="bg-muted/50 p-3 rounded-lg whitespace-pre-wrap">{request.message}</p>
-          </div>
+          {/* Description — только если есть */}
+          {request.message && (
+            <div className="space-y-0.5">
+              <Label className="text-xs text-muted-foreground">Описание проблемы</Label>
+              <p className="bg-muted/50 p-2.5 rounded-lg whitespace-pre-wrap text-sm">{request.message}</p>
+            </div>
+          )}
 
           {/* Timestamps */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
             <div className="flex items-center gap-2 text-sm">
               <Calendar className="h-4 w-4 text-muted-foreground" />
               <div>
@@ -779,8 +779,8 @@ const RequestDetails = ({ request: initialRequest, onBack, isManager }: RequestD
       {(request.status === "in_progress" || request.status === "completed") && (
         <Card className="border-border/50">
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <ClipboardList className="h-5 w-5" />
+            <CardTitle className="text-base flex items-center gap-2">
+              <ClipboardList className="h-4 w-4" />
               Чек-лист работ
             </CardTitle>
           </CardHeader>
@@ -862,8 +862,8 @@ const RequestDetails = ({ request: initialRequest, onBack, isManager }: RequestD
       <Card className="border-border/50">
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Package className="h-5 w-5" />
+            <CardTitle className="text-base flex items-center gap-2">
+              <Package className="h-4 w-4" />
               Товары и услуги
             </CardTitle>
             {canEdit && (
@@ -947,9 +947,7 @@ const RequestDetails = ({ request: initialRequest, onBack, isManager }: RequestD
               )}
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              Нет добавленных товаров или услуг
-            </p>
+            <p className="text-xs text-muted-foreground py-1">Нет добавленных товаров или услуг</p>
           )}
         </CardContent>
       </Card>
