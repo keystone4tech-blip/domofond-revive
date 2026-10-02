@@ -10,22 +10,30 @@ import {
   Loader2, ShieldCheck, Home, Rocket, Wrench, Sparkles, Database, Code2,
   TrendingUp, Calendar, Lock, FileText, Building2, Scale, Printer, Search,
   Filter, Layers, CheckCircle2, DollarSign, Award, Clock, ArrowRight, GitCommit,
-  GitBranch, Laptop, Cpu, Check, SlidersHorizontal
+  GitBranch, Laptop, Cpu, Check, SlidersHorizontal, Moon, Sun, Sunrise, Sunset,
+  AlertTriangle, ChevronLeft, ChevronRight, X
 } from "lucide-react";
 import {
   SUPERADMIN_EMAIL, OWNER,
   JUNIOR_HOURLY_RATE, MARKET_HOURLY_RATE,
   JUNIOR_BASE_COST, MARKET_BASE_COST,
-  PROJECT_START_PRE_GIT, GITHUB_FIRST_COMMIT_DATE, GITHUB_FIRST_COMMIT_HASH,
-  TOTAL_GIT_COMMITS, GIT_MONTHS_DEV, PRE_GIT_MONTHS_DEV, TOTAL_MONTHS_DEV,
+  PROJECT_START, GITHUB_FIRST_COMMIT_DATE, GITHUB_FIRST_COMMIT_HASH,
+  TOTAL_GIT_COMMITS, TOTAL_MONTHS_DEV,
   PROJECT_CHANGELOG, MODULE_META, KIND_META, Kind, ProjectModule, ProjectEntry
 } from "@/data/projectChangelog";
+import {
+  GIT_AUDIT_SUMMARY, CALENDAR_DAYS, ALL_AUDIT_COMMITS,
+  CommitAuditItem, DayAudit, TimeCategory
+} from "@/data/gitCommitAudit";
 
-// Вспомогательная функция красивого форматирования рублей
+// Вспомогательная функция форматирования рублей
 const rub = (n: number) => Math.round(n).toLocaleString("ru-RU") + " ₽";
 
 // Режим отображения стоимости
 type PricingMode = "junior" | "market" | "compare";
+
+// Фильтр списка коммитов аудита
+type AuditCommitFilter = "all" | "off_hours" | "work_hours";
 
 const Project: React.FC = () => {
   const navigate = useNavigate();
@@ -38,10 +46,38 @@ const Project: React.FC = () => {
   // Интерактивная пользовательская ставка для калькулятора (по умолчанию 750 ₽/ч)
   const [customRate, setCustomRate] = useState<number>(JUNIOR_HOURLY_RATE);
 
-  // Фильтры и поиск по журналу
+  // Фильтры и поиск по общему реестру этапов changelog
   const [search, setSearch] = useState("");
   const [selectedKind, setSelectedKind] = useState<string>("all");
   const [selectedModule, setSelectedModule] = useState<string>("all");
+
+  // --------------------------------------------------------------------------
+  // Стейты для юридического календаря и аудита времени
+  // --------------------------------------------------------------------------
+  // Выбранный месяц для календаря в формате "YYYY-MM" (по умолчанию октябрь 2026 или октябрь 2025)
+  const [selectedMonth, setSelectedMonth] = useState<string>("2026-10");
+  // Выбранный день в календаре (при клике показываем поминутный список коммитов)
+  const [selectedDayDate, setSelectedDayDate] = useState<string | null>(null);
+  // Фильтр коммитов в таблице аудита
+  const [auditFilter, setAuditFilter] = useState<AuditCommitFilter>("all");
+  const [auditSearch, setAuditSearch] = useState<string>("");
+
+  // Список всех месяцев разработки платформы (с октября 2025 по октябрь 2026)
+  const availableMonths = useMemo(() => [
+    { key: "2025-10", label: "Октябрь 2025 (Старт проекта 14.10)" },
+    { key: "2025-11", label: "Ноябрь 2025" },
+    { key: "2025-12", label: "Декабрь 2025" },
+    { key: "2026-01", label: "Январь 2026 (FSM-каркас)" },
+    { key: "2026-02", label: "Февраль 2026" },
+    { key: "2026-03", label: "Март 2026 (Биллинг)" },
+    { key: "2026-04", label: "Апрель 2026 (Пик разработки)" },
+    { key: "2026-05", label: "Май 2026" },
+    { key: "2026-06", label: "Июнь 2026 (Полевая служба FSM)" },
+    { key: "2026-07", label: "Июль 2026" },
+    { key: "2026-08", label: "Август 2026" },
+    { key: "2026-09", label: "Сентябрь 2026 (Монтаж, ЮKassa)" },
+    { key: "2026-10", label: "Октябрь 2026 (Аналитика, 1 год)" },
+  ], []);
 
   // СТРОГАЯ ЗАЩИТА ДОСТУПА: доступ открыт ТОЛЬКО суперадмину viruscorp4@gmail.com
   useEffect(() => {
@@ -89,7 +125,6 @@ const Project: React.FC = () => {
 
   // Расчет суммарной аналитики и двух моделей оценки (Junior vs Рынок)
   const stats = useMemo(() => {
-    // Обогащаем каждую запись changelog расчетом по обеим ставкам
     const items = PROJECT_CHANGELOG.map(e => ({
       ...e,
       juniorCost: e.hours * JUNIOR_HOURLY_RATE,
@@ -98,11 +133,6 @@ const Project: React.FC = () => {
     }));
 
     const totalHours = items.reduce((sum, e) => sum + e.hours, 0);
-
-    // Часы по коммитам в Git (все записи кроме начального года до Git)
-    const gitItems = items.filter(e => e.id !== "stage-2024-10-01-0000");
-    const gitHours = gitItems.reduce((sum, e) => sum + e.hours, 0);
-    const preGitHours = totalHours - gitHours;
 
     // Стоимости по минимальной ставке (Junior)
     const juniorDevCost = items.reduce((sum, e) => sum + e.juniorCost, 0);
@@ -152,8 +182,6 @@ const Project: React.FC = () => {
     return {
       items,
       totalHours,
-      gitHours,
-      preGitHours,
       juniorTotal,
       juniorDevCost,
       juniorBaseCost,
@@ -168,7 +196,7 @@ const Project: React.FC = () => {
     };
   }, [customRate]);
 
-  // Фильтрованный список задач в журнале
+  // Фильтрованный список задач в общем changelog
   const filteredItems = useMemo(() => {
     return stats.items.filter(item => {
       const matchSearch = !search.trim() || 
@@ -182,6 +210,83 @@ const Project: React.FC = () => {
       return matchSearch && matchKind && matchModule;
     });
   }, [stats.items, search, selectedKind, selectedModule]);
+
+  // --------------------------------------------------------------------------
+  // Логика календаря: генерация сетки выбранного месяца
+  // --------------------------------------------------------------------------
+  const calendarGrid = useMemo(() => {
+    const [yearStr, monthStr] = selectedMonth.split("-");
+    const year = parseInt(yearStr, 10);
+    const month = parseInt(monthStr, 10); // 1-12
+
+    // Количество дней в месяце
+    const daysInMonth = new Date(year, month, 0).getDate();
+    // День недели первого дня месяца (0=Вс, 1=Пн, ... 6=Сб) -> переводим в 0=Пн, 6=Вс
+    const firstDayWeekdayRaw = new Date(year, month - 1, 1).getDay();
+    const firstDayOffset = (firstDayWeekdayRaw + 6) % 7; // Сдвиг для Пн=0
+
+    // Карта данных по датам из CALENDAR_DAYS
+    const daysDataMap = new Map<string, DayAudit>();
+    CALENDAR_DAYS.forEach(d => daysDataMap.set(d.date, d));
+
+    const cells: Array<{
+      dayNum: number | null;
+      dateStr: string | null;
+      data: DayAudit | null;
+      isWeekend: boolean;
+    }> = [];
+
+    // Пустые ячейки до 1-го числа
+    for (let i = 0; i < firstDayOffset; i++) {
+      cells.push({ dayNum: null, dateStr: null, data: null, isWeekend: false });
+    }
+
+    // Дни месяца
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dayStr = String(day).padStart(2, "0");
+      const dateStr = `${yearStr}-${monthStr}-${dayStr}`;
+      const dayOfWeekRaw = new Date(year, month - 1, day).getDay();
+      const isWeekend = dayOfWeekRaw === 0 || dayOfWeekRaw === 6; // Вс или Сб
+
+      const data = daysDataMap.get(dateStr) || null;
+      cells.push({
+        dayNum: day,
+        dateStr,
+        data,
+        isWeekend,
+      });
+    }
+
+    return cells;
+  }, [selectedMonth]);
+
+  // Данные выбранного в календаре дня
+  const activeDayData = useMemo(() => {
+    if (!selectedDayDate) return null;
+    return CALENDAR_DAYS.find(d => d.date === selectedDayDate) || null;
+  }, [selectedDayDate]);
+
+  // Фильтрованный список коммитов для таблицы аудита
+  const filteredAuditCommits = useMemo(() => {
+    return ALL_AUDIT_COMMITS.filter(item => {
+      // Фильтр по типу времени
+      if (auditFilter === "off_hours" && item.isWorkTime) return false;
+      if (auditFilter === "work_hours" && !item.isWorkTime) return false;
+
+      // Поиск
+      if (auditSearch.trim()) {
+        const q = auditSearch.toLowerCase();
+        const match = item.hash.toLowerCase().includes(q) ||
+          item.datetime.includes(q) ||
+          item.subject.toLowerCase().includes(q) ||
+          item.catLabel.toLowerCase().includes(q) ||
+          item.dayOfWeek.toLowerCase().includes(q);
+        if (!match) return false;
+      }
+
+      return true;
+    });
+  }, [auditFilter, auditSearch]);
 
   if (checking) {
     return (
@@ -199,7 +304,7 @@ const Project: React.FC = () => {
       <style>{`
         @media print {
           .no-print { display: none !important; }
-          body { background: white !important; color: black !important; font-size: 11pt; }
+          body { background: white !important; color: black !important; font-size: 10pt; }
           .print-break { page-break-after: always; }
           .card-print { border: 1px solid #ddd !important; box-shadow: none !important; }
         }
@@ -221,7 +326,7 @@ const Project: React.FC = () => {
               Дневник разработки и аналитический паспорт «Домофондар»
             </h1>
             <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-              Персональный учет эволюции кодовой базы с осени 2024 года, 541 коммит в GitHub и расчет себестоимости разработки.
+              Персональный учет времени: точный старт <b>14 октября 2025 г. в 02:26</b> (ночь), 542 коммита и юридический аудит внерабочих часов.
             </p>
           </div>
 
@@ -244,12 +349,459 @@ const Project: React.FC = () => {
           </div>
         </div>
 
+        {/* ================================================================== */}
+        {/* ГЛАВНЫЙ БЛОК: ЮРИДИЧЕСКИЙ АУДИТ ВНЕРАБОЧЕГО ВРЕМЕНИ И КАЛЕНДАРЬ     */}
+        {/* ================================================================== */}
+        <Card className="rounded-2xl border-2 border-primary/40 bg-gradient-to-b from-primary/5 via-background to-background shadow-md card-print text-left overflow-hidden">
+          <CardHeader className="pb-4 border-b border-border/40 bg-muted/20">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="space-y-1">
+                <CardTitle className="text-lg sm:text-xl font-black flex items-center gap-2">
+                  <ShieldCheck className="h-6 w-6 text-emerald-600 shrink-0" />
+                  Юридический аудит времени: Разработка во внерабочие часы
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Поминутный анализ всех <b>542 коммитов</b> Git. Доказательство того, что разработка велась в личное время (ночи, вечера, выходные).
+                </CardDescription>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-400/30 text-xs px-2.5 py-1 font-bold">
+                  🟢 {GIT_AUDIT_SUMMARY.offHours} ч ({GIT_AUDIT_SUMMARY.offPct}%) вне работы
+                </Badge>
+              </div>
+            </div>
+          </CardHeader>
+
+          <CardContent className="pt-5 space-y-6">
+            
+            {/* Ключевые метрики распределения часов */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+              {/* Внерабочее время (Личное) */}
+              <div className="p-4 rounded-xl border-2 border-emerald-500/40 bg-emerald-500/5 space-y-1.5">
+                <div className="flex items-center justify-between text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                  <span className="flex items-center gap-1.5">
+                    <Moon className="h-4 w-4" />
+                    Внерабочее (Личное) время
+                  </span>
+                  <span className="font-mono text-sm">{GIT_AUDIT_SUMMARY.offPct}%</span>
+                </div>
+                <p className="text-2xl sm:text-3xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                  {GIT_AUDIT_SUMMARY.offHours} <span className="text-sm font-semibold">часов</span>
+                </p>
+                <p className="text-[11px] text-muted-foreground leading-snug">
+                  <b>{GIT_AUDIT_SUMMARY.offCommits} из 542 коммитов</b> сделаны глубокой ночью (с 00:00), ранним утром, поздним вечером или в выходные дни (Сб/Вс).
+                </p>
+              </div>
+
+              {/* Рабочее окно (Будни 09:00 - 17:00) */}
+              <div className="p-4 rounded-xl border border-border/60 bg-muted/20 space-y-1.5">
+                <div className="flex items-center justify-between text-xs font-bold text-amber-700 dark:text-amber-300">
+                  <span className="flex items-center gap-1.5">
+                    <Sun className="h-4 w-4" />
+                    Рабочее окно (Будни 09–17)
+                  </span>
+                  <span className="font-mono text-sm">{GIT_AUDIT_SUMMARY.workPct}%</span>
+                </div>
+                <p className="text-2xl sm:text-3xl font-black text-foreground font-mono">
+                  {GIT_AUDIT_SUMMARY.workHours} <span className="text-sm font-semibold">часов</span>
+                </p>
+                <p className="text-[11px] text-muted-foreground leading-snug">
+                  <b>{GIT_AUDIT_SUMMARY.workCommits} коммитов</b> (точечные фиксы, обеденные перерывы, дни отпусков). Все зафиксированы с точностью до минуты.
+                </p>
+              </div>
+
+              {/* Точка старта */}
+              <div className="p-4 rounded-xl border border-border/60 bg-muted/20 space-y-1.5">
+                <div className="flex items-center justify-between text-xs font-bold text-primary">
+                  <span className="flex items-center gap-1.5">
+                    <Calendar className="h-4 w-4" />
+                    Первый коммит проекта
+                  </span>
+                  <span className="font-mono text-xs">{GITHUB_FIRST_COMMIT_HASH}</span>
+                </div>
+                <p className="text-xl sm:text-2xl font-black text-primary font-mono pt-0.5">
+                  14.10.2025 <span className="text-sm">02:26</span>
+                </p>
+                <p className="text-[11px] text-muted-foreground leading-snug">
+                  Проект начат <b>глубокой ночью в 02:26</b> во вторник, 14 октября 2025 года (внерабочее время).
+                </p>
+              </div>
+            </div>
+
+            {/* Визуальная шкала соотношения времени */}
+            <div className="space-y-1.5">
+              <div className="flex justify-between items-center text-xs">
+                <span className="font-bold flex items-center gap-1.5 text-emerald-700 dark:text-emerald-300">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
+                  Личное время: {GIT_AUDIT_SUMMARY.offHours} ч ({GIT_AUDIT_SUMMARY.offPct}%)
+                </span>
+                <span className="font-bold flex items-center gap-1.5 text-amber-700 dark:text-amber-300">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" />
+                  Рабочее окно: {GIT_AUDIT_SUMMARY.workHours} ч ({GIT_AUDIT_SUMMARY.workPct}%)
+                </span>
+              </div>
+
+              <div className="h-4 rounded-full bg-muted overflow-hidden flex shadow-inner">
+                <div 
+                  className="h-full bg-emerald-500 transition-all duration-500" 
+                  style={{ width: `${GIT_AUDIT_SUMMARY.offPct}%` }}
+                  title={`Внерабочее время: ${GIT_AUDIT_SUMMARY.offHours} ч (${GIT_AUDIT_SUMMARY.offPct}%)`}
+                />
+                <div 
+                  className="h-full bg-amber-500/80 transition-all duration-500" 
+                  style={{ width: `${GIT_AUDIT_SUMMARY.workPct}%` }}
+                  title={`Рабочее окно: ${GIT_AUDIT_SUMMARY.workHours} ч (${GIT_AUDIT_SUMMARY.workPct}%)`}
+                />
+              </div>
+            </div>
+
+            {/* Детализация по 5 категориям времени суток */}
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
+              <div className="p-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-1">
+                <span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
+                  <Moon className="h-3 w-3 text-emerald-600" /> Ночь (00–06)
+                </span>
+                <p className="font-mono font-bold text-foreground">
+                  {GIT_AUDIT_SUMMARY.byCategory.night.hours} ч
+                </p>
+                <p className="text-[10px] text-muted-foreground">
+                  {GIT_AUDIT_SUMMARY.byCategory.night.count} коммитов
+                </p>
+              </div>
+
+              <div className="p-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-1">
+                <span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
+                  <Sunrise className="h-3 w-3 text-emerald-600" /> Утро (06–09)
+                </span>
+                <p className="font-mono font-bold text-foreground">
+                  {GIT_AUDIT_SUMMARY.byCategory.morning.hours} ч
+                </p>
+                <p className="text-[10px] text-muted-foreground">
+                  {GIT_AUDIT_SUMMARY.byCategory.morning.count} коммитов
+                </p>
+              </div>
+
+              <div className="p-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-1">
+                <span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
+                  <Sunset className="h-3 w-3 text-emerald-600" /> Вечер (17–00)
+                </span>
+                <p className="font-mono font-bold text-foreground">
+                  {GIT_AUDIT_SUMMARY.byCategory.evening.hours} ч
+                </p>
+                <p className="text-[10px] text-muted-foreground">
+                  {GIT_AUDIT_SUMMARY.byCategory.evening.count} коммитов
+                </p>
+              </div>
+
+              <div className="p-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-1">
+                <span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
+                  <Calendar className="h-3 w-3 text-emerald-600" /> Выходные (Сб/Вс)
+                </span>
+                <p className="font-mono font-bold text-foreground">
+                  {GIT_AUDIT_SUMMARY.byCategory.weekend.hours} ч
+                </p>
+                <p className="text-[10px] text-muted-foreground">
+                  {GIT_AUDIT_SUMMARY.byCategory.weekend.count} коммитов
+                </p>
+              </div>
+
+              <div className="p-2.5 rounded-xl border border-amber-500/30 bg-amber-500/5 space-y-1 col-span-2 sm:col-span-1">
+                <span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
+                  <Sun className="h-3 w-3 text-amber-600" /> Будни (09–17)
+                </span>
+                <p className="font-mono font-bold text-foreground">
+                  {GIT_AUDIT_SUMMARY.byCategory.work_hours.hours} ч
+                </p>
+                <p className="text-[10px] text-muted-foreground">
+                  {GIT_AUDIT_SUMMARY.byCategory.work_hours.count} коммитов
+                </p>
+              </div>
+            </div>
+
+            {/* -------------------------------------------------------------- */}
+            {/* ИНТЕРАКТИВНЫЙ КАЛЕНДАРЬ РАЗРАБОТКИ                            */}
+            {/* -------------------------------------------------------------- */}
+            <div className="pt-3 border-t border-border/40 space-y-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <h3 className="text-sm font-bold flex items-center gap-2 text-foreground">
+                  <Calendar className="h-4 w-4 text-primary" />
+                  Интерактивный календарь коммитов по дням
+                </h3>
+
+                {/* Выбор месяца */}
+                <div className="flex items-center gap-2 no-print">
+                  <select
+                    value={selectedMonth}
+                    onChange={e => {
+                      setSelectedMonth(e.target.value);
+                      setSelectedDayDate(null);
+                    }}
+                    className="h-8 text-xs rounded-xl border border-input bg-background px-3 font-semibold cursor-pointer"
+                  >
+                    {availableMonths.map(m => (
+                      <option key={m.key} value={m.key}>{m.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Легенда цветов */}
+              <div className="flex items-center gap-4 flex-wrap text-[11px] text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block" />
+                  Только внерабочее время (ночи/вечера или Сб/Вс)
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-sm bg-amber-500 inline-block" />
+                  Есть коммиты в интервале 09:00–17:00 (будни)
+                </span>
+                <span className="flex items-center gap-1.5 text-primary font-medium">
+                  💡 Нажмите на любой день, чтобы открыть поминутный протокол
+                </span>
+              </div>
+
+              {/* Сетка календаря */}
+              <div className="border border-border/50 rounded-xl overflow-hidden bg-background">
+                {/* Дни недели */}
+                <div className="grid grid-cols-7 text-center font-bold text-xs py-2 bg-muted/30 border-b border-border/40">
+                  <span className="text-foreground">Пн</span>
+                  <span className="text-foreground">Вт</span>
+                  <span className="text-foreground">Ср</span>
+                  <span className="text-foreground">Чт</span>
+                  <span className="text-foreground">Пт</span>
+                  <span className="text-rose-500 font-black">Сб</span>
+                  <span className="text-rose-500 font-black">Вс</span>
+                </div>
+
+                {/* Ячейки дней */}
+                <div className="grid grid-cols-7 gap-px bg-border/40">
+                  {calendarGrid.map((cell, idx) => {
+                    if (cell.dayNum === null) {
+                      return <div key={`empty-${idx}`} className="bg-background min-h-[56px] opacity-25" />;
+                    }
+
+                    const hasData = !!cell.data;
+                    const isSelected = selectedDayDate === cell.dateStr;
+                    const hasWork = cell.data?.hasWorkCommits;
+
+                    return (
+                      <button
+                        key={cell.dateStr}
+                        type="button"
+                        onClick={() => {
+                          if (hasData) {
+                            setSelectedDayDate(selectedDayDate === cell.dateStr ? null : cell.dateStr);
+                          }
+                        }}
+                        className={`p-1.5 text-left min-h-[56px] transition-all flex flex-col justify-between relative ${
+                          isSelected 
+                            ? "ring-2 ring-primary bg-primary/10 z-10" 
+                            : hasData 
+                              ? "bg-background hover:bg-muted/30 cursor-pointer" 
+                              : "bg-background/60 opacity-60 cursor-default"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <span className={`text-xs font-bold ${cell.isWeekend ? "text-rose-500" : "text-foreground"}`}>
+                            {cell.dayNum}
+                          </span>
+                          {hasData && (
+                            <span className="text-[10px] font-mono text-muted-foreground font-bold">
+                              {cell.data?.totalCommits} комм.
+                            </span>
+                          )}
+                        </div>
+
+                        {hasData && (
+                          <div className="mt-1">
+                            {hasWork ? (
+                              <Badge className="text-[9px] py-0 px-1 bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-400/40 w-full justify-center">
+                                🟡 раб: {cell.data?.workHours}ч
+                              </Badge>
+                            ) : (
+                              <Badge className="text-[9px] py-0 px-1 bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-400/40 w-full justify-center">
+                                🟢 личн: {cell.data?.offHours}ч
+                              </Badge>
+                            )}
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Детальный протокол выбранного дня */}
+              {activeDayData && (
+                <div className="p-4 rounded-xl border-2 border-primary/50 bg-primary/5 space-y-3 animate-in fade-in">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <h4 className="text-sm font-bold text-foreground flex items-center gap-2">
+                        <span>📅 Протокол за {activeDayData.date} ({activeDayData.dayOfWeek})</span>
+                        {activeDayData.isWeekend && (
+                          <Badge variant="outline" className="text-[10px] text-rose-500 border-rose-300">
+                            Выходной день
+                          </Badge>
+                        )}
+                      </h4>
+                      <p className="text-xs text-muted-foreground">
+                        Всего коммитов: <b>{activeDayData.totalCommits}</b> | Личное время: <b>{activeDayData.offHours} ч</b> | Рабочее окно: <b>{activeDayData.workHours} ч</b>
+                      </p>
+                    </div>
+
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => setSelectedDayDate(null)}
+                      className="h-7 w-7 p-0 rounded-full"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  <div className="divide-y divide-border/40 border border-border/40 rounded-lg overflow-hidden bg-background">
+                    {activeDayData.commits.map((c, i) => (
+                      <div key={c.hash + i} className="p-2.5 text-xs flex items-center justify-between gap-3 flex-wrap">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <span className="font-mono font-bold text-primary shrink-0">
+                            ⏰ {c.time}
+                          </span>
+                          <span className="font-mono text-muted-foreground text-[11px] shrink-0">
+                            [{c.hash}]
+                          </span>
+                          <span className="text-foreground truncate" title={c.subject}>
+                            {c.subject}
+                          </span>
+                        </div>
+
+                        <div className="shrink-0 flex items-center gap-2">
+                          {c.isWorkTime ? (
+                            <Badge className="text-[10px] bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-400/30">
+                              🟡 {c.catLabel} (~{c.sessionMins} мин)
+                            </Badge>
+                          ) : (
+                            <Badge className="text-[10px] bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-400/30">
+                              🟢 {c.catLabel} (~{c.sessionMins} мин)
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* -------------------------------------------------------------- */}
+            {/* ПОМИНУТНЫЙ РЕЕСТР КОММИТОВ С ФИЛЬТРОМ                          */}
+            {/* -------------------------------------------------------------- */}
+            <div className="pt-3 border-t border-border/40 space-y-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <h3 className="text-sm font-bold flex items-center gap-2 text-foreground">
+                  <FileText className="h-4 w-4 text-primary" />
+                  Поминутный реестр коммитов (542 записи)
+                </h3>
+
+                <Badge variant="outline" className="text-xs font-mono">
+                  {filteredAuditCommits.length} коммитов отобрано
+                </Badge>
+              </div>
+
+              {/* Фильтры и поиск реестра аудита */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 no-print">
+                <div className="relative">
+                  <Search className="h-3.5 w-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={auditSearch}
+                    onChange={e => setAuditSearch(e.target.value)}
+                    placeholder="Поиск по хэшу, дате или названию..."
+                    className="pl-8 text-xs h-9 rounded-xl"
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-1 bg-muted/40 p-1 rounded-xl border border-border/40 col-span-2">
+                  <button
+                    type="button"
+                    onClick={() => setAuditFilter("all")}
+                    className={`text-xs py-1 rounded-lg font-bold transition-all ${
+                      auditFilter === "all" ? "bg-background text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Все (542)
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setAuditFilter("off_hours")}
+                    className={`text-xs py-1 rounded-lg font-bold transition-all ${
+                      auditFilter === "off_hours" ? "bg-emerald-500 text-white shadow-xs" : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    🟢 Личное время (323)
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setAuditFilter("work_hours")}
+                    className={`text-xs py-1 rounded-lg font-bold transition-all ${
+                      auditFilter === "work_hours" ? "bg-amber-500 text-white shadow-xs" : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    🟡 Рабочие часы (219)
+                  </button>
+                </div>
+              </div>
+
+              {/* Таблица/список коммитов */}
+              <div className="border border-border/40 rounded-xl overflow-hidden max-h-96 overflow-y-auto divide-y divide-border/30 bg-background text-xs">
+                {filteredAuditCommits.length === 0 ? (
+                  <div className="p-6 text-center text-muted-foreground">
+                    Коммитов по заданным параметрам не найдено.
+                  </div>
+                ) : (
+                  filteredAuditCommits.map((item, idx) => (
+                    <div key={item.hash + idx} className="p-3 hover:bg-muted/20 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="space-y-0.5 min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-mono font-bold text-foreground">
+                            📅 {item.datetime} ({item.dayShort})
+                          </span>
+                          <span className="font-mono text-primary font-bold text-[11px] bg-primary/10 px-1.5 py-0.5 rounded">
+                            {item.hash}
+                          </span>
+                          {item.isWorkTime ? (
+                            <Badge className="text-[10px] py-0 px-1.5 bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-400/30">
+                              🟡 {item.catLabel}
+                            </Badge>
+                          ) : (
+                            <Badge className="text-[10px] py-0 px-1.5 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-400/30">
+                              🟢 {item.catLabel}
+                            </Badge>
+                          )}
+                          <span className="text-[10px] text-muted-foreground font-mono">
+                            ~{item.sessionMins} мин
+                          </span>
+                        </div>
+                        <p className="text-muted-foreground text-xs pt-0.5 truncate">
+                          {item.subject}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+          </CardContent>
+        </Card>
+
         {/* Интерактивный переключатель режима расчета цен */}
         <Card className="no-print border-border/60 bg-muted/20 rounded-2xl shadow-xs">
           <CardContent className="p-3 sm:p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground w-full sm:w-auto">
               <Scale className="h-4 w-4 text-primary shrink-0" />
-              <span>Режим расчета стоимости:</span>
+              <span>Режим расчета стоимости разработки:</span>
             </div>
 
             <div className="grid grid-cols-3 gap-1.5 w-full sm:w-auto bg-background/80 p-1 rounded-xl border border-border/50">
@@ -299,10 +851,10 @@ const Project: React.FC = () => {
             <CardContent className="p-4 text-left">
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Calendar className="h-4 w-4 text-primary" />
-                Жизненный цикл
+                Срок разработки
               </div>
-              <p className="text-xl sm:text-2xl font-black mt-2 tracking-tight">~2 года</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">с осени 2024 г. по н.в.</p>
+              <p className="text-xl sm:text-2xl font-black mt-2 tracking-tight">12 месяцев</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">с 14.10.2025 по 02.10.2026</p>
             </CardContent>
           </Card>
 
@@ -316,7 +868,7 @@ const Project: React.FC = () => {
               <p className="text-xl sm:text-2xl font-black mt-2 tracking-tight text-blue-600 dark:text-blue-400">
                 {TOTAL_GIT_COMMITS} коммитов
               </p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">старт в Git: 13.10.2025 ({GITHUB_FIRST_COMMIT_HASH})</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">старт 14.10.2025 02:26 ({GITHUB_FIRST_COMMIT_HASH})</p>
             </CardContent>
           </Card>
 
@@ -330,7 +882,7 @@ const Project: React.FC = () => {
               <p className="text-xl sm:text-2xl font-black mt-2 tracking-tight text-purple-600 dark:text-purple-400">
                 {stats.totalHours} часов
               </p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">эквивалент 7.5 мес. фуллтайма</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">экспертный объем разработки</p>
             </CardContent>
           </Card>
 
@@ -381,74 +933,6 @@ const Project: React.FC = () => {
           </Card>
         </div>
 
-        {/* Блок «Исторический таймлайн: От закрытого старта до публикации на GitHub» */}
-        <Card className="rounded-2xl border-border/60 shadow-xs card-print text-left overflow-hidden">
-          <CardHeader className="pb-3 border-b border-border/30 bg-muted/20">
-            <CardTitle className="text-base font-bold flex items-center gap-2">
-              <GitBranch className="h-5 w-5 text-primary shrink-0" />
-              Эволюция проекта: От проектирования до GitHub и сегодняшних релизов
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Фиксация ключевых этапов жизни кодовой базы: 1 год предварительной разработки до Git + 1 год непрерывных коммитов в GitHub.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pt-4 pb-5 space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {/* Фаза 1 */}
-              <div className="p-3.5 rounded-xl border border-border/60 bg-muted/15 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono font-bold text-amber-600 dark:text-amber-400">ФАЗА 1: ДО GIT</span>
-                  <Badge variant="outline" className="text-[10px] py-0 px-1.5">~12 месяцев</Badge>
-                </div>
-                <h4 className="text-xs font-bold text-foreground">Закрытая разработка и фундамент</h4>
-                <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  Осень 2024 — Октябрь 2025. Проектирование FSM-бизнес-процессов домофонного предприятия, сбор требований абонентского учета, 
-                  составление структуры базы данных PostgreSQL на 50+ таблиц и логики диспетчеризации.
-                </p>
-                <div className="pt-1 text-[11px] font-mono text-muted-foreground flex justify-between">
-                  <span>Трудозатраты:</span>
-                  <span className="font-bold text-foreground">380 часов</span>
-                </div>
-              </div>
-
-              {/* Точка заливки на GitHub */}
-              <div className="p-3.5 rounded-xl border-2 border-primary/50 bg-primary/5 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono font-bold text-primary">ТОЧКА ИНИЦИАЛИЗАЦИИ</span>
-                  <Badge className="text-[10px] py-0 px-1.5 bg-primary text-primary-foreground font-mono">c2cfbfc</Badge>
-                </div>
-                <h4 className="text-xs font-bold text-foreground">Выгрузка на GitHub: 13.10.2025</h4>
-                <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  <b>13 октября 2025 г. в 23:26</b> проект официально опубликован в репозитории GitHub. 
-                  Кодовая база зафиксирована на стеке Vite + React + TypeScript + Supabase. 
-                  С этой секунды запущен строгий версионный учет каждой правки.
-                </p>
-                <div className="pt-1 text-[11px] font-mono text-muted-foreground flex justify-between">
-                  <span>Первый коммит:</span>
-                  <span className="font-bold text-primary">13.10.2025 23:26</span>
-                </div>
-              </div>
-
-              {/* Фаза 2 */}
-              <div className="p-3.5 rounded-xl border border-border/60 bg-muted/15 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400">ФАЗА 2: В GITHUB</span>
-                  <Badge variant="outline" className="text-[10px] py-0 px-1.5">12 месяцев</Badge>
-                </div>
-                <h4 className="text-xs font-bold text-foreground">Непрерывная эволюция и релизы</h4>
-                <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  Октябрь 2025 — Октябрь 2026. Зафиксирован <b>541 коммит</b>. Созданы модули CRM/FSM, 
-                  эквайринг ЮKassa с фискализацией 54-ФЗ, личные кабинеты жильцов, учет монтажа новых домов, голосования ОСС и кадры.
-                </p>
-                <div className="pt-1 text-[11px] font-mono text-muted-foreground flex justify-between">
-                  <span>Коммитов в Git:</span>
-                  <span className="font-bold text-foreground">{TOTAL_GIT_COMMITS} шт.</span>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Подробное сравнение: «Моя разработка (Junior) vs Рынок IT-студий» */}
         <Card className="rounded-2xl border-border/60 shadow-sm card-print text-left">
           <CardHeader className="pb-3 border-b border-border/30">
@@ -486,7 +970,7 @@ const Project: React.FC = () => {
                 <tbody className="divide-y divide-border/30">
                   <tr>
                     <td className="py-2.5 px-3 font-medium">
-                      Архитектурное ядро и схема БД (1-й год до Git)
+                      Базовое ядро, база данных PostgreSQL и архитектурный каркас
                       <span className="block text-[10px] text-muted-foreground">PostgreSQL 50+ таблиц, авторизация, логика FSM, RLS-защита</span>
                     </td>
                     <td className="py-2.5 px-3 font-mono font-bold text-emerald-600 dark:text-emerald-400">
@@ -502,24 +986,24 @@ const Project: React.FC = () => {
 
                   <tr>
                     <td className="py-2.5 px-3 font-medium">
-                      Разработка 8 модулей в Git (12 месяцев, {stats.gitHours} ч)
-                      <span className="block text-[10px] text-muted-foreground">541 коммит: биллинг 54-ФЗ, ЛК жильца, мобильные мастера, монтаж</span>
+                      Разработка 8 модулей в Git (12 месяцев, {stats.totalHours} ч)
+                      <span className="block text-[10px] text-muted-foreground">542 коммита: биллинг 54-ФЗ, ЛК жильца, мобильные мастера, монтаж</span>
                     </td>
                     <td className="py-2.5 px-3 font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                      {rub(stats.gitHours * JUNIOR_HOURLY_RATE)}
+                      {rub(stats.juniorDevCost)}
                     </td>
                     <td className="py-2.5 px-3 font-mono font-bold text-blue-600 dark:text-blue-400">
-                      {rub(stats.gitHours * MARKET_HOURLY_RATE)}
+                      {rub(stats.marketDevCost)}
                     </td>
                     <td className="py-2.5 px-3 font-mono font-bold text-right text-primary">
-                      +{rub(stats.gitHours * (MARKET_HOURLY_RATE - JUNIOR_HOURLY_RATE))}
+                      +{rub(stats.marketDevCost - stats.juniorDevCost)}
                     </td>
                   </tr>
 
                   <tr className="bg-primary/5 font-black text-sm">
                     <td className="py-3 px-3 text-foreground">
                       ИТОГОВАЯ ОЦЕНКА ПЛАТФОРМЫ «ДОМОФОНДАР»
-                      <span className="block text-[10px] text-muted-foreground font-normal">Полный цикл разработки (~2 года, 1 170+ часов)</span>
+                      <span className="block text-[10px] text-muted-foreground font-normal">1 год непрерывной разработки (14.10.2025 — 02.10.2026)</span>
                     </td>
                     <td className="py-3 px-3 font-mono text-emerald-600 dark:text-emerald-400">
                       {rub(stats.juniorTotal)}
@@ -538,14 +1022,14 @@ const Project: React.FC = () => {
             <div className="p-3.5 rounded-xl border border-emerald-500/30 bg-emerald-500/5 text-xs text-muted-foreground leading-relaxed space-y-1">
               <p className="font-bold text-foreground flex items-center gap-1.5">
                 <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                Инженерное резюме для себя:
+                Инженерный вывод:
               </p>
               <p>
-                Даже если оценивать проект по предельно консервативной минимальной ставке начинающего стажера (<b>{JUNIOR_HOURLY_RATE} ₽/час</b>), 
+                Даже если оценивать проект по предельно низкой ставке начинающего стажера (<b>{JUNIOR_HOURLY_RATE} ₽/час</b>), 
                 созданная кодовая база представляет собой самостоятельный цифровой актив стоимостью <b>{rub(stats.juniorTotal)}</b>.
               </p>
               <p>
-                В случае обращения в коммерческую IT-студию разработка аналогичного комплекса под ключ с 541 коммитом и интеграцией платежей обошлась бы компании в <b>{rub(stats.marketTotal)}</b>. 
+                В случае обращения в коммерческую IT-студию разработка аналогичного комплекса под ключ с 542 коммитами и интеграцией платежей обошлась бы компании в <b>{rub(stats.marketTotal)}</b>. 
                 Реализация платформы собственными силами сберегла <b>{rub(stats.diff)}</b>.
               </p>
             </div>
@@ -694,10 +1178,10 @@ const Project: React.FC = () => {
               <div>
                 <CardTitle className="text-base sm:text-lg font-bold flex items-center gap-2">
                   <TrendingUp className="h-5 w-5 text-primary" />
-                  Хронологический журнал доработок платформы
+                  Хронологический журнал этапов разработки
                 </CardTitle>
                 <CardDescription className="text-xs mt-0.5">
-                  Всего записей в реестре: <b>{stats.items.length}</b>. Каждая запись содержит дату, точное время, затраченные часы и оценку себестоимости.
+                  Ключевые вехи с 14 октября 2025 г. по 2 октября 2026 г. Всего записей: <b>{stats.items.length}</b>.
                 </CardDescription>
               </div>
 
@@ -836,7 +1320,7 @@ const Project: React.FC = () => {
 
         {/* Подвал */}
         <div className="text-center text-xs text-muted-foreground pt-4 pb-8 space-y-1">
-          <p>© 2024–{new Date().getFullYear()} {OWNER}. Персональный дневник инженера.</p>
+          <p>© 2025–{new Date().getFullYear()} {OWNER}. Персональный дневник инженера.</p>
           <p className="text-[11px] text-muted-foreground/70">
             Система автоматизированного учета инженерных трудозатрат и хронологии платформы «Домофондар».
           </p>

@@ -36,15 +36,12 @@ export const MARKET_BASE_COST = 2000000; // 2 000 000 ₽
 export const HOURLY_RATE = MARKET_HOURLY_RATE;
 export const BASE_PLATFORM_COST = MARKET_BASE_COST;
 
-// Хронология проекта: полный цикл разработки
-export const PROJECT_START_PRE_GIT = "Осень 2024 г."; // Начало проектирования (закрытый этап)
-export const GITHUB_FIRST_COMMIT_DATE = "13 октября 2025 г. 23:26"; // Дата заливки на GitHub
+// Хронология проекта: точный старт по данным Git
+export const PROJECT_START = "14 октября 2025 г. 02:26"; // Официальный старт проекта (МСК, коммит c2cfbfc)
+export const GITHUB_FIRST_COMMIT_DATE = "14 октября 2025 г. 02:26 (МСК)";
 export const GITHUB_FIRST_COMMIT_HASH = "c2cfbfc"; // Первый коммит в репозитории
-export const TOTAL_GIT_COMMITS = 541; // Всего коммитов в Git
-export const GIT_MONTHS_DEV = 12; // Месяцев фиксации в Git (октябрь 2025 – октябрь 2026)
-export const PRE_GIT_MONTHS_DEV = 12; // Месяцев разработки до выгрузки в Git (октябрь 2024 – октябрь 2025)
-export const TOTAL_MONTHS_DEV = 24; // Общий жизненный цикл платформы (~2 года)
-export const PROJECT_START = GITHUB_FIRST_COMMIT_DATE;
+export const TOTAL_GIT_COMMITS = 542; // Всего коммитов в Git
+export const TOTAL_MONTHS_DEV = 12; // Срок разработки платформы (ровно 1 год)
 
 export type Kind = "feature" | "fix" | "improvement" | "infra";
 export type ProjectModule = 
@@ -292,23 +289,13 @@ export const PROJECT_CHANGELOG: ProjectEntry[] = [
     difficulty: "Высокая",
   },
   {
-    id: "stage-2025-10-13-2326",
-    datetime: "2025-10-13 23:26",
-    title: "Публикация на GitHub (коммит c2cfbfc): переход на непрерывный контроль версий",
-    description: "Первая точка фиксации в Git-репозитории. Проект к этому моменту уже разрабатывался около 1 года в закрытом режиме. На GitHub залита базовая кодовая база современного стека (Vite + React + TypeScript + Tailwind CSS + Supabase/PostgreSQL). Начат детальный учёт всех доработок и коммитов.",
+    id: "stage-2025-10-14-0226",
+    datetime: "2025-10-14 02:26",
+    title: "Старт создания проекта «Домофондар» (первый коммит c2cfbfc)",
+    description: "Официальная точка отсчета создания платформы: 14 октября 2025 года в 02:26 ночи. Инициализация репозитория в GitHub, первичное проектирование архитектуры домофонного учета, подключение облачной базы данных Supabase PostgreSQL, настройка современного стека Vite + React + TypeScript + Tailwind CSS.",
     module: "infra_mobile",
     kind: "infra",
     hours: 80,
-    difficulty: "Комплексная",
-  },
-  {
-    id: "stage-2024-10-01-0000",
-    datetime: "2024-10-01 10:00",
-    title: "Проектирование и предварительная разработка платформы (до выгрузки в Git)",
-    description: "Начальный закрытый этап разработки (осень 2024 — октябрь 2025 г., около года работы). Исследование бизнес-процессов домофонной компании, составление структуры данных на 50+ таблиц, проектирование логики распределения нарядов FSM, безопасности ПДн и архитектурного каркаса.",
-    module: "security_audit",
-    kind: "feature",
-    hours: 380,
     difficulty: "Комплексная",
   },
 ];
