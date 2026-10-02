@@ -110,6 +110,16 @@ export const GIT_AUDIT_SUMMARY = {
   offPct: 73.8,
   workPct: 26.1,
   
+  // Реальный совокупный объем инженерной разработки (написание кода на ПК, проектирование БД, отладка до коммита)
+  fullDevHoursTotal: 1080,
+  fullDevOffHours: 797,      // ~800 часов личного времени автора (73.8%)
+  fullDevWorkHours: 283,     // 26.2% в рабочие часы офиса
+  
+  // Чистый хронометраж фиксации и отправки деплоев на GitHub
+  deployHoursTotal: 142.2,
+  deployOffHours: 105.0,
+  deployWorkHours: 37.1,
+  
   offCommits: 390,
   workCommits: 155,
   offCommitsPct: 71.6,

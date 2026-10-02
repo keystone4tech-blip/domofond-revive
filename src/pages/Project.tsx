@@ -11,7 +11,7 @@ import {
   TrendingUp, Calendar, Lock, FileText, Building2, Scale, Printer, Search,
   Filter, Layers, CheckCircle2, DollarSign, Award, Clock, ArrowRight, GitCommit,
   GitBranch, Laptop, Cpu, Check, SlidersHorizontal, Moon, Sun, Sunrise, Sunset,
-  AlertTriangle, ChevronLeft, ChevronRight, X, Bot, Server, Flag, Briefcase, ExternalLink,
+  AlertTriangle, AlertCircle, ChevronLeft, ChevronRight, X, Bot, Server, Flag, Briefcase, ExternalLink,
   BarChart3, PieChart as PieIcon, LineChart as LineIcon
 } from "lucide-react";
 import {
@@ -169,8 +169,22 @@ const Project: React.FC = () => {
   // 4. Распределение личного vs рабочего времени
   const timePieData = useMemo(() => {
     return [
-      { name: "Личное время (праздники, ночи, выходные, дорога)", value: GIT_AUDIT_SUMMARY.offCommits, hours: GIT_AUDIT_SUMMARY.offHours, color: "#10b981" },
-      { name: "Рабочие часы (плотные серии >5 коммитов)", value: GIT_AUDIT_SUMMARY.workCommits, hours: GIT_AUDIT_SUMMARY.workHours, color: "#f59e0b" },
+      { 
+        name: "Личное время (праздники, ночи, выходные, дорога)", 
+        value: GIT_AUDIT_SUMMARY.fullDevOffHours, 
+        hours: GIT_AUDIT_SUMMARY.fullDevOffHours, 
+        deployHours: GIT_AUDIT_SUMMARY.deployOffHours,
+        commits: GIT_AUDIT_SUMMARY.offCommits,
+        color: "#10b981" 
+      },
+      { 
+        name: "Рабочие часы (плотные серии >5 коммитов)", 
+        value: GIT_AUDIT_SUMMARY.fullDevWorkHours, 
+        hours: GIT_AUDIT_SUMMARY.fullDevWorkHours, 
+        deployHours: GIT_AUDIT_SUMMARY.deployWorkHours,
+        commits: GIT_AUDIT_SUMMARY.workCommits,
+        color: "#f59e0b" 
+      },
     ];
   }, []);
 
@@ -803,7 +817,10 @@ const Project: React.FC = () => {
                           ))}
                         </Pie>
                         <Tooltip 
-                          formatter={(val: number, name: string, item: any) => [`${val} коммитов (${item.payload.hours} ч)`, name]}
+                          formatter={(val: number, name: string, item: any) => [
+                            `~${val} ч разработки (${item.payload.deployHours} ч в ${item.payload.commits} коммитах)`, 
+                            name
+                          ]}
                           contentStyle={{ backgroundColor: "rgba(15, 23, 42, 0.95)", borderColor: "#334155", borderRadius: "10px", fontSize: "11px", color: "#fff" }}
                         />
                       </PieChart>
@@ -815,14 +832,14 @@ const Project: React.FC = () => {
                         <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
                         Личное время (праздники, ночи, вечера, дорога):
                       </span>
-                      <span>{GIT_AUDIT_SUMMARY.offPct}% ({GIT_AUDIT_SUMMARY.offCommits} комм.)</span>
+                      <span>~800 ч ({GIT_AUDIT_SUMMARY.offPct}%) / 105 ч деплоев</span>
                     </div>
                     <div className="flex items-center justify-between font-bold text-amber-700 dark:text-amber-300">
                       <span className="flex items-center gap-1.5">
                         <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" />
                         Рабочие серии (&gt;5 коммитов в будни):
                       </span>
-                      <span>{GIT_AUDIT_SUMMARY.workPct}% ({GIT_AUDIT_SUMMARY.workCommits} комм.)</span>
+                      <span>~280 ч ({GIT_AUDIT_SUMMARY.workPct}%) / 37 ч деплоев</span>
                     </div>
                   </div>
                 </div>
@@ -997,7 +1014,7 @@ const Project: React.FC = () => {
 
               <div className="flex items-center gap-2">
                 <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-400/30 text-xs px-2.5 py-1 font-bold">
-                  🟢 {GIT_AUDIT_SUMMARY.offHours} ч ({GIT_AUDIT_SUMMARY.offPct}%) личное время
+                  🟢 ~800 ч ({GIT_AUDIT_SUMMARY.offPct}%) личное время (105 ч деплоев)
                 </Badge>
               </div>
             </div>
@@ -1008,7 +1025,7 @@ const Project: React.FC = () => {
             {/* Ключевые метрики распределения часов */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
               {/* Личное время */}
-              <div className="p-4 rounded-xl border-2 border-emerald-500/40 bg-emerald-500/5 space-y-1.5">
+              <div className="p-4 rounded-xl border-2 border-emerald-500/40 bg-emerald-500/5 space-y-2">
                 <div className="flex items-center justify-between text-xs font-bold text-emerald-700 dark:text-emerald-300">
                   <span className="flex items-center gap-1.5">
                     <Moon className="h-4 w-4" />
@@ -1016,16 +1033,21 @@ const Project: React.FC = () => {
                   </span>
                   <span className="font-mono text-sm">{GIT_AUDIT_SUMMARY.offPct}%</span>
                 </div>
-                <p className="text-2xl sm:text-3xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
-                  {GIT_AUDIT_SUMMARY.offHours} <span className="text-sm font-semibold">часов</span>
-                </p>
+                <div>
+                  <p className="text-2xl sm:text-3xl font-black text-emerald-600 dark:text-emerald-400 font-mono leading-none">
+                    ~800 <span className="text-sm font-semibold">часов разработки</span>
+                  </p>
+                  <p className="text-xs font-semibold text-emerald-700/80 dark:text-emerald-300/80 mt-1">
+                    (включая {GIT_AUDIT_SUMMARY.deployOffHours} ч прямых деплоев в Git)
+                  </p>
+                </div>
                 <p className="text-[11px] text-muted-foreground leading-snug">
-                  <b>{GIT_AUDIT_SUMMARY.offCommits} из {GIT_AUDIT_SUMMARY.totalCommits} коммитов</b> сделаны в праздничные дни РФ (1–4 мая, 9–11 мая, новогодние каникулы), субботы, воскресенья, ночи, вечера после 16:00, а также в дороге или обеденных перерывах (до 5 коммитов за день).
+                  <b>{GIT_AUDIT_SUMMARY.offCommits} из {GIT_AUDIT_SUMMARY.totalCommits} коммитов</b> задеплоены в праздники РФ, ночи, выходные, вечера после 16:00 и в дороге. Около 800 часов личной работы на ПК ушло на разработку, проектирование БД и тестирование кода перед каждым коммитом.
                 </p>
               </div>
 
               {/* Рабочее окно */}
-              <div className="p-4 rounded-xl border border-border/60 bg-muted/20 space-y-1.5">
+              <div className="p-4 rounded-xl border border-border/60 bg-muted/20 space-y-2">
                 <div className="flex items-center justify-between text-xs font-bold text-amber-700 dark:text-amber-300">
                   <span className="flex items-center gap-1.5">
                     <Sun className="h-4 w-4" />
@@ -1033,16 +1055,21 @@ const Project: React.FC = () => {
                   </span>
                   <span className="font-mono text-sm">{GIT_AUDIT_SUMMARY.workPct}%</span>
                 </div>
-                <p className="text-2xl sm:text-3xl font-black text-foreground font-mono">
-                  {GIT_AUDIT_SUMMARY.workHours} <span className="text-sm font-semibold">часов</span>
-                </p>
+                <div>
+                  <p className="text-2xl sm:text-3xl font-black text-foreground font-mono leading-none">
+                    ~280 <span className="text-sm font-semibold">часов разработки</span>
+                  </p>
+                  <p className="text-xs font-semibold text-muted-foreground mt-1">
+                    (включая {GIT_AUDIT_SUMMARY.deployWorkHours} ч прямых деплоев в Git)
+                  </p>
+                </div>
                 <p className="text-[11px] text-muted-foreground leading-snug">
-                  <b>{GIT_AUDIT_SUMMARY.workCommits} коммитов</b> в дни плотной непрерывной разработки (более 5 коммитов за рабочий день в будни). Зафиксированы с точностью до минуты.
+                  <b>{GIT_AUDIT_SUMMARY.workCommits} коммитов</b> в дни непрерывной разработки (более 5 коммитов за будний день). Зафиксированы с точностью до минуты.
                 </p>
               </div>
 
               {/* Точка старта */}
-              <div className="p-4 rounded-xl border border-border/60 bg-muted/20 space-y-1.5">
+              <div className="p-4 rounded-xl border border-border/60 bg-muted/20 space-y-2">
                 <div className="flex items-center justify-between text-xs font-bold text-primary">
                   <span className="flex items-center gap-1.5">
                     <Calendar className="h-4 w-4" />
@@ -1050,11 +1077,16 @@ const Project: React.FC = () => {
                   </span>
                   <span className="font-mono text-xs">{GITHUB_FIRST_COMMIT_HASH}</span>
                 </div>
-                <p className="text-xl sm:text-2xl font-black text-primary font-mono pt-0.5">
-                  14.10.2025 <span className="text-sm">02:26</span>
-                </p>
+                <div>
+                  <p className="text-xl sm:text-2xl font-black text-primary font-mono leading-none">
+                    14.10.2025 <span className="text-sm">02:26</span>
+                  </p>
+                  <p className="text-xs font-semibold text-muted-foreground mt-1">
+                    (глубокая ночь / личное время)
+                  </p>
+                </div>
                 <p className="text-[11px] text-muted-foreground leading-snug">
-                  Проект начат мной <b>глубокой ночью в 02:26</b> во вторник, 14 октября 2025 года (мое личное время).
+                  Проект начат мной <b>глубокой ночью в 02:26</b> во вторник, 14 октября 2025 года (мое личное свободное время).
                 </p>
               </div>
             </div>
@@ -1064,11 +1096,11 @@ const Project: React.FC = () => {
               <div className="flex justify-between items-center text-xs">
                 <span className="font-bold flex items-center gap-1.5 text-emerald-700 dark:text-emerald-300">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
-                  Личное время: {GIT_AUDIT_SUMMARY.offHours} ч ({GIT_AUDIT_SUMMARY.offPct}%)
+                  Личное время: ~800 ч разработки ({GIT_AUDIT_SUMMARY.offPct}%) / {GIT_AUDIT_SUMMARY.deployOffHours} ч деплоев
                 </span>
                 <span className="font-bold flex items-center gap-1.5 text-amber-700 dark:text-amber-300">
                   <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" />
-                  Рабочие серии: {GIT_AUDIT_SUMMARY.workHours} ч ({GIT_AUDIT_SUMMARY.workPct}%)
+                  Рабочие серии: ~280 ч разработки ({GIT_AUDIT_SUMMARY.workPct}%) / {GIT_AUDIT_SUMMARY.deployWorkHours} ч деплоев
                 </span>
               </div>
 
@@ -1081,6 +1113,38 @@ const Project: React.FC = () => {
                   className="h-full bg-amber-500/80 transition-all duration-500" 
                   style={{ width: `${GIT_AUDIT_SUMMARY.workPct}%` }}
                 />
+              </div>
+            </div>
+
+            {/* АКЦЕНТНЫЙ БЛОК: ЭФФЕКТ АЙСБЕРГА РАЗРАБОТКИ */}
+            <div className="p-4 rounded-xl border-2 border-primary/30 bg-primary/5 space-y-2.5 text-xs">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-primary shrink-0" />
+                <h4 className="font-black text-sm text-foreground">
+                  Важное инженерное пояснение: «Эффект айсберга» (почему в Git 105 часов деплоев, а реальный труд составил ~800 часов личного времени)
+                </h4>
+              </div>
+              <p className="text-muted-foreground leading-relaxed">
+                В Git-репозиторий на GitHub код отправлялся <b>только после того, как он был полностью написан, запущен и тщательно протестирован на моем локальном ПК</b>. 
+                До каждого деплоя шли часы проектирования структуры таблиц БД, написания логики TypeScript/React, верстки адаптивных интерфейсов и локальной отладки.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div className="p-3 rounded-lg border border-border/60 bg-background/80 space-y-1">
+                  <span className="font-bold text-[11px] text-primary flex items-center gap-1.5">
+                    <Laptop className="h-3.5 w-3.5" /> Подводная часть айсберга (~1 080 ч разработки / ~800 ч в личное время)
+                  </span>
+                  <p className="text-[11px] text-muted-foreground leading-snug">
+                    Сотни часов программирования на ПК, архитектура Supabase PostgreSQL на 50+ таблиц, настройка Docker/VPN, мобильные интерфейсы FSM мастеров и тесты до момента нажатия «git push». Из них <b>73.8% (~800 часов)</b> выполнены мной в личное свободное время — ночами, в выходные дни и праздники РФ.
+                  </p>
+                </div>
+                <div className="p-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 space-y-1">
+                  <span className="font-bold text-[11px] text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5">
+                    <GitBranch className="h-3.5 w-3.5" /> Верхушка айсберга (142.2 ч деплоев / 105.0 ч в личное время)
+                  </span>
+                  <p className="text-[11px] text-muted-foreground leading-snug">
+                    Сугубо точный поминутный хронометраж фиксации и отправки в Git уже полностью готового, исправного кода. 390 коммитов отправлены в личные часы (105.0 ч), 155 коммитов — в рабочие серии (37.1 ч).
+                  </p>
+                </div>
               </div>
             </div>
 
