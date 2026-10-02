@@ -1,18 +1,21 @@
 /**
  * ==============================================================================
- * ЮРИДИЧЕСКИЙ АУДИТ РАБОЧЕГО И ВНЕРАБОЧЕГО ВРЕМЕНИ РАЗРАБОТКИ
- * С УЧЕТОМ ОФИЦИАЛЬНОГО ПРОИЗВОДСТВЕННОГО КАЛЕНДАРЯ РФ (2025–2026)
+ * МОЙ ЛИЧНЫЙ ДНЕВНИК И АУДИТ ВРЕМЕНИ РАЗРАБОТКИ
+ * С УЧЕТОМ ПРОИЗВОДСТВЕННОГО КАЛЕНДАРЯ РФ И РЕАЛЬНОГО РАСПИСАНИЯ
  * ==============================================================================
  * Платформа: «Домофондар»
- * Автор и разработчик: Можнов Владимир Сергеевич
- * Дата и время старта: 14 октября 2025 г. 02:26 (МСК, первый коммит c2cfbfc)
+ * Разработчик: Можнов Владимир Сергеевич
+ * Дата и время старта: 2025-10-14 02:26 (МСК, первый коммит c2cfbfc)
  * 
- * КРИТЕРИИ АУДИТА:
- * 1. Рабочее время: Обычные будние дни (Пн–Пт) строго с 09:00 до 17:00 (МСК).
- * 2. Внерабочее (личное) время разработчика:
- *    - Все государственные праздники и перенесенные выходные дни РФ (1–8 января, 23 фев, 8–9 мар, 1–4 мая, 9–11 мая, 12 июня, 3–4 ноя, 31 дек).
- *    - Все субботы и воскресенья (полные 24 часа).
- *    - Будни: Глубокая ночь (00:00–06:00), Раннее утро (06:00–09:00), Поздний вечер (17:00–00:00).
+ * КРИТЕРИИ УЧЕТА ВРЕМЕНИ:
+ * 1. Личное / свободное время разработчика:
+ *    - Все государственные праздники РФ и перенесенные выходные (1–8 янв, 23 фев, 8–9 мар, 1–4 мая, 9–11 мая, 12 июня).
+ *    - Все выходные дни (Суббота / Воскресенье) полные 24 часа.
+ *    - Ночи (00:00–06:00), раннее утро (06:00–09:00).
+ *    - Вечера и ранний приезд домой (16:00–00:00).
+ *    - Разовые заливки в пути / в обеденный перерыв / свободные минуты (до 5 коммитов за день в интервале 09:00–16:00).
+ * 2. Рабочее время:
+ *    - Только дни с плотной разработкой (строго более 5 коммитов подряд в окне 09:00–16:00 в будни).
  * ==============================================================================
  */
 
@@ -21,8 +24,9 @@ export type TimeCategory =
   | "weekend"       // Выходной день (Суббота / Воскресенье)
   | "night"         // Глубокая ночь (00:00–06:00)
   | "morning"       // Раннее утро (06:00–09:00)
-  | "evening"       // Поздний вечер (17:00–00:00)
-  | "work_hours";   // Рабочие часы (Будни 09:00–17:00)
+  | "evening"       // Вечер / приехал пораньше (16:00–00:00)
+  | "transit_free"  // В пути / обед / свободное время (до 5 коммитов)
+  | "work_hours";   // Рабочие часы (плотная разработка >5 коммитов)
 
 export interface CommitAuditItem {
   hash: string;
@@ -94,53 +98,58 @@ export const RUSSIAN_HOLIDAYS_MAP: Record<string, string> = {
 };
 
 export const GIT_AUDIT_SUMMARY = {
-  totalCommits: 542,
+  totalCommits: 545,
   firstCommitDate: "2025-10-14 02:26",
   firstCommitHash: "c2cfbfc",
-  lastCommitDate: "2026-10-02 21:43",
-  lastCommitHash: "91ae6fb",
+  lastCommitDate: "2026-10-02 22:41",
+  lastCommitHash: "add88a3",
   
-  totalHours: 223.7,
-  offHours: 143.8,
-  workHours: 80.0,
-  offPct: 64.3,
-  workPct: 35.8,
+  totalHours: 142.2,
+  offHours: 105.0,
+  workHours: 37.1,
+  offPct: 73.8,
+  workPct: 26.1,
   
-  offCommits: 351,
-  workCommits: 191,
-  offCommitsPct: 64.8,
-  workCommitsPct: 35.2,
+  offCommits: 390,
+  workCommits: 155,
+  offCommitsPct: 71.6,
+  workCommitsPct: 28.4,
   
   byCategory: {
   "holiday": {
     "count": 40,
-    "hours": 13.8,
+    "hours": 8.0,
     "label": "Гос. праздник РФ (Нерабочий день)"
   },
   "weekend": {
     "count": 167,
-    "hours": 64.8,
+    "hours": 41.1,
     "label": "Выходные дни (Суббота / Воскресенье)"
   },
   "night": {
     "count": 22,
-    "hours": 11.8,
+    "hours": 8.2,
     "label": "Глубокая ночь (00:00–06:00)"
   },
   "morning": {
     "count": 23,
-    "hours": 8.8,
+    "hours": 4.8,
     "label": "Раннее утро (06:00–09:00)"
   },
   "evening": {
-    "count": 99,
-    "hours": 44.6,
-    "label": "Поздний вечер (17:00–00:00)"
+    "count": 115,
+    "hours": 35.4,
+    "label": "Вечер / приехал пораньше (16:00–00:00)"
+  },
+  "transit_free": {
+    "count": 23,
+    "hours": 7.6,
+    "label": "В пути / обед / свободное время (до 5 коммитов)"
   },
   "work_hours": {
-    "count": 191,
-    "hours": 80.0,
-    "label": "Рабочие часы (Будни 09:00–17:00)"
+    "count": 155,
+    "hours": 37.1,
+    "label": "Рабочие часы (плотная разработка >5 коммитов)"
   }
 } as Record<TimeCategory, { count: number; hours: number; label: string }>
 };
@@ -154,11 +163,11 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "isHoliday": false,
     "holidayName": null,
     "totalCommits": 7,
-    "offCommits": 5,
-    "workCommits": 2,
-    "offHours": 2.0,
-    "workHours": 1.3,
-    "hasWorkCommits": true,
+    "offCommits": 7,
+    "workCommits": 0,
+    "offHours": 2.4,
+    "workHours": 0.0,
+    "hasWorkCommits": false,
     "commits": [
       {
         "hash": "c2cfbfc",
@@ -177,7 +186,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "category": "night",
         "catLabel": "Глубокая ночь (00:00–06:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Refactor: Update website based on analysis"
       },
       {
@@ -187,7 +196,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "category": "night",
         "catLabel": "Глубокая ночь (00:00–06:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Enable Cloud integration"
       },
       {
@@ -197,7 +206,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "category": "night",
         "catLabel": "Глубокая ночь (00:00–06:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "feat: Enable Cloud and database migration"
       },
       {
@@ -207,26 +216,26 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "category": "night",
         "catLabel": "Глубокая ночь (00:00–06:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Fix: Update handle_updated_at function"
       },
       {
         "hash": "2f7a68a",
         "time": "09:13",
         "datetime": "2025-10-14 09:13",
-        "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-        "isWorkTime": true,
-        "sessionMins": 60,
+        "category": "transit_free",
+        "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+        "isWorkTime": false,
+        "sessionMins": 25,
         "subject": "Refactor: Update images, adapt for mobile, add theme toggle"
       },
       {
         "hash": "210c048",
         "time": "09:32",
         "datetime": "2025-10-14 09:32",
-        "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-        "isWorkTime": true,
+        "category": "transit_free",
+        "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+        "isWorkTime": false,
         "sessionMins": 19,
         "subject": "Update company contact information"
       }
@@ -240,20 +249,20 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "isHoliday": false,
     "holidayName": null,
     "totalCommits": 1,
-    "offCommits": 0,
-    "workCommits": 1,
-    "offHours": 0.0,
-    "workHours": 1.0,
-    "hasWorkCommits": true,
+    "offCommits": 1,
+    "workCommits": 0,
+    "offHours": 0.4,
+    "workHours": 0.0,
+    "hasWorkCommits": false,
     "commits": [
       {
         "hash": "f2ebc2f",
         "time": "10:43",
         "datetime": "2025-10-15 10:43",
-        "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-        "isWorkTime": true,
-        "sessionMins": 60,
+        "category": "transit_free",
+        "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+        "isWorkTime": false,
+        "sessionMins": 25,
         "subject": "Add admin panel database tables"
       }
     ]
@@ -266,40 +275,40 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "isHoliday": false,
     "holidayName": null,
     "totalCommits": 3,
-    "offCommits": 0,
-    "workCommits": 3,
-    "offHours": 0.0,
-    "workHours": 1.5,
-    "hasWorkCommits": true,
+    "offCommits": 3,
+    "workCommits": 0,
+    "offHours": 0.8,
+    "workHours": 0.0,
+    "hasWorkCommits": false,
     "commits": [
       {
         "hash": "5f334fd",
         "time": "12:10",
         "datetime": "2025-10-16 12:10",
-        "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-        "isWorkTime": true,
-        "sessionMins": 60,
+        "category": "transit_free",
+        "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+        "isWorkTime": false,
+        "sessionMins": 25,
         "subject": "Add admin user and update hero section"
       },
       {
         "hash": "e5ccd93",
         "time": "12:14",
         "datetime": "2025-10-16 12:14",
-        "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-        "isWorkTime": true,
-        "sessionMins": 15,
+        "category": "transit_free",
+        "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+        "isWorkTime": false,
+        "sessionMins": 10,
         "subject": "Refactor: Update hero section and theme"
       },
       {
         "hash": "1fb8fa9",
         "time": "12:19",
         "datetime": "2025-10-16 12:19",
-        "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-        "isWorkTime": true,
-        "sessionMins": 15,
+        "category": "transit_free",
+        "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+        "isWorkTime": false,
+        "sessionMins": 10,
         "subject": "Fix: Improve hero section and mobile responsiveness"
       }
     ]
@@ -315,7 +324,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "offCommits": 0,
     "workCommits": 7,
     "offHours": 0.0,
-    "workHours": 3.0,
+    "workHours": 1.8,
     "hasWorkCommits": true,
     "commits": [
       {
@@ -323,9 +332,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:20",
         "datetime": "2025-10-17 09:20",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "Refactor: Add comments and likes to news and promotions"
       },
       {
@@ -333,9 +342,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:22",
         "datetime": "2025-10-17 09:22",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Add login button to admin panel"
       },
       {
@@ -343,9 +352,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:32",
         "datetime": "2025-10-17 09:32",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Fix: Allow editing of \"Possibilities\" block"
       },
       {
@@ -353,9 +362,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:42",
         "datetime": "2025-10-17 09:42",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Fix: Allow creating multiple premium blocks"
       },
       {
@@ -363,7 +372,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:58",
         "datetime": "2025-10-17 09:58",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
         "sessionMins": 15,
         "subject": "Implement comment moderation"
@@ -373,9 +382,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "10:46",
         "datetime": "2025-10-17 10:46",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 48,
+        "sessionMins": 25,
         "subject": "Refactor contact section"
       },
       {
@@ -383,9 +392,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "10:54",
         "datetime": "2025-10-17 10:54",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Add animations and admin controls for stats"
       }
     ]
@@ -400,7 +409,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "totalCommits": 2,
     "offCommits": 2,
     "workCommits": 0,
-    "offHours": 1.2,
+    "offHours": 0.6,
     "workHours": 0.0,
     "hasWorkCommits": false,
     "commits": [
@@ -409,9 +418,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "04:34",
         "datetime": "2026-01-06 04:34",
         "category": "holiday",
-        "catLabel": "Гос. праздник РФ: Новогодние каникулы",
+        "catLabel": "Гос. праздник РФ (Нерабочий день)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "Changes"
       },
       {
@@ -419,9 +428,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "04:34",
         "datetime": "2026-01-06 04:34",
         "category": "holiday",
-        "catLabel": "Гос. праздник РФ: Новогодние каникулы",
+        "catLabel": "Гос. праздник РФ (Нерабочий день)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Implement FSM system scaffolding"
       }
     ]
@@ -436,7 +445,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "totalCommits": 6,
     "offCommits": 6,
     "workCommits": 0,
-    "offHours": 2.2,
+    "offHours": 1.3,
     "workHours": 0.0,
     "hasWorkCommits": false,
     "commits": [
@@ -445,9 +454,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "11:15",
         "datetime": "2026-01-08 11:15",
         "category": "holiday",
-        "catLabel": "Гос. праздник РФ: Новогодние каникулы",
+        "catLabel": "Гос. праздник РФ (Нерабочий день)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "Changes"
       },
       {
@@ -455,9 +464,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "11:15",
         "datetime": "2026-01-08 11:15",
         "category": "holiday",
-        "catLabel": "Гос. праздник РФ: Новогодние каникулы",
+        "catLabel": "Гос. праздник РФ (Нерабочий день)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Extend FSM admin panels"
       },
       {
@@ -465,9 +474,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "11:27",
         "datetime": "2026-01-08 11:27",
         "category": "holiday",
-        "catLabel": "Гос. праздник РФ: Новогодние каникулы",
+        "catLabel": "Гос. праздник РФ (Нерабочий день)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 12,
         "subject": "Changes"
       },
       {
@@ -475,9 +484,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "11:27",
         "datetime": "2026-01-08 11:27",
         "category": "holiday",
-        "catLabel": "Гос. праздник РФ: Новогодние каникулы",
+        "catLabel": "Гос. праздник РФ (Нерабочий день)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Fix log roles fetch"
       },
       {
@@ -485,9 +494,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "11:29",
         "datetime": "2026-01-08 11:29",
         "category": "holiday",
-        "catLabel": "Гос. праздник РФ: Новогодние каникулы",
+        "catLabel": "Гос. праздник РФ (Нерабочий день)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -495,9 +504,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "11:29",
         "datetime": "2026-01-08 11:29",
         "category": "holiday",
-        "catLabel": "Гос. праздник РФ: Новогодние каникулы",
+        "catLabel": "Гос. праздник РФ (Нерабочий день)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Fix FSM access race"
       }
     ]
@@ -510,50 +519,50 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "isHoliday": false,
     "holidayName": null,
     "totalCommits": 4,
-    "offCommits": 0,
-    "workCommits": 4,
-    "offHours": 0.0,
-    "workHours": 2.7,
-    "hasWorkCommits": true,
+    "offCommits": 4,
+    "workCommits": 0,
+    "offHours": 1.2,
+    "workHours": 0.0,
+    "hasWorkCommits": false,
     "commits": [
       {
         "hash": "d99685b",
         "time": "12:23",
         "datetime": "2026-01-09 12:23",
-        "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-        "isWorkTime": true,
-        "sessionMins": 60,
+        "category": "transit_free",
+        "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+        "isWorkTime": false,
+        "sessionMins": 25,
         "subject": "Changes"
       },
       {
         "hash": "976c56e",
         "time": "12:23",
         "datetime": "2026-01-09 12:23",
-        "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-        "isWorkTime": true,
-        "sessionMins": 15,
+        "category": "transit_free",
+        "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+        "isWorkTime": false,
+        "sessionMins": 10,
         "subject": "Add telegram bot edge function"
       },
       {
         "hash": "8820060",
         "time": "13:35",
         "datetime": "2026-01-09 13:35",
-        "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-        "isWorkTime": true,
-        "sessionMins": 72,
+        "category": "transit_free",
+        "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+        "isWorkTime": false,
+        "sessionMins": 25,
         "subject": "Changes"
       },
       {
         "hash": "ff18ad9",
         "time": "13:35",
         "datetime": "2026-01-09 13:35",
-        "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-        "isWorkTime": true,
-        "sessionMins": 15,
+        "category": "transit_free",
+        "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+        "isWorkTime": false,
+        "sessionMins": 10,
         "subject": "Add db proxy edge func"
       }
     ]
@@ -568,7 +577,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "totalCommits": 10,
     "offCommits": 10,
     "workCommits": 0,
-    "offHours": 4.0,
+    "offHours": 2.2,
     "workHours": 0.0,
     "hasWorkCommits": false,
     "commits": [
@@ -577,9 +586,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "02:07",
         "datetime": "2026-01-11 02:07",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "Changes"
       },
       {
@@ -587,9 +596,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "02:07",
         "datetime": "2026-01-11 02:07",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Enhance FSM staff flow"
       },
       {
@@ -597,9 +606,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "12:55",
         "datetime": "2026-01-11 12:55",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "Changes"
       },
       {
@@ -607,9 +616,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "12:55",
         "datetime": "2026-01-11 12:55",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Fix assign binding fix"
       },
       {
@@ -617,9 +626,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:00",
         "datetime": "2026-01-11 13:00",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -627,9 +636,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:01",
         "datetime": "2026-01-11 13:01",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Improve fsm search and accept flow"
       },
       {
@@ -637,9 +646,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:06",
         "datetime": "2026-01-11 13:06",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -647,9 +656,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:06",
         "datetime": "2026-01-11 13:06",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Объединить должности в прайм"
       },
       {
@@ -657,9 +666,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:13",
         "datetime": "2026-01-11 13:13",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -667,9 +676,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:13",
         "datetime": "2026-01-11 13:13",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Fix employee editing flow"
       }
     ]
@@ -682,30 +691,30 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "isHoliday": false,
     "holidayName": null,
     "totalCommits": 2,
-    "offCommits": 0,
-    "workCommits": 2,
-    "offHours": 0.0,
-    "workHours": 1.2,
-    "hasWorkCommits": true,
+    "offCommits": 2,
+    "workCommits": 0,
+    "offHours": 0.6,
+    "workHours": 0.0,
+    "hasWorkCommits": false,
     "commits": [
       {
         "hash": "2045287",
         "time": "10:41",
         "datetime": "2026-01-13 10:41",
-        "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-        "isWorkTime": true,
-        "sessionMins": 60,
+        "category": "transit_free",
+        "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+        "isWorkTime": false,
+        "sessionMins": 25,
         "subject": "Changes"
       },
       {
         "hash": "615c406",
         "time": "10:41",
         "datetime": "2026-01-13 10:41",
-        "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-        "isWorkTime": true,
-        "sessionMins": 15,
+        "category": "transit_free",
+        "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+        "isWorkTime": false,
+        "sessionMins": 10,
         "subject": "Улучшить FSM управление"
       }
     ]
@@ -718,30 +727,30 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "isHoliday": false,
     "holidayName": null,
     "totalCommits": 2,
-    "offCommits": 0,
-    "workCommits": 2,
-    "offHours": 0.0,
-    "workHours": 1.2,
-    "hasWorkCommits": true,
+    "offCommits": 2,
+    "workCommits": 0,
+    "offHours": 0.6,
+    "workHours": 0.0,
+    "hasWorkCommits": false,
     "commits": [
       {
         "hash": "5aad5e9",
         "time": "13:31",
         "datetime": "2026-01-14 13:31",
-        "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-        "isWorkTime": true,
-        "sessionMins": 60,
+        "category": "transit_free",
+        "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+        "isWorkTime": false,
+        "sessionMins": 25,
         "subject": "Changes"
       },
       {
         "hash": "3f2c8b9",
         "time": "13:31",
         "datetime": "2026-01-14 13:31",
-        "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-        "isWorkTime": true,
-        "sessionMins": 15,
+        "category": "transit_free",
+        "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+        "isWorkTime": false,
+        "sessionMins": 10,
         "subject": "Fix task visibility and menu"
       }
     ]
@@ -754,20 +763,20 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "isHoliday": false,
     "holidayName": null,
     "totalCommits": 1,
-    "offCommits": 0,
-    "workCommits": 1,
-    "offHours": 0.0,
-    "workHours": 1.0,
-    "hasWorkCommits": true,
+    "offCommits": 1,
+    "workCommits": 0,
+    "offHours": 0.4,
+    "workHours": 0.0,
+    "hasWorkCommits": false,
     "commits": [
       {
         "hash": "3214018",
         "time": "14:13",
         "datetime": "2026-01-16 14:13",
-        "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-        "isWorkTime": true,
-        "sessionMins": 60,
+        "category": "transit_free",
+        "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+        "isWorkTime": false,
+        "sessionMins": 25,
         "subject": "Обновление проекта: добавление новых компонентов и миграций"
       }
     ]
@@ -780,29 +789,29 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "isHoliday": false,
     "holidayName": null,
     "totalCommits": 3,
-    "offCommits": 0,
-    "workCommits": 3,
-    "offHours": 0.0,
-    "workHours": 1.8,
-    "hasWorkCommits": true,
+    "offCommits": 3,
+    "workCommits": 0,
+    "offHours": 1.1,
+    "workHours": 0.0,
+    "hasWorkCommits": false,
     "commits": [
       {
         "hash": "8b84558",
         "time": "14:33",
         "datetime": "2026-01-19 14:33",
-        "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-        "isWorkTime": true,
-        "sessionMins": 60,
+        "category": "transit_free",
+        "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+        "isWorkTime": false,
+        "sessionMins": 25,
         "subject": "Обновление компонентов и страниц проекта Домофондар"
       },
       {
         "hash": "bc28bd0",
         "time": "15:05",
         "datetime": "2026-01-19 15:05",
-        "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-        "isWorkTime": true,
+        "category": "transit_free",
+        "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+        "isWorkTime": false,
         "sessionMins": 32,
         "subject": "Добавление менеджера заявок и обновление компонентов"
       },
@@ -810,10 +819,10 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "hash": "ba821e3",
         "time": "15:06",
         "datetime": "2026-01-19 15:06",
-        "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-        "isWorkTime": true,
-        "sessionMins": 15,
+        "category": "transit_free",
+        "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+        "isWorkTime": false,
+        "sessionMins": 10,
         "subject": "Добавление компонента RequestsManager и миграции для заявок"
       }
     ]
@@ -828,7 +837,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "totalCommits": 4,
     "offCommits": 4,
     "workCommits": 0,
-    "offHours": 2.5,
+    "offHours": 1.2,
     "workHours": 0.0,
     "hasWorkCommits": false,
     "commits": [
@@ -839,7 +848,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "category": "night",
         "catLabel": "Глубокая ночь (00:00–06:00)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "Changes"
       },
       {
@@ -849,7 +858,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "category": "night",
         "catLabel": "Глубокая ночь (00:00–06:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Revamp FSM bottom nav and tables"
       },
       {
@@ -859,7 +868,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "category": "night",
         "catLabel": "Глубокая ночь (00:00–06:00)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "Changes"
       },
       {
@@ -869,7 +878,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "category": "night",
         "catLabel": "Глубокая ночь (00:00–06:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Improve FSM RequestDetails UI"
       }
     ]
@@ -884,7 +893,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "totalCommits": 2,
     "offCommits": 2,
     "workCommits": 0,
-    "offHours": 1.2,
+    "offHours": 0.6,
     "workHours": 0.0,
     "hasWorkCommits": false,
     "commits": [
@@ -895,7 +904,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "category": "morning",
         "catLabel": "Раннее утро (06:00–09:00)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "Changes"
       },
       {
@@ -905,7 +914,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "category": "morning",
         "catLabel": "Раннее утро (06:00–09:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Improve FSM requests UI and reporting"
       }
     ]
@@ -920,7 +929,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "totalCommits": 4,
     "offCommits": 4,
     "workCommits": 0,
-    "offHours": 1.8,
+    "offHours": 0.9,
     "workHours": 0.0,
     "hasWorkCommits": false,
     "commits": [
@@ -929,9 +938,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:48",
         "datetime": "2026-02-07 15:48",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "Changes"
       },
       {
@@ -939,9 +948,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:48",
         "datetime": "2026-02-07 15:48",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Enhance FSM requests management"
       },
       {
@@ -949,9 +958,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:57",
         "datetime": "2026-02-07 15:57",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -959,9 +968,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:57",
         "datetime": "2026-02-07 15:57",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Расширил FSM отчёт"
       }
     ]
@@ -976,7 +985,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "totalCommits": 4,
     "offCommits": 4,
     "workCommits": 0,
-    "offHours": 1.8,
+    "offHours": 0.9,
     "workHours": 0.0,
     "hasWorkCommits": false,
     "commits": [
@@ -985,9 +994,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "11:47",
         "datetime": "2026-02-08 11:47",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "Changes"
       },
       {
@@ -995,9 +1004,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "11:47",
         "datetime": "2026-02-08 11:47",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Add manager role support"
       },
       {
@@ -1005,9 +1014,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "11:59",
         "datetime": "2026-02-08 11:59",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 11,
         "subject": "Changes"
       },
       {
@@ -1015,9 +1024,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "11:59",
         "datetime": "2026-02-08 11:59",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Improve FSM nav and UI"
       }
     ]
@@ -1030,30 +1039,30 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "isHoliday": false,
     "holidayName": null,
     "totalCommits": 2,
-    "offCommits": 0,
-    "workCommits": 2,
-    "offHours": 0.0,
-    "workHours": 1.2,
-    "hasWorkCommits": true,
+    "offCommits": 2,
+    "workCommits": 0,
+    "offHours": 0.6,
+    "workHours": 0.0,
+    "hasWorkCommits": false,
     "commits": [
       {
         "hash": "91ac1af",
         "time": "11:12",
         "datetime": "2026-02-09 11:12",
-        "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-        "isWorkTime": true,
-        "sessionMins": 60,
+        "category": "transit_free",
+        "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+        "isWorkTime": false,
+        "sessionMins": 25,
         "subject": "Changes"
       },
       {
         "hash": "8d8739c",
         "time": "11:12",
         "datetime": "2026-02-09 11:12",
-        "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-        "isWorkTime": true,
-        "sessionMins": 15,
+        "category": "transit_free",
+        "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+        "isWorkTime": false,
+        "sessionMins": 10,
         "subject": "Расширил FSM дашборд"
       }
     ]
@@ -1068,7 +1077,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "totalCommits": 2,
     "offCommits": 2,
     "workCommits": 0,
-    "offHours": 1.2,
+    "offHours": 0.6,
     "workHours": 0.0,
     "hasWorkCommits": false,
     "commits": [
@@ -1079,7 +1088,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "category": "morning",
         "catLabel": "Раннее утро (06:00–09:00)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "Changes"
       },
       {
@@ -1089,7 +1098,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "category": "morning",
         "catLabel": "Раннее утро (06:00–09:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Enable FSM access & verification"
       }
     ]
@@ -1105,7 +1114,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "offCommits": 0,
     "workCommits": 16,
     "offHours": 0.0,
-    "workHours": 5.8,
+    "workHours": 3.5,
     "hasWorkCommits": true,
     "commits": [
       {
@@ -1113,9 +1122,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "11:25",
         "datetime": "2026-03-18 11:25",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "Add Calculator page and update logic"
       },
       {
@@ -1123,9 +1132,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "11:39",
         "datetime": "2026-03-18 11:39",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 13,
         "subject": "Work in progress"
       },
       {
@@ -1133,9 +1142,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "11:39",
         "datetime": "2026-03-18 11:39",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -1143,9 +1152,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "11:39",
         "datetime": "2026-03-18 11:39",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Integrate calculator styling"
       },
       {
@@ -1153,9 +1162,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "11:40",
         "datetime": "2026-03-18 11:40",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Integrate calculator page"
       },
       {
@@ -1163,9 +1172,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "11:40",
         "datetime": "2026-03-18 11:40",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Preceding changes"
       },
       {
@@ -1173,9 +1182,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "11:40",
         "datetime": "2026-03-18 11:40",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Enhance calculator page styling"
       },
       {
@@ -1183,9 +1192,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "11:40",
         "datetime": "2026-03-18 11:40",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Enhance calculator page and admin tab"
       },
       {
@@ -1193,9 +1202,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "11:41",
         "datetime": "2026-03-18 11:41",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Add calculator page polish"
       },
       {
@@ -1203,9 +1212,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "11:54",
         "datetime": "2026-03-18 11:54",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 13,
         "subject": "Исправлена верификация и расчёты"
       },
       {
@@ -1213,9 +1222,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "11:57",
         "datetime": "2026-03-18 11:57",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Update profiles policy"
       },
       {
@@ -1223,9 +1232,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "11:58",
         "datetime": "2026-03-18 11:58",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Add manager update policy"
       },
       {
@@ -1233,9 +1242,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:09",
         "datetime": "2026-03-18 13:09",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 71,
+        "sessionMins": 25,
         "subject": "Update gate calculation logic: 5500 RUB per gate shared by apartments"
       },
       {
@@ -1243,9 +1252,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:20",
         "datetime": "2026-03-18 13:20",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Fix gate price display in calculator details"
       },
       {
@@ -1253,7 +1262,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:44",
         "datetime": "2026-03-18 13:44",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
         "sessionMins": 24,
         "subject": "Update package-lock.json after dependency installation"
@@ -1263,9 +1272,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:54",
         "datetime": "2026-03-18 13:54",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Fix lint error (explicit any) in Calculator.tsx"
       }
     ]
@@ -1280,7 +1289,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "totalCommits": 17,
     "offCommits": 17,
     "workCommits": 0,
-    "offHours": 5.0,
+    "offHours": 3.1,
     "workHours": 0.0,
     "hasWorkCommits": false,
     "commits": [
@@ -1291,7 +1300,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "category": "morning",
         "catLabel": "Раннее утро (06:00–09:00)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "Обновил интерфейс ядра"
       },
       {
@@ -1301,7 +1310,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "category": "morning",
         "catLabel": "Раннее утро (06:00–09:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Add chat widget table"
       },
       {
@@ -1311,7 +1320,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "category": "morning",
         "catLabel": "Раннее утро (06:00–09:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Preceding changes"
       },
       {
@@ -1321,7 +1330,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "category": "morning",
         "catLabel": "Раннее утро (06:00–09:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Preceding changes"
       },
       {
@@ -1331,7 +1340,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "category": "morning",
         "catLabel": "Раннее утро (06:00–09:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Добавлен чат-виджет ИИ"
       },
       {
@@ -1341,7 +1350,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "category": "morning",
         "catLabel": "Раннее утро (06:00–09:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Preceding changes"
       },
       {
@@ -1351,7 +1360,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "category": "morning",
         "catLabel": "Раннее утро (06:00–09:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Добавил чат-виджет и админку"
       },
       {
@@ -1361,7 +1370,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "category": "morning",
         "catLabel": "Раннее утро (06:00–09:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Добавил AI чат виджет"
       },
       {
@@ -1371,7 +1380,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "category": "morning",
         "catLabel": "Раннее утро (06:00–09:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Добавил чат-виджет AI"
       },
       {
@@ -1381,7 +1390,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "category": "morning",
         "catLabel": "Раннее утро (06:00–09:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Add AI chat widget"
       },
       {
@@ -1391,7 +1400,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "category": "morning",
         "catLabel": "Раннее утро (06:00–09:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 11,
         "subject": "Добавил чат-ответ с Markdown"
       },
       {
@@ -1401,7 +1410,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "category": "morning",
         "catLabel": "Раннее утро (06:00–09:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Add chat history tables"
       },
       {
@@ -1411,7 +1420,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "category": "morning",
         "catLabel": "Раннее утро (06:00–09:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Добавил чат историю и политику"
       },
       {
@@ -1421,7 +1430,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "category": "morning",
         "catLabel": "Раннее утро (06:00–09:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Preceding changes"
       },
       {
@@ -1431,7 +1440,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "category": "morning",
         "catLabel": "Раннее утро (06:00–09:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Preceding changes"
       },
       {
@@ -1441,7 +1450,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "category": "morning",
         "catLabel": "Раннее утро (06:00–09:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Chat history admin page added"
       },
       {
@@ -1451,7 +1460,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "category": "morning",
         "catLabel": "Раннее утро (06:00–09:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Добавил историю чатов админке"
       }
     ]
@@ -1466,7 +1475,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "totalCommits": 6,
     "offCommits": 6,
     "workCommits": 0,
-    "offHours": 2.4,
+    "offHours": 1.5,
     "workHours": 0.0,
     "hasWorkCommits": false,
     "commits": [
@@ -1475,9 +1484,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "10:05",
         "datetime": "2026-03-21 10:05",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "Work in progress"
       },
       {
@@ -1485,9 +1494,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "10:06",
         "datetime": "2026-03-21 10:06",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Make chat widget links clickable"
       },
       {
@@ -1495,9 +1504,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "10:06",
         "datetime": "2026-03-21 10:06",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Поддержка ссылок в виджете"
       },
       {
@@ -1505,9 +1514,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "10:07",
         "datetime": "2026-03-21 10:07",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Enable HTML links in chat widget"
       },
       {
@@ -1515,7 +1524,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "10:30",
         "datetime": "2026-03-21 10:30",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
         "sessionMins": 23,
         "subject": "Добавил пуш-уведомления"
@@ -1525,9 +1534,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "10:30",
         "datetime": "2026-03-21 10:30",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Добавил подписки пуш-уведомлений"
       }
     ]
@@ -1543,7 +1552,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "offCommits": 0,
     "workCommits": 15,
     "offHours": 0.0,
-    "workHours": 4.5,
+    "workHours": 2.9,
     "hasWorkCommits": true,
     "commits": [
       {
@@ -1551,9 +1560,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:25",
         "datetime": "2026-03-23 13:25",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "Enable push notifications setup"
       },
       {
@@ -1561,9 +1570,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:25",
         "datetime": "2026-03-23 13:25",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Add push notifications"
       },
       {
@@ -1571,9 +1580,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:25",
         "datetime": "2026-03-23 13:25",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Добавил push-уведомления"
       },
       {
@@ -1581,9 +1590,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:26",
         "datetime": "2026-03-23 13:26",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Add push notifications support"
       },
       {
@@ -1591,9 +1600,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:26",
         "datetime": "2026-03-23 13:26",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Add push notification support"
       },
       {
@@ -1601,9 +1610,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:26",
         "datetime": "2026-03-23 13:26",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Add push notifications support"
       },
       {
@@ -1611,9 +1620,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:26",
         "datetime": "2026-03-23 13:26",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Добавил push-уведомления"
       },
       {
@@ -1621,9 +1630,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:26",
         "datetime": "2026-03-23 13:26",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Enable push notifications"
       },
       {
@@ -1631,9 +1640,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:27",
         "datetime": "2026-03-23 13:27",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Add push-notifications"
       },
       {
@@ -1641,7 +1650,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:45",
         "datetime": "2026-03-23 13:45",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
         "sessionMins": 17,
         "subject": "Push notifications failing"
@@ -1651,9 +1660,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:45",
         "datetime": "2026-03-23 13:45",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Fix push notification encryption"
       },
       {
@@ -1661,9 +1670,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:45",
         "datetime": "2026-03-23 13:45",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Push notifications fixed"
       },
       {
@@ -1671,9 +1680,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:46",
         "datetime": "2026-03-23 13:46",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Fix push notification flow"
       },
       {
@@ -1681,9 +1690,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:46",
         "datetime": "2026-03-23 13:46",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Fix push notification flow"
       },
       {
@@ -1691,9 +1700,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:46",
         "datetime": "2026-03-23 13:46",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Fix push notification encryption"
       }
     ]
@@ -1708,7 +1717,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "totalCommits": 4,
     "offCommits": 4,
     "workCommits": 0,
-    "offHours": 1.8,
+    "offHours": 0.9,
     "workHours": 0.0,
     "hasWorkCommits": false,
     "commits": [
@@ -1717,9 +1726,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "18:05",
         "datetime": "2026-03-24 18:05",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "Fix push notifications flow"
       },
       {
@@ -1727,9 +1736,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "18:07",
         "datetime": "2026-03-24 18:07",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Enhance admin/director RBAC"
       },
       {
@@ -1737,9 +1746,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "18:07",
         "datetime": "2026-03-24 18:07",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Improve push & admin guards"
       },
       {
@@ -1747,9 +1756,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "18:08",
         "datetime": "2026-03-24 18:08",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Improve push notifications and admin rules"
       }
     ]
@@ -1765,7 +1774,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "offCommits": 0,
     "workCommits": 13,
     "offHours": 0.0,
-    "workHours": 4.0,
+    "workHours": 2.5,
     "hasWorkCommits": true,
     "commits": [
       {
@@ -1773,9 +1782,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:21",
         "datetime": "2026-03-26 15:21",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "Work in progress"
       },
       {
@@ -1783,9 +1792,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:23",
         "datetime": "2026-03-26 15:23",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Fix push notifications"
       },
       {
@@ -1793,9 +1802,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:23",
         "datetime": "2026-03-26 15:23",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Fix push notifications"
       },
       {
@@ -1803,9 +1812,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:25",
         "datetime": "2026-03-26 15:25",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Fix push notifications delivery"
       },
       {
@@ -1813,9 +1822,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:26",
         "datetime": "2026-03-26 15:26",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Improve push notifications"
       },
       {
@@ -1823,9 +1832,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:26",
         "datetime": "2026-03-26 15:26",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Improve push notifications"
       },
       {
@@ -1833,9 +1842,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:38",
         "datetime": "2026-03-26 15:38",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 12,
         "subject": "Add telegram tables"
       },
       {
@@ -1843,9 +1852,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:39",
         "datetime": "2026-03-26 15:39",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Add Telegram DB tables"
       },
       {
@@ -1853,9 +1862,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:40",
         "datetime": "2026-03-26 15:40",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Add telegram bot + notify flow"
       },
       {
@@ -1863,9 +1872,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:40",
         "datetime": "2026-03-26 15:40",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Add Telegram bot & notify flow"
       },
       {
@@ -1873,9 +1882,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:40",
         "datetime": "2026-03-26 15:40",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Add telegram bot tables and notify flow"
       },
       {
@@ -1883,9 +1892,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:41",
         "datetime": "2026-03-26 15:41",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Enhance push + Telegram bot"
       },
       {
@@ -1893,9 +1902,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:42",
         "datetime": "2026-03-26 15:42",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Improve push-notif and Telegram bot"
       }
     ]
@@ -1908,20 +1917,20 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "isHoliday": false,
     "holidayName": null,
     "totalCommits": 16,
-    "offCommits": 15,
-    "workCommits": 1,
-    "offHours": 3.8,
-    "workHours": 1.0,
-    "hasWorkCommits": true,
+    "offCommits": 16,
+    "workCommits": 0,
+    "offHours": 2.9,
+    "workHours": 0.0,
+    "hasWorkCommits": false,
     "commits": [
       {
         "hash": "f0ae7be",
         "time": "16:59",
         "datetime": "2026-04-01 16:59",
-        "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-        "isWorkTime": true,
-        "sessionMins": 60,
+        "category": "evening",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+        "isWorkTime": false,
+        "sessionMins": 25,
         "subject": "Work in progress"
       },
       {
@@ -1929,9 +1938,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "17:00",
         "datetime": "2026-04-01 17:00",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -1939,9 +1948,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "17:01",
         "datetime": "2026-04-01 17:01",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Integrate account data system"
       },
       {
@@ -1949,9 +1958,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "17:02",
         "datetime": "2026-04-01 17:02",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Fix calculator RLS policy"
       },
       {
@@ -1959,9 +1968,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "17:02",
         "datetime": "2026-04-01 17:02",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Fix RLS and add accounts"
       },
       {
@@ -1969,9 +1978,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "17:03",
         "datetime": "2026-04-01 17:03",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Fix calculator RLS and add accounts table"
       },
       {
@@ -1979,9 +1988,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "17:04",
         "datetime": "2026-04-01 17:04",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Preceding changes"
       },
       {
@@ -1989,9 +1998,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "17:04",
         "datetime": "2026-04-01 17:04",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Preceding changes"
       },
       {
@@ -1999,9 +2008,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "17:04",
         "datetime": "2026-04-01 17:04",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Fix calculator RLS and perms"
       },
       {
@@ -2009,9 +2018,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "17:04",
         "datetime": "2026-04-01 17:04",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Fix calculator RLS and perms"
       },
       {
@@ -2019,9 +2028,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "17:05",
         "datetime": "2026-04-01 17:05",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Preceding changes"
       },
       {
@@ -2029,9 +2038,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "17:05",
         "datetime": "2026-04-01 17:05",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Accounts admin UI added"
       },
       {
@@ -2039,9 +2048,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "17:05",
         "datetime": "2026-04-01 17:05",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Preceding changes"
       },
       {
@@ -2049,9 +2058,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "17:05",
         "datetime": "2026-04-01 17:05",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Add AccountsManager UI"
       },
       {
@@ -2059,9 +2068,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "17:05",
         "datetime": "2026-04-01 17:05",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Enhance accounts mgmt and UI"
       },
       {
@@ -2069,9 +2078,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "17:06",
         "datetime": "2026-04-01 17:06",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Accounts data UI added"
       }
     ]
@@ -2084,10 +2093,10 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "isHoliday": false,
     "holidayName": null,
     "totalCommits": 36,
-    "offCommits": 3,
-    "workCommits": 33,
-    "offHours": 1.5,
-    "workHours": 11.6,
+    "offCommits": 6,
+    "workCommits": 30,
+    "offHours": 1.8,
+    "workHours": 6.8,
     "hasWorkCommits": true,
     "commits": [
       {
@@ -2095,9 +2104,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "10:24",
         "datetime": "2026-04-06 10:24",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "Work in progress"
       },
       {
@@ -2105,9 +2114,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "10:24",
         "datetime": "2026-04-06 10:24",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2115,9 +2124,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "10:24",
         "datetime": "2026-04-06 10:24",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Increase workbox cache limit"
       },
       {
@@ -2125,9 +2134,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "11:10",
         "datetime": "2026-04-06 11:10",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 45,
+        "sessionMins": 25,
         "subject": "feat: добавлена автоматизированная генерация КП в формате DOCX и интеграция с админ-панелью"
       },
       {
@@ -2135,7 +2144,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "11:37",
         "datetime": "2026-04-06 11:37",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
         "sessionMins": 26,
         "subject": "style: обновлен футер КП (автогенерация и кликабельная ссылка)"
@@ -2145,9 +2154,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "11:39",
         "datetime": "2026-04-06 11:39",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "feat: в КП добавлен логотип компании"
       },
       {
@@ -2155,9 +2164,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "11:45",
         "datetime": "2026-04-06 11:45",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "fix: исправлена нумерация разделов и детализация тарифа в КП"
       },
       {
@@ -2165,9 +2174,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "11:53",
         "datetime": "2026-04-06 11:53",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "style: ширина логотипа в КП увеличена для корректного соотношения сторон"
       },
       {
@@ -2175,7 +2184,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "12:23",
         "datetime": "2026-04-06 12:23",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
         "sessionMins": 29,
         "subject": "Improve address-based info bot"
@@ -2185,9 +2194,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "12:23",
         "datetime": "2026-04-06 12:23",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Fix build TS issues and bot"
       },
       {
@@ -2195,9 +2204,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "12:24",
         "datetime": "2026-04-06 12:24",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Fix chat account info handling"
       },
       {
@@ -2205,9 +2214,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "12:29",
         "datetime": "2026-04-06 12:29",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Address lookup failed fixed"
       },
       {
@@ -2215,9 +2224,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "12:29",
         "datetime": "2026-04-06 12:29",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Improve account search robustness"
       },
       {
@@ -2225,9 +2234,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "12:44",
         "datetime": "2026-04-06 12:44",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 14,
         "subject": "Work in progress"
       },
       {
@@ -2235,9 +2244,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "12:44",
         "datetime": "2026-04-06 12:44",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2245,9 +2254,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "12:45",
         "datetime": "2026-04-06 12:45",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Уточнил поиск по адресу"
       },
       {
@@ -2255,9 +2264,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "12:45",
         "datetime": "2026-04-06 12:45",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Improve account output formatting from chat"
       },
       {
@@ -2265,7 +2274,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:05",
         "datetime": "2026-04-06 13:05",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
         "sessionMins": 20,
         "subject": "feat: динамическая нумерация и обновление текстов в КП"
@@ -2275,7 +2284,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:20",
         "datetime": "2026-04-06 13:20",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
         "sessionMins": 15,
         "subject": "feat: интерактивные подсказки и улучшенные тексты в калькуляторе"
@@ -2285,9 +2294,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:24",
         "datetime": "2026-04-06 13:24",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "chore: синхронизация всех файлов проекта и ассетов"
       },
       {
@@ -2295,9 +2304,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:27",
         "datetime": "2026-04-06 13:27",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "fix: валюта чат-бота изменена на рубли"
       },
       {
@@ -2305,9 +2314,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:35",
         "datetime": "2026-04-06 13:35",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "feat: добавлена проверка задолженности при создании заявки в чате"
       },
       {
@@ -2315,9 +2324,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:37",
         "datetime": "2026-04-06 13:37",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "fix: опечатка и уточнение логики платных вызовов в чат-боте"
       },
       {
@@ -2325,7 +2334,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:55",
         "datetime": "2026-04-06 13:55",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
         "sessionMins": 17,
         "subject": "fix: глубокое исправление поиска по адресу и валюты в чат-боте"
@@ -2335,9 +2344,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "14:00",
         "datetime": "2026-04-06 14:00",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "feat: интеллектуальная очистка промпта и типизация чат-функции"
       },
       {
@@ -2345,9 +2354,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "14:04",
         "datetime": "2026-04-06 14:04",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "fix: устранение зависания при пустом адресе в поиске"
       },
       {
@@ -2355,9 +2364,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "14:12",
         "datetime": "2026-04-06 14:12",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "feat: добавлена информация о компании в конец КП (docx)"
       },
       {
@@ -2365,9 +2374,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "14:25",
         "datetime": "2026-04-06 14:25",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 13,
         "subject": "style: центрирование блока контактов в КП"
       },
       {
@@ -2375,9 +2384,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:50",
         "datetime": "2026-04-06 15:50",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 85,
+        "sessionMins": 25,
         "subject": "fix: калькулятор 0 домофонов и обновление текстов КП"
       },
       {
@@ -2385,18 +2394,18 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:53",
         "datetime": "2026-04-06 15:53",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "style: уточнение формулировки про калитки в КП"
       },
       {
         "hash": "84e281b",
         "time": "16:21",
         "datetime": "2026-04-06 16:21",
-        "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-        "isWorkTime": true,
+        "category": "evening",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+        "isWorkTime": false,
         "sessionMins": 27,
         "subject": "fix: установка 0 домофонов по умолчанию и фикс зависимости цен за камеры"
       },
@@ -2404,9 +2413,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "hash": "9fa4a24",
         "time": "16:46",
         "datetime": "2026-04-06 16:46",
-        "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-        "isWorkTime": true,
+        "category": "evening",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+        "isWorkTime": false,
         "sessionMins": 24,
         "subject": "fix: восстановление переменных и применение разделенной логики тарифов"
       },
@@ -2414,10 +2423,10 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "hash": "e90db96",
         "time": "16:57",
         "datetime": "2026-04-06 16:57",
-        "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-        "isWorkTime": true,
-        "sessionMins": 15,
+        "category": "evening",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+        "isWorkTime": false,
+        "sessionMins": 11,
         "subject": "feat: добавление кол-ва подъездов и квартир в заголовок КП"
       },
       {
@@ -2425,9 +2434,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "17:00",
         "datetime": "2026-04-06 17:00",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "feat: детализация состава оборудования в тезисах КП"
       },
       {
@@ -2435,9 +2444,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "17:03",
         "datetime": "2026-04-06 17:03",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "fix: скрытие тезисов про домофон в КП при их отсутствии"
       },
       {
@@ -2445,9 +2454,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "20:33",
         "datetime": "2026-04-06 20:33",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "docs: итоговый отчет о прогрессе проекта"
       }
     ]
@@ -2462,7 +2471,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "totalCommits": 15,
     "offCommits": 15,
     "workCommits": 0,
-    "offHours": 4.5,
+    "offHours": 2.8,
     "workHours": 0.0,
     "hasWorkCommits": false,
     "commits": [
@@ -2471,9 +2480,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "16:41",
         "datetime": "2026-04-19 16:41",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "Changes"
       },
       {
@@ -2481,9 +2490,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "16:42",
         "datetime": "2026-04-19 16:42",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2491,9 +2500,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "16:42",
         "datetime": "2026-04-19 16:42",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2501,9 +2510,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "16:43",
         "datetime": "2026-04-19 16:43",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2511,9 +2520,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "16:43",
         "datetime": "2026-04-19 16:43",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2521,9 +2530,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "16:43",
         "datetime": "2026-04-19 16:43",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2531,9 +2540,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "16:43",
         "datetime": "2026-04-19 16:43",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2541,9 +2550,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "16:43",
         "datetime": "2026-04-19 16:43",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2551,9 +2560,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "16:44",
         "datetime": "2026-04-19 16:44",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2561,9 +2570,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "16:44",
         "datetime": "2026-04-19 16:44",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2571,9 +2580,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "16:44",
         "datetime": "2026-04-19 16:44",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2581,9 +2590,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "16:45",
         "datetime": "2026-04-19 16:45",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2591,9 +2600,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "16:45",
         "datetime": "2026-04-19 16:45",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2601,9 +2610,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "16:45",
         "datetime": "2026-04-19 16:45",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2611,9 +2620,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "16:45",
         "datetime": "2026-04-19 16:45",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Добавил AI SEO систему"
       }
     ]
@@ -2628,7 +2637,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "totalCommits": 15,
     "offCommits": 15,
     "workCommits": 0,
-    "offHours": 4.5,
+    "offHours": 2.8,
     "workHours": 0.0,
     "hasWorkCommits": false,
     "commits": [
@@ -2637,9 +2646,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:03",
         "datetime": "2026-04-25 15:03",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "Changes"
       },
       {
@@ -2647,9 +2656,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:03",
         "datetime": "2026-04-25 15:03",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2657,9 +2666,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:03",
         "datetime": "2026-04-25 15:03",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2667,9 +2676,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:04",
         "datetime": "2026-04-25 15:04",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2677,9 +2686,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:05",
         "datetime": "2026-04-25 15:05",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2687,9 +2696,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:06",
         "datetime": "2026-04-25 15:06",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2697,9 +2706,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:06",
         "datetime": "2026-04-25 15:06",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2707,9 +2716,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:06",
         "datetime": "2026-04-25 15:06",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2717,9 +2726,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:07",
         "datetime": "2026-04-25 15:07",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2727,9 +2736,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:07",
         "datetime": "2026-04-25 15:07",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2737,9 +2746,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:08",
         "datetime": "2026-04-25 15:08",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Исправил баг в SEO apply"
       },
       {
@@ -2747,9 +2756,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:11",
         "datetime": "2026-04-25 15:11",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2757,9 +2766,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:12",
         "datetime": "2026-04-25 15:12",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2767,9 +2776,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:12",
         "datetime": "2026-04-25 15:12",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2777,9 +2786,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:12",
         "datetime": "2026-04-25 15:12",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Добавил авто-новости в админке"
       }
     ]
@@ -2794,7 +2803,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "totalCommits": 22,
     "offCommits": 22,
     "workCommits": 0,
-    "offHours": 6.3,
+    "offHours": 4.0,
     "workHours": 0.0,
     "hasWorkCommits": false,
     "commits": [
@@ -2803,9 +2812,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:18",
         "datetime": "2026-04-26 09:18",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "Changes"
       },
       {
@@ -2813,9 +2822,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:18",
         "datetime": "2026-04-26 09:18",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2823,9 +2832,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:19",
         "datetime": "2026-04-26 09:19",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2833,9 +2842,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:19",
         "datetime": "2026-04-26 09:19",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2843,9 +2852,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:20",
         "datetime": "2026-04-26 09:20",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2853,9 +2862,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:20",
         "datetime": "2026-04-26 09:20",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2863,9 +2872,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:20",
         "datetime": "2026-04-26 09:20",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2873,9 +2882,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:21",
         "datetime": "2026-04-26 09:21",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2883,9 +2892,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:21",
         "datetime": "2026-04-26 09:21",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2893,9 +2902,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:21",
         "datetime": "2026-04-26 09:21",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2903,9 +2912,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:21",
         "datetime": "2026-04-26 09:21",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2913,9 +2922,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:22",
         "datetime": "2026-04-26 09:22",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2923,9 +2932,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:23",
         "datetime": "2026-04-26 09:23",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2933,9 +2942,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:23",
         "datetime": "2026-04-26 09:23",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Обновиł render markdown w postach"
       },
       {
@@ -2943,7 +2952,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:39",
         "datetime": "2026-04-26 09:39",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
         "sessionMins": 16,
         "subject": "Changes"
@@ -2953,9 +2962,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:40",
         "datetime": "2026-04-26 09:40",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2963,9 +2972,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:40",
         "datetime": "2026-04-26 09:40",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2973,9 +2982,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:40",
         "datetime": "2026-04-26 09:40",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2983,9 +2992,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:41",
         "datetime": "2026-04-26 09:41",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -2993,9 +3002,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:41",
         "datetime": "2026-04-26 09:41",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3003,9 +3012,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:41",
         "datetime": "2026-04-26 09:41",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3013,9 +3022,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:42",
         "datetime": "2026-04-26 09:42",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Исправил посты и добавил редактор"
       }
     ]
@@ -3030,8 +3039,8 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "totalCommits": 20,
     "offCommits": 8,
     "workCommits": 12,
-    "offHours": 2.8,
-    "workHours": 3.8,
+    "offHours": 1.6,
+    "workHours": 2.2,
     "hasWorkCommits": true,
     "commits": [
       {
@@ -3039,9 +3048,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:21",
         "datetime": "2026-04-27 09:21",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "Changes"
       },
       {
@@ -3049,9 +3058,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:21",
         "datetime": "2026-04-27 09:21",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3059,9 +3068,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:21",
         "datetime": "2026-04-27 09:21",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3069,9 +3078,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:22",
         "datetime": "2026-04-27 09:22",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3079,9 +3088,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:23",
         "datetime": "2026-04-27 09:23",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3089,9 +3098,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:23",
         "datetime": "2026-04-27 09:23",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3099,9 +3108,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:24",
         "datetime": "2026-04-27 09:24",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3109,9 +3118,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:24",
         "datetime": "2026-04-27 09:24",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3119,9 +3128,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:24",
         "datetime": "2026-04-27 09:24",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3129,9 +3138,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:24",
         "datetime": "2026-04-27 09:24",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3139,9 +3148,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:24",
         "datetime": "2026-04-27 09:24",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3149,9 +3158,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:25",
         "datetime": "2026-04-27 09:25",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Исправил сегменты и голосование"
       },
       {
@@ -3159,9 +3168,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "21:46",
         "datetime": "2026-04-27 21:46",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "Changes"
       },
       {
@@ -3169,9 +3178,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "21:46",
         "datetime": "2026-04-27 21:46",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3179,9 +3188,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "21:47",
         "datetime": "2026-04-27 21:47",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3189,9 +3198,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "21:47",
         "datetime": "2026-04-27 21:47",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3199,9 +3208,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "21:48",
         "datetime": "2026-04-27 21:48",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3209,9 +3218,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "21:49",
         "datetime": "2026-04-27 21:49",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3219,9 +3228,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "21:49",
         "datetime": "2026-04-27 21:49",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3229,9 +3238,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "21:50",
         "datetime": "2026-04-27 21:50",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Добавил CRUD сегментов и шаблон"
       }
     ]
@@ -3246,7 +3255,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "totalCommits": 9,
     "offCommits": 9,
     "workCommits": 0,
-    "offHours": 3.0,
+    "offHours": 1.8,
     "workHours": 0.0,
     "hasWorkCommits": false,
     "commits": [
@@ -3255,9 +3264,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:40",
         "datetime": "2026-05-01 09:40",
         "category": "holiday",
-        "catLabel": "Гос. праздник РФ: Праздник Весны и Труда",
+        "catLabel": "Гос. праздник РФ (Нерабочий день)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "Changes"
       },
       {
@@ -3265,9 +3274,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:40",
         "datetime": "2026-05-01 09:40",
         "category": "holiday",
-        "catLabel": "Гос. праздник РФ: Праздник Весны и Труда",
+        "catLabel": "Гос. праздник РФ (Нерабочий день)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3275,9 +3284,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:40",
         "datetime": "2026-05-01 09:40",
         "category": "holiday",
-        "catLabel": "Гос. праздник РФ: Праздник Весны и Труда",
+        "catLabel": "Гос. праздник РФ (Нерабочий день)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3285,9 +3294,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:40",
         "datetime": "2026-05-01 09:40",
         "category": "holiday",
-        "catLabel": "Гос. праздник РФ: Праздник Весны и Труда",
+        "catLabel": "Гос. праздник РФ (Нерабочий день)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3295,9 +3304,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:41",
         "datetime": "2026-05-01 09:41",
         "category": "holiday",
-        "catLabel": "Гос. праздник РФ: Праздник Весны и Труда",
+        "catLabel": "Гос. праздник РФ (Нерабочий день)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Устранил ошибку SEO-постинга"
       },
       {
@@ -3305,9 +3314,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:52",
         "datetime": "2026-05-01 09:52",
         "category": "holiday",
-        "catLabel": "Гос. праздник РФ: Праздник Весны и Труда",
+        "catLabel": "Гос. праздник РФ (Нерабочий день)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3315,9 +3324,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:52",
         "datetime": "2026-05-01 09:52",
         "category": "holiday",
-        "catLabel": "Гос. праздник РФ: Праздник Весны и Труда",
+        "catLabel": "Гос. праздник РФ (Нерабочий день)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Исправил формат периода и тг"
       },
       {
@@ -3325,9 +3334,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:55",
         "datetime": "2026-05-01 09:55",
         "category": "holiday",
-        "catLabel": "Гос. праздник РФ: Праздник Весны и Труда",
+        "catLabel": "Гос. праздник РФ (Нерабочий день)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3335,9 +3344,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:55",
         "datetime": "2026-05-01 09:55",
         "category": "holiday",
-        "catLabel": "Гос. праздник РФ: Праздник Весны и Труда",
+        "catLabel": "Гос. праздник РФ (Нерабочий день)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Убрал дубль валюты и fixed period"
       }
     ]
@@ -3352,7 +3361,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "totalCommits": 10,
     "offCommits": 10,
     "workCommits": 0,
-    "offHours": 3.2,
+    "offHours": 1.9,
     "workHours": 0.0,
     "hasWorkCommits": false,
     "commits": [
@@ -3361,9 +3370,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "12:58",
         "datetime": "2026-05-02 12:58",
         "category": "holiday",
-        "catLabel": "Гос. праздник РФ: Праздничный выходной день",
+        "catLabel": "Гос. праздник РФ (Нерабочий день)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "Changes"
       },
       {
@@ -3371,9 +3380,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "12:58",
         "datetime": "2026-05-02 12:58",
         "category": "holiday",
-        "catLabel": "Гос. праздник РФ: Праздничный выходной день",
+        "catLabel": "Гос. праздник РФ (Нерабочий день)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Добавил учёт задолженности в заявку"
       },
       {
@@ -3381,9 +3390,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:08",
         "datetime": "2026-05-02 13:08",
         "category": "holiday",
-        "catLabel": "Гос. праздник РФ: Праздничный выходной день",
+        "catLabel": "Гос. праздник РФ (Нерабочий день)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3391,9 +3400,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:08",
         "datetime": "2026-05-02 13:08",
         "category": "holiday",
-        "catLabel": "Гос. праздник РФ: Праздничный выходной день",
+        "catLabel": "Гос. праздник РФ (Нерабочий день)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3401,9 +3410,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:08",
         "datetime": "2026-05-02 13:08",
         "category": "holiday",
-        "catLabel": "Гос. праздник РФ: Праздничный выходной день",
+        "catLabel": "Гос. праздник РФ (Нерабочий день)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3411,9 +3420,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:08",
         "datetime": "2026-05-02 13:08",
         "category": "holiday",
-        "catLabel": "Гос. праздник РФ: Праздничный выходной день",
+        "catLabel": "Гос. праздник РФ (Нерабочий день)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3421,9 +3430,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:09",
         "datetime": "2026-05-02 13:09",
         "category": "holiday",
-        "catLabel": "Гос. праздник РФ: Праздничный выходной день",
+        "catLabel": "Гос. праздник РФ (Нерабочий день)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3431,9 +3440,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:09",
         "datetime": "2026-05-02 13:09",
         "category": "holiday",
-        "catLabel": "Гос. праздник РФ: Праздничный выходной день",
+        "catLabel": "Гос. праздник РФ (Нерабочий день)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3441,9 +3450,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:09",
         "datetime": "2026-05-02 13:09",
         "category": "holiday",
-        "catLabel": "Гос. праздник РФ: Праздничный выходной день",
+        "catLabel": "Гос. праздник РФ (Нерабочий день)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3451,9 +3460,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:09",
         "datetime": "2026-05-02 13:09",
         "category": "holiday",
-        "catLabel": "Гос. праздник РФ: Праздничный выходной день",
+        "catLabel": "Гос. праздник РФ (Нерабочий день)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Обновил логику чат-бота"
       }
     ]
@@ -3468,7 +3477,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "totalCommits": 13,
     "offCommits": 13,
     "workCommits": 0,
-    "offHours": 4.0,
+    "offHours": 2.4,
     "workHours": 0.0,
     "hasWorkCommits": false,
     "commits": [
@@ -3477,9 +3486,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "10:34",
         "datetime": "2026-05-04 10:34",
         "category": "holiday",
-        "catLabel": "Гос. праздник РФ: Праздничный перенесенный выходной день",
+        "catLabel": "Гос. праздник РФ (Нерабочий день)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "Changes"
       },
       {
@@ -3487,9 +3496,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "10:34",
         "datetime": "2026-05-04 10:34",
         "category": "holiday",
-        "catLabel": "Гос. праздник РФ: Праздничный перенесенный выходной день",
+        "catLabel": "Гос. праздник РФ (Нерабочий день)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3497,9 +3506,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "10:35",
         "datetime": "2026-05-04 10:35",
         "category": "holiday",
-        "catLabel": "Гос. праздник РФ: Праздничный перенесенный выходной день",
+        "catLabel": "Гос. праздник РФ (Нерабочий день)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3507,9 +3516,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "10:35",
         "datetime": "2026-05-04 10:35",
         "category": "holiday",
-        "catLabel": "Гос. праздник РФ: Праздничный перенесенный выходной день",
+        "catLabel": "Гос. праздник РФ (Нерабочий день)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3517,9 +3526,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "10:35",
         "datetime": "2026-05-04 10:35",
         "category": "holiday",
-        "catLabel": "Гос. праздник РФ: Праздничный перенесенный выходной день",
+        "catLabel": "Гос. праздник РФ (Нерабочий день)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3527,9 +3536,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "10:35",
         "datetime": "2026-05-04 10:35",
         "category": "holiday",
-        "catLabel": "Гос. праздник РФ: Праздничный перенесенный выходной день",
+        "catLabel": "Гос. праздник РФ (Нерабочий день)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3537,9 +3546,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "10:36",
         "datetime": "2026-05-04 10:36",
         "category": "holiday",
-        "catLabel": "Гос. праздник РФ: Праздничный перенесенный выходной день",
+        "catLabel": "Гос. праздник РФ (Нерабочий день)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3547,9 +3556,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "10:36",
         "datetime": "2026-05-04 10:36",
         "category": "holiday",
-        "catLabel": "Гос. праздник РФ: Праздничный перенесенный выходной день",
+        "catLabel": "Гос. праздник РФ (Нерабочий день)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3557,9 +3566,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "10:37",
         "datetime": "2026-05-04 10:37",
         "category": "holiday",
-        "catLabel": "Гос. праздник РФ: Праздничный перенесенный выходной день",
+        "catLabel": "Гос. праздник РФ (Нерабочий день)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Обновил доступность данных"
       },
       {
@@ -3567,9 +3576,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "10:42",
         "datetime": "2026-05-04 10:42",
         "category": "holiday",
-        "catLabel": "Гос. праздник РФ: Праздничный перенесенный выходной день",
+        "catLabel": "Гос. праздник РФ (Нерабочий день)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3577,9 +3586,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "10:43",
         "datetime": "2026-05-04 10:43",
         "category": "holiday",
-        "catLabel": "Гос. праздник РФ: Праздничный перенесенный выходной день",
+        "catLabel": "Гос. праздник РФ (Нерабочий день)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3587,9 +3596,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "10:43",
         "datetime": "2026-05-04 10:43",
         "category": "holiday",
-        "catLabel": "Гос. праздник РФ: Праздничный перенесенный выходной день",
+        "catLabel": "Гос. праздник РФ (Нерабочий день)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3597,9 +3606,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "10:43",
         "datetime": "2026-05-04 10:43",
         "category": "holiday",
-        "catLabel": "Гос. праздник РФ: Праздничный перенесенный выходной день",
+        "catLabel": "Гос. праздник РФ (Нерабочий день)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Добавил логику для частных клиентов"
       }
     ]
@@ -3615,7 +3624,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "offCommits": 0,
     "workCommits": 13,
     "offHours": 0.0,
-    "workHours": 4.0,
+    "workHours": 2.4,
     "hasWorkCommits": true,
     "commits": [
       {
@@ -3623,9 +3632,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:21",
         "datetime": "2026-05-06 09:21",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "Changes"
       },
       {
@@ -3633,9 +3642,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:21",
         "datetime": "2026-05-06 09:21",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3643,9 +3652,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:22",
         "datetime": "2026-05-06 09:22",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3653,9 +3662,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:22",
         "datetime": "2026-05-06 09:22",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Добавил отмену заявок в ЛК"
       },
       {
@@ -3663,9 +3672,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:28",
         "datetime": "2026-05-06 09:28",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3673,9 +3682,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:28",
         "datetime": "2026-05-06 09:28",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3683,9 +3692,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:28",
         "datetime": "2026-05-06 09:28",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3693,9 +3702,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:28",
         "datetime": "2026-05-06 09:28",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Добавил отмену в работе"
       },
       {
@@ -3703,9 +3712,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:38",
         "datetime": "2026-05-06 09:38",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3713,9 +3722,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:38",
         "datetime": "2026-05-06 09:38",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3723,9 +3732,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:38",
         "datetime": "2026-05-06 09:38",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3733,9 +3742,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:39",
         "datetime": "2026-05-06 09:39",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3743,9 +3752,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:39",
         "datetime": "2026-05-06 09:39",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Объединил плашку доступа"
       }
     ]
@@ -3760,7 +3769,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "totalCommits": 15,
     "offCommits": 15,
     "workCommits": 0,
-    "offHours": 6.2,
+    "offHours": 4.0,
     "workHours": 0.0,
     "hasWorkCommits": false,
     "commits": [
@@ -3769,9 +3778,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "19:13",
         "datetime": "2026-05-30 19:13",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "feat: complete migration to local Postgres, Nginx production build, and GitHub Actions CI/CD"
       },
       {
@@ -3779,9 +3788,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "20:14",
         "datetime": "2026-05-30 20:14",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 61,
+        "sessionMins": 25,
         "subject": "trigger GitHub Actions deploy"
       },
       {
@@ -3789,9 +3798,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "20:23",
         "datetime": "2026-05-30 20:23",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "fix: use modern docker compose syntax"
       },
       {
@@ -3799,9 +3808,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "20:26",
         "datetime": "2026-05-30 20:26",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "trigger GitHub Actions after adding swap file"
       },
       {
@@ -3809,7 +3818,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "20:41",
         "datetime": "2026-05-30 20:41",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
         "sessionMins": 15,
         "subject": "fix: updated api urls for production proxy and fixed missing image"
@@ -3819,9 +3828,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "20:46",
         "datetime": "2026-05-30 20:46",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "fix: TypeScript strict type checking for Vite env variables"
       },
       {
@@ -3829,9 +3838,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "20:59",
         "datetime": "2026-05-30 20:59",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 13,
         "subject": "fix: rename corrupted image to png"
       },
       {
@@ -3839,7 +3848,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "21:22",
         "datetime": "2026-05-30 21:22",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
         "sessionMins": 22,
         "subject": "chore: update config backup and admin credentials"
@@ -3849,9 +3858,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "21:27",
         "datetime": "2026-05-30 21:27",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "fix(calculator): remove default values and add descriptive placeholders"
       },
       {
@@ -3859,7 +3868,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "22:02",
         "datetime": "2026-05-30 22:02",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
         "sessionMins": 34,
         "subject": "fix(auth): add getUser polyfill for admin access"
@@ -3869,9 +3878,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "22:16",
         "datetime": "2026-05-30 22:16",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 13,
         "subject": "fix: полная перестройка схемы БД - 29 таблиц, polyfill getUser(), E2E 100%"
       },
       {
@@ -3879,9 +3888,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "22:25",
         "datetime": "2026-05-30 22:25",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "fix: disable push notifications on desktop to prevent unwanted permission prompts"
       },
       {
@@ -3889,9 +3898,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "23:12",
         "datetime": "2026-05-30 23:12",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 46,
+        "sessionMins": 25,
         "subject": "fix: recreate site_blocks table with correct schema for frontend compatibility"
       },
       {
@@ -3899,9 +3908,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "23:18",
         "datetime": "2026-05-30 23:18",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Changes"
       },
       {
@@ -3909,9 +3918,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "23:19",
         "datetime": "2026-05-30 23:19",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Синхронизировал проект на GitHub"
       }
     ]
@@ -3926,7 +3935,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "totalCommits": 26,
     "offCommits": 26,
     "workCommits": 0,
-    "offHours": 12.7,
+    "offHours": 8.3,
     "workHours": 0.0,
     "hasWorkCommits": false,
     "commits": [
@@ -3935,9 +3944,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "11:52",
         "datetime": "2026-05-31 11:52",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "fix(auth): настроено проксирование API и Auth запросов в Vite и Nginx"
       },
       {
@@ -3945,9 +3954,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "12:06",
         "datetime": "2026-05-31 12:06",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 13,
         "subject": "docs(logs): задокументированы серверные исправления бд и ролей"
       },
       {
@@ -3955,9 +3964,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "12:18",
         "datetime": "2026-05-31 12:18",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 12,
         "subject": "fix(client): убран заголовок Authorization для анонимных запросов к PostgREST"
       },
       {
@@ -3965,9 +3974,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "12:19",
         "datetime": "2026-05-31 12:19",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "fix(auth): реактивный вход без перезагрузки и исправление анонимных запросов калькулятора"
       },
       {
@@ -3975,7 +3984,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "12:35",
         "datetime": "2026-05-31 12:35",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
         "sessionMins": 15,
         "subject": "Fix VITE_SUPABASE_URL to point to local /api instead of cloud"
@@ -3985,7 +3994,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:19",
         "datetime": "2026-05-31 13:19",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
         "sessionMins": 44,
         "subject": "feat: умный автокомплит адреса в личном кабинете по базе лицевых счетов"
@@ -3995,9 +4004,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:28",
         "datetime": "2026-05-31 13:28",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "feat: токенизированный поиск по корпусам и группировка до домов в автокомплите адреса"
       },
       {
@@ -4005,7 +4014,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:48",
         "datetime": "2026-05-31 13:48",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
         "sessionMins": 19,
         "subject": "fix: умный автокомплит улиц и домов с нечетким поиском биграмм"
@@ -4015,9 +4024,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:53",
         "datetime": "2026-05-31 13:53",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "docs: обновить журнал изменений проекта"
       },
       {
@@ -4025,7 +4034,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "14:12",
         "datetime": "2026-05-31 14:12",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
         "sessionMins": 19,
         "subject": "fix: восстановить утерянные стейты автокомплита в Cabinet"
@@ -4035,9 +4044,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "14:25",
         "datetime": "2026-05-31 14:25",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 12,
         "subject": "style: исправить мобильную адаптивность личного кабинета (убрать горизонтальный скролл)"
       },
       {
@@ -4045,9 +4054,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "16:26",
         "datetime": "2026-05-31 16:26",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "feat: интегрировать конструктор заказа оборудования и платных услуг с автозаполнением оплаты банка Кубань Кредит"
       },
       {
@@ -4055,7 +4064,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "16:52",
         "datetime": "2026-05-31 16:52",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
         "sessionMins": 25,
         "subject": "fix: исправить краш оплаты в кабинете и бесконечную загрузку заявок в FSM"
@@ -4065,9 +4074,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "18:04",
         "datetime": "2026-05-31 18:04",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 71,
+        "sessionMins": 25,
         "subject": "feat: добавить две кнопки оплаты, историю заявок и прямую интеграцию с pay.kk.ru"
       },
       {
@@ -4075,9 +4084,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "18:55",
         "datetime": "2026-05-31 18:55",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 51,
+        "sessionMins": 25,
         "subject": "refactor: replace Supabase Realtime subscriptions with setInterval Polling due to PostgREST limitations"
       },
       {
@@ -4085,7 +4094,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "19:28",
         "datetime": "2026-05-31 19:28",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
         "sessionMins": 33,
         "subject": "feat: add email management and floor input in Cabinet; show payment details in FSM RequestDetails"
@@ -4095,9 +4104,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "19:35",
         "datetime": "2026-05-31 19:35",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "fix: document requests table fix in PROJECT_LOG.md"
       },
       {
@@ -4105,7 +4114,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "20:02",
         "datetime": "2026-05-31 20:02",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
         "sessionMins": 26,
         "subject": "feat: полное удаление lovable.dev и рекламы, обновление PWA иконок и favicon на основе нового премиального логотипа Домофондар"
@@ -4115,7 +4124,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "20:22",
         "datetime": "2026-05-31 20:22",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
         "sessionMins": 20,
         "subject": "security: закрыт порт СУБД 5432 от внешнего мира для предотвращения атак"
@@ -4125,9 +4134,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "20:30",
         "datetime": "2026-05-31 20:30",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "security: включен метод trust для локальной сети докера"
       },
       {
@@ -4135,9 +4144,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "20:37",
         "datetime": "2026-05-31 20:37",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "feat: добавлен bash скрипт для очистки сессий и сброса пароля СУБД на VPS"
       },
       {
@@ -4145,9 +4154,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "22:23",
         "datetime": "2026-05-31 22:23",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 106,
+        "sessionMins": 25,
         "subject": "feat: интегрирован DaData, ФЗ-152 соглашение, выбор типа помещения, контакты в заявках и автосборка адреса"
       },
       {
@@ -4155,7 +4164,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "22:47",
         "datetime": "2026-05-31 22:47",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
         "sessionMins": 23,
         "subject": "feat: исправлен нечеткий поиск улиц, обязательный этаж, постепенное заполнение полей и ручной ввод адресов"
@@ -4165,7 +4174,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "23:04",
         "datetime": "2026-05-31 23:04",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
         "sessionMins": 17,
         "subject": "style: скрыть абонентские плашки для частных клиентов в ЛК"
@@ -4175,7 +4184,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "23:20",
         "datetime": "2026-05-31 23:20",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
         "sessionMins": 15,
         "subject": "fix: реактивная верификация, исправление сброса полей при редактировании и сборки адреса в ЛК"
@@ -4185,7 +4194,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "23:44",
         "datetime": "2026-05-31 23:44",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
         "sessionMins": 23,
         "subject": "fix: строгая географическая фильтрация подсказок DaData по Краснодарскому краю и Адыгее"
@@ -4200,10 +4209,10 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "isHoliday": false,
     "holidayName": null,
     "totalCommits": 12,
-    "offCommits": 4,
-    "workCommits": 8,
-    "offHours": 2.0,
-    "workHours": 4.2,
+    "offCommits": 5,
+    "workCommits": 7,
+    "offHours": 1.8,
+    "workHours": 2.4,
     "hasWorkCommits": true,
     "commits": [
       {
@@ -4213,7 +4222,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "category": "night",
         "catLabel": "Глубокая ночь (00:00–06:00)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "feat(chat): реализовано интеллектуальное авто-открытие и сворачивание виджета чата"
       },
       {
@@ -4233,7 +4242,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "category": "night",
         "catLabel": "Глубокая ночь (00:00–06:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "feat(chat): увеличена задержка открытия до 8с и показа до 10с для идеального UX"
       },
       {
@@ -4251,9 +4260,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:58",
         "datetime": "2026-06-01 13:58",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "feat(domain): миграция проекта на новый домен domofondar.ru"
       },
       {
@@ -4261,7 +4270,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "14:37",
         "datetime": "2026-06-01 14:37",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
         "sessionMins": 39,
         "subject": "fix(cabinet): fix 6/6a house collision, address matching, and email verification preservation on data clear"
@@ -4271,7 +4280,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:10",
         "datetime": "2026-06-01 15:10",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
         "sessionMins": 32,
         "subject": "Устранение багов ЛК: исправление синтаксических ошибок, точное сопоставление лицевых счетов для адресов с корпусами и буквами (Войсковая 6а, Бжегокайская, Корнилова) и защита email"
@@ -4281,9 +4290,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:22",
         "datetime": "2026-06-01 15:22",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 12,
         "subject": "Устранение багов ЛК: восстановление функций calculateTotals, handleCreateOrderRequest, handlePayLaterOnSite и переменных toast, hasAdminConsoleAccess, isLocked для предотвращения рантайм падения и синего экрана"
       },
       {
@@ -4291,9 +4300,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:23",
         "datetime": "2026-06-01 15:23",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Устранение багов ЛК: обновление PROJECT_LOG.md с фиксацией рантайм-исправлений"
       },
       {
@@ -4301,9 +4310,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:38",
         "datetime": "2026-06-01 15:38",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 14,
         "subject": "Устранение багов ЛК: интеграция глобального отладчика runtimeError в Cabinet.tsx"
       },
       {
@@ -4311,19 +4320,19 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:45",
         "datetime": "2026-06-01 15:45",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "fix(cabinet): исправление бесконечного цикла редиректов и зависания loading"
       },
       {
         "hash": "7c2f761",
         "time": "16:46",
         "datetime": "2026-06-01 16:46",
-        "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-        "isWorkTime": true,
-        "sessionMins": 60,
+        "category": "evening",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+        "isWorkTime": false,
+        "sessionMins": 25,
         "subject": "Устранение багов ЛК: обновление PROJECT_LOG.md с фиксацией"
       }
     ]
@@ -4338,7 +4347,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "totalCommits": 6,
     "offCommits": 6,
     "workCommits": 0,
-    "offHours": 2.7,
+    "offHours": 1.9,
     "workHours": 0.0,
     "hasWorkCommits": false,
     "commits": [
@@ -4347,9 +4356,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "19:50",
         "datetime": "2026-06-03 19:50",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "fix(cabinet): исправление парсинга адресов с корпусами, буквами и дробями (6а, корп. 2, 31/1)"
       },
       {
@@ -4357,9 +4366,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "20:01",
         "datetime": "2026-06-03 20:01",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "fix(docker): add postgrest dependency to frontend to prevent nginx resolving error"
       },
       {
@@ -4367,7 +4376,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "20:24",
         "datetime": "2026-06-03 20:24",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
         "sessionMins": 22,
         "subject": "fix(docker): add restart policy to postgrest service"
@@ -4377,7 +4386,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "20:54",
         "datetime": "2026-06-03 20:54",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
         "sessionMins": 30,
         "subject": "fix(cabinet): trim address parts in normalization to ensure exact house/apartment matching"
@@ -4387,7 +4396,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "21:14",
         "datetime": "2026-06-03 21:14",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
         "sessionMins": 20,
         "subject": "fix(cabinet): normalize street compare in autocomplete and prioritize local houses in sorted list"
@@ -4397,9 +4406,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "21:23",
         "datetime": "2026-06-03 21:23",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "docs: update PROJECT_LOG and add remote integration test script"
       }
     ]
@@ -4412,60 +4421,60 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "isHoliday": false,
     "holidayName": null,
     "totalCommits": 22,
-    "offCommits": 17,
-    "workCommits": 5,
-    "offHours": 7.2,
-    "workHours": 2.0,
-    "hasWorkCommits": true,
+    "offCommits": 22,
+    "workCommits": 0,
+    "offHours": 6.2,
+    "workHours": 0.0,
+    "hasWorkCommits": false,
     "commits": [
       {
         "hash": "834be64",
         "time": "16:14",
         "datetime": "2026-06-05 16:14",
-        "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-        "isWorkTime": true,
-        "sessionMins": 60,
+        "category": "evening",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+        "isWorkTime": false,
+        "sessionMins": 25,
         "subject": "feat: исправление автокомплита домов и добавление вкладки реквизитов (Карта партнера)"
       },
       {
         "hash": "66536b1",
         "time": "16:22",
         "datetime": "2026-06-05 16:22",
-        "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-        "isWorkTime": true,
-        "sessionMins": 15,
+        "category": "evening",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+        "isWorkTime": false,
+        "sessionMins": 10,
         "subject": "chore: переименование файла реквизитов во избежание проблем с URL в Nginx"
       },
       {
         "hash": "97d8786",
         "time": "16:22",
         "datetime": "2026-06-05 16:22",
-        "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-        "isWorkTime": true,
-        "sessionMins": 15,
+        "category": "evening",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+        "isWorkTime": false,
+        "sessionMins": 10,
         "subject": "docs: документирование изменений в PROJECT_LOG.md"
       },
       {
         "hash": "8497907",
         "time": "16:33",
         "datetime": "2026-06-05 16:33",
-        "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-        "isWorkTime": true,
-        "sessionMins": 15,
+        "category": "evening",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+        "isWorkTime": false,
+        "sessionMins": 10,
         "subject": "fix: прямое скачивание документов без открытия новых вкладок"
       },
       {
         "hash": "e38cd64",
         "time": "16:33",
         "datetime": "2026-06-05 16:33",
-        "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-        "isWorkTime": true,
-        "sessionMins": 15,
+        "category": "evening",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+        "isWorkTime": false,
+        "sessionMins": 10,
         "subject": "docs: детализация PROJECT_LOG.md о прямом скачивании"
       },
       {
@@ -4473,7 +4482,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "17:18",
         "datetime": "2026-06-05 17:18",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
         "sessionMins": 44,
         "subject": "feat: поиск по лицевому счёту в ЛК + исправление вью unique_houses + улучшение сортировки домов"
@@ -4483,9 +4492,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "17:23",
         "datetime": "2026-06-05 17:23",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "fix: CI/CD деплоит только frontend без конфликта контейнеров БД"
       },
       {
@@ -4493,9 +4502,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "18:15",
         "datetime": "2026-06-05 18:15",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 52,
+        "sessionMins": 25,
         "subject": "feat: выделение подъезда, исправление автокомплита корпусов и редизайн блока л/с"
       },
       {
@@ -4503,9 +4512,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "18:22",
         "datetime": "2026-06-05 18:22",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "fix: отключено кэширование sw.js и index.html in nginx.conf для корректного обновления PWA"
       },
       {
@@ -4513,9 +4522,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "18:29",
         "datetime": "2026-06-05 18:29",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "style: fix account search banner text contrast on light/dark themes"
       },
       {
@@ -4523,7 +4532,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "18:45",
         "datetime": "2026-06-05 18:45",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
         "sessionMins": 16,
         "subject": "feat: display entrance and apartment fields in one row, fix entrance regex to prevent false matches with house corps, add auto-fill for entrance on apartment select"
@@ -4533,9 +4542,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "18:51",
         "datetime": "2026-06-05 18:51",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "fix: remove literal dollar sign from JSX entrance and flat suggestions"
       },
       {
@@ -4543,9 +4552,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "19:00",
         "datetime": "2026-06-05 19:00",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "style: change glass-premium card background to subtle blue and border to light blue on light theme for better contrast"
       },
       {
@@ -4553,9 +4562,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "19:11",
         "datetime": "2026-06-05 19:11",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "style: apply realistic blue glassmorphism to all cards and widgets on light theme"
       },
       {
@@ -4563,9 +4572,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "20:02",
         "datetime": "2026-06-05 20:02",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 51,
+        "sessionMins": 25,
         "subject": "feat: премиальный стекломорфизм Glassmorphism Pro для светлой и темной тем"
       },
       {
@@ -4573,7 +4582,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "20:18",
         "datetime": "2026-06-05 20:18",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
         "sessionMins": 15,
         "subject": "fix: повышение контраста светлого матового стекла и добавление градиента body"
@@ -4583,7 +4592,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "20:42",
         "datetime": "2026-06-05 20:42",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
         "sessionMins": 23,
         "subject": "fix: насыщенный сине-голубой тон и контрастный контур светлого матового стекла"
@@ -4593,7 +4602,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "21:22",
         "datetime": "2026-06-05 21:22",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
         "sessionMins": 40,
         "subject": "fix: стилизация и контрастность кнопок с контуром (outline) и ховер вкладок"
@@ -4603,7 +4612,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "21:38",
         "datetime": "2026-06-05 21:38",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
         "sessionMins": 15,
         "subject": "feat(cabinet): simplify property fields and fix billing account linkage"
@@ -4613,9 +4622,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "21:48",
         "datetime": "2026-06-05 21:48",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "feat(calculator): fix calculation database schema and implement entrance-to-intercom sync with validation"
       },
       {
@@ -4623,9 +4632,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "22:46",
         "datetime": "2026-06-05 22:46",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 57,
+        "sessionMins": 25,
         "subject": "feat: унификация стиля кнопок на светлой теме с ShinyButton"
       },
       {
@@ -4633,9 +4642,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "22:54",
         "datetime": "2026-06-05 22:54",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "refactor: перенос стилей ShinyButton в index.css и доработка цветов"
       }
     ]
@@ -4650,7 +4659,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "totalCommits": 32,
     "offCommits": 32,
     "workCommits": 0,
-    "offHours": 11.6,
+    "offHours": 7.8,
     "workHours": 0.0,
     "hasWorkCommits": false,
     "commits": [
@@ -4659,9 +4668,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:07",
         "datetime": "2026-06-06 09:07",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "fix(cabinet): устранение краша рендеринга из-за пропущенного импорта Info"
       },
       {
@@ -4669,9 +4678,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:13",
         "datetime": "2026-06-06 09:13",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "feat(ui): мобильная адаптация ShinyButton и перенос кнопок в flex-wrap в контактах"
       },
       {
@@ -4679,7 +4688,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:36",
         "datetime": "2026-06-06 09:36",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
         "sessionMins": 23,
         "subject": "Фикс привязки лицевых счетов и условной обязательности этажа в ЛК"
@@ -4689,9 +4698,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:46",
         "datetime": "2026-06-06 09:46",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "feat: integrate interactive 3D Spline scene and Spotlight effects"
       },
       {
@@ -4699,7 +4708,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "10:08",
         "datetime": "2026-06-06 10:08",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
         "sessionMins": 21,
         "subject": "fix: resolve regex street-type matching bug removing syllables in middle of street names"
@@ -4709,9 +4718,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "10:22",
         "datetime": "2026-06-06 10:22",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 13,
         "subject": "feat: redesign Hero text and style, fix Dockerfile Out of Memory on VPS"
       },
       {
@@ -4719,7 +4728,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "10:47",
         "datetime": "2026-06-06 10:47",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
         "sessionMins": 25,
         "subject": "fix(cabinet): narrow search by street and house"
@@ -4729,9 +4738,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "10:51",
         "datetime": "2026-06-06 10:51",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "style(hero): make 3d spline scene borderless and seamless on background"
       },
       {
@@ -4739,9 +4748,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "14:07",
         "datetime": "2026-06-06 14:07",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "style: unify page backgrounds and fix sticky header positioning"
       },
       {
@@ -4749,9 +4758,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "18:37",
         "datetime": "2026-06-06 18:37",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "style: fix sticky header, redesign logo and fix RLS policies for anonymous users"
       },
       {
@@ -4759,9 +4768,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "18:40",
         "datetime": "2026-06-06 18:40",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "docs: update PROJECT_LOG.md with Header fix and RLS fix"
       },
       {
@@ -4769,9 +4778,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "18:44",
         "datetime": "2026-06-06 18:44",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "style: add animated 3D ShieldCheck logo with glow and shimmer effect to Header"
       },
       {
@@ -4779,9 +4788,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "18:48",
         "datetime": "2026-06-06 18:48",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "docs: log animated logo features in PROJECT_LOG.md"
       },
       {
@@ -4789,9 +4798,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "18:53",
         "datetime": "2026-06-06 18:53",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "style: reverse shimmer animation direction to left-to-right"
       },
       {
@@ -4799,9 +4808,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "18:55",
         "datetime": "2026-06-06 18:55",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "docs: log shimmer direction change in PROJECT_LOG.md"
       },
       {
@@ -4809,7 +4818,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "19:11",
         "datetime": "2026-06-06 19:11",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
         "sessionMins": 15,
         "subject": "style: unify section headers, fix Hero text cut-off, update Footer logo"
@@ -4819,9 +4828,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "19:19",
         "datetime": "2026-06-06 19:19",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "style: fix header centering and add card hover effects in Domofony, add buttons to SmartIntercom"
       },
       {
@@ -4829,9 +4838,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "19:23",
         "datetime": "2026-06-06 19:23",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "style: add slide animation to Contact tabs, unify tab headers"
       },
       {
@@ -4839,9 +4848,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "19:31",
         "datetime": "2026-06-06 19:31",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "style: редизайн калькулятора, пошаговые анимации для Вопросов и Контактов, обновление PROJECT_LOG.md"
       },
       {
@@ -4849,9 +4858,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "19:39",
         "datetime": "2026-06-06 19:39",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "style: выравнивание шапок вкладок контактов, удаление щита и оранжевых элементов"
       },
       {
@@ -4859,9 +4868,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "19:48",
         "datetime": "2026-06-06 19:48",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "style: редизайн кнопок на ShinyButton по всему сайту, выравнивание в Умном домофоне"
       },
       {
@@ -4869,7 +4878,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "20:18",
         "datetime": "2026-06-06 20:18",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
         "sessionMins": 30,
         "subject": "feat(cabinet): replace remaining emojis in address fields with lucide icons (DoorOpen, Home, Building2)"
@@ -4879,9 +4888,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "20:28",
         "datetime": "2026-06-06 20:28",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "fix(cabinet): wrap Cabinet page in ErrorBoundary to prevent blank page and capture runtime errors"
       },
       {
@@ -4889,9 +4898,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "20:32",
         "datetime": "2026-06-06 20:32",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "fix(cabinet): import missing lucide icons (Home, Building2, User, Phone, Mail, Lock, Lightbulb, Hash, MapPin, Building)"
       },
       {
@@ -4899,9 +4908,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "20:33",
         "datetime": "2026-06-06 20:33",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "docs: update PROJECT_LOG.md with import fix details"
       },
       {
@@ -4909,9 +4918,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "21:22",
         "datetime": "2026-06-06 21:22",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 48,
+        "sessionMins": 25,
         "subject": "feat: полноэкранный FSM и Admin дашборд, графики Recharts, realtime подписки, KPI мастеров и диспетчеров"
       },
       {
@@ -4919,9 +4928,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "21:28",
         "datetime": "2026-06-06 21:28",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "fix: устранение race condition в загрузке ролей useUserRole и интеграция ErrorBoundary для FSM/Admin страниц"
       },
       {
@@ -4929,9 +4938,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "21:36",
         "datetime": "2026-06-06 21:36",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "feat: добавление галочки 'Оставаться в системе' и провайдера автовыхода по неактивности SessionTimeoutProvider"
       },
       {
@@ -4939,9 +4948,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "21:48",
         "datetime": "2026-06-06 21:48",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 12,
         "subject": "fix: import cn in FSMDashboard to resolve FSM render crash"
       },
       {
@@ -4949,9 +4958,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "22:01",
         "datetime": "2026-06-06 22:01",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 12,
         "subject": "feat: render FSM requests in a compact table and open details in modal Dialog"
       },
       {
@@ -4959,7 +4968,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "22:22",
         "datetime": "2026-06-06 22:22",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
         "sessionMins": 20,
         "subject": "fix: mobile responsive - overflow-x-auto tables, adaptive grids in FSM and Admin panels"
@@ -4969,7 +4978,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "22:41",
         "datetime": "2026-06-06 22:41",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
         "sessionMins": 19,
         "subject": "fix: critical mobile overflow - global CSS min-width:0, overflow-x:hidden on root containers, FSM/Admin layout fixes"
@@ -4986,7 +4995,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "totalCommits": 1,
     "offCommits": 1,
     "workCommits": 0,
-    "offHours": 1.0,
+    "offHours": 0.4,
     "workHours": 0.0,
     "hasWorkCommits": false,
     "commits": [
@@ -4995,9 +5004,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "12:21",
         "datetime": "2026-06-07 12:21",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "fix: change API prefix from /auth/ to /backend-api/ to resolve routing conflict with /auth and Cannot GET"
       }
     ]
@@ -5010,10 +5019,10 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "isHoliday": false,
     "holidayName": null,
     "totalCommits": 10,
-    "offCommits": 0,
-    "workCommits": 10,
-    "offHours": 0.0,
-    "workHours": 4.7,
+    "offCommits": 1,
+    "workCommits": 9,
+    "offHours": 0.2,
+    "workHours": 2.4,
     "hasWorkCommits": true,
     "commits": [
       {
@@ -5021,9 +5030,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:01",
         "datetime": "2026-09-22 13:01",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "feat(prod): secure deployment configuration, domofondar naming, backups module and hidden superadmin"
       },
       {
@@ -5031,9 +5040,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:47",
         "datetime": "2026-09-22 13:47",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 46,
+        "sessionMins": 25,
         "subject": "feat(nav): add admin and fsm quick navigation buttons for superadmin and director"
       },
       {
@@ -5041,9 +5050,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "14:55",
         "datetime": "2026-09-22 14:55",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 67,
+        "sessionMins": 25,
         "subject": "fix(core): fix white screen on main page, add ErrorBoundary, safe UUID fallback, db schema update"
       },
       {
@@ -5051,9 +5060,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:01",
         "datetime": "2026-09-22 15:01",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "feat(branding): rename FSM to CRM Domofondar and admin to Admin Panel"
       },
       {
@@ -5061,7 +5070,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:21",
         "datetime": "2026-09-22 15:21",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
         "sessionMins": 20,
         "subject": "fix(calculator): fix anon calculation permissions and fix docx file corruption"
@@ -5071,9 +5080,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:30",
         "datetime": "2026-09-22 15:30",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "fix(calculator): allow anonymous users to save calculations and generate proposal docx"
       },
       {
@@ -5081,9 +5090,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:39",
         "datetime": "2026-09-22 15:39",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "fix(nav): restore CRM and Admin Panel buttons in cabinet and fix role check permissions"
       },
       {
@@ -5091,9 +5100,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:49",
         "datetime": "2026-09-22 15:49",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "fix(auth): prevent duplicate authorization headers and fix expected 3 parts in jwt got 5"
       },
       {
@@ -5101,19 +5110,19 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:59",
         "datetime": "2026-09-22 15:59",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "fix(mobile): адаптация мобильной шапки, логотипа и номера телефона"
       },
       {
         "hash": "8e682e9",
         "time": "16:11",
         "datetime": "2026-09-22 16:11",
-        "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-        "isWorkTime": true,
-        "sessionMins": 15,
+        "category": "evening",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+        "isWorkTime": false,
+        "sessionMins": 12,
         "subject": "feat(mobile): скрытие кнопки входа в шапке и акцентная кнопка с переливом в нижнем меню"
       }
     ]
@@ -5126,10 +5135,10 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "isHoliday": false,
     "holidayName": null,
     "totalCommits": 17,
-    "offCommits": 2,
-    "workCommits": 15,
-    "offHours": 1.4,
-    "workHours": 7.7,
+    "offCommits": 4,
+    "workCommits": 13,
+    "offHours": 1.6,
+    "workHours": 4.0,
     "hasWorkCommits": true,
     "commits": [
       {
@@ -5137,9 +5146,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "10:03",
         "datetime": "2026-09-23 10:03",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "fix(crm,admin): устранение ошибок БД для задач, адресов, логопасов и бэкапов"
       },
       {
@@ -5147,9 +5156,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "10:14",
         "datetime": "2026-09-23 10:14",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 11,
         "subject": "feat(ssl): настройка HTTPS TLS 1.3 и доверенного SSL сертификата"
       },
       {
@@ -5157,9 +5166,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "11:04",
         "datetime": "2026-09-23 11:04",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 50,
+        "sessionMins": 25,
         "subject": "feat: integrate Kuban Credit Bank and YooKassa online payments"
       },
       {
@@ -5167,7 +5176,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "11:32",
         "datetime": "2026-09-23 11:32",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
         "sessionMins": 28,
         "subject": "chore: remove commission-free mentions on payment page"
@@ -5177,9 +5186,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "12:47",
         "datetime": "2026-09-23 12:47",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 74,
+        "sessionMins": 25,
         "subject": "fix: subscribers import encoding CP1251, handset parsing, and accounts period constraint"
       },
       {
@@ -5187,9 +5196,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "14:01",
         "datetime": "2026-09-23 14:01",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 74,
+        "sessionMins": 25,
         "subject": "feat: integrate Взаиморасчеты общие registry with debt/overpayment, auto-create accounts, and free smart intercom access for has_lk subscribers"
       },
       {
@@ -5197,9 +5206,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "14:14",
         "datetime": "2026-09-23 14:14",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 12,
         "subject": "fix: add missing format import and improve TSV parsing for Взаиморасчеты общие"
       },
       {
@@ -5207,7 +5216,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "14:30",
         "datetime": "2026-09-23 14:30",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
         "sessionMins": 16,
         "subject": "fix(cabinet, registry): fix user profile email saving and debt/overpayment parser in mutual settlements"
@@ -5217,9 +5226,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "14:37",
         "datetime": "2026-09-23 14:37",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "fix(registry): deduplicate accounts and adapt registry upload / history tables for error-free import"
       },
       {
@@ -5227,9 +5236,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "14:43",
         "datetime": "2026-09-23 14:43",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "fix(registry): fix ReferenceError batchNum and safe loadData after 100% upload"
       },
       {
@@ -5237,7 +5246,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:05",
         "datetime": "2026-09-23 15:05",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
         "sessionMins": 21,
         "subject": "fix(verification): add missing verification columns to profiles and requests, fix verification submit error"
@@ -5247,7 +5256,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:21",
         "datetime": "2026-09-23 15:21",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
         "sessionMins": 16,
         "subject": "fix(payments): fix YooKassa confirmation url redirect and update prepayment notice"
@@ -5257,7 +5266,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "15:37",
         "datetime": "2026-09-23 15:37",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
         "sessionMins": 15,
         "subject": "feat(cabinet): add automatic payment sync, instant debt deduction and electronic receipts"
@@ -5266,9 +5275,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "hash": "960c80a",
         "time": "16:02",
         "datetime": "2026-09-23 16:02",
-        "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-        "isWorkTime": true,
+        "category": "evening",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+        "isWorkTime": false,
         "sessionMins": 25,
         "subject": "feat(cabinet): add 3-tab history switcher, electronic receipts, remove registers from modal, apply 5% acquiring fee to YooKassa payments"
       },
@@ -5276,9 +5285,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "hash": "6e903f1",
         "time": "16:25",
         "datetime": "2026-09-23 16:25",
-        "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-        "isWorkTime": true,
+        "category": "evening",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+        "isWorkTime": false,
         "sessionMins": 23,
         "subject": "fix(yookassa): verify payment status before showing success toast and restrict receipts to succeeded payments"
       },
@@ -5287,9 +5296,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "22:51",
         "datetime": "2026-09-23 22:51",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "feat(mobile): add React Native (Expo) mobile app and GitHub Actions APK build workflow"
       },
       {
@@ -5297,7 +5306,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "23:15",
         "datetime": "2026-09-23 23:15",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
         "sessionMins": 24,
         "subject": "fix(ci): optimize Android APK build workflow and isolate deploy.yml from mobile changes"
@@ -5314,8 +5323,8 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "totalCommits": 25,
     "offCommits": 11,
     "workCommits": 14,
-    "offHours": 6.5,
-    "workHours": 5.9,
+    "offHours": 5.3,
+    "workHours": 4.0,
     "hasWorkCommits": true,
     "commits": [
       {
@@ -5325,7 +5334,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "category": "night",
         "catLabel": "Глубокая ночь (00:00–06:00)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "fix(mobile): resolve SplashScreen freeze by removing blocking font loader and cleanup stack routes"
       },
       {
@@ -5373,9 +5382,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:45",
         "datetime": "2026-09-24 09:45",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "feat(payments): automate yookassa status check, remove manual buttons, handle payment.canceled webhook"
       },
       {
@@ -5383,9 +5392,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "10:54",
         "datetime": "2026-09-24 10:54",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 69,
+        "sessionMins": 25,
         "subject": "feat(auth & cabinet): single login field, optional email/floor, top personal info card with debt, phone contract modal"
       },
       {
@@ -5393,7 +5402,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "11:27",
         "datetime": "2026-09-24 11:27",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
         "sessionMins": 33,
         "subject": "feat(cabinet): request buttons placement, quick repair chips, order creation strictly after yookassa payment"
@@ -5403,7 +5412,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "11:54",
         "datetime": "2026-09-24 11:54",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
         "sessionMins": 26,
         "subject": "feat(cabinet): fullwidth shiny request button under payment, remove duplicate history button, set requests tab as default"
@@ -5413,9 +5422,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "12:02",
         "datetime": "2026-09-24 12:02",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "feat(auth & verification): clean registration form, simplify verification dialog, enforce strict profile and file validation"
       },
       {
@@ -5423,9 +5432,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "12:13",
         "datetime": "2026-09-24 12:13",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "fix(requests): migrate db columns (street, house, entrance, floor), add toggle to repair chips without duplicates, add door slamming chip"
       },
       {
@@ -5433,9 +5442,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "12:27",
         "datetime": "2026-09-24 12:27",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 14,
         "subject": "feat(crm): nomenclature import with prices, folders and subfolders tree with bulk item assignment"
       },
       {
@@ -5443,7 +5452,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "12:48",
         "datetime": "2026-09-24 12:48",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
         "sessionMins": 20,
         "subject": "feat(crm): separate promo_price, manual installation_price, and add product photo upload with preview"
@@ -5453,7 +5462,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:03",
         "datetime": "2026-09-24 13:03",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
         "sessionMins": 15,
         "subject": "feat(fsm): add BindProductsDialog with folder tree, search, and price type selection per entrance"
@@ -5463,9 +5472,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:10",
         "datetime": "2026-09-24 13:10",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "fix(addresses): remove default 'Vizit' and hide intercom model badge when empty"
       },
       {
@@ -5473,9 +5482,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:18",
         "datetime": "2026-09-24 13:18",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "fix(cabinet): isolate products strictly by entrance bindings and improve address matching"
       },
       {
@@ -5483,9 +5492,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:25",
         "datetime": "2026-09-24 13:25",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "feat(cabinet): show dispatcher block and contacts link when no products bound to entrance"
       },
       {
@@ -5493,9 +5502,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "13:36",
         "datetime": "2026-09-24 13:36",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "fix(cabinet): reset order state on open/close and fix key price calculation with entrance bindings"
       },
       {
@@ -5503,7 +5512,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "14:00",
         "datetime": "2026-09-24 14:00",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
         "sessionMins": 24,
         "subject": "feat(cabinet): refactor order modal - remove manual contacts, step-by-step equipment reveal after service, single handset selection, always show keys, conditional credentials"
@@ -5513,9 +5522,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "21:21",
         "datetime": "2026-09-24 21:21",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "fix(cabinet): isolate orders from maintenance payments, fix key search, add FK to request_items"
       },
       {
@@ -5523,7 +5532,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "21:50",
         "datetime": "2026-09-24 21:50",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
         "sessionMins": 28,
         "subject": "feat(products): add code_1c column, update official requisites on receipts, bind keys strictly by ID"
@@ -5533,7 +5542,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "22:27",
         "datetime": "2026-09-24 22:27",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
         "sessionMins": 37,
         "subject": "feat: ступенчатая акция на ключи, новый порядок заказа в ЛК, статус умный дом и бейджи оборудования"
@@ -5543,9 +5552,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "22:41",
         "datetime": "2026-09-24 22:41",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 13,
         "subject": "fix(cabinet): устранение сброса выбранных товаров и услуг из-за фоновых асинхронных обновлений"
       },
       {
@@ -5553,7 +5562,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "23:04",
         "datetime": "2026-09-24 23:04",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
         "sessionMins": 23,
         "subject": "feat: привязка умного дома строго по подъездам, статус на адресах и компактные плашки подъездов в CRM"
@@ -5563,9 +5572,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "23:18",
         "datetime": "2026-09-24 23:18",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 13,
         "subject": "fix(mobile): resolve logo freeze, connect directly to 45.8.99.238 server IP, enable cleartext traffic, and implement full Cabinet functionality"
       }
     ]
@@ -5580,8 +5589,8 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "totalCommits": 15,
     "offCommits": 9,
     "workCommits": 6,
-    "offHours": 5.1,
-    "workHours": 2.9,
+    "offHours": 3.5,
+    "workHours": 2.3,
     "hasWorkCommits": true,
     "commits": [
       {
@@ -5589,9 +5598,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:06",
         "datetime": "2026-09-25 09:06",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "feat(crm & cabinet): add data change review flow, reposition edit button with warning, fix requests visibility"
       },
       {
@@ -5599,7 +5608,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "09:34",
         "datetime": "2026-09-25 09:34",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
         "sessionMins": 28,
         "subject": "feat(fsm): add CRM roles and permissions constructor, fix employees db error"
@@ -5609,7 +5618,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "10:01",
         "datetime": "2026-09-25 10:01",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
         "sessionMins": 26,
         "subject": "fix(cabinet): fix smart intercom detection for entrance 4 and upgrade cabinet order selector UI"
@@ -5619,9 +5628,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "10:15",
         "datetime": "2026-09-25 10:15",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
-        "sessionMins": 15,
+        "sessionMins": 13,
         "subject": "docs: update PROJECT_LOG with frontend container update details"
       },
       {
@@ -5629,7 +5638,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "10:31",
         "datetime": "2026-09-25 10:31",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
         "sessionMins": 16,
         "subject": "feat(cabinet): make equipment order dialog compact with single-item collapse and smooth auto-scroll"
@@ -5639,7 +5648,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "11:00",
         "datetime": "2026-09-25 11:00",
         "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+        "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
         "isWorkTime": true,
         "sessionMins": 29,
         "subject": "feat(cabinet): simplify payment totals, rename to total to pay, add transaction fee note"
@@ -5649,9 +5658,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "19:56",
         "datetime": "2026-09-25 19:56",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "feat: track purchased LK, hide in order form, and update cabinet banner"
       },
       {
@@ -5659,9 +5668,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "21:14",
         "datetime": "2026-09-25 21:14",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 77,
+        "sessionMins": 25,
         "subject": "fix(auth & cabinet): normalize email/phone, fix profile reset in poll, optional email and quick start requests"
       },
       {
@@ -5669,7 +5678,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "21:40",
         "datetime": "2026-09-25 21:40",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
         "sessionMins": 26,
         "subject": "feat(legal): implement 152-FZ privacy policy, data consent, public offer, modal viewer and contacts documents integration"
@@ -5679,7 +5688,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "21:56",
         "datetime": "2026-09-25 21:56",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
         "sessionMins": 16,
         "subject": "fix(footer): rewrite footer links to SPA routes, fix tab navigation and add scrollToTop for search params"
@@ -5689,7 +5698,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "22:21",
         "datetime": "2026-09-25 22:21",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
         "sessionMins": 25,
         "subject": "feat: user portfolio upload with video/photo carousel and CRM moderation"
@@ -5699,7 +5708,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "22:57",
         "datetime": "2026-09-25 22:57",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
         "sessionMins": 35,
         "subject": "feat(portfolio): automate client profile data in background, require phone only for guests, expand CRM moderator view"
@@ -5709,7 +5718,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "23:14",
         "datetime": "2026-09-25 23:14",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
         "sessionMins": 16,
         "subject": "feat(design): unify hero sections across all pages with text-shimmer gradient animation"
@@ -5719,9 +5728,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "23:22",
         "datetime": "2026-09-25 23:22",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "feat(ui): синхронизация плавной анимации появления страниц Kontakty, NashiRaboty и Golosovanie"
       },
       {
@@ -5729,7 +5738,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "23:57",
         "datetime": "2026-09-25 23:57",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
         "sessionMins": 34,
         "subject": "feat(stats): реальные счетчики из БД, исправление калькуляции чисел и сапфирово-лазурный стиль"
@@ -5746,7 +5755,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "totalCommits": 16,
     "offCommits": 16,
     "workCommits": 0,
-    "offHours": 7.2,
+    "offHours": 5.0,
     "workHours": 0.0,
     "hasWorkCommits": false,
     "commits": [
@@ -5755,9 +5764,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "00:15",
         "datetime": "2026-09-26 00:15",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "feat(ui): бегущий луч по контуру карточек, разделение 7 лет и 22 года, сапфирово-лазурный стиль"
       },
       {
@@ -5765,9 +5774,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "00:24",
         "datetime": "2026-09-26 00:24",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "docs: памятка и шаблон по созданию карточек Shiny Card со светящимся контуром"
       },
       {
@@ -5775,7 +5784,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "00:52",
         "datetime": "2026-09-26 00:52",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
         "sessionMins": 27,
         "subject": "feat(hero): интерактивный терминал домофона 0 сек, реальные преимущества и ряд кнопок (Оплатить ТО, ЛК, Расчет, Контакты)"
@@ -5785,7 +5794,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "01:09",
         "datetime": "2026-09-26 01:09",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
         "sessionMins": 17,
         "subject": "feat(intercom): живой зрачок камеры со слежением, симулятор видеозвонка и 5 кликабельных виджетов с подсказками"
@@ -5795,9 +5804,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "01:24",
         "datetime": "2026-09-26 01:24",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 14,
         "subject": "feat(intercom): реалистичное фото посетителя у видеопанели и плавное спокойное парение значков"
       },
       {
@@ -5805,9 +5814,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "01:38",
         "datetime": "2026-09-26 01:38",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 14,
         "subject": "feat(ui): update intercom view to yandex food courier, add face id card and spacious terminal frame"
       },
       {
@@ -5815,7 +5824,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "01:55",
         "datetime": "2026-09-26 01:55",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
         "sessionMins": 16,
         "subject": "fix(legal): replace domofondar.ru with домофондар.рф across documents, templates and requisites"
@@ -5825,7 +5834,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "02:17",
         "datetime": "2026-09-26 02:17",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
         "sessionMins": 22,
         "subject": "fix(content): correct experience to 7 years in Krasnodar / 20+ in South Russia, remove false 24/7, modernize cards with shiny shimmer and update FAQ"
@@ -5835,7 +5844,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "02:36",
         "datetime": "2026-09-26 02:36",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
         "sessionMins": 18,
         "subject": "feat(ui): add smooth vertical slide-up word animation (дома -> квартиры -> офиса -> ЖК) in Hero title"
@@ -5845,9 +5854,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "02:45",
         "datetime": "2026-09-26 02:45",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "style(hero): remove underline, inherit title shimmer and font, increase word interval to 3.8s"
       },
       {
@@ -5855,7 +5864,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "03:00",
         "datetime": "2026-09-26 03:00",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
         "sessionMins": 15,
         "subject": "feat(hero): seamless shimmer word rotator with mobile layout stabilization and vertical mask"
@@ -5865,7 +5874,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "03:29",
         "datetime": "2026-09-26 03:29",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
         "sessionMins": 29,
         "subject": "fix(hero): restore clean 3-line typography, remove broken mask, fix word visibility and smooth rotation"
@@ -5875,9 +5884,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "10:53",
         "datetime": "2026-09-26 10:53",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "feat(payments): configure live YooKassa Shop ID 1372116 and production secret key"
       },
       {
@@ -5885,9 +5894,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "11:40",
         "datetime": "2026-09-26 11:40",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 47,
+        "sessionMins": 25,
         "subject": "feat(ssl): configure Let's Encrypt SSL certificate for domofondar.rf with auto HTTP-to-HTTPS redirect"
       },
       {
@@ -5895,9 +5904,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "11:50",
         "datetime": "2026-09-26 11:50",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "fix(payments): implement 54-FZ fiscal receipt generation for live YooKassa shop 1372116"
       },
       {
@@ -5905,9 +5914,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "12:35",
         "datetime": "2026-09-26 12:35",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 45,
+        "sessionMins": 25,
         "subject": "fix(cabinet): redesign order equipment modal in domofondar blue style and update comment prompt"
       }
     ]
@@ -5922,7 +5931,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "totalCommits": 1,
     "offCommits": 1,
     "workCommits": 0,
-    "offHours": 1.0,
+    "offHours": 0.4,
     "workHours": 0.0,
     "hasWorkCommits": false,
     "commits": [
@@ -5931,9 +5940,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "01:25",
         "datetime": "2026-09-27 01:25",
         "category": "weekend",
-        "catLabel": "Выходной день (Сб/Вс)",
+        "catLabel": "Выходной день (Суббота / Воскресенье)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "fix(cabinet): prevent system phone email auto-filling and lock form after saving profile"
       }
     ]
@@ -5948,7 +5957,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "totalCommits": 5,
     "offCommits": 5,
     "workCommits": 0,
-    "offHours": 2.6,
+    "offHours": 2.0,
     "workHours": 0.0,
     "hasWorkCommits": false,
     "commits": [
@@ -5957,9 +5966,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "21:14",
         "datetime": "2026-09-28 21:14",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "Fix: убрано наследие Supabase (upload/voting/notify), crm_roles, аудит проекта"
       },
       {
@@ -5967,7 +5976,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "21:48",
         "datetime": "2026-09-28 21:48",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
         "sessionMins": 34,
         "subject": "APK на HTTPS-домен, отдача /media в nginx, автовыкладка APK на сервер"
@@ -5977,9 +5986,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "21:51",
         "datetime": "2026-09-28 21:51",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "build-apk.yml: автовыкладка APK на сервер в правильном месте"
       },
       {
@@ -5987,7 +5996,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "22:15",
         "datetime": "2026-09-28 22:15",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
         "sessionMins": 24,
         "subject": "ЛК Этап 1: регистрация по телефону, фикс крашей кабинета, смягчение частный клиент"
@@ -5997,7 +6006,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "22:40",
         "datetime": "2026-09-28 22:40",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
         "sessionMins": 25,
         "subject": "ЛК: фикс сброса профиля, единая кнопка редактирования, правки через одобрение"
@@ -6014,7 +6023,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "totalCommits": 7,
     "offCommits": 7,
     "workCommits": 0,
-    "offHours": 3.0,
+    "offHours": 2.1,
     "workHours": 0.0,
     "hasWorkCommits": false,
     "commits": [
@@ -6023,9 +6032,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "19:44",
         "datetime": "2026-09-29 19:44",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "Этап 2: мастер заполнения ЛК, каскадный поиск, хранение счёта"
       },
       {
@@ -6033,9 +6042,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "19:51",
         "datetime": "2026-09-29 19:51",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Этап 2: закрыть ПДн в lookup + авторизация поиска"
       },
       {
@@ -6043,7 +6052,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "20:09",
         "datetime": "2026-09-29 20:09",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
         "sessionMins": 18,
         "subject": "ЛК: ручной адрес, поиск по телефону, дружелюбный текст, поле телефона, убран Быстрый старт"
@@ -6053,9 +6062,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "20:20",
         "datetime": "2026-09-29 20:20",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "ЛК: подсказки адресов по Краснодару с приоритетом обслуживаемых"
       },
       {
@@ -6063,7 +6072,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "21:04",
         "datetime": "2026-09-29 21:04",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
         "sessionMins": 44,
         "subject": "Этап 3: карточка абонента + нормализация импорта"
@@ -6073,9 +6082,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "21:08",
         "datetime": "2026-09-29 21:08",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Этап 3: карточка абонента + нормализация импорта"
       },
       {
@@ -6083,9 +6092,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "21:12",
         "datetime": "2026-09-29 21:12",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "gitignore: разрешить миграции + migration_stage3"
       }
     ]
@@ -6098,29 +6107,29 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "isHoliday": false,
     "holidayName": null,
     "totalCommits": 8,
-    "offCommits": 5,
-    "workCommits": 3,
-    "offHours": 3.2,
-    "workHours": 1.8,
-    "hasWorkCommits": true,
+    "offCommits": 8,
+    "workCommits": 0,
+    "offHours": 3.9,
+    "workHours": 0.0,
+    "hasWorkCommits": false,
     "commits": [
       {
         "hash": "2eb39a8",
         "time": "10:04",
         "datetime": "2026-09-30 10:04",
-        "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-        "isWorkTime": true,
-        "sessionMins": 60,
+        "category": "transit_free",
+        "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+        "isWorkTime": false,
+        "sessionMins": 25,
         "subject": "Кабинет: фикс визарда (мигание, телефон, улица/корпус, оборудование)"
       },
       {
         "hash": "4182a7c",
         "time": "10:24",
         "datetime": "2026-09-30 10:24",
-        "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-        "isWorkTime": true,
+        "category": "transit_free",
+        "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+        "isWorkTime": false,
         "sessionMins": 20,
         "subject": "Импорт: фикс автоопределения кодировки (UTF-8/BOM)"
       },
@@ -6128,9 +6137,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "hash": "395c6c8",
         "time": "10:55",
         "datetime": "2026-09-30 10:55",
-        "category": "work_hours",
-        "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-        "isWorkTime": true,
+        "category": "transit_free",
+        "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+        "isWorkTime": false,
         "sessionMins": 30,
         "subject": "Кабинет: корректное сопоставление дома с корпусом для оборудования"
       },
@@ -6139,9 +6148,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "18:11",
         "datetime": "2026-09-30 18:11",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "Визард/импорт: районы, дубли домов, адрес при сохранении"
       },
       {
@@ -6149,7 +6158,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "18:40",
         "datetime": "2026-09-30 18:40",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
         "sessionMins": 28,
         "subject": "Кабинет: восстановление телефона из логина + убрана кнопка сброса"
@@ -6159,7 +6168,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "19:17",
         "datetime": "2026-09-30 19:17",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
         "sessionMins": 37,
         "subject": "Этап 4: типы устройств, привязка оборудования к услугам, анкета"
@@ -6169,7 +6178,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "20:02",
         "datetime": "2026-09-30 20:02",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
         "sessionMins": 44,
         "subject": "CRM: кнопка Справочники в панели + инлайн-редактирование категорий и типов"
@@ -6179,7 +6188,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "20:28",
         "datetime": "2026-09-30 20:28",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
         "sessionMins": 26,
         "subject": "Заказ: автоподбор услуг по анкете (установлено/не установлено)"
@@ -6196,7 +6205,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "totalCommits": 12,
     "offCommits": 12,
     "workCommits": 0,
-    "offHours": 5.3,
+    "offHours": 3.7,
     "workHours": 0.0,
     "hasWorkCommits": false,
     "commits": [
@@ -6207,7 +6216,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "category": "night",
         "catLabel": "Глубокая ночь (00:00–06:00)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "Подбор оборудования: сценарии-галочки (вкладка CRM) + логика заказа"
       },
       {
@@ -6227,7 +6236,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "category": "night",
         "catLabel": "Глубокая ночь (00:00–06:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Fix: превью-цена ключа на монтаже сразу показывает льготную (не прыгает 300→200)"
       },
       {
@@ -6237,7 +6246,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "category": "night",
         "catLabel": "Глубокая ночь (00:00–06:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "Кабинет: скрыть внутреннее название тарифа, блок обслуживания в одну строку"
       },
       {
@@ -6245,9 +6254,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "19:43",
         "datetime": "2026-10-01 19:43",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "Личные кабинеты + журнал удалений (кто удалил) + роли без системных (кроме Директора)"
       },
       {
@@ -6255,9 +6264,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "19:56",
         "datetime": "2026-10-01 19:56",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 12,
         "subject": "feat: полное удаление пользователей (purge) + кнопка в Удалённых"
       },
       {
@@ -6265,9 +6274,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "20:06",
         "datetime": "2026-10-01 20:06",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "feat: подтверждение + журнал удалений для новостей, акций и справочников"
       },
       {
@@ -6275,7 +6284,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "20:42",
         "datetime": "2026-10-01 20:42",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
         "sessionMins": 36,
         "subject": "feat: карточка сотрудника, анкета активации, фильтры, фикс кэша вкладок"
@@ -6285,7 +6294,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "20:59",
         "datetime": "2026-10-01 20:59",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
         "sessionMins": 16,
         "subject": "feat: фото сотрудника в анкете (селфи/загрузка) + в карточке"
@@ -6295,9 +6304,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "21:13",
         "datetime": "2026-10-01 21:13",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 13,
         "subject": "feat: вкладка «Бывшие сотрудники» — архив уволенных с полной анкетой и статистикой"
       },
       {
@@ -6305,9 +6314,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "21:16",
         "datetime": "2026-10-01 21:16",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "feat: кнопка «Вернуть в штат» для бывших сотрудников"
       },
       {
@@ -6315,7 +6324,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "21:56",
         "datetime": "2026-10-01 21:56",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
         "sessionMins": 39,
         "subject": "feat: раздел «Новые дома» (монтаж) + история статусов подъездов + Excel-выгрузки"
@@ -6329,10 +6338,10 @@ export const CALENDAR_DAYS: DayAudit[] = [
     "isWeekend": false,
     "isHoliday": false,
     "holidayName": null,
-    "totalCommits": 6,
-    "offCommits": 6,
+    "totalCommits": 9,
+    "offCommits": 9,
     "workCommits": 0,
-    "offHours": 4.3,
+    "offHours": 3.1,
     "workHours": 0.0,
     "hasWorkCommits": false,
     "commits": [
@@ -6343,7 +6352,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "category": "morning",
         "catLabel": "Раннее утро (06:00–09:00)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "fix: сжатие фото сотрудника перед загрузкой (обход лимита nginx 413)"
       },
       {
@@ -6353,7 +6362,7 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "category": "morning",
         "catLabel": "Раннее утро (06:00–09:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 10,
         "subject": "fix: восстановлены файлы раздела Новые дома (стёрлись при git reset)"
       },
       {
@@ -6361,9 +6370,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "19:40",
         "datetime": "2026-10-02 19:40",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 60,
+        "sessionMins": 25,
         "subject": "fix: финжурнал только реальные платежи; корректное определение обслуживаемого адреса (не частный)"
       },
       {
@@ -6371,9 +6380,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "19:54",
         "datetime": "2026-10-02 19:54",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 15,
+        "sessionMins": 13,
         "subject": "ui: компактный список заявок (строки-карточки) + плотная карточка заявки"
       },
       {
@@ -6381,9 +6390,9 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "21:12",
         "datetime": "2026-10-02 21:12",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
-        "sessionMins": 77,
+        "sessionMins": 25,
         "subject": "feat(project): инвестиционный дашборд суперадмина 'Паспорт проекта' и реестр changelog"
       },
       {
@@ -6391,16 +6400,46 @@ export const CALENDAR_DAYS: DayAudit[] = [
         "time": "21:43",
         "datetime": "2026-10-02 21:43",
         "category": "evening",
-        "catLabel": "Поздний вечер (17:00–00:00)",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
         "isWorkTime": false,
         "sessionMins": 31,
         "subject": "feat(project): аналитический дашборд инженера, сравнение Junior vs Рынок, точка GitHub c2cfbfc"
+      },
+      {
+        "hash": "cac1d06",
+        "time": "22:12",
+        "datetime": "2026-10-02 22:12",
+        "category": "evening",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+        "isWorkTime": false,
+        "sessionMins": 29,
+        "subject": "feat(project): юридический аудит времени, календарь коммитов и старт 14.10.2025 02:26"
+      },
+      {
+        "hash": "4a60db0",
+        "time": "22:29",
+        "datetime": "2026-10-02 22:29",
+        "category": "evening",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+        "isWorkTime": false,
+        "sessionMins": 16,
+        "subject": "feat(project): учет производственного календаря РФ (гос. праздники) и расходов на AI/VPN"
+      },
+      {
+        "hash": "add88a3",
+        "time": "22:41",
+        "datetime": "2026-10-02 22:41",
+        "category": "evening",
+        "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+        "isWorkTime": false,
+        "sessionMins": 11,
+        "subject": "feat(project): деньщина в офисе, поэтапный прайс-лист студий 2.8-3.8 млн и источники"
       }
     ]
   }
 ];
 
-export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
+export const ALL_GIT_COMMITS: CommitAuditItem[] = [
   {
     "hash": "c2cfbfc",
     "datetime": "2025-10-14 02:26",
@@ -6430,7 +6469,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWorkTime": false,
     "category": "night",
     "catLabel": "Глубокая ночь (00:00–06:00)",
-    "sessionMins": 15,
+    "sessionMins": 10,
     "subject": "Refactor: Update website based on analysis"
   },
   {
@@ -6446,7 +6485,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWorkTime": false,
     "category": "night",
     "catLabel": "Глубокая ночь (00:00–06:00)",
-    "sessionMins": 15,
+    "sessionMins": 10,
     "subject": "Enable Cloud integration"
   },
   {
@@ -6462,7 +6501,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWorkTime": false,
     "category": "night",
     "catLabel": "Глубокая ночь (00:00–06:00)",
-    "sessionMins": 15,
+    "sessionMins": 10,
     "subject": "feat: Enable Cloud and database migration"
   },
   {
@@ -6478,7 +6517,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWorkTime": false,
     "category": "night",
     "catLabel": "Глубокая ночь (00:00–06:00)",
-    "sessionMins": 15,
+    "sessionMins": 10,
     "subject": "Fix: Update handle_updated_at function"
   },
   {
@@ -6491,10 +6530,10 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWeekend": false,
     "isHoliday": false,
     "holidayName": null,
-    "isWorkTime": true,
-    "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 60,
+    "isWorkTime": false,
+    "category": "transit_free",
+    "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+    "sessionMins": 25,
     "subject": "Refactor: Update images, adapt for mobile, add theme toggle"
   },
   {
@@ -6507,9 +6546,9 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWeekend": false,
     "isHoliday": false,
     "holidayName": null,
-    "isWorkTime": true,
-    "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+    "isWorkTime": false,
+    "category": "transit_free",
+    "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
     "sessionMins": 19,
     "subject": "Update company contact information"
   },
@@ -6523,10 +6562,10 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWeekend": false,
     "isHoliday": false,
     "holidayName": null,
-    "isWorkTime": true,
-    "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 60,
+    "isWorkTime": false,
+    "category": "transit_free",
+    "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+    "sessionMins": 25,
     "subject": "Add admin panel database tables"
   },
   {
@@ -6539,10 +6578,10 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWeekend": false,
     "isHoliday": false,
     "holidayName": null,
-    "isWorkTime": true,
-    "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 60,
+    "isWorkTime": false,
+    "category": "transit_free",
+    "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+    "sessionMins": 25,
     "subject": "Add admin user and update hero section"
   },
   {
@@ -6555,10 +6594,10 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWeekend": false,
     "isHoliday": false,
     "holidayName": null,
-    "isWorkTime": true,
-    "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "isWorkTime": false,
+    "category": "transit_free",
+    "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+    "sessionMins": 10,
     "subject": "Refactor: Update hero section and theme"
   },
   {
@@ -6571,10 +6610,10 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWeekend": false,
     "isHoliday": false,
     "holidayName": null,
-    "isWorkTime": true,
-    "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "isWorkTime": false,
+    "category": "transit_free",
+    "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+    "sessionMins": 10,
     "subject": "Fix: Improve hero section and mobile responsiveness"
   },
   {
@@ -6589,8 +6628,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 60,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 25,
     "subject": "Refactor: Add comments and likes to news and promotions"
   },
   {
@@ -6605,8 +6644,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Add login button to admin panel"
   },
   {
@@ -6621,8 +6660,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Fix: Allow editing of \"Possibilities\" block"
   },
   {
@@ -6637,8 +6676,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Fix: Allow creating multiple premium blocks"
   },
   {
@@ -6653,7 +6692,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
     "sessionMins": 15,
     "subject": "Implement comment moderation"
   },
@@ -6669,8 +6708,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 48,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 25,
     "subject": "Refactor contact section"
   },
   {
@@ -6685,8 +6724,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Add animations and admin controls for stats"
   },
   {
@@ -6701,8 +6740,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": "Новогодние каникулы",
     "isWorkTime": false,
     "category": "holiday",
-    "catLabel": "Гос. праздник РФ: Новогодние каникулы",
-    "sessionMins": 60,
+    "catLabel": "Гос. праздник РФ (Нерабочий день)",
+    "sessionMins": 25,
     "subject": "Changes"
   },
   {
@@ -6717,8 +6756,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": "Новогодние каникулы",
     "isWorkTime": false,
     "category": "holiday",
-    "catLabel": "Гос. праздник РФ: Новогодние каникулы",
-    "sessionMins": 15,
+    "catLabel": "Гос. праздник РФ (Нерабочий день)",
+    "sessionMins": 10,
     "subject": "Implement FSM system scaffolding"
   },
   {
@@ -6733,8 +6772,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": "Новогодние каникулы",
     "isWorkTime": false,
     "category": "holiday",
-    "catLabel": "Гос. праздник РФ: Новогодние каникулы",
-    "sessionMins": 60,
+    "catLabel": "Гос. праздник РФ (Нерабочий день)",
+    "sessionMins": 25,
     "subject": "Changes"
   },
   {
@@ -6749,8 +6788,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": "Новогодние каникулы",
     "isWorkTime": false,
     "category": "holiday",
-    "catLabel": "Гос. праздник РФ: Новогодние каникулы",
-    "sessionMins": 15,
+    "catLabel": "Гос. праздник РФ (Нерабочий день)",
+    "sessionMins": 10,
     "subject": "Extend FSM admin panels"
   },
   {
@@ -6765,8 +6804,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": "Новогодние каникулы",
     "isWorkTime": false,
     "category": "holiday",
-    "catLabel": "Гос. праздник РФ: Новогодние каникулы",
-    "sessionMins": 15,
+    "catLabel": "Гос. праздник РФ (Нерабочий день)",
+    "sessionMins": 12,
     "subject": "Changes"
   },
   {
@@ -6781,8 +6820,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": "Новогодние каникулы",
     "isWorkTime": false,
     "category": "holiday",
-    "catLabel": "Гос. праздник РФ: Новогодние каникулы",
-    "sessionMins": 15,
+    "catLabel": "Гос. праздник РФ (Нерабочий день)",
+    "sessionMins": 10,
     "subject": "Fix log roles fetch"
   },
   {
@@ -6797,8 +6836,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": "Новогодние каникулы",
     "isWorkTime": false,
     "category": "holiday",
-    "catLabel": "Гос. праздник РФ: Новогодние каникулы",
-    "sessionMins": 15,
+    "catLabel": "Гос. праздник РФ (Нерабочий день)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -6813,8 +6852,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": "Новогодние каникулы",
     "isWorkTime": false,
     "category": "holiday",
-    "catLabel": "Гос. праздник РФ: Новогодние каникулы",
-    "sessionMins": 15,
+    "catLabel": "Гос. праздник РФ (Нерабочий день)",
+    "sessionMins": 10,
     "subject": "Fix FSM access race"
   },
   {
@@ -6827,10 +6866,10 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWeekend": false,
     "isHoliday": false,
     "holidayName": null,
-    "isWorkTime": true,
-    "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 60,
+    "isWorkTime": false,
+    "category": "transit_free",
+    "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+    "sessionMins": 25,
     "subject": "Changes"
   },
   {
@@ -6843,10 +6882,10 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWeekend": false,
     "isHoliday": false,
     "holidayName": null,
-    "isWorkTime": true,
-    "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "isWorkTime": false,
+    "category": "transit_free",
+    "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+    "sessionMins": 10,
     "subject": "Add telegram bot edge function"
   },
   {
@@ -6859,10 +6898,10 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWeekend": false,
     "isHoliday": false,
     "holidayName": null,
-    "isWorkTime": true,
-    "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 72,
+    "isWorkTime": false,
+    "category": "transit_free",
+    "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+    "sessionMins": 25,
     "subject": "Changes"
   },
   {
@@ -6875,10 +6914,10 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWeekend": false,
     "isHoliday": false,
     "holidayName": null,
-    "isWorkTime": true,
-    "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "isWorkTime": false,
+    "category": "transit_free",
+    "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+    "sessionMins": 10,
     "subject": "Add db proxy edge func"
   },
   {
@@ -6893,8 +6932,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 60,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 25,
     "subject": "Changes"
   },
   {
@@ -6909,8 +6948,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Enhance FSM staff flow"
   },
   {
@@ -6925,8 +6964,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 60,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 25,
     "subject": "Changes"
   },
   {
@@ -6941,8 +6980,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Fix assign binding fix"
   },
   {
@@ -6957,8 +6996,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -6973,8 +7012,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Improve fsm search and accept flow"
   },
   {
@@ -6989,8 +7028,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -7005,8 +7044,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Объединить должности в прайм"
   },
   {
@@ -7021,8 +7060,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -7037,8 +7076,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Fix employee editing flow"
   },
   {
@@ -7051,10 +7090,10 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWeekend": false,
     "isHoliday": false,
     "holidayName": null,
-    "isWorkTime": true,
-    "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 60,
+    "isWorkTime": false,
+    "category": "transit_free",
+    "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+    "sessionMins": 25,
     "subject": "Changes"
   },
   {
@@ -7067,10 +7106,10 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWeekend": false,
     "isHoliday": false,
     "holidayName": null,
-    "isWorkTime": true,
-    "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "isWorkTime": false,
+    "category": "transit_free",
+    "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+    "sessionMins": 10,
     "subject": "Улучшить FSM управление"
   },
   {
@@ -7083,10 +7122,10 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWeekend": false,
     "isHoliday": false,
     "holidayName": null,
-    "isWorkTime": true,
-    "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 60,
+    "isWorkTime": false,
+    "category": "transit_free",
+    "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+    "sessionMins": 25,
     "subject": "Changes"
   },
   {
@@ -7099,10 +7138,10 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWeekend": false,
     "isHoliday": false,
     "holidayName": null,
-    "isWorkTime": true,
-    "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "isWorkTime": false,
+    "category": "transit_free",
+    "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+    "sessionMins": 10,
     "subject": "Fix task visibility and menu"
   },
   {
@@ -7115,10 +7154,10 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWeekend": false,
     "isHoliday": false,
     "holidayName": null,
-    "isWorkTime": true,
-    "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 60,
+    "isWorkTime": false,
+    "category": "transit_free",
+    "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+    "sessionMins": 25,
     "subject": "Обновление проекта: добавление новых компонентов и миграций"
   },
   {
@@ -7131,10 +7170,10 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWeekend": false,
     "isHoliday": false,
     "holidayName": null,
-    "isWorkTime": true,
-    "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 60,
+    "isWorkTime": false,
+    "category": "transit_free",
+    "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+    "sessionMins": 25,
     "subject": "Обновление компонентов и страниц проекта Домофондар"
   },
   {
@@ -7147,9 +7186,9 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWeekend": false,
     "isHoliday": false,
     "holidayName": null,
-    "isWorkTime": true,
-    "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+    "isWorkTime": false,
+    "category": "transit_free",
+    "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
     "sessionMins": 32,
     "subject": "Добавление менеджера заявок и обновление компонентов"
   },
@@ -7163,10 +7202,10 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWeekend": false,
     "isHoliday": false,
     "holidayName": null,
-    "isWorkTime": true,
-    "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "isWorkTime": false,
+    "category": "transit_free",
+    "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+    "sessionMins": 10,
     "subject": "Добавление компонента RequestsManager и миграции для заявок"
   },
   {
@@ -7182,7 +7221,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWorkTime": false,
     "category": "night",
     "catLabel": "Глубокая ночь (00:00–06:00)",
-    "sessionMins": 60,
+    "sessionMins": 25,
     "subject": "Changes"
   },
   {
@@ -7198,7 +7237,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWorkTime": false,
     "category": "night",
     "catLabel": "Глубокая ночь (00:00–06:00)",
-    "sessionMins": 15,
+    "sessionMins": 10,
     "subject": "Revamp FSM bottom nav and tables"
   },
   {
@@ -7214,7 +7253,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWorkTime": false,
     "category": "night",
     "catLabel": "Глубокая ночь (00:00–06:00)",
-    "sessionMins": 60,
+    "sessionMins": 25,
     "subject": "Changes"
   },
   {
@@ -7230,7 +7269,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWorkTime": false,
     "category": "night",
     "catLabel": "Глубокая ночь (00:00–06:00)",
-    "sessionMins": 15,
+    "sessionMins": 10,
     "subject": "Improve FSM RequestDetails UI"
   },
   {
@@ -7246,7 +7285,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWorkTime": false,
     "category": "morning",
     "catLabel": "Раннее утро (06:00–09:00)",
-    "sessionMins": 60,
+    "sessionMins": 25,
     "subject": "Changes"
   },
   {
@@ -7262,7 +7301,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWorkTime": false,
     "category": "morning",
     "catLabel": "Раннее утро (06:00–09:00)",
-    "sessionMins": 15,
+    "sessionMins": 10,
     "subject": "Improve FSM requests UI and reporting"
   },
   {
@@ -7277,8 +7316,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 60,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 25,
     "subject": "Changes"
   },
   {
@@ -7293,8 +7332,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Enhance FSM requests management"
   },
   {
@@ -7309,8 +7348,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -7325,8 +7364,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Расширил FSM отчёт"
   },
   {
@@ -7341,8 +7380,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 60,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 25,
     "subject": "Changes"
   },
   {
@@ -7357,8 +7396,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Add manager role support"
   },
   {
@@ -7373,8 +7412,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 11,
     "subject": "Changes"
   },
   {
@@ -7389,8 +7428,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Improve FSM nav and UI"
   },
   {
@@ -7403,10 +7442,10 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWeekend": false,
     "isHoliday": false,
     "holidayName": null,
-    "isWorkTime": true,
-    "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 60,
+    "isWorkTime": false,
+    "category": "transit_free",
+    "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+    "sessionMins": 25,
     "subject": "Changes"
   },
   {
@@ -7419,10 +7458,10 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWeekend": false,
     "isHoliday": false,
     "holidayName": null,
-    "isWorkTime": true,
-    "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "isWorkTime": false,
+    "category": "transit_free",
+    "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+    "sessionMins": 10,
     "subject": "Расширил FSM дашборд"
   },
   {
@@ -7438,7 +7477,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWorkTime": false,
     "category": "morning",
     "catLabel": "Раннее утро (06:00–09:00)",
-    "sessionMins": 60,
+    "sessionMins": 25,
     "subject": "Changes"
   },
   {
@@ -7454,7 +7493,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWorkTime": false,
     "category": "morning",
     "catLabel": "Раннее утро (06:00–09:00)",
-    "sessionMins": 15,
+    "sessionMins": 10,
     "subject": "Enable FSM access & verification"
   },
   {
@@ -7469,8 +7508,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 60,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 25,
     "subject": "Add Calculator page and update logic"
   },
   {
@@ -7485,8 +7524,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 13,
     "subject": "Work in progress"
   },
   {
@@ -7501,8 +7540,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -7517,8 +7556,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Integrate calculator styling"
   },
   {
@@ -7533,8 +7572,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Integrate calculator page"
   },
   {
@@ -7549,8 +7588,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Preceding changes"
   },
   {
@@ -7565,8 +7604,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Enhance calculator page styling"
   },
   {
@@ -7581,8 +7620,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Enhance calculator page and admin tab"
   },
   {
@@ -7597,8 +7636,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Add calculator page polish"
   },
   {
@@ -7613,8 +7652,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 13,
     "subject": "Исправлена верификация и расчёты"
   },
   {
@@ -7629,8 +7668,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Update profiles policy"
   },
   {
@@ -7645,8 +7684,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Add manager update policy"
   },
   {
@@ -7661,8 +7700,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 71,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 25,
     "subject": "Update gate calculation logic: 5500 RUB per gate shared by apartments"
   },
   {
@@ -7677,8 +7716,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Fix gate price display in calculator details"
   },
   {
@@ -7693,7 +7732,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
     "sessionMins": 24,
     "subject": "Update package-lock.json after dependency installation"
   },
@@ -7709,8 +7748,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Fix lint error (explicit any) in Calculator.tsx"
   },
   {
@@ -7726,7 +7765,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWorkTime": false,
     "category": "morning",
     "catLabel": "Раннее утро (06:00–09:00)",
-    "sessionMins": 60,
+    "sessionMins": 25,
     "subject": "Обновил интерфейс ядра"
   },
   {
@@ -7742,7 +7781,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWorkTime": false,
     "category": "morning",
     "catLabel": "Раннее утро (06:00–09:00)",
-    "sessionMins": 15,
+    "sessionMins": 10,
     "subject": "Add chat widget table"
   },
   {
@@ -7758,7 +7797,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWorkTime": false,
     "category": "morning",
     "catLabel": "Раннее утро (06:00–09:00)",
-    "sessionMins": 15,
+    "sessionMins": 10,
     "subject": "Preceding changes"
   },
   {
@@ -7774,7 +7813,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWorkTime": false,
     "category": "morning",
     "catLabel": "Раннее утро (06:00–09:00)",
-    "sessionMins": 15,
+    "sessionMins": 10,
     "subject": "Preceding changes"
   },
   {
@@ -7790,7 +7829,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWorkTime": false,
     "category": "morning",
     "catLabel": "Раннее утро (06:00–09:00)",
-    "sessionMins": 15,
+    "sessionMins": 10,
     "subject": "Добавлен чат-виджет ИИ"
   },
   {
@@ -7806,7 +7845,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWorkTime": false,
     "category": "morning",
     "catLabel": "Раннее утро (06:00–09:00)",
-    "sessionMins": 15,
+    "sessionMins": 10,
     "subject": "Preceding changes"
   },
   {
@@ -7822,7 +7861,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWorkTime": false,
     "category": "morning",
     "catLabel": "Раннее утро (06:00–09:00)",
-    "sessionMins": 15,
+    "sessionMins": 10,
     "subject": "Добавил чат-виджет и админку"
   },
   {
@@ -7838,7 +7877,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWorkTime": false,
     "category": "morning",
     "catLabel": "Раннее утро (06:00–09:00)",
-    "sessionMins": 15,
+    "sessionMins": 10,
     "subject": "Добавил AI чат виджет"
   },
   {
@@ -7854,7 +7893,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWorkTime": false,
     "category": "morning",
     "catLabel": "Раннее утро (06:00–09:00)",
-    "sessionMins": 15,
+    "sessionMins": 10,
     "subject": "Добавил чат-виджет AI"
   },
   {
@@ -7870,7 +7909,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWorkTime": false,
     "category": "morning",
     "catLabel": "Раннее утро (06:00–09:00)",
-    "sessionMins": 15,
+    "sessionMins": 10,
     "subject": "Add AI chat widget"
   },
   {
@@ -7886,7 +7925,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWorkTime": false,
     "category": "morning",
     "catLabel": "Раннее утро (06:00–09:00)",
-    "sessionMins": 15,
+    "sessionMins": 11,
     "subject": "Добавил чат-ответ с Markdown"
   },
   {
@@ -7902,7 +7941,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWorkTime": false,
     "category": "morning",
     "catLabel": "Раннее утро (06:00–09:00)",
-    "sessionMins": 15,
+    "sessionMins": 10,
     "subject": "Add chat history tables"
   },
   {
@@ -7918,7 +7957,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWorkTime": false,
     "category": "morning",
     "catLabel": "Раннее утро (06:00–09:00)",
-    "sessionMins": 15,
+    "sessionMins": 10,
     "subject": "Добавил чат историю и политику"
   },
   {
@@ -7934,7 +7973,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWorkTime": false,
     "category": "morning",
     "catLabel": "Раннее утро (06:00–09:00)",
-    "sessionMins": 15,
+    "sessionMins": 10,
     "subject": "Preceding changes"
   },
   {
@@ -7950,7 +7989,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWorkTime": false,
     "category": "morning",
     "catLabel": "Раннее утро (06:00–09:00)",
-    "sessionMins": 15,
+    "sessionMins": 10,
     "subject": "Preceding changes"
   },
   {
@@ -7966,7 +8005,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWorkTime": false,
     "category": "morning",
     "catLabel": "Раннее утро (06:00–09:00)",
-    "sessionMins": 15,
+    "sessionMins": 10,
     "subject": "Chat history admin page added"
   },
   {
@@ -7982,7 +8021,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWorkTime": false,
     "category": "morning",
     "catLabel": "Раннее утро (06:00–09:00)",
-    "sessionMins": 15,
+    "sessionMins": 10,
     "subject": "Добавил историю чатов админке"
   },
   {
@@ -7997,8 +8036,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 60,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 25,
     "subject": "Work in progress"
   },
   {
@@ -8013,8 +8052,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Make chat widget links clickable"
   },
   {
@@ -8029,8 +8068,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Поддержка ссылок в виджете"
   },
   {
@@ -8045,8 +8084,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Enable HTML links in chat widget"
   },
   {
@@ -8061,7 +8100,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
     "sessionMins": 23,
     "subject": "Добавил пуш-уведомления"
   },
@@ -8077,8 +8116,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Добавил подписки пуш-уведомлений"
   },
   {
@@ -8093,8 +8132,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 60,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 25,
     "subject": "Enable push notifications setup"
   },
   {
@@ -8109,8 +8148,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Add push notifications"
   },
   {
@@ -8125,8 +8164,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Добавил push-уведомления"
   },
   {
@@ -8141,8 +8180,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Add push notifications support"
   },
   {
@@ -8157,8 +8196,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Add push notification support"
   },
   {
@@ -8173,8 +8212,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Add push notifications support"
   },
   {
@@ -8189,8 +8228,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Добавил push-уведомления"
   },
   {
@@ -8205,8 +8244,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Enable push notifications"
   },
   {
@@ -8221,8 +8260,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Add push-notifications"
   },
   {
@@ -8237,7 +8276,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
     "sessionMins": 17,
     "subject": "Push notifications failing"
   },
@@ -8253,8 +8292,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Fix push notification encryption"
   },
   {
@@ -8269,8 +8308,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Push notifications fixed"
   },
   {
@@ -8285,8 +8324,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Fix push notification flow"
   },
   {
@@ -8301,8 +8340,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Fix push notification flow"
   },
   {
@@ -8317,8 +8356,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Fix push notification encryption"
   },
   {
@@ -8333,8 +8372,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 60,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 25,
     "subject": "Fix push notifications flow"
   },
   {
@@ -8349,8 +8388,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "Enhance admin/director RBAC"
   },
   {
@@ -8365,8 +8404,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "Improve push & admin guards"
   },
   {
@@ -8381,8 +8420,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "Improve push notifications and admin rules"
   },
   {
@@ -8397,8 +8436,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 60,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 25,
     "subject": "Work in progress"
   },
   {
@@ -8413,8 +8452,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Fix push notifications"
   },
   {
@@ -8429,8 +8468,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Fix push notifications"
   },
   {
@@ -8445,8 +8484,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Fix push notifications delivery"
   },
   {
@@ -8461,8 +8500,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Improve push notifications"
   },
   {
@@ -8477,8 +8516,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Improve push notifications"
   },
   {
@@ -8493,8 +8532,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 12,
     "subject": "Add telegram tables"
   },
   {
@@ -8509,8 +8548,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Add Telegram DB tables"
   },
   {
@@ -8525,8 +8564,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Add telegram bot + notify flow"
   },
   {
@@ -8541,8 +8580,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Add Telegram bot & notify flow"
   },
   {
@@ -8557,8 +8596,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Add telegram bot tables and notify flow"
   },
   {
@@ -8573,8 +8612,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Enhance push + Telegram bot"
   },
   {
@@ -8589,8 +8628,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Improve push-notif and Telegram bot"
   },
   {
@@ -8603,10 +8642,10 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWeekend": false,
     "isHoliday": false,
     "holidayName": null,
-    "isWorkTime": true,
-    "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 60,
+    "isWorkTime": false,
+    "category": "evening",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 25,
     "subject": "Work in progress"
   },
   {
@@ -8621,8 +8660,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -8637,8 +8676,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "Integrate account data system"
   },
   {
@@ -8653,8 +8692,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "Fix calculator RLS policy"
   },
   {
@@ -8669,8 +8708,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "Fix RLS and add accounts"
   },
   {
@@ -8685,8 +8724,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "Fix calculator RLS and add accounts table"
   },
   {
@@ -8701,8 +8740,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "Preceding changes"
   },
   {
@@ -8717,8 +8756,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "Preceding changes"
   },
   {
@@ -8733,8 +8772,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "Fix calculator RLS and perms"
   },
   {
@@ -8749,8 +8788,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "Fix calculator RLS and perms"
   },
   {
@@ -8765,8 +8804,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "Preceding changes"
   },
   {
@@ -8781,8 +8820,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "Accounts admin UI added"
   },
   {
@@ -8797,8 +8836,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "Preceding changes"
   },
   {
@@ -8813,8 +8852,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "Add AccountsManager UI"
   },
   {
@@ -8829,8 +8868,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "Enhance accounts mgmt and UI"
   },
   {
@@ -8845,8 +8884,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "Accounts data UI added"
   },
   {
@@ -8861,8 +8900,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 60,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 25,
     "subject": "Work in progress"
   },
   {
@@ -8877,8 +8916,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -8893,8 +8932,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Increase workbox cache limit"
   },
   {
@@ -8909,8 +8948,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 45,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 25,
     "subject": "feat: добавлена автоматизированная генерация КП в формате DOCX и интеграция с админ-панелью"
   },
   {
@@ -8925,7 +8964,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
     "sessionMins": 26,
     "subject": "style: обновлен футер КП (автогенерация и кликабельная ссылка)"
   },
@@ -8941,8 +8980,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "feat: в КП добавлен логотип компании"
   },
   {
@@ -8957,8 +8996,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "fix: исправлена нумерация разделов и детализация тарифа в КП"
   },
   {
@@ -8973,8 +9012,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "style: ширина логотипа в КП увеличена для корректного соотношения сторон"
   },
   {
@@ -8989,7 +9028,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
     "sessionMins": 29,
     "subject": "Improve address-based info bot"
   },
@@ -9005,8 +9044,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Fix build TS issues and bot"
   },
   {
@@ -9021,8 +9060,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Fix chat account info handling"
   },
   {
@@ -9037,8 +9076,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Address lookup failed fixed"
   },
   {
@@ -9053,8 +9092,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Improve account search robustness"
   },
   {
@@ -9069,8 +9108,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 14,
     "subject": "Work in progress"
   },
   {
@@ -9085,8 +9124,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -9101,8 +9140,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Уточнил поиск по адресу"
   },
   {
@@ -9117,8 +9156,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Improve account output formatting from chat"
   },
   {
@@ -9133,7 +9172,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
     "sessionMins": 20,
     "subject": "feat: динамическая нумерация и обновление текстов в КП"
   },
@@ -9149,7 +9188,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
     "sessionMins": 15,
     "subject": "feat: интерактивные подсказки и улучшенные тексты в калькуляторе"
   },
@@ -9165,8 +9204,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "chore: синхронизация всех файлов проекта и ассетов"
   },
   {
@@ -9181,8 +9220,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "fix: валюта чат-бота изменена на рубли"
   },
   {
@@ -9197,8 +9236,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "feat: добавлена проверка задолженности при создании заявки в чате"
   },
   {
@@ -9213,8 +9252,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "fix: опечатка и уточнение логики платных вызовов в чат-боте"
   },
   {
@@ -9229,7 +9268,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
     "sessionMins": 17,
     "subject": "fix: глубокое исправление поиска по адресу и валюты в чат-боте"
   },
@@ -9245,8 +9284,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "feat: интеллектуальная очистка промпта и типизация чат-функции"
   },
   {
@@ -9261,8 +9300,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "fix: устранение зависания при пустом адресе в поиске"
   },
   {
@@ -9277,8 +9316,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "feat: добавлена информация о компании в конец КП (docx)"
   },
   {
@@ -9293,8 +9332,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 13,
     "subject": "style: центрирование блока контактов в КП"
   },
   {
@@ -9309,8 +9348,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 85,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 25,
     "subject": "fix: калькулятор 0 домофонов и обновление текстов КП"
   },
   {
@@ -9325,8 +9364,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "style: уточнение формулировки про калитки в КП"
   },
   {
@@ -9339,9 +9378,9 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWeekend": false,
     "isHoliday": false,
     "holidayName": null,
-    "isWorkTime": true,
-    "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+    "isWorkTime": false,
+    "category": "evening",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
     "sessionMins": 27,
     "subject": "fix: установка 0 домофонов по умолчанию и фикс зависимости цен за камеры"
   },
@@ -9355,9 +9394,9 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWeekend": false,
     "isHoliday": false,
     "holidayName": null,
-    "isWorkTime": true,
-    "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+    "isWorkTime": false,
+    "category": "evening",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
     "sessionMins": 24,
     "subject": "fix: восстановление переменных и применение разделенной логики тарифов"
   },
@@ -9371,10 +9410,10 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWeekend": false,
     "isHoliday": false,
     "holidayName": null,
-    "isWorkTime": true,
-    "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "isWorkTime": false,
+    "category": "evening",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 11,
     "subject": "feat: добавление кол-ва подъездов и квартир в заголовок КП"
   },
   {
@@ -9389,8 +9428,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "feat: детализация состава оборудования в тезисах КП"
   },
   {
@@ -9405,8 +9444,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "fix: скрытие тезисов про домофон в КП при их отсутствии"
   },
   {
@@ -9421,8 +9460,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 60,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 25,
     "subject": "docs: итоговый отчет о прогрессе проекта"
   },
   {
@@ -9437,8 +9476,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 60,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 25,
     "subject": "Changes"
   },
   {
@@ -9453,8 +9492,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -9469,8 +9508,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -9485,8 +9524,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -9501,8 +9540,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -9517,8 +9556,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -9533,8 +9572,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -9549,8 +9588,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -9565,8 +9604,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -9581,8 +9620,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -9597,8 +9636,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -9613,8 +9652,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -9629,8 +9668,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -9645,8 +9684,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -9661,8 +9700,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Добавил AI SEO систему"
   },
   {
@@ -9677,8 +9716,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 60,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 25,
     "subject": "Changes"
   },
   {
@@ -9693,8 +9732,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -9709,8 +9748,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -9725,8 +9764,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -9741,8 +9780,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -9757,8 +9796,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -9773,8 +9812,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -9789,8 +9828,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -9805,8 +9844,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -9821,8 +9860,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -9837,8 +9876,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Исправил баг в SEO apply"
   },
   {
@@ -9853,8 +9892,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -9869,8 +9908,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -9885,8 +9924,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -9901,8 +9940,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Добавил авто-новости в админке"
   },
   {
@@ -9917,8 +9956,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 60,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 25,
     "subject": "Changes"
   },
   {
@@ -9933,8 +9972,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -9949,8 +9988,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -9965,8 +10004,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -9981,8 +10020,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -9997,8 +10036,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10013,8 +10052,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10029,8 +10068,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10045,8 +10084,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10061,8 +10100,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10077,8 +10116,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10093,8 +10132,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10109,8 +10148,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10125,8 +10164,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Обновиł render markdown w postach"
   },
   {
@@ -10141,7 +10180,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
     "sessionMins": 16,
     "subject": "Changes"
   },
@@ -10157,8 +10196,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10173,8 +10212,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10189,8 +10228,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10205,8 +10244,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10221,8 +10260,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10237,8 +10276,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10253,8 +10292,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Исправил посты и добавил редактор"
   },
   {
@@ -10269,8 +10308,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 60,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 25,
     "subject": "Changes"
   },
   {
@@ -10285,8 +10324,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10301,8 +10340,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10317,8 +10356,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10333,8 +10372,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10349,8 +10388,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10365,8 +10404,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10381,8 +10420,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10397,8 +10436,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10413,8 +10452,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10429,8 +10468,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10445,8 +10484,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Исправил сегменты и голосование"
   },
   {
@@ -10461,8 +10500,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 60,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 25,
     "subject": "Changes"
   },
   {
@@ -10477,8 +10516,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10493,8 +10532,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10509,8 +10548,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10525,8 +10564,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10541,8 +10580,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10557,8 +10596,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10573,8 +10612,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "Добавил CRUD сегментов и шаблон"
   },
   {
@@ -10589,8 +10628,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": "Праздник Весны и Труда",
     "isWorkTime": false,
     "category": "holiday",
-    "catLabel": "Гос. праздник РФ: Праздник Весны и Труда",
-    "sessionMins": 60,
+    "catLabel": "Гос. праздник РФ (Нерабочий день)",
+    "sessionMins": 25,
     "subject": "Changes"
   },
   {
@@ -10605,8 +10644,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": "Праздник Весны и Труда",
     "isWorkTime": false,
     "category": "holiday",
-    "catLabel": "Гос. праздник РФ: Праздник Весны и Труда",
-    "sessionMins": 15,
+    "catLabel": "Гос. праздник РФ (Нерабочий день)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10621,8 +10660,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": "Праздник Весны и Труда",
     "isWorkTime": false,
     "category": "holiday",
-    "catLabel": "Гос. праздник РФ: Праздник Весны и Труда",
-    "sessionMins": 15,
+    "catLabel": "Гос. праздник РФ (Нерабочий день)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10637,8 +10676,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": "Праздник Весны и Труда",
     "isWorkTime": false,
     "category": "holiday",
-    "catLabel": "Гос. праздник РФ: Праздник Весны и Труда",
-    "sessionMins": 15,
+    "catLabel": "Гос. праздник РФ (Нерабочий день)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10653,8 +10692,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": "Праздник Весны и Труда",
     "isWorkTime": false,
     "category": "holiday",
-    "catLabel": "Гос. праздник РФ: Праздник Весны и Труда",
-    "sessionMins": 15,
+    "catLabel": "Гос. праздник РФ (Нерабочий день)",
+    "sessionMins": 10,
     "subject": "Устранил ошибку SEO-постинга"
   },
   {
@@ -10669,8 +10708,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": "Праздник Весны и Труда",
     "isWorkTime": false,
     "category": "holiday",
-    "catLabel": "Гос. праздник РФ: Праздник Весны и Труда",
-    "sessionMins": 15,
+    "catLabel": "Гос. праздник РФ (Нерабочий день)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10685,8 +10724,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": "Праздник Весны и Труда",
     "isWorkTime": false,
     "category": "holiday",
-    "catLabel": "Гос. праздник РФ: Праздник Весны и Труда",
-    "sessionMins": 15,
+    "catLabel": "Гос. праздник РФ (Нерабочий день)",
+    "sessionMins": 10,
     "subject": "Исправил формат периода и тг"
   },
   {
@@ -10701,8 +10740,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": "Праздник Весны и Труда",
     "isWorkTime": false,
     "category": "holiday",
-    "catLabel": "Гос. праздник РФ: Праздник Весны и Труда",
-    "sessionMins": 15,
+    "catLabel": "Гос. праздник РФ (Нерабочий день)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10717,8 +10756,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": "Праздник Весны и Труда",
     "isWorkTime": false,
     "category": "holiday",
-    "catLabel": "Гос. праздник РФ: Праздник Весны и Труда",
-    "sessionMins": 15,
+    "catLabel": "Гос. праздник РФ (Нерабочий день)",
+    "sessionMins": 10,
     "subject": "Убрал дубль валюты и fixed period"
   },
   {
@@ -10733,8 +10772,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": "Праздничный выходной день",
     "isWorkTime": false,
     "category": "holiday",
-    "catLabel": "Гос. праздник РФ: Праздничный выходной день",
-    "sessionMins": 60,
+    "catLabel": "Гос. праздник РФ (Нерабочий день)",
+    "sessionMins": 25,
     "subject": "Changes"
   },
   {
@@ -10749,8 +10788,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": "Праздничный выходной день",
     "isWorkTime": false,
     "category": "holiday",
-    "catLabel": "Гос. праздник РФ: Праздничный выходной день",
-    "sessionMins": 15,
+    "catLabel": "Гос. праздник РФ (Нерабочий день)",
+    "sessionMins": 10,
     "subject": "Добавил учёт задолженности в заявку"
   },
   {
@@ -10765,8 +10804,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": "Праздничный выходной день",
     "isWorkTime": false,
     "category": "holiday",
-    "catLabel": "Гос. праздник РФ: Праздничный выходной день",
-    "sessionMins": 15,
+    "catLabel": "Гос. праздник РФ (Нерабочий день)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10781,8 +10820,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": "Праздничный выходной день",
     "isWorkTime": false,
     "category": "holiday",
-    "catLabel": "Гос. праздник РФ: Праздничный выходной день",
-    "sessionMins": 15,
+    "catLabel": "Гос. праздник РФ (Нерабочий день)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10797,8 +10836,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": "Праздничный выходной день",
     "isWorkTime": false,
     "category": "holiday",
-    "catLabel": "Гос. праздник РФ: Праздничный выходной день",
-    "sessionMins": 15,
+    "catLabel": "Гос. праздник РФ (Нерабочий день)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10813,8 +10852,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": "Праздничный выходной день",
     "isWorkTime": false,
     "category": "holiday",
-    "catLabel": "Гос. праздник РФ: Праздничный выходной день",
-    "sessionMins": 15,
+    "catLabel": "Гос. праздник РФ (Нерабочий день)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10829,8 +10868,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": "Праздничный выходной день",
     "isWorkTime": false,
     "category": "holiday",
-    "catLabel": "Гос. праздник РФ: Праздничный выходной день",
-    "sessionMins": 15,
+    "catLabel": "Гос. праздник РФ (Нерабочий день)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10845,8 +10884,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": "Праздничный выходной день",
     "isWorkTime": false,
     "category": "holiday",
-    "catLabel": "Гос. праздник РФ: Праздничный выходной день",
-    "sessionMins": 15,
+    "catLabel": "Гос. праздник РФ (Нерабочий день)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10861,8 +10900,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": "Праздничный выходной день",
     "isWorkTime": false,
     "category": "holiday",
-    "catLabel": "Гос. праздник РФ: Праздничный выходной день",
-    "sessionMins": 15,
+    "catLabel": "Гос. праздник РФ (Нерабочий день)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10877,8 +10916,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": "Праздничный выходной день",
     "isWorkTime": false,
     "category": "holiday",
-    "catLabel": "Гос. праздник РФ: Праздничный выходной день",
-    "sessionMins": 15,
+    "catLabel": "Гос. праздник РФ (Нерабочий день)",
+    "sessionMins": 10,
     "subject": "Обновил логику чат-бота"
   },
   {
@@ -10893,8 +10932,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": "Праздничный перенесенный выходной день",
     "isWorkTime": false,
     "category": "holiday",
-    "catLabel": "Гос. праздник РФ: Праздничный перенесенный выходной день",
-    "sessionMins": 60,
+    "catLabel": "Гос. праздник РФ (Нерабочий день)",
+    "sessionMins": 25,
     "subject": "Changes"
   },
   {
@@ -10909,8 +10948,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": "Праздничный перенесенный выходной день",
     "isWorkTime": false,
     "category": "holiday",
-    "catLabel": "Гос. праздник РФ: Праздничный перенесенный выходной день",
-    "sessionMins": 15,
+    "catLabel": "Гос. праздник РФ (Нерабочий день)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10925,8 +10964,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": "Праздничный перенесенный выходной день",
     "isWorkTime": false,
     "category": "holiday",
-    "catLabel": "Гос. праздник РФ: Праздничный перенесенный выходной день",
-    "sessionMins": 15,
+    "catLabel": "Гос. праздник РФ (Нерабочий день)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10941,8 +10980,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": "Праздничный перенесенный выходной день",
     "isWorkTime": false,
     "category": "holiday",
-    "catLabel": "Гос. праздник РФ: Праздничный перенесенный выходной день",
-    "sessionMins": 15,
+    "catLabel": "Гос. праздник РФ (Нерабочий день)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10957,8 +10996,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": "Праздничный перенесенный выходной день",
     "isWorkTime": false,
     "category": "holiday",
-    "catLabel": "Гос. праздник РФ: Праздничный перенесенный выходной день",
-    "sessionMins": 15,
+    "catLabel": "Гос. праздник РФ (Нерабочий день)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10973,8 +11012,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": "Праздничный перенесенный выходной день",
     "isWorkTime": false,
     "category": "holiday",
-    "catLabel": "Гос. праздник РФ: Праздничный перенесенный выходной день",
-    "sessionMins": 15,
+    "catLabel": "Гос. праздник РФ (Нерабочий день)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -10989,8 +11028,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": "Праздничный перенесенный выходной день",
     "isWorkTime": false,
     "category": "holiday",
-    "catLabel": "Гос. праздник РФ: Праздничный перенесенный выходной день",
-    "sessionMins": 15,
+    "catLabel": "Гос. праздник РФ (Нерабочий день)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -11005,8 +11044,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": "Праздничный перенесенный выходной день",
     "isWorkTime": false,
     "category": "holiday",
-    "catLabel": "Гос. праздник РФ: Праздничный перенесенный выходной день",
-    "sessionMins": 15,
+    "catLabel": "Гос. праздник РФ (Нерабочий день)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -11021,8 +11060,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": "Праздничный перенесенный выходной день",
     "isWorkTime": false,
     "category": "holiday",
-    "catLabel": "Гос. праздник РФ: Праздничный перенесенный выходной день",
-    "sessionMins": 15,
+    "catLabel": "Гос. праздник РФ (Нерабочий день)",
+    "sessionMins": 10,
     "subject": "Обновил доступность данных"
   },
   {
@@ -11037,8 +11076,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": "Праздничный перенесенный выходной день",
     "isWorkTime": false,
     "category": "holiday",
-    "catLabel": "Гос. праздник РФ: Праздничный перенесенный выходной день",
-    "sessionMins": 15,
+    "catLabel": "Гос. праздник РФ (Нерабочий день)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -11053,8 +11092,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": "Праздничный перенесенный выходной день",
     "isWorkTime": false,
     "category": "holiday",
-    "catLabel": "Гос. праздник РФ: Праздничный перенесенный выходной день",
-    "sessionMins": 15,
+    "catLabel": "Гос. праздник РФ (Нерабочий день)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -11069,8 +11108,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": "Праздничный перенесенный выходной день",
     "isWorkTime": false,
     "category": "holiday",
-    "catLabel": "Гос. праздник РФ: Праздничный перенесенный выходной день",
-    "sessionMins": 15,
+    "catLabel": "Гос. праздник РФ (Нерабочий день)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -11085,8 +11124,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": "Праздничный перенесенный выходной день",
     "isWorkTime": false,
     "category": "holiday",
-    "catLabel": "Гос. праздник РФ: Праздничный перенесенный выходной день",
-    "sessionMins": 15,
+    "catLabel": "Гос. праздник РФ (Нерабочий день)",
+    "sessionMins": 10,
     "subject": "Добавил логику для частных клиентов"
   },
   {
@@ -11101,8 +11140,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 60,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 25,
     "subject": "Changes"
   },
   {
@@ -11117,8 +11156,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -11133,8 +11172,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -11149,8 +11188,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Добавил отмену заявок в ЛК"
   },
   {
@@ -11165,8 +11204,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -11181,8 +11220,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -11197,8 +11236,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -11213,8 +11252,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Добавил отмену в работе"
   },
   {
@@ -11229,8 +11268,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -11245,8 +11284,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -11261,8 +11300,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -11277,8 +11316,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -11293,8 +11332,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Объединил плашку доступа"
   },
   {
@@ -11309,8 +11348,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 60,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 25,
     "subject": "feat: complete migration to local Postgres, Nginx production build, and GitHub Actions CI/CD"
   },
   {
@@ -11325,8 +11364,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 61,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 25,
     "subject": "trigger GitHub Actions deploy"
   },
   {
@@ -11341,8 +11380,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "fix: use modern docker compose syntax"
   },
   {
@@ -11357,8 +11396,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "trigger GitHub Actions after adding swap file"
   },
   {
@@ -11373,7 +11412,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
     "sessionMins": 15,
     "subject": "fix: updated api urls for production proxy and fixed missing image"
   },
@@ -11389,8 +11428,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "fix: TypeScript strict type checking for Vite env variables"
   },
   {
@@ -11405,8 +11444,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 13,
     "subject": "fix: rename corrupted image to png"
   },
   {
@@ -11421,7 +11460,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
     "sessionMins": 22,
     "subject": "chore: update config backup and admin credentials"
   },
@@ -11437,8 +11476,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "fix(calculator): remove default values and add descriptive placeholders"
   },
   {
@@ -11453,7 +11492,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
     "sessionMins": 34,
     "subject": "fix(auth): add getUser polyfill for admin access"
   },
@@ -11469,8 +11508,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 13,
     "subject": "fix: полная перестройка схемы БД - 29 таблиц, polyfill getUser(), E2E 100%"
   },
   {
@@ -11485,8 +11524,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "fix: disable push notifications on desktop to prevent unwanted permission prompts"
   },
   {
@@ -11501,8 +11540,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 46,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 25,
     "subject": "fix: recreate site_blocks table with correct schema for frontend compatibility"
   },
   {
@@ -11517,8 +11556,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Changes"
   },
   {
@@ -11533,8 +11572,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "Синхронизировал проект на GitHub"
   },
   {
@@ -11549,8 +11588,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 60,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 25,
     "subject": "fix(auth): настроено проксирование API и Auth запросов в Vite и Nginx"
   },
   {
@@ -11565,8 +11604,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 13,
     "subject": "docs(logs): задокументированы серверные исправления бд и ролей"
   },
   {
@@ -11581,8 +11620,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 12,
     "subject": "fix(client): убран заголовок Authorization для анонимных запросов к PostgREST"
   },
   {
@@ -11597,8 +11636,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "fix(auth): реактивный вход без перезагрузки и исправление анонимных запросов калькулятора"
   },
   {
@@ -11613,7 +11652,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
     "sessionMins": 15,
     "subject": "Fix VITE_SUPABASE_URL to point to local /api instead of cloud"
   },
@@ -11629,7 +11668,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
     "sessionMins": 44,
     "subject": "feat: умный автокомплит адреса в личном кабинете по базе лицевых счетов"
   },
@@ -11645,8 +11684,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "feat: токенизированный поиск по корпусам и группировка до домов в автокомплите адреса"
   },
   {
@@ -11661,7 +11700,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
     "sessionMins": 19,
     "subject": "fix: умный автокомплит улиц и домов с нечетким поиском биграмм"
   },
@@ -11677,8 +11716,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "docs: обновить журнал изменений проекта"
   },
   {
@@ -11693,7 +11732,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
     "sessionMins": 19,
     "subject": "fix: восстановить утерянные стейты автокомплита в Cabinet"
   },
@@ -11709,8 +11748,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 12,
     "subject": "style: исправить мобильную адаптивность личного кабинета (убрать горизонтальный скролл)"
   },
   {
@@ -11725,8 +11764,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 60,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 25,
     "subject": "feat: интегрировать конструктор заказа оборудования и платных услуг с автозаполнением оплаты банка Кубань Кредит"
   },
   {
@@ -11741,7 +11780,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
     "sessionMins": 25,
     "subject": "fix: исправить краш оплаты в кабинете и бесконечную загрузку заявок в FSM"
   },
@@ -11757,8 +11796,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 71,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 25,
     "subject": "feat: добавить две кнопки оплаты, историю заявок и прямую интеграцию с pay.kk.ru"
   },
   {
@@ -11773,8 +11812,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 51,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 25,
     "subject": "refactor: replace Supabase Realtime subscriptions with setInterval Polling due to PostgREST limitations"
   },
   {
@@ -11789,7 +11828,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
     "sessionMins": 33,
     "subject": "feat: add email management and floor input in Cabinet; show payment details in FSM RequestDetails"
   },
@@ -11805,8 +11844,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "fix: document requests table fix in PROJECT_LOG.md"
   },
   {
@@ -11821,7 +11860,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
     "sessionMins": 26,
     "subject": "feat: полное удаление lovable.dev и рекламы, обновление PWA иконок и favicon на основе нового премиального логотипа Домофондар"
   },
@@ -11837,7 +11876,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
     "sessionMins": 20,
     "subject": "security: закрыт порт СУБД 5432 от внешнего мира для предотвращения атак"
   },
@@ -11853,8 +11892,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "security: включен метод trust для локальной сети докера"
   },
   {
@@ -11869,8 +11908,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "feat: добавлен bash скрипт для очистки сессий и сброса пароля СУБД на VPS"
   },
   {
@@ -11885,8 +11924,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 106,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 25,
     "subject": "feat: интегрирован DaData, ФЗ-152 соглашение, выбор типа помещения, контакты в заявках и автосборка адреса"
   },
   {
@@ -11901,7 +11940,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
     "sessionMins": 23,
     "subject": "feat: исправлен нечеткий поиск улиц, обязательный этаж, постепенное заполнение полей и ручной ввод адресов"
   },
@@ -11917,7 +11956,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
     "sessionMins": 17,
     "subject": "style: скрыть абонентские плашки для частных клиентов в ЛК"
   },
@@ -11933,7 +11972,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
     "sessionMins": 15,
     "subject": "fix: реактивная верификация, исправление сброса полей при редактировании и сборки адреса в ЛК"
   },
@@ -11949,7 +11988,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
     "sessionMins": 23,
     "subject": "fix: строгая географическая фильтрация подсказок DaData по Краснодарскому краю и Адыгее"
   },
@@ -11966,7 +12005,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWorkTime": false,
     "category": "night",
     "catLabel": "Глубокая ночь (00:00–06:00)",
-    "sessionMins": 60,
+    "sessionMins": 25,
     "subject": "feat(chat): реализовано интеллектуальное авто-открытие и сворачивание виджета чата"
   },
   {
@@ -11998,7 +12037,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWorkTime": false,
     "category": "night",
     "catLabel": "Глубокая ночь (00:00–06:00)",
-    "sessionMins": 15,
+    "sessionMins": 10,
     "subject": "feat(chat): увеличена задержка открытия до 8с и показа до 10с для идеального UX"
   },
   {
@@ -12029,8 +12068,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 60,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 25,
     "subject": "feat(domain): миграция проекта на новый домен domofondar.ru"
   },
   {
@@ -12045,7 +12084,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
     "sessionMins": 39,
     "subject": "fix(cabinet): fix 6/6a house collision, address matching, and email verification preservation on data clear"
   },
@@ -12061,7 +12100,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
     "sessionMins": 32,
     "subject": "Устранение багов ЛК: исправление синтаксических ошибок, точное сопоставление лицевых счетов для адресов с корпусами и буквами (Войсковая 6а, Бжегокайская, Корнилова) и защита email"
   },
@@ -12077,8 +12116,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 12,
     "subject": "Устранение багов ЛК: восстановление функций calculateTotals, handleCreateOrderRequest, handlePayLaterOnSite и переменных toast, hasAdminConsoleAccess, isLocked для предотвращения рантайм падения и синего экрана"
   },
   {
@@ -12093,8 +12132,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "Устранение багов ЛК: обновление PROJECT_LOG.md с фиксацией рантайм-исправлений"
   },
   {
@@ -12109,8 +12148,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 14,
     "subject": "Устранение багов ЛК: интеграция глобального отладчика runtimeError в Cabinet.tsx"
   },
   {
@@ -12125,8 +12164,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "fix(cabinet): исправление бесконечного цикла редиректов и зависания loading"
   },
   {
@@ -12139,10 +12178,10 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWeekend": false,
     "isHoliday": false,
     "holidayName": null,
-    "isWorkTime": true,
-    "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 60,
+    "isWorkTime": false,
+    "category": "evening",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 25,
     "subject": "Устранение багов ЛК: обновление PROJECT_LOG.md с фиксацией"
   },
   {
@@ -12157,8 +12196,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 60,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 25,
     "subject": "fix(cabinet): исправление парсинга адресов с корпусами, буквами и дробями (6а, корп. 2, 31/1)"
   },
   {
@@ -12173,8 +12212,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "fix(docker): add postgrest dependency to frontend to prevent nginx resolving error"
   },
   {
@@ -12189,7 +12228,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
     "sessionMins": 22,
     "subject": "fix(docker): add restart policy to postgrest service"
   },
@@ -12205,7 +12244,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
     "sessionMins": 30,
     "subject": "fix(cabinet): trim address parts in normalization to ensure exact house/apartment matching"
   },
@@ -12221,7 +12260,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
     "sessionMins": 20,
     "subject": "fix(cabinet): normalize street compare in autocomplete and prioritize local houses in sorted list"
   },
@@ -12237,8 +12276,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "docs: update PROJECT_LOG and add remote integration test script"
   },
   {
@@ -12251,10 +12290,10 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWeekend": false,
     "isHoliday": false,
     "holidayName": null,
-    "isWorkTime": true,
-    "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 60,
+    "isWorkTime": false,
+    "category": "evening",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 25,
     "subject": "feat: исправление автокомплита домов и добавление вкладки реквизитов (Карта партнера)"
   },
   {
@@ -12267,10 +12306,10 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWeekend": false,
     "isHoliday": false,
     "holidayName": null,
-    "isWorkTime": true,
-    "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "isWorkTime": false,
+    "category": "evening",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "chore: переименование файла реквизитов во избежание проблем с URL в Nginx"
   },
   {
@@ -12283,10 +12322,10 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWeekend": false,
     "isHoliday": false,
     "holidayName": null,
-    "isWorkTime": true,
-    "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "isWorkTime": false,
+    "category": "evening",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "docs: документирование изменений в PROJECT_LOG.md"
   },
   {
@@ -12299,10 +12338,10 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWeekend": false,
     "isHoliday": false,
     "holidayName": null,
-    "isWorkTime": true,
-    "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "isWorkTime": false,
+    "category": "evening",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "fix: прямое скачивание документов без открытия новых вкладок"
   },
   {
@@ -12315,10 +12354,10 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWeekend": false,
     "isHoliday": false,
     "holidayName": null,
-    "isWorkTime": true,
-    "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "isWorkTime": false,
+    "category": "evening",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "docs: детализация PROJECT_LOG.md о прямом скачивании"
   },
   {
@@ -12333,7 +12372,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
     "sessionMins": 44,
     "subject": "feat: поиск по лицевому счёту в ЛК + исправление вью unique_houses + улучшение сортировки домов"
   },
@@ -12349,8 +12388,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "fix: CI/CD деплоит только frontend без конфликта контейнеров БД"
   },
   {
@@ -12365,8 +12404,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 52,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 25,
     "subject": "feat: выделение подъезда, исправление автокомплита корпусов и редизайн блока л/с"
   },
   {
@@ -12381,8 +12420,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "fix: отключено кэширование sw.js и index.html in nginx.conf для корректного обновления PWA"
   },
   {
@@ -12397,8 +12436,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "style: fix account search banner text contrast on light/dark themes"
   },
   {
@@ -12413,7 +12452,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
     "sessionMins": 16,
     "subject": "feat: display entrance and apartment fields in one row, fix entrance regex to prevent false matches with house corps, add auto-fill for entrance on apartment select"
   },
@@ -12429,8 +12468,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "fix: remove literal dollar sign from JSX entrance and flat suggestions"
   },
   {
@@ -12445,8 +12484,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "style: change glass-premium card background to subtle blue and border to light blue on light theme for better contrast"
   },
   {
@@ -12461,8 +12500,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "style: apply realistic blue glassmorphism to all cards and widgets on light theme"
   },
   {
@@ -12477,8 +12516,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 51,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 25,
     "subject": "feat: премиальный стекломорфизм Glassmorphism Pro для светлой и темной тем"
   },
   {
@@ -12493,7 +12532,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
     "sessionMins": 15,
     "subject": "fix: повышение контраста светлого матового стекла и добавление градиента body"
   },
@@ -12509,7 +12548,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
     "sessionMins": 23,
     "subject": "fix: насыщенный сине-голубой тон и контрастный контур светлого матового стекла"
   },
@@ -12525,7 +12564,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
     "sessionMins": 40,
     "subject": "fix: стилизация и контрастность кнопок с контуром (outline) и ховер вкладок"
   },
@@ -12541,7 +12580,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
     "sessionMins": 15,
     "subject": "feat(cabinet): simplify property fields and fix billing account linkage"
   },
@@ -12557,8 +12596,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "feat(calculator): fix calculation database schema and implement entrance-to-intercom sync with validation"
   },
   {
@@ -12573,8 +12612,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 57,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 25,
     "subject": "feat: унификация стиля кнопок на светлой теме с ShinyButton"
   },
   {
@@ -12589,8 +12628,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "refactor: перенос стилей ShinyButton в index.css и доработка цветов"
   },
   {
@@ -12605,8 +12644,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 60,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 25,
     "subject": "fix(cabinet): устранение краша рендеринга из-за пропущенного импорта Info"
   },
   {
@@ -12621,8 +12660,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "feat(ui): мобильная адаптация ShinyButton и перенос кнопок в flex-wrap в контактах"
   },
   {
@@ -12637,7 +12676,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
     "sessionMins": 23,
     "subject": "Фикс привязки лицевых счетов и условной обязательности этажа в ЛК"
   },
@@ -12653,8 +12692,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "feat: integrate interactive 3D Spline scene and Spotlight effects"
   },
   {
@@ -12669,7 +12708,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
     "sessionMins": 21,
     "subject": "fix: resolve regex street-type matching bug removing syllables in middle of street names"
   },
@@ -12685,8 +12724,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 13,
     "subject": "feat: redesign Hero text and style, fix Dockerfile Out of Memory on VPS"
   },
   {
@@ -12701,7 +12740,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
     "sessionMins": 25,
     "subject": "fix(cabinet): narrow search by street and house"
   },
@@ -12717,8 +12756,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "style(hero): make 3d spline scene borderless and seamless on background"
   },
   {
@@ -12733,8 +12772,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 60,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 25,
     "subject": "style: unify page backgrounds and fix sticky header positioning"
   },
   {
@@ -12749,8 +12788,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 60,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 25,
     "subject": "style: fix sticky header, redesign logo and fix RLS policies for anonymous users"
   },
   {
@@ -12765,8 +12804,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "docs: update PROJECT_LOG.md with Header fix and RLS fix"
   },
   {
@@ -12781,8 +12820,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "style: add animated 3D ShieldCheck logo with glow and shimmer effect to Header"
   },
   {
@@ -12797,8 +12836,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "docs: log animated logo features in PROJECT_LOG.md"
   },
   {
@@ -12813,8 +12852,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "style: reverse shimmer animation direction to left-to-right"
   },
   {
@@ -12829,8 +12868,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "docs: log shimmer direction change in PROJECT_LOG.md"
   },
   {
@@ -12845,7 +12884,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
     "sessionMins": 15,
     "subject": "style: unify section headers, fix Hero text cut-off, update Footer logo"
   },
@@ -12861,8 +12900,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "style: fix header centering and add card hover effects in Domofony, add buttons to SmartIntercom"
   },
   {
@@ -12877,8 +12916,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "style: add slide animation to Contact tabs, unify tab headers"
   },
   {
@@ -12893,8 +12932,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "style: редизайн калькулятора, пошаговые анимации для Вопросов и Контактов, обновление PROJECT_LOG.md"
   },
   {
@@ -12909,8 +12948,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "style: выравнивание шапок вкладок контактов, удаление щита и оранжевых элементов"
   },
   {
@@ -12925,8 +12964,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "style: редизайн кнопок на ShinyButton по всему сайту, выравнивание в Умном домофоне"
   },
   {
@@ -12941,7 +12980,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
     "sessionMins": 30,
     "subject": "feat(cabinet): replace remaining emojis in address fields with lucide icons (DoorOpen, Home, Building2)"
   },
@@ -12957,8 +12996,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "fix(cabinet): wrap Cabinet page in ErrorBoundary to prevent blank page and capture runtime errors"
   },
   {
@@ -12973,8 +13012,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "fix(cabinet): import missing lucide icons (Home, Building2, User, Phone, Mail, Lock, Lightbulb, Hash, MapPin, Building)"
   },
   {
@@ -12989,8 +13028,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "docs: update PROJECT_LOG.md with import fix details"
   },
   {
@@ -13005,8 +13044,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 48,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 25,
     "subject": "feat: полноэкранный FSM и Admin дашборд, графики Recharts, realtime подписки, KPI мастеров и диспетчеров"
   },
   {
@@ -13021,8 +13060,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "fix: устранение race condition в загрузке ролей useUserRole и интеграция ErrorBoundary для FSM/Admin страниц"
   },
   {
@@ -13037,8 +13076,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "feat: добавление галочки 'Оставаться в системе' и провайдера автовыхода по неактивности SessionTimeoutProvider"
   },
   {
@@ -13053,8 +13092,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 12,
     "subject": "fix: import cn in FSMDashboard to resolve FSM render crash"
   },
   {
@@ -13069,8 +13108,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 12,
     "subject": "feat: render FSM requests in a compact table and open details in modal Dialog"
   },
   {
@@ -13085,7 +13124,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
     "sessionMins": 20,
     "subject": "fix: mobile responsive - overflow-x-auto tables, adaptive grids in FSM and Admin panels"
   },
@@ -13101,7 +13140,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
     "sessionMins": 19,
     "subject": "fix: critical mobile overflow - global CSS min-width:0, overflow-x:hidden on root containers, FSM/Admin layout fixes"
   },
@@ -13117,8 +13156,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 60,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 25,
     "subject": "fix: change API prefix from /auth/ to /backend-api/ to resolve routing conflict with /auth and Cannot GET"
   },
   {
@@ -13133,8 +13172,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 60,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 25,
     "subject": "feat(prod): secure deployment configuration, domofondar naming, backups module and hidden superadmin"
   },
   {
@@ -13149,8 +13188,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 46,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 25,
     "subject": "feat(nav): add admin and fsm quick navigation buttons for superadmin and director"
   },
   {
@@ -13165,8 +13204,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 67,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 25,
     "subject": "fix(core): fix white screen on main page, add ErrorBoundary, safe UUID fallback, db schema update"
   },
   {
@@ -13181,8 +13220,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "feat(branding): rename FSM to CRM Domofondar and admin to Admin Panel"
   },
   {
@@ -13197,7 +13236,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
     "sessionMins": 20,
     "subject": "fix(calculator): fix anon calculation permissions and fix docx file corruption"
   },
@@ -13213,8 +13252,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "fix(calculator): allow anonymous users to save calculations and generate proposal docx"
   },
   {
@@ -13229,8 +13268,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "fix(nav): restore CRM and Admin Panel buttons in cabinet and fix role check permissions"
   },
   {
@@ -13245,8 +13284,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "fix(auth): prevent duplicate authorization headers and fix expected 3 parts in jwt got 5"
   },
   {
@@ -13261,8 +13300,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "fix(mobile): адаптация мобильной шапки, логотипа и номера телефона"
   },
   {
@@ -13275,10 +13314,10 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWeekend": false,
     "isHoliday": false,
     "holidayName": null,
-    "isWorkTime": true,
-    "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "isWorkTime": false,
+    "category": "evening",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 12,
     "subject": "feat(mobile): скрытие кнопки входа в шапке и акцентная кнопка с переливом в нижнем меню"
   },
   {
@@ -13293,8 +13332,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 60,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 25,
     "subject": "fix(crm,admin): устранение ошибок БД для задач, адресов, логопасов и бэкапов"
   },
   {
@@ -13309,8 +13348,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 11,
     "subject": "feat(ssl): настройка HTTPS TLS 1.3 и доверенного SSL сертификата"
   },
   {
@@ -13325,8 +13364,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 50,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 25,
     "subject": "feat: integrate Kuban Credit Bank and YooKassa online payments"
   },
   {
@@ -13341,7 +13380,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
     "sessionMins": 28,
     "subject": "chore: remove commission-free mentions on payment page"
   },
@@ -13357,8 +13396,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 74,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 25,
     "subject": "fix: subscribers import encoding CP1251, handset parsing, and accounts period constraint"
   },
   {
@@ -13373,8 +13412,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 74,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 25,
     "subject": "feat: integrate Взаиморасчеты общие registry with debt/overpayment, auto-create accounts, and free smart intercom access for has_lk subscribers"
   },
   {
@@ -13389,8 +13428,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 12,
     "subject": "fix: add missing format import and improve TSV parsing for Взаиморасчеты общие"
   },
   {
@@ -13405,7 +13444,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
     "sessionMins": 16,
     "subject": "fix(cabinet, registry): fix user profile email saving and debt/overpayment parser in mutual settlements"
   },
@@ -13421,8 +13460,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "fix(registry): deduplicate accounts and adapt registry upload / history tables for error-free import"
   },
   {
@@ -13437,8 +13476,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "fix(registry): fix ReferenceError batchNum and safe loadData after 100% upload"
   },
   {
@@ -13453,7 +13492,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
     "sessionMins": 21,
     "subject": "fix(verification): add missing verification columns to profiles and requests, fix verification submit error"
   },
@@ -13469,7 +13508,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
     "sessionMins": 16,
     "subject": "fix(payments): fix YooKassa confirmation url redirect and update prepayment notice"
   },
@@ -13485,7 +13524,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
     "sessionMins": 15,
     "subject": "feat(cabinet): add automatic payment sync, instant debt deduction and electronic receipts"
   },
@@ -13499,9 +13538,9 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWeekend": false,
     "isHoliday": false,
     "holidayName": null,
-    "isWorkTime": true,
-    "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+    "isWorkTime": false,
+    "category": "evening",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
     "sessionMins": 25,
     "subject": "feat(cabinet): add 3-tab history switcher, electronic receipts, remove registers from modal, apply 5% acquiring fee to YooKassa payments"
   },
@@ -13515,9 +13554,9 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWeekend": false,
     "isHoliday": false,
     "holidayName": null,
-    "isWorkTime": true,
-    "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+    "isWorkTime": false,
+    "category": "evening",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
     "sessionMins": 23,
     "subject": "fix(yookassa): verify payment status before showing success toast and restrict receipts to succeeded payments"
   },
@@ -13533,8 +13572,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 60,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 25,
     "subject": "feat(mobile): add React Native (Expo) mobile app and GitHub Actions APK build workflow"
   },
   {
@@ -13549,7 +13588,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
     "sessionMins": 24,
     "subject": "fix(ci): optimize Android APK build workflow and isolate deploy.yml from mobile changes"
   },
@@ -13566,7 +13605,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWorkTime": false,
     "category": "night",
     "catLabel": "Глубокая ночь (00:00–06:00)",
-    "sessionMins": 60,
+    "sessionMins": 25,
     "subject": "fix(mobile): resolve SplashScreen freeze by removing blocking font loader and cleanup stack routes"
   },
   {
@@ -13645,8 +13684,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 60,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 25,
     "subject": "feat(payments): automate yookassa status check, remove manual buttons, handle payment.canceled webhook"
   },
   {
@@ -13661,8 +13700,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 69,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 25,
     "subject": "feat(auth & cabinet): single login field, optional email/floor, top personal info card with debt, phone contract modal"
   },
   {
@@ -13677,7 +13716,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
     "sessionMins": 33,
     "subject": "feat(cabinet): request buttons placement, quick repair chips, order creation strictly after yookassa payment"
   },
@@ -13693,7 +13732,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
     "sessionMins": 26,
     "subject": "feat(cabinet): fullwidth shiny request button under payment, remove duplicate history button, set requests tab as default"
   },
@@ -13709,8 +13748,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "feat(auth & verification): clean registration form, simplify verification dialog, enforce strict profile and file validation"
   },
   {
@@ -13725,8 +13764,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "fix(requests): migrate db columns (street, house, entrance, floor), add toggle to repair chips without duplicates, add door slamming chip"
   },
   {
@@ -13741,8 +13780,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 14,
     "subject": "feat(crm): nomenclature import with prices, folders and subfolders tree with bulk item assignment"
   },
   {
@@ -13757,7 +13796,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
     "sessionMins": 20,
     "subject": "feat(crm): separate promo_price, manual installation_price, and add product photo upload with preview"
   },
@@ -13773,7 +13812,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
     "sessionMins": 15,
     "subject": "feat(fsm): add BindProductsDialog with folder tree, search, and price type selection per entrance"
   },
@@ -13789,8 +13828,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "fix(addresses): remove default 'Vizit' and hide intercom model badge when empty"
   },
   {
@@ -13805,8 +13844,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "fix(cabinet): isolate products strictly by entrance bindings and improve address matching"
   },
   {
@@ -13821,8 +13860,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "feat(cabinet): show dispatcher block and contacts link when no products bound to entrance"
   },
   {
@@ -13837,8 +13876,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 10,
     "subject": "fix(cabinet): reset order state on open/close and fix key price calculation with entrance bindings"
   },
   {
@@ -13853,7 +13892,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
     "sessionMins": 24,
     "subject": "feat(cabinet): refactor order modal - remove manual contacts, step-by-step equipment reveal after service, single handset selection, always show keys, conditional credentials"
   },
@@ -13869,8 +13908,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 60,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 25,
     "subject": "fix(cabinet): isolate orders from maintenance payments, fix key search, add FK to request_items"
   },
   {
@@ -13885,7 +13924,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
     "sessionMins": 28,
     "subject": "feat(products): add code_1c column, update official requisites on receipts, bind keys strictly by ID"
   },
@@ -13901,7 +13940,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
     "sessionMins": 37,
     "subject": "feat: ступенчатая акция на ключи, новый порядок заказа в ЛК, статус умный дом и бейджи оборудования"
   },
@@ -13917,8 +13956,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 13,
     "subject": "fix(cabinet): устранение сброса выбранных товаров и услуг из-за фоновых асинхронных обновлений"
   },
   {
@@ -13933,7 +13972,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
     "sessionMins": 23,
     "subject": "feat: привязка умного дома строго по подъездам, статус на адресах и компактные плашки подъездов в CRM"
   },
@@ -13949,8 +13988,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 13,
     "subject": "fix(mobile): resolve logo freeze, connect directly to 45.8.99.238 server IP, enable cleartext traffic, and implement full Cabinet functionality"
   },
   {
@@ -13965,8 +14004,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 60,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 25,
     "subject": "feat(crm & cabinet): add data change review flow, reposition edit button with warning, fix requests visibility"
   },
   {
@@ -13981,7 +14020,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
     "sessionMins": 28,
     "subject": "feat(fsm): add CRM roles and permissions constructor, fix employees db error"
   },
@@ -13997,7 +14036,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
     "sessionMins": 26,
     "subject": "fix(cabinet): fix smart intercom detection for entrance 4 and upgrade cabinet order selector UI"
   },
@@ -14013,8 +14052,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 15,
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
+    "sessionMins": 13,
     "subject": "docs: update PROJECT_LOG with frontend container update details"
   },
   {
@@ -14029,7 +14068,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
     "sessionMins": 16,
     "subject": "feat(cabinet): make equipment order dialog compact with single-item collapse and smooth auto-scroll"
   },
@@ -14045,7 +14084,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": true,
     "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+    "catLabel": "Рабочие часы (плотная разработка >5 коммитов)",
     "sessionMins": 29,
     "subject": "feat(cabinet): simplify payment totals, rename to total to pay, add transaction fee note"
   },
@@ -14061,8 +14100,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 60,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 25,
     "subject": "feat: track purchased LK, hide in order form, and update cabinet banner"
   },
   {
@@ -14077,8 +14116,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 77,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 25,
     "subject": "fix(auth & cabinet): normalize email/phone, fix profile reset in poll, optional email and quick start requests"
   },
   {
@@ -14093,7 +14132,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
     "sessionMins": 26,
     "subject": "feat(legal): implement 152-FZ privacy policy, data consent, public offer, modal viewer and contacts documents integration"
   },
@@ -14109,7 +14148,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
     "sessionMins": 16,
     "subject": "fix(footer): rewrite footer links to SPA routes, fix tab navigation and add scrollToTop for search params"
   },
@@ -14125,7 +14164,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
     "sessionMins": 25,
     "subject": "feat: user portfolio upload with video/photo carousel and CRM moderation"
   },
@@ -14141,7 +14180,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
     "sessionMins": 35,
     "subject": "feat(portfolio): automate client profile data in background, require phone only for guests, expand CRM moderator view"
   },
@@ -14157,7 +14196,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
     "sessionMins": 16,
     "subject": "feat(design): unify hero sections across all pages with text-shimmer gradient animation"
   },
@@ -14173,8 +14212,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "feat(ui): синхронизация плавной анимации появления страниц Kontakty, NashiRaboty и Golosovanie"
   },
   {
@@ -14189,7 +14228,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
     "sessionMins": 34,
     "subject": "feat(stats): реальные счетчики из БД, исправление калькуляции чисел и сапфирово-лазурный стиль"
   },
@@ -14205,8 +14244,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 60,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 25,
     "subject": "feat(ui): бегущий луч по контуру карточек, разделение 7 лет и 22 года, сапфирово-лазурный стиль"
   },
   {
@@ -14221,8 +14260,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "docs: памятка и шаблон по созданию карточек Shiny Card со светящимся контуром"
   },
   {
@@ -14237,7 +14276,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
     "sessionMins": 27,
     "subject": "feat(hero): интерактивный терминал домофона 0 сек, реальные преимущества и ряд кнопок (Оплатить ТО, ЛК, Расчет, Контакты)"
   },
@@ -14253,7 +14292,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
     "sessionMins": 17,
     "subject": "feat(intercom): живой зрачок камеры со слежением, симулятор видеозвонка и 5 кликабельных виджетов с подсказками"
   },
@@ -14269,8 +14308,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 14,
     "subject": "feat(intercom): реалистичное фото посетителя у видеопанели и плавное спокойное парение значков"
   },
   {
@@ -14285,8 +14324,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 14,
     "subject": "feat(ui): update intercom view to yandex food courier, add face id card and spacious terminal frame"
   },
   {
@@ -14301,7 +14340,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
     "sessionMins": 16,
     "subject": "fix(legal): replace domofondar.ru with домофондар.рф across documents, templates and requisites"
   },
@@ -14317,7 +14356,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
     "sessionMins": 22,
     "subject": "fix(content): correct experience to 7 years in Krasnodar / 20+ in South Russia, remove false 24/7, modernize cards with shiny shimmer and update FAQ"
   },
@@ -14333,7 +14372,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
     "sessionMins": 18,
     "subject": "feat(ui): add smooth vertical slide-up word animation (дома -> квартиры -> офиса -> ЖК) in Hero title"
   },
@@ -14349,8 +14388,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "style(hero): remove underline, inherit title shimmer and font, increase word interval to 3.8s"
   },
   {
@@ -14365,7 +14404,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
     "sessionMins": 15,
     "subject": "feat(hero): seamless shimmer word rotator with mobile layout stabilization and vertical mask"
   },
@@ -14381,7 +14420,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
     "sessionMins": 29,
     "subject": "fix(hero): restore clean 3-line typography, remove broken mask, fix word visibility and smooth rotation"
   },
@@ -14397,8 +14436,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 60,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 25,
     "subject": "feat(payments): configure live YooKassa Shop ID 1372116 and production secret key"
   },
   {
@@ -14413,8 +14452,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 47,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 25,
     "subject": "feat(ssl): configure Let's Encrypt SSL certificate for domofondar.rf with auto HTTP-to-HTTPS redirect"
   },
   {
@@ -14429,8 +14468,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 15,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 10,
     "subject": "fix(payments): implement 54-FZ fiscal receipt generation for live YooKassa shop 1372116"
   },
   {
@@ -14445,8 +14484,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 45,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 25,
     "subject": "fix(cabinet): redesign order equipment modal in domofondar blue style and update comment prompt"
   },
   {
@@ -14461,8 +14500,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "weekend",
-    "catLabel": "Выходной день (Сб/Вс)",
-    "sessionMins": 60,
+    "catLabel": "Выходной день (Суббота / Воскресенье)",
+    "sessionMins": 25,
     "subject": "fix(cabinet): prevent system phone email auto-filling and lock form after saving profile"
   },
   {
@@ -14477,8 +14516,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 60,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 25,
     "subject": "Fix: убрано наследие Supabase (upload/voting/notify), crm_roles, аудит проекта"
   },
   {
@@ -14493,7 +14532,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
     "sessionMins": 34,
     "subject": "APK на HTTPS-домен, отдача /media в nginx, автовыкладка APK на сервер"
   },
@@ -14509,8 +14548,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "build-apk.yml: автовыкладка APK на сервер в правильном месте"
   },
   {
@@ -14525,7 +14564,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
     "sessionMins": 24,
     "subject": "ЛК Этап 1: регистрация по телефону, фикс крашей кабинета, смягчение частный клиент"
   },
@@ -14541,7 +14580,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
     "sessionMins": 25,
     "subject": "ЛК: фикс сброса профиля, единая кнопка редактирования, правки через одобрение"
   },
@@ -14557,8 +14596,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 60,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 25,
     "subject": "Этап 2: мастер заполнения ЛК, каскадный поиск, хранение счёта"
   },
   {
@@ -14573,8 +14612,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "Этап 2: закрыть ПДн в lookup + авторизация поиска"
   },
   {
@@ -14589,7 +14628,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
     "sessionMins": 18,
     "subject": "ЛК: ручной адрес, поиск по телефону, дружелюбный текст, поле телефона, убран Быстрый старт"
   },
@@ -14605,8 +14644,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "ЛК: подсказки адресов по Краснодару с приоритетом обслуживаемых"
   },
   {
@@ -14621,7 +14660,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
     "sessionMins": 44,
     "subject": "Этап 3: карточка абонента + нормализация импорта"
   },
@@ -14637,8 +14676,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "Этап 3: карточка абонента + нормализация импорта"
   },
   {
@@ -14653,8 +14692,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "gitignore: разрешить миграции + migration_stage3"
   },
   {
@@ -14667,10 +14706,10 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWeekend": false,
     "isHoliday": false,
     "holidayName": null,
-    "isWorkTime": true,
-    "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
-    "sessionMins": 60,
+    "isWorkTime": false,
+    "category": "transit_free",
+    "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
+    "sessionMins": 25,
     "subject": "Кабинет: фикс визарда (мигание, телефон, улица/корпус, оборудование)"
   },
   {
@@ -14683,9 +14722,9 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWeekend": false,
     "isHoliday": false,
     "holidayName": null,
-    "isWorkTime": true,
-    "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+    "isWorkTime": false,
+    "category": "transit_free",
+    "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
     "sessionMins": 20,
     "subject": "Импорт: фикс автоопределения кодировки (UTF-8/BOM)"
   },
@@ -14699,9 +14738,9 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWeekend": false,
     "isHoliday": false,
     "holidayName": null,
-    "isWorkTime": true,
-    "category": "work_hours",
-    "catLabel": "Рабочие часы (Будни 09:00–17:00)",
+    "isWorkTime": false,
+    "category": "transit_free",
+    "catLabel": "В пути / обед / свободное время (до 5 коммитов)",
     "sessionMins": 30,
     "subject": "Кабинет: корректное сопоставление дома с корпусом для оборудования"
   },
@@ -14717,8 +14756,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 60,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 25,
     "subject": "Визард/импорт: районы, дубли домов, адрес при сохранении"
   },
   {
@@ -14733,7 +14772,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
     "sessionMins": 28,
     "subject": "Кабинет: восстановление телефона из логина + убрана кнопка сброса"
   },
@@ -14749,7 +14788,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
     "sessionMins": 37,
     "subject": "Этап 4: типы устройств, привязка оборудования к услугам, анкета"
   },
@@ -14765,7 +14804,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
     "sessionMins": 44,
     "subject": "CRM: кнопка Справочники в панели + инлайн-редактирование категорий и типов"
   },
@@ -14781,7 +14820,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
     "sessionMins": 26,
     "subject": "Заказ: автоподбор услуг по анкете (установлено/не установлено)"
   },
@@ -14798,7 +14837,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWorkTime": false,
     "category": "night",
     "catLabel": "Глубокая ночь (00:00–06:00)",
-    "sessionMins": 60,
+    "sessionMins": 25,
     "subject": "Подбор оборудования: сценарии-галочки (вкладка CRM) + логика заказа"
   },
   {
@@ -14830,7 +14869,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWorkTime": false,
     "category": "night",
     "catLabel": "Глубокая ночь (00:00–06:00)",
-    "sessionMins": 15,
+    "sessionMins": 10,
     "subject": "Fix: превью-цена ключа на монтаже сразу показывает льготную (не прыгает 300→200)"
   },
   {
@@ -14846,7 +14885,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWorkTime": false,
     "category": "night",
     "catLabel": "Глубокая ночь (00:00–06:00)",
-    "sessionMins": 15,
+    "sessionMins": 10,
     "subject": "Кабинет: скрыть внутреннее название тарифа, блок обслуживания в одну строку"
   },
   {
@@ -14861,8 +14900,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 60,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 25,
     "subject": "Личные кабинеты + журнал удалений (кто удалил) + роли без системных (кроме Директора)"
   },
   {
@@ -14877,8 +14916,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 12,
     "subject": "feat: полное удаление пользователей (purge) + кнопка в Удалённых"
   },
   {
@@ -14893,8 +14932,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "feat: подтверждение + журнал удалений для новостей, акций и справочников"
   },
   {
@@ -14909,7 +14948,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
     "sessionMins": 36,
     "subject": "feat: карточка сотрудника, анкета активации, фильтры, фикс кэша вкладок"
   },
@@ -14925,7 +14964,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
     "sessionMins": 16,
     "subject": "feat: фото сотрудника в анкете (селфи/загрузка) + в карточке"
   },
@@ -14941,8 +14980,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 13,
     "subject": "feat: вкладка «Бывшие сотрудники» — архив уволенных с полной анкетой и статистикой"
   },
   {
@@ -14957,8 +14996,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 10,
     "subject": "feat: кнопка «Вернуть в штат» для бывших сотрудников"
   },
   {
@@ -14973,7 +15012,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
     "sessionMins": 39,
     "subject": "feat: раздел «Новые дома» (монтаж) + история статусов подъездов + Excel-выгрузки"
   },
@@ -14990,7 +15029,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWorkTime": false,
     "category": "morning",
     "catLabel": "Раннее утро (06:00–09:00)",
-    "sessionMins": 60,
+    "sessionMins": 25,
     "subject": "fix: сжатие фото сотрудника перед загрузкой (обход лимита nginx 413)"
   },
   {
@@ -15006,7 +15045,7 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "isWorkTime": false,
     "category": "morning",
     "catLabel": "Раннее утро (06:00–09:00)",
-    "sessionMins": 15,
+    "sessionMins": 10,
     "subject": "fix: восстановлены файлы раздела Новые дома (стёрлись при git reset)"
   },
   {
@@ -15021,8 +15060,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 60,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 25,
     "subject": "fix: финжурнал только реальные платежи; корректное определение обслуживаемого адреса (не частный)"
   },
   {
@@ -15037,8 +15076,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 15,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 13,
     "subject": "ui: компактный список заявок (строки-карточки) + плотная карточка заявки"
   },
   {
@@ -15053,8 +15092,8 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
-    "sessionMins": 77,
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 25,
     "subject": "feat(project): инвестиционный дашборд суперадмина 'Паспорт проекта' и реестр changelog"
   },
   {
@@ -15069,8 +15108,58 @@ export const ALL_AUDIT_COMMITS: CommitAuditItem[] = [
     "holidayName": null,
     "isWorkTime": false,
     "category": "evening",
-    "catLabel": "Поздний вечер (17:00–00:00)",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
     "sessionMins": 31,
     "subject": "feat(project): аналитический дашборд инженера, сравнение Junior vs Рынок, точка GitHub c2cfbfc"
+  },
+  {
+    "hash": "cac1d06",
+    "datetime": "2026-10-02 22:12",
+    "date": "2026-10-02",
+    "time": "22:12",
+    "dayOfWeek": "Пятница",
+    "dayShort": "Пт",
+    "isWeekend": false,
+    "isHoliday": false,
+    "holidayName": null,
+    "isWorkTime": false,
+    "category": "evening",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 29,
+    "subject": "feat(project): юридический аудит времени, календарь коммитов и старт 14.10.2025 02:26"
+  },
+  {
+    "hash": "4a60db0",
+    "datetime": "2026-10-02 22:29",
+    "date": "2026-10-02",
+    "time": "22:29",
+    "dayOfWeek": "Пятница",
+    "dayShort": "Пт",
+    "isWeekend": false,
+    "isHoliday": false,
+    "holidayName": null,
+    "isWorkTime": false,
+    "category": "evening",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 16,
+    "subject": "feat(project): учет производственного календаря РФ (гос. праздники) и расходов на AI/VPN"
+  },
+  {
+    "hash": "add88a3",
+    "datetime": "2026-10-02 22:41",
+    "date": "2026-10-02",
+    "time": "22:41",
+    "dayOfWeek": "Пятница",
+    "dayShort": "Пт",
+    "isWeekend": false,
+    "isHoliday": false,
+    "holidayName": null,
+    "isWorkTime": false,
+    "category": "evening",
+    "catLabel": "Вечер / приехал пораньше (16:00–00:00)",
+    "sessionMins": 11,
+    "subject": "feat(project): деньщина в офисе, поэтапный прайс-лист студий 2.8-3.8 млн и источники"
   }
 ];
+
+export const ALL_AUDIT_COMMITS = ALL_GIT_COMMITS;
