@@ -11,8 +11,13 @@ import {
   TrendingUp, Calendar, Lock, FileText, Building2, Scale, Printer, Search,
   Filter, Layers, CheckCircle2, DollarSign, Award, Clock, ArrowRight, GitCommit,
   GitBranch, Laptop, Cpu, Check, SlidersHorizontal, Moon, Sun, Sunrise, Sunset,
-  AlertTriangle, ChevronLeft, ChevronRight, X, Bot, Server, Flag, Briefcase, ExternalLink
+  AlertTriangle, ChevronLeft, ChevronRight, X, Bot, Server, Flag, Briefcase, ExternalLink,
+  BarChart3, PieChart as PieIcon, LineChart as LineIcon
 } from "lucide-react";
+import {
+  ResponsiveContainer, BarChart, Bar, LineChart, Line, AreaChart, Area,
+  PieChart, Pie, Cell, XAxis, YAxis, Tooltip, Legend, CartesianGrid
+} from "recharts";
 import {
   SUPERADMIN_EMAIL, OWNER,
   JUNIOR_HOURLY_RATE, MARKET_HOURLY_RATE,
@@ -79,6 +84,95 @@ const Project: React.FC = () => {
     { key: "2026-09", label: "Сентябрь 2026 (Монтаж, ЮKassa)" },
     { key: "2026-10", label: "Октябрь 2026 (Аналитика, 1 год)" },
   ], []);
+
+  // --------------------------------------------------------------------------
+  // Данные для интерактивных графиков (Recharts)
+  // --------------------------------------------------------------------------
+  // 1. Сравнение 12 этапов (Моя цена vs Студия vs Экономия)
+  const stagesChartData = useMemo(() => {
+    return STAGE_PRICE_LIST.map((stage, idx) => ({
+      name: `Этап ${idx + 1}`,
+      title: stage.title.replace(/^\d+\.\s*/, ""),
+      myMinPrice: stage.myMinPrice,
+      studioPrice: stage.studioPrice,
+      savings: stage.savings,
+    }));
+  }, []);
+
+  // 2. Помесячная динамика разработки (коммиты, часы, личное vs рабочее)
+  const monthlyChartData = useMemo(() => {
+    const monthsMap: Record<string, { month: string; label: string; commits: number; hours: number; personalCommits: number; workCommits: number }> = {};
+    const monthsList = [
+      { key: "2025-10", label: "Окт 25" },
+      { key: "2025-11", label: "Ноя 25" },
+      { key: "2025-12", label: "Дек 25" },
+      { key: "2026-01", label: "Янв 26" },
+      { key: "2026-02", label: "Фев 26" },
+      { key: "2026-03", label: "Мар 26" },
+      { key: "2026-04", label: "Апр 26" },
+      { key: "2026-05", label: "Май 26" },
+      { key: "2026-06", label: "Июн 26" },
+      { key: "2026-07", label: "Июл 26" },
+      { key: "2026-08", label: "Авг 26" },
+      { key: "2026-09", label: "Сен 26" },
+      { key: "2026-10", label: "Окт 26" },
+    ];
+    
+    monthsList.forEach(m => {
+      monthsMap[m.key] = { month: m.key, label: m.label, commits: 0, hours: 0, personalCommits: 0, workCommits: 0 };
+    });
+
+    ALL_AUDIT_COMMITS.forEach(c => {
+      const mKey = c.date.substring(0, 7);
+      if (monthsMap[mKey]) {
+        monthsMap[mKey].commits += 1;
+        monthsMap[mKey].hours += Math.round((c.sessionMins / 60) * 10) / 10;
+        if (c.isWorkTime) {
+          monthsMap[mKey].workCommits += 1;
+        } else {
+          monthsMap[mKey].personalCommits += 1;
+        }
+      }
+    });
+
+    return monthsList.map(m => ({
+      ...monthsMap[m.key],
+      hours: Math.round(monthsMap[m.key].hours * 10) / 10
+    }));
+  }, []);
+
+  // 3. Структура 8 функциональных модулей (часы и доли)
+  const modulesChartData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    PROJECT_CHANGELOG.forEach(e => {
+      counts[e.module] = (counts[e.module] || 0) + e.hours;
+    });
+
+    const colors: Record<string, string> = {
+      crm_fsm: "#3b82f6",          // Синий
+      cabinet: "#10b981",          // Изумрудный
+      billing_payments: "#8b5cf6", // Фиолетовый
+      montage: "#f59e0b",          // Янтарный
+      hr_staff: "#ec4899",         // Розовый
+      voting: "#06b6d4",           // Циан
+      security_audit: "#ef4444",   // Красный
+      infra_mobile: "#64748b",     // Графитовый
+    };
+
+    return Object.entries(counts).map(([mod, hrs]) => ({
+      name: MODULE_META[mod as ProjectModule]?.label || mod,
+      value: hrs,
+      color: colors[mod] || "#94a3b8"
+    }));
+  }, []);
+
+  // 4. Распределение личного vs рабочего времени
+  const timePieData = useMemo(() => {
+    return [
+      { name: "Личное время (праздники, ночи, выходные, дорога)", value: GIT_AUDIT_SUMMARY.offCommits, hours: GIT_AUDIT_SUMMARY.offHours, color: "#10b981" },
+      { name: "Рабочие часы (плотные серии >5 коммитов)", value: GIT_AUDIT_SUMMARY.workCommits, hours: GIT_AUDIT_SUMMARY.workHours, color: "#f59e0b" },
+    ];
+  }, []);
 
   // СТРОГАЯ ЗАЩИТА ДОСТУПА: доступ открыт ТОЛЬКО суперадмину viruscorp4@gmail.com
   useEffect(() => {
@@ -333,7 +427,18 @@ const Project: React.FC = () => {
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                const el = document.getElementById("analytics-dashboard-section");
+                if (el) el.scrollIntoView({ behavior: "smooth" });
+              }}
+              className="gap-1.5 rounded-xl border-primary/40 bg-primary/10 text-primary hover:bg-primary/20 font-bold text-xs h-10 px-4"
+            >
+              <BarChart3 className="h-4 w-4 text-primary" />
+              Аналитика и графики
+            </Button>
             <Button 
               variant="outline" 
               onClick={() => window.print()}
@@ -525,6 +630,245 @@ const Project: React.FC = () => {
         </Card>
 
         {/* ================================================================== */}
+        {/* АНАЛИТИЧЕСКИЙ ЦЕНТР И ИНТЕРАКТИВНЫЕ ГРАФИКИ (RECHARTS)             */}
+        {/* ================================================================== */}
+        <div id="analytics-dashboard-section" className="space-y-4">
+          <Card className="rounded-2xl border-2 border-primary/40 bg-gradient-to-b from-primary/5 via-background to-background shadow-md card-print text-left overflow-hidden">
+            <CardHeader className="pb-3 border-b border-border/30 bg-muted/20">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="space-y-0.5">
+                  <CardTitle className="text-base sm:text-xl font-black flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5 text-primary shrink-0" />
+                    Интерактивная аналитика и графики экосистемы «Домофондар»
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Наглядное сопоставление финансовых затрат, динамики разработки, структуры модулей и распределения времени.
+                  </CardDescription>
+                </div>
+                <Badge className="bg-primary/10 text-primary border-primary/20 text-xs font-bold">
+                  📊 Полная визуализация 12 месяцев
+                </Badge>
+              </div>
+            </CardHeader>
+
+            <CardContent className="pt-4 space-y-6">
+              
+              {/* ГРАФИК 1: Финансовое сравнение 12 этапов (BarChart) */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <h4 className="font-bold text-sm text-foreground flex items-center gap-2">
+                    <DollarSign className="h-4 w-4 text-emerald-600" />
+                    Сравнение стоимости по 12 ключевым этапам: Минималка фриланса vs Студия под ключ
+                  </h4>
+                  <div className="flex items-center gap-3 text-[11px] text-muted-foreground flex-wrap">
+                    <span className="flex items-center gap-1">
+                      <span className="w-2.5 h-2.5 rounded-sm bg-blue-500 inline-block" />
+                      Студия ({rub(TOTAL_STUDIO_PRICE)})
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block" />
+                      Моя минималка ({rub(TOTAL_MY_MIN_PRICE)})
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-2.5 h-2.5 rounded-sm bg-amber-500 inline-block" />
+                      Сбережения (+{rub(TOTAL_PRICE_SAVINGS)})
+                    </span>
+                  </div>
+                </div>
+
+                <div className="h-64 sm:h-72 w-full pt-2">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={stagesChartData} margin={{ top: 10, right: 10, left: 0, bottom: 25 }}>
+                      <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                      <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} angle={-25} textAnchor="end" />
+                      <YAxis tickFormatter={(val) => `${val / 1000}k`} tick={{ fontSize: 10 }} />
+                      <Tooltip 
+                        formatter={(val: number) => [rub(val)]}
+                        labelFormatter={(label, payload) => {
+                          const item = payload?.[0]?.payload;
+                          return item ? `${item.name}: ${item.title}` : label;
+                        }}
+                        contentStyle={{ backgroundColor: "rgba(15, 23, 42, 0.95)", borderColor: "#334155", borderRadius: "12px", fontSize: "11px", color: "#fff" }}
+                      />
+                      <Bar dataKey="studioPrice" name="IT-студия под ключ" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="myMinPrice" name="Моя минимальная оценка" fill="#10b981" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="savings" name="Экономия для компании" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* ГРАФИК 2: Помесячная динамика разработки (AreaChart) */}
+              <div className="space-y-2 pt-4 border-t border-border/30">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <h4 className="font-bold text-sm text-foreground flex items-center gap-2">
+                    <LineIcon className="h-4 w-4 text-purple-600" />
+                    Помесячная динамика разработки платформы (октябрь 2025 — октябрь 2026)
+                  </h4>
+                  <span className="text-[11px] text-muted-foreground font-mono">
+                    Всего {GIT_AUDIT_SUMMARY.totalHours} часов чистого кодинга · {GIT_AUDIT_SUMMARY.totalCommits} коммитов
+                  </span>
+                </div>
+
+                <div className="h-56 sm:h-64 w-full pt-2">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={monthlyChartData} margin={{ top: 10, right: 10, left: 0, bottom: 10 }}>
+                      <defs>
+                        <linearGradient id="colorHours" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.4}/>
+                          <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.0}/>
+                        </linearGradient>
+                        <linearGradient id="colorCommits" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.4}/>
+                          <stop offset="95%" stopColor="#10b981" stopOpacity={0.0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                      <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                      <YAxis tick={{ fontSize: 10 }} />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: "rgba(15, 23, 42, 0.95)", borderColor: "#334155", borderRadius: "12px", fontSize: "11px", color: "#fff" }}
+                      />
+                      <Area type="monotone" dataKey="commits" name="Коммиты" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorCommits)" />
+                      <Area type="monotone" dataKey="hours" name="Часы разработки" stroke="#8b5cf6" strokeWidth={2} fillOpacity={1} fill="url(#colorHours)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* ДВЕ КРУГОВЫЕ ДИАГРАММЫ В 2 КОЛОНКИ: Модули и Время */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-border/30">
+                
+                {/* Круговая диаграмма: Распределение по 8 модулям */}
+                <div className="p-3.5 rounded-xl border border-border/60 bg-muted/15 space-y-2">
+                  <h5 className="font-bold text-xs text-foreground flex items-center gap-1.5">
+                    <Layers className="h-4 w-4 text-primary" />
+                    Трудозатраты по 8 подсистемам платформы
+                  </h5>
+                  <div className="h-48 w-full flex items-center justify-center">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={modulesChartData}
+                          dataKey="value"
+                          nameKey="name"
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={70}
+                          innerRadius={40}
+                          paddingAngle={3}
+                        >
+                          {modulesChartData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip 
+                          formatter={(val: number) => [`${val} часов`, "Объем"]}
+                          contentStyle={{ backgroundColor: "rgba(15, 23, 42, 0.95)", borderColor: "#334155", borderRadius: "10px", fontSize: "11px", color: "#fff" }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1 text-[10px] text-muted-foreground pt-1">
+                    {modulesChartData.slice(0, 6).map((m) => (
+                      <div key={m.name} className="flex items-center gap-1 truncate" title={m.name}>
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: m.color }} />
+                        <span className="truncate">{m.name.split(" ")[0]} ({m.value} ч)</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Круговая диаграмма: Личное vs Рабочее время */}
+                <div className="p-3.5 rounded-xl border border-border/60 bg-muted/15 space-y-2">
+                  <h5 className="font-bold text-xs text-foreground flex items-center gap-1.5">
+                    <Clock className="h-4 w-4 text-emerald-600" />
+                    Распределение времени разработки: Личное vs Рабочее
+                  </h5>
+                  <div className="h-48 w-full flex items-center justify-center">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={timePieData}
+                          dataKey="value"
+                          nameKey="name"
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={70}
+                          innerRadius={40}
+                          paddingAngle={3}
+                        >
+                          {timePieData.map((entry, index) => (
+                            <Cell key={`cell-time-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip 
+                          formatter={(val: number, name: string, item: any) => [`${val} коммитов (${item.payload.hours} ч)`, name]}
+                          contentStyle={{ backgroundColor: "rgba(15, 23, 42, 0.95)", borderColor: "#334155", borderRadius: "10px", fontSize: "11px", color: "#fff" }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="space-y-1 text-[11px] pt-1">
+                    <div className="flex items-center justify-between font-bold text-emerald-700 dark:text-emerald-300">
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
+                        Личное время (праздники, ночи, вечера, дорога):
+                      </span>
+                      <span>{GIT_AUDIT_SUMMARY.offPct}% ({GIT_AUDIT_SUMMARY.offCommits} комм.)</span>
+                    </div>
+                    <div className="flex items-center justify-between font-bold text-amber-700 dark:text-amber-300">
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" />
+                        Рабочие серии (&gt;5 коммитов в будни):
+                      </span>
+                      <span>{GIT_AUDIT_SUMMARY.workPct}% ({GIT_AUDIT_SUMMARY.workCommits} комм.)</span>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* СРАВНЕНИЕ СРОКОВ РАЗРАБОТКИ: СТУДИЯ VS МОЯ РАЗРАБОТКА */}
+              <div className="p-4 rounded-xl border-2 border-primary/30 bg-primary/5 space-y-2 text-xs">
+                <h5 className="font-bold text-sm text-foreground flex items-center gap-2">
+                  <Rocket className="h-4 w-4 text-primary" />
+                  Сроки реализации и фактор «внутренней кухни» предприятия
+                </h5>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <div className="p-3 rounded-lg border border-rose-500/30 bg-rose-500/5 space-y-1">
+                    <span className="text-[11px] font-bold text-rose-700 dark:text-rose-300">
+                      ❌ Заказная IT-студия «со стороны»
+                    </span>
+                    <p className="font-mono text-base font-black text-rose-600 dark:text-rose-400">
+                      14 – 24+ месяцев (1.5 – 2 года)
+                    </p>
+                    <p className="text-[11px] text-muted-foreground leading-snug">
+                      Не зная специфики домофонного сервиса и монтажей, сторонняя студия тратит 4–6 месяцев только на ТЗ. 
+                      Любая правка требует допсоглашений и оплаты, процесс затягивается на неопределенное время.
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 space-y-1">
+                    <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300">
+                      ✅ Собственная разработка автором изнутри
+                    </span>
+                    <p className="font-mono text-base font-black text-emerald-600 dark:text-emerald-400">
+                      12 месяцев (сразу в боевой эксплуатацией)
+                    </p>
+                    <p className="text-[11px] text-muted-foreground leading-snug">
+                      Глубокое понимание бизнес-процессов диспетчеров, монтажников и выгрузок 1С. 
+                      Новые модули выкатывались в бой без проволочек, сразу разгружая офис и принося финансовый результат.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* ================================================================== */}
         {/* ПОЭТАПНЫЙ РЫНОЧНЫЙ ПРАЙС-ЛИСТ (СКОЛЬКО ПРИШЛОСЬ БЫ ОТДАТЬ В СТУДИЮ) */}
         {/* ================================================================== */}
         <Card className="rounded-2xl border-border/60 shadow-sm card-print text-left">
@@ -616,15 +960,20 @@ const Project: React.FC = () => {
               </table>
             </div>
 
-            <div className="p-3.5 rounded-xl border border-emerald-500/30 bg-emerald-500/5 text-xs text-muted-foreground leading-relaxed space-y-1">
-              <p className="font-bold text-foreground flex items-center gap-1.5">
+            <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/5 text-xs text-muted-foreground leading-relaxed space-y-2">
+              <p className="font-bold text-foreground text-sm flex items-center gap-1.5">
                 <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                Мой вывод по затратам:
+                Мой вывод по затратам и нормативным срокам:
               </p>
               <p>
                 По минимальным расценкам фриланса вся моя работа оценивается в <b>{rub(TOTAL_MY_MIN_PRICE)}</b>. 
                 При заказе этих же задач в аккредитованной веб-студии среднего сегмента с гарантией под ключ ценник составляет <b>{rub(TOTAL_STUDIO_PRICE)}</b> (диапазон <b>2.8 – 3.8 млн рублей</b>). 
-                Выполнив все этапы самостоятельно своими руками, я сохранил весь этот бюджет.
+                Выполнив все этапы самостоятельно своими руками, я сохранил весь этот бюджет для компании.
+              </p>
+              <p className="pt-1.5 border-t border-emerald-500/20 leading-relaxed">
+                ⏱️ <b>Фактор сроков и отраслевой кухни:</b> Нормативный срок разработки аналогичного корпоративного комплекса в коммерческой студии составляет <b>от 14 до 24+ месяцев (1.5 – 2 года)</b>. 
+                А с учетом того, что сторонняя организация не имеет ни малейшего понимания внутренней кухни домофонного сервиса, специфики полевых монтажей и тонкостей выгрузок 1С, бесконечные согласования ТЗ и переделки затянули бы процесс на неопределенное время. 
+                Зная всю систему изнутри, я внедрял готовые решения сразу в боевую эксплуатацию без задержек и бюрократии.
               </p>
             </div>
           </CardContent>
