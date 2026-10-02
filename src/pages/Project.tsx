@@ -11,7 +11,7 @@ import {
   TrendingUp, Calendar, Lock, FileText, Building2, Scale, Printer, Search,
   Filter, Layers, CheckCircle2, DollarSign, Award, Clock, ArrowRight, GitCommit,
   GitBranch, Laptop, Cpu, Check, SlidersHorizontal, Moon, Sun, Sunrise, Sunset,
-  AlertTriangle, ChevronLeft, ChevronRight, X, Bot, Server, Flag
+  AlertTriangle, ChevronLeft, ChevronRight, X, Bot, Server, Flag, Briefcase, ExternalLink
 } from "lucide-react";
 import {
   SUPERADMIN_EMAIL, OWNER,
@@ -21,6 +21,8 @@ import {
   TOTAL_GIT_COMMITS, TOTAL_MONTHS_DEV,
   EXPENSES_GEMINI_MONTHLY, EXPENSES_CLAUDE_MONTHLY, EXPENSES_VPN_SERVER_MONTHLY,
   EXPENSES_TOTAL_MONTHLY, EXPENSES_TOTAL_PERIOD, EXPENSES_NOTE,
+  MEDIAN_FULLSTACK_SALARY, DAILY_RATE_OFFICE, HOURLY_RATE_OFFICE, HABR_CAREER_URL,
+  STAGE_PRICE_LIST, TOTAL_MY_MIN_PRICE, TOTAL_STUDIO_PRICE, TOTAL_PRICE_SAVINGS,
   PROJECT_CHANGELOG, MODULE_META, KIND_META, Kind, ProjectModule, ProjectEntry
 } from "@/data/projectChangelog";
 import {
@@ -54,13 +56,10 @@ const Project: React.FC = () => {
   const [selectedModule, setSelectedModule] = useState<string>("all");
 
   // --------------------------------------------------------------------------
-  // Стейты для юридического календаря и аудита времени
+  // Стейты для календаря и хронометража времени
   // --------------------------------------------------------------------------
-  // Выбранный месяц для календаря в формате "YYYY-MM"
   const [selectedMonth, setSelectedMonth] = useState<string>("2026-10");
-  // Выбранный день в календаре (при клике показываем поминутный список коммитов)
   const [selectedDayDate, setSelectedDayDate] = useState<string | null>(null);
-  // Фильтр коммитов в таблице аудита
   const [auditFilter, setAuditFilter] = useState<AuditCommitFilter>("all");
   const [auditSearch, setAuditSearch] = useState<string>("");
 
@@ -221,13 +220,10 @@ const Project: React.FC = () => {
     const year = parseInt(yearStr, 10);
     const month = parseInt(monthStr, 10); // 1-12
 
-    // Количество дней в месяце
     const daysInMonth = new Date(year, month, 0).getDate();
-    // День недели первого дня месяца (0=Вс, 1=Пн, ... 6=Сб) -> переводим в 0=Пн, 6=Вс
     const firstDayWeekdayRaw = new Date(year, month - 1, 1).getDay();
     const firstDayOffset = (firstDayWeekdayRaw + 6) % 7; // Сдвиг для Пн=0
 
-    // Карта данных по датам из CALENDAR_DAYS
     const daysDataMap = new Map<string, DayAudit>();
     CALENDAR_DAYS.forEach(d => daysDataMap.set(d.date, d));
 
@@ -250,7 +246,7 @@ const Project: React.FC = () => {
       const dayStr = String(day).padStart(2, "0");
       const dateStr = `${yearStr}-${monthStr}-${dayStr}`;
       const dayOfWeekRaw = new Date(year, month - 1, day).getDay();
-      const isWeekend = dayOfWeekRaw === 0 || dayOfWeekRaw === 6; // Вс или Сб
+      const isWeekend = dayOfWeekRaw === 0 || dayOfWeekRaw === 6;
 
       const holidayName = RUSSIAN_HOLIDAYS_MAP[dateStr] || null;
       const isHoliday = !!holidayName;
@@ -275,14 +271,12 @@ const Project: React.FC = () => {
     return CALENDAR_DAYS.find(d => d.date === selectedDayDate) || null;
   }, [selectedDayDate]);
 
-  // Фильтрованный список коммитов для таблицы аудита
+  // Фильтрованный список коммитов для таблицы хронометража
   const filteredAuditCommits = useMemo(() => {
     return ALL_AUDIT_COMMITS.filter(item => {
-      // Фильтр по типу времени
       if (auditFilter === "off_hours" && item.isWorkTime) return false;
       if (auditFilter === "work_hours" && !item.isWorkTime) return false;
 
-      // Поиск
       if (auditSearch.trim()) {
         const q = auditSearch.toLowerCase();
         const match = item.hash.toLowerCase().includes(q) ||
@@ -335,7 +329,7 @@ const Project: React.FC = () => {
               Дневник разработки и аналитический паспорт «Домофондар»
             </h1>
             <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-              Персональный учет времени: точный старт <b>14 октября 2025 г. в 02:26</b> (ночь), 542 коммита и аудит нерабочих часов по производственному календарю РФ.
+              Персональный учет времени и стоимости: точный старт <b>14 октября 2025 г. в 02:26</b> (ночь), 542 коммита и аудит расходов в сравнении с рынком РФ.
             </p>
           </div>
 
@@ -359,24 +353,213 @@ const Project: React.FC = () => {
         </div>
 
         {/* ================================================================== */}
-        {/* ГЛАВНЫЙ БЛОК: ЮРИДИЧЕСКИЙ АУДИТ ВНЕРАБОЧЕГО ВРЕМЕНИ И КАЛЕНДАРЬ     */}
+        {/* КЛЮЧЕВОЙ БАННЕР СРАВНЕНИЯ: СКОЛЬКО ПРИШЛОСЬ БЫ ЗАПЛАТИТЬ В СТУДИИ  */}
+        {/* ================================================================== */}
+        <Card className="border-2 border-amber-500/40 bg-gradient-to-r from-amber-500/10 via-primary/10 to-amber-500/10 rounded-2xl shadow-sm card-print text-left">
+          <CardContent className="p-4 sm:p-5 flex items-start gap-3.5">
+            <Award className="h-6 w-6 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <div className="space-y-1.5 text-xs sm:text-sm leading-relaxed">
+              <p className="font-black text-foreground text-sm sm:text-base">
+                Главный экономический вывод проекта:
+              </p>
+              <p className="text-muted-foreground">
+                При обращении в аккредитованную IT-студию среднего сегмента (рейтинг Рунета) разработка аналогичного программного комплекса «под ключ» 
+                обошлась бы в <b className="text-foreground">2 800 000 – 3 800 000 ₽</b>. 
+                Реализовав всю платформу самостоятельно, <b>я не потратил эти средства и сохранил бюджет</b>, создав независимый цифровой актив.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* ================================================================== */}
+        {/* БЛОК: ОФИСНАЯ ДЕНЬЩИНА И ЗАРПЛАТА FULLSTACK-РАЗРАБОТЧИКА (ХАБР)   */}
+        {/* ================================================================== */}
+        <Card className="rounded-2xl border-border/60 shadow-xs card-print text-left">
+          <CardHeader className="pb-3 border-b border-border/30 bg-muted/20">
+            <CardTitle className="text-sm sm:text-base font-bold flex items-center justify-between flex-wrap gap-2">
+              <span className="flex items-center gap-2">
+                <Briefcase className="h-4 w-4 text-primary" />
+                Офисная деньщина и средняя зарплата Fullstack-программиста в РФ (2026)
+              </span>
+              <a 
+                href={HABR_CAREER_URL} 
+                target="_blank" 
+                rel="noreferrer"
+                className="text-xs text-primary hover:underline flex items-center gap-1 font-semibold no-print"
+              >
+                Источник: Хабр Карьера <ExternalLink className="h-3 w-3" />
+              </a>
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Сколько стоит рабочий день штатного Senior/Fullstack разработчика в офисе на рынке труда в России.
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent className="pt-4 space-y-4 text-xs sm:text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="p-3.5 rounded-xl border border-border/60 bg-muted/15 space-y-1">
+                <span className="text-[11px] text-muted-foreground font-semibold">
+                  Медианная зарплата Fullstack в РФ
+                </span>
+                <p className="text-xl sm:text-2xl font-black font-mono text-foreground">
+                  {rub(MEDIAN_FULLSTACK_SALARY)}
+                </p>
+                <p className="text-[11px] text-muted-foreground">на руки в месяц (стек React + TS + Postgres)</p>
+              </div>
+
+              <div className="p-3.5 rounded-xl border-2 border-primary/40 bg-primary/5 space-y-1">
+                <span className="text-[11px] text-primary font-bold">
+                  Деньщина в офисе (21 р.д.)
+                </span>
+                <p className="text-xl sm:text-2xl font-black font-mono text-primary">
+                  {rub(DAILY_RATE_OFFICE)}
+                </p>
+                <p className="text-[11px] text-muted-foreground">стоимость одного полного рабочего дня в офисе</p>
+              </div>
+
+              <div className="p-3.5 rounded-xl border border-border/60 bg-muted/15 space-y-1">
+                <span className="text-[11px] text-muted-foreground font-semibold">
+                  Часовая ставка в офисе (8ч)
+                </span>
+                <p className="text-xl sm:text-2xl font-black font-mono text-foreground">
+                  {rub(HOURLY_RATE_OFFICE)} / час
+                </p>
+                <p className="text-[11px] text-muted-foreground">чистая стоимость труда без налогов 43%</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-muted-foreground leading-relaxed italic border-l-2 border-primary/40 pl-3">
+              💡 <b>Сравнение:</b> Если бы компания наняла одного штатного Fullstack-разработчика на этот проект в офис, 
+              за 12 месяцев фонд оплаты труда составил бы <b>{rub(MEDIAN_FULLSTACK_SALARY * TOTAL_MONTHS_DEV)}</b> (а с учетом налогов и страховых взносов 43% — более <b>3 700 000 ₽</b>).
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* ================================================================== */}
+        {/* ПОЭТАПНЫЙ РЫНОЧНЫЙ ПРАЙС-ЛИСТ (СКОЛЬКО ПРИШЛОСЬ БЫ ОТДАТЬ В СТУДИЮ) */}
+        {/* ================================================================== */}
+        <Card className="rounded-2xl border-border/60 shadow-sm card-print text-left">
+          <CardHeader className="pb-3 border-b border-border/30 bg-muted/20">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="space-y-0.5">
+                <CardTitle className="text-base sm:text-lg font-bold flex items-center gap-2">
+                  <Layers className="h-5 w-5 text-primary shrink-0" />
+                  Реальная поэтапная оценка проекта по прайсам студий и фриланса в РФ
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Сколько реально стоит каждый созданный этап и сколько пришлось бы заплатить разработчикам, если бы я не сделал всё сам.
+                </CardDescription>
+              </div>
+
+              <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-400/30 text-xs font-mono font-bold">
+                Сэкономлено: {rub(TOTAL_PRICE_SAVINGS)}
+              </Badge>
+            </div>
+          </CardHeader>
+
+          <CardContent className="pt-4 space-y-4">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-border/40 text-muted-foreground bg-muted/20">
+                    <th className="py-2.5 px-3 font-semibold">#</th>
+                    <th className="py-2.5 px-3 font-semibold">Выполненный этап и функционал</th>
+                    <th className="py-2.5 px-3 font-semibold text-emerald-600 dark:text-emerald-400">
+                      Моя минималка (фриланс)
+                    </th>
+                    <th className="py-2.5 px-3 font-semibold text-blue-600 dark:text-blue-400">
+                      Пришлось бы отдать студии
+                    </th>
+                    <th className="py-2.5 px-3 font-semibold text-primary font-bold">
+                      Сэкономлено
+                    </th>
+                    <th className="py-2.5 px-3 font-semibold text-right no-print">Источник</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/30">
+                  {STAGE_PRICE_LIST.map((stage, idx) => (
+                    <tr key={stage.id} className="hover:bg-muted/15 transition-colors">
+                      <td className="py-2.5 px-3 font-mono text-muted-foreground">{idx + 1}</td>
+                      <td className="py-2.5 px-3">
+                        <span className="font-bold text-foreground block">{stage.title}</span>
+                        <span className="text-[11px] text-muted-foreground leading-snug block pt-0.5">
+                          {stage.description}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 font-mono font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
+                        {rub(stage.myMinPrice)}
+                      </td>
+                      <td className="py-2.5 px-3 font-mono font-bold text-blue-600 dark:text-blue-400 whitespace-nowrap">
+                        {rub(stage.studioPrice)}
+                      </td>
+                      <td className="py-2.5 px-3 font-mono font-black text-primary whitespace-nowrap">
+                        +{rub(stage.savings)}
+                      </td>
+                      <td className="py-2.5 px-3 text-right no-print whitespace-nowrap">
+                        <a 
+                          href={stage.sourceUrl} 
+                          target="_blank" 
+                          rel="noreferrer"
+                          className="text-[11px] text-primary hover:underline inline-flex items-center gap-1 font-medium"
+                        >
+                          {stage.sourceName.split(" ")[0]} <ExternalLink className="h-2.5 w-2.5" />
+                        </a>
+                      </td>
+                    </tr>
+                  ))}
+
+                  <tr className="bg-primary/5 font-black text-xs sm:text-sm">
+                    <td colSpan={2} className="py-3 px-3 text-foreground">
+                      ИТОГО ПО ВСЕМ ЭТАПАМ ПЛАТФОРМЫ
+                      <span className="block text-[10px] text-muted-foreground font-normal">12 ключевых функциональных систем</span>
+                    </td>
+                    <td className="py-3 px-3 font-mono text-emerald-600 dark:text-emerald-400">
+                      {rub(TOTAL_MY_MIN_PRICE)}
+                    </td>
+                    <td className="py-3 px-3 font-mono text-blue-600 dark:text-blue-400">
+                      {rub(TOTAL_STUDIO_PRICE)}
+                    </td>
+                    <td colSpan={2} className="py-3 px-3 font-mono text-primary font-black">
+                      +{rub(TOTAL_PRICE_SAVINGS)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div className="p-3.5 rounded-xl border border-emerald-500/30 bg-emerald-500/5 text-xs text-muted-foreground leading-relaxed space-y-1">
+              <p className="font-bold text-foreground flex items-center gap-1.5">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                Вывод по прайс-листу:
+              </p>
+              <p>
+                По минимальным расценкам фриланса вся работа стоит <b>{rub(TOTAL_MY_MIN_PRICE)}</b>. 
+                При заказе этих же задач в аккредитованной веб-студии среднего сегмента с гарантией под ключ ценник составляет <b>{rub(TOTAL_STUDIO_PRICE)}</b> (диапазон <b>2.8 – 3.8 млн рублей</b>). 
+                Выполнив все этапы самостоятельно, мне не пришлось отдавать эту сумму сторонним подрядчикам.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* ================================================================== */}
+        {/* БЛОК: ХРОНОМЕТРАЖ И АУДИТ ВРЕМЕНИ (КАЛЕНДАРЬ И ПРАЗДНИКИ РФ)       */}
         {/* ================================================================== */}
         <Card className="rounded-2xl border-2 border-primary/40 bg-gradient-to-b from-primary/5 via-background to-background shadow-md card-print text-left overflow-hidden">
           <CardHeader className="pb-4 border-b border-border/40 bg-muted/20">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="space-y-1">
                 <CardTitle className="text-lg sm:text-xl font-black flex items-center gap-2">
-                  <ShieldCheck className="h-6 w-6 text-emerald-600 shrink-0" />
-                  Юридический аудит времени: Разработка во внерабочие часы
+                  <Clock className="h-6 w-6 text-emerald-600 shrink-0" />
+                  Хронометраж времени разработки: Личные и рабочие часы
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Поминутный анализ всех <b>542 коммитов</b> Git с учетом <b>официального производственного календаря РФ</b> (праздники 1–8 янв, 23 фев, 8 мар, 1–4 мая, 9–11 мая, 12 июня, сб/вс).
+                  Поминутный учет всех <b>542 коммитов</b> Git с учетом <b>производственного календаря РФ</b> (праздники 1–8 янв, 23 фев, 8 мар, 1–4 мая, 9–11 мая, 12 июня, сб/вс).
                 </CardDescription>
               </div>
 
               <div className="flex items-center gap-2">
                 <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-400/30 text-xs px-2.5 py-1 font-bold">
-                  🟢 {GIT_AUDIT_SUMMARY.offHours} ч ({GIT_AUDIT_SUMMARY.offPct}%) вне работы
+                  🟢 {GIT_AUDIT_SUMMARY.offHours} ч ({GIT_AUDIT_SUMMARY.offPct}%) личное время
                 </Badge>
               </div>
             </div>
@@ -386,12 +569,12 @@ const Project: React.FC = () => {
             
             {/* Ключевые метрики распределения часов */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-              {/* Внерабочее время (Личное) */}
+              {/* Личное время */}
               <div className="p-4 rounded-xl border-2 border-emerald-500/40 bg-emerald-500/5 space-y-1.5">
                 <div className="flex items-center justify-between text-xs font-bold text-emerald-700 dark:text-emerald-300">
                   <span className="flex items-center gap-1.5">
                     <Moon className="h-4 w-4" />
-                    Внерабочее (Личное) время
+                    Личное (Внерабочее) время
                   </span>
                   <span className="font-mono text-sm">{GIT_AUDIT_SUMMARY.offPct}%</span>
                 </div>
@@ -403,7 +586,7 @@ const Project: React.FC = () => {
                 </p>
               </div>
 
-              {/* Рабочее окно (Обычные будни 09:00 - 17:00) */}
+              {/* Рабочее окно */}
               <div className="p-4 rounded-xl border border-border/60 bg-muted/20 space-y-1.5">
                 <div className="flex items-center justify-between text-xs font-bold text-amber-700 dark:text-amber-300">
                   <span className="flex items-center gap-1.5">
@@ -416,7 +599,7 @@ const Project: React.FC = () => {
                   {GIT_AUDIT_SUMMARY.workHours} <span className="text-sm font-semibold">часов</span>
                 </p>
                 <p className="text-[11px] text-muted-foreground leading-snug">
-                  <b>{GIT_AUDIT_SUMMARY.workCommits} коммитов</b> (точечные хотфиксы, обеденное время, отпуска). Зафиксированы с точностью до минуты.
+                  <b>{GIT_AUDIT_SUMMARY.workCommits} коммитов</b> (точечные фиксы, обеденное время, отпуска). Зафиксированы с точностью до минуты.
                 </p>
               </div>
 
@@ -433,7 +616,7 @@ const Project: React.FC = () => {
                   14.10.2025 <span className="text-sm">02:26</span>
                 </p>
                 <p className="text-[11px] text-muted-foreground leading-snug">
-                  Проект начат <b>глубокой ночью в 02:26</b> во вторник, 14 октября 2025 года (нерабочее время).
+                  Проект начат <b>глубокой ночью в 02:26</b> во вторник, 14 октября 2025 года (личное время).
                 </p>
               </div>
             </div>
@@ -455,19 +638,16 @@ const Project: React.FC = () => {
                 <div 
                   className="h-full bg-emerald-500 transition-all duration-500" 
                   style={{ width: `${GIT_AUDIT_SUMMARY.offPct}%` }}
-                  title={`Внерабочее время: ${GIT_AUDIT_SUMMARY.offHours} ч (${GIT_AUDIT_SUMMARY.offPct}%)`}
                 />
                 <div 
                   className="h-full bg-amber-500/80 transition-all duration-500" 
                   style={{ width: `${GIT_AUDIT_SUMMARY.workPct}%` }}
-                  title={`Рабочее окно: ${GIT_AUDIT_SUMMARY.workHours} ч (${GIT_AUDIT_SUMMARY.workPct}%)`}
                 />
               </div>
             </div>
 
-            {/* Детализация по 6 категориям (включая государственные праздники РФ) */}
+            {/* Детализация по 6 категориям */}
             <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 text-xs">
-              {/* Праздники РФ */}
               <div className="p-2.5 rounded-xl border border-rose-500/40 bg-rose-500/10 space-y-1">
                 <span className="text-[10px] text-rose-700 dark:text-rose-300 font-bold flex items-center gap-1">
                   <Flag className="h-3 w-3 text-rose-600 shrink-0" /> Праздники РФ
@@ -480,7 +660,6 @@ const Project: React.FC = () => {
                 </p>
               </div>
 
-              {/* Выходные */}
               <div className="p-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-1">
                 <span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
                   <Calendar className="h-3 w-3 text-emerald-600 shrink-0" /> Выходные (Сб/Вс)
@@ -493,7 +672,6 @@ const Project: React.FC = () => {
                 </p>
               </div>
 
-              {/* Ночь */}
               <div className="p-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-1">
                 <span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
                   <Moon className="h-3 w-3 text-emerald-600 shrink-0" /> Ночь (00–06)
@@ -506,7 +684,6 @@ const Project: React.FC = () => {
                 </p>
               </div>
 
-              {/* Утро */}
               <div className="p-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-1">
                 <span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
                   <Sunrise className="h-3 w-3 text-emerald-600 shrink-0" /> Утро (06–09)
@@ -519,7 +696,6 @@ const Project: React.FC = () => {
                 </p>
               </div>
 
-              {/* Вечер */}
               <div className="p-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-1">
                 <span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
                   <Sunset className="h-3 w-3 text-emerald-600 shrink-0" /> Вечер (17–00)
@@ -532,7 +708,6 @@ const Project: React.FC = () => {
                 </p>
               </div>
 
-              {/* Будни */}
               <div className="p-2.5 rounded-xl border border-amber-500/30 bg-amber-500/5 space-y-1">
                 <span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
                   <Sun className="h-3 w-3 text-amber-600 shrink-0" /> Будни (09–17)
@@ -547,7 +722,7 @@ const Project: React.FC = () => {
             </div>
 
             {/* -------------------------------------------------------------- */}
-            {/* ИНТЕРАКТИВНЫЙ КАЛЕНДАРЬ РАЗРАБОТКИ С ГОС. ПРАЗДНИКАМИ РФ       */}
+            {/* ИНТЕРАКТИВНЫЙ КАЛЕНДАРЬ РАЗРАБОТКИ                            */}
             {/* -------------------------------------------------------------- */}
             <div className="pt-3 border-t border-border/40 space-y-3">
               <div className="flex items-center justify-between flex-wrap gap-2">
@@ -556,7 +731,6 @@ const Project: React.FC = () => {
                   Интерактивный календарь с производственным календарем РФ
                 </h3>
 
-                {/* Выбор месяца */}
                 <div className="flex items-center gap-2 no-print">
                   <select
                     value={selectedMonth}
@@ -577,24 +751,20 @@ const Project: React.FC = () => {
               <div className="flex items-center gap-4 flex-wrap text-[11px] text-muted-foreground">
                 <span className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-sm bg-rose-500 inline-block" />
-                  Официальный государственный праздник РФ (Нерабочий день)
+                  Государственный праздник РФ (Нерабочий день)
                 </span>
                 <span className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block" />
-                  Только внерабочее время (ночи/вечера или Сб/Вс)
+                  Личное время (ночи/вечера или Сб/Вс)
                 </span>
                 <span className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-sm bg-amber-500 inline-block" />
-                  Есть коммиты в интервале 09:00–17:00 (обычные будни)
-                </span>
-                <span className="flex items-center gap-1.5 text-primary font-medium">
-                  💡 Нажмите на день для поминутного протокола
+                  Коммиты в интервале 09:00–17:00 (будни)
                 </span>
               </div>
 
               {/* Сетка календаря */}
               <div className="border border-border/50 rounded-xl overflow-hidden bg-background">
-                {/* Дни недели */}
                 <div className="grid grid-cols-7 text-center font-bold text-xs py-2 bg-muted/30 border-b border-border/40">
                   <span className="text-foreground">Пн</span>
                   <span className="text-foreground">Вт</span>
@@ -605,7 +775,6 @@ const Project: React.FC = () => {
                   <span className="text-rose-500 font-black">Вс</span>
                 </div>
 
-                {/* Ячейки дней */}
                 <div className="grid grid-cols-7 gap-px bg-border/40">
                   {calendarGrid.map((cell, idx) => {
                     if (cell.dayNum === null) {
@@ -760,7 +929,7 @@ const Project: React.FC = () => {
                 </Badge>
               </div>
 
-              {/* Фильтры и поиск реестра аудита */}
+              {/* Фильтры и поиск реестра */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 no-print">
                 <div className="relative">
                   <Search className="h-3.5 w-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -935,7 +1104,7 @@ const Project: React.FC = () => {
               </span>
             </div>
 
-            {/* Юридическая сноска автора */}
+            {/* Заметка автора */}
             <p className="text-[11px] text-muted-foreground/80 leading-relaxed italic border-l-2 border-primary/40 pl-3">
               💡 <b>Заметка автора:</b> {EXPENSES_NOTE}
             </p>
@@ -1092,7 +1261,7 @@ const Project: React.FC = () => {
               </Badge>
             </CardTitle>
             <CardDescription className="text-xs">
-              Объективное сопоставление себестоимости разработки платформы по минимальной ставке начинающего специалиста и коммерческой оценки заказной IT-студии.
+              Объективное сопоставление: сколько проект стоит по минимальной ставке и сколько пришлось бы отдать разработчикам/студии под ключ (<b>2.8 – 3.8 млн ₽</b>).
             </CardDescription>
           </CardHeader>
 
@@ -1191,7 +1360,7 @@ const Project: React.FC = () => {
                 созданная кодовая база представляет собой самостоятельный цифровой актив стоимостью <b>{rub(stats.juniorTotal + EXPENSES_TOTAL_PERIOD)}</b>.
               </p>
               <p>
-                В случае обращения в коммерческую IT-студию разработка аналогичного комплекса под ключ с 542 коммитами и интеграцией платежей обошлась бы компании в <b>{rub(stats.marketTotal + EXPENSES_TOTAL_PERIOD)}</b>. 
+                В случае обращения в коммерческую IT-студию разработка аналогичного комплекса под ключ с 542 коммитами и интеграцией платежей обошлась бы компании в <b>{rub(stats.marketTotal + EXPENSES_TOTAL_PERIOD)}</b> (от <b>2.8 до 3.8 млн рублей</b>). 
                 Реализация платформы собственными силами сберегла <b>{rub(stats.diff)}</b>.
               </p>
             </div>

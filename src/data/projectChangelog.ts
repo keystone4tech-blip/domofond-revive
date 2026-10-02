@@ -61,6 +61,157 @@ export const EXPENSES_TOTAL_PERIOD = EXPENSES_TOTAL_MONTHLY * TOTAL_MONTHS_DEV; 
 export const EXPENSES_NOTE = 
   "Оплаты производились ежемесячно из личных средств. В сумму не включены сотни часов, затраченные автором на установку, самостоятельную настройку и администрирование серверного программного обеспечения и VPN.";
 
+// ==============================================================================
+// ОФИСНАЯ ДЕНЬЩИНА И ЗАРПЛАТА FULLSTACK-РАЗРАБОТЧИКА (ХАБР КАРЬЕРА 2026)
+// ==============================================================================
+export const MEDIAN_FULLSTACK_SALARY = 220000; // 220 000 ₽/мес на руки (медиана Хабр Карьеры 2026)
+export const OFFICE_WORK_DAYS_MONTH = 21;      // Среднее число рабочих дней в месяце
+export const DAILY_RATE_OFFICE = Math.round(MEDIAN_FULLSTACK_SALARY / OFFICE_WORK_DAYS_MONTH); // ~10 500 ₽ / день
+export const HOURLY_RATE_OFFICE = Math.round(DAILY_RATE_OFFICE / 8); // ~1 312 ₽ / час
+export const HABR_CAREER_URL = "https://career.habr.com/salaries";
+
+// ==============================================================================
+// РЕАЛЬНЫЙ ПОЭТАПНЫЙ РЫНОЧНЫЙ ПРАЙС-ЛИСТ (СКОЛЬКО ПРИШЛОСЬ БЫ ОТДАТЬ РАЗРАБОТЧИКАМ)
+// ==============================================================================
+export interface StagePriceItem {
+  id: string;
+  title: string;
+  description: string;
+  myMinPrice: number;        // Минимальная себестоимость / фриланс
+  studioPrice: number;       // Сколько пришлось бы отдать веб-студии среднего сегмента под ключ
+  sourceName: string;        // Источник рыночной оценки
+  sourceUrl: string;         // Ссылка на источник
+  savings: number;           // Сколько сэкономил (не пришлось отдавать сторонним разработчикам)
+}
+
+export const STAGE_PRICE_LIST: StagePriceItem[] = [
+  {
+    id: "stage-landing",
+    title: "1. Создание промо-сайта и одностраничного портала",
+    description: "Разработка адаптивного интерфейса (React, Tailwind CSS), интерактивные блоки услуг, калькуляторы, формы сбора заявок, анимации.",
+    myMinPrice: 45000,
+    studioPrice: 150000,
+    sourceName: "Рейтинг Рунета (Разработка лендингов)",
+    sourceUrl: "https://ratingruneta.ru/landing/",
+    savings: 105000,
+  },
+  {
+    id: "stage-database",
+    title: "2. Архитектура и схема базы данных PostgreSQL",
+    description: "Проектирование реляционной схемы на 50+ таблиц, индексы, внешние ключи, триггеры обновления, функции и RLS-политики безопасности данных.",
+    myMinPrice: 70000,
+    studioPrice: 220000,
+    sourceName: "Хабр Фриланс (Проектирование БД)",
+    sourceUrl: "https://freelance.habr.com/",
+    savings: 150000,
+  },
+  {
+    id: "stage-auth",
+    title: "3. Контур авторизации, роли доступа и безопасность ПДн",
+    description: "Вход по номеру телефона / паролю, SMS/OTP верификация, JWT-токены, разделение ролей (жилец, диспетчер, мастер, админ, суперадмин).",
+    myMinPrice: 55000,
+    studioPrice: 180000,
+    sourceName: "Хабр Фриланс (Аутентификация & RBAC)",
+    sourceUrl: "https://freelance.habr.com/",
+    savings: 125000,
+  },
+  {
+    id: "stage-cabinet",
+    title: "4. Личный кабинет жильца / абонента МКД",
+    description: "Интерактивный кабинет: привязка лицевых счетов, онлайн-просмотр задолженности, история начислений, анкета оборудования, вызов мастера.",
+    myMinPrice: 110000,
+    studioPrice: 380000,
+    sourceName: "Рейтинг Рунета (Личные кабинеты и порталы)",
+    sourceUrl: "https://ratingruneta.ru/",
+    savings: 270000,
+  },
+  {
+    id: "stage-yookassa",
+    title: "5. Подключение эквайринга ЮKassa с чеками 54-ФЗ",
+    description: "Прием банковских карт, СБП, обработка вебхуков платежей, фискализация онлайн-чеков по 54-ФЗ, автоматическое погашение долга в БД.",
+    myMinPrice: 50000,
+    studioPrice: 160000,
+    sourceName: "ЮKassa / Kwork (Интеграция 54-ФЗ)",
+    sourceUrl: "https://yookassa.ru/developers/api",
+    savings: 110000,
+  },
+  {
+    id: "stage-fsm-crm",
+    title: "6. FSM & CRM система диспетчеризации заявок",
+    description: "Полноценный контур управления выездной службой: карточки нарядов, логистика, фильтры инцидентов, закрепление мастеров за объектами.",
+    myMinPrice: 240000,
+    studioPrice: 750000,
+    sourceName: "Рейтинг Рунета (Отраслевые CRM/FSM)",
+    sourceUrl: "https://ratingruneta.ru/",
+    savings: 510000,
+  },
+  {
+    id: "stage-fsm-mobile",
+    title: "7. Мобильный кабинет полевого инженера FSM",
+    description: "Адаптированный мобильный интерфейс мастера: геопозиционирование выездов к подъездам, обязательные фотоотчеты «до/после», чек-листы ТО.",
+    myMinPrice: 120000,
+    studioPrice: 390000,
+    sourceName: "Хабр Фриланс (Мобильный веб-интерфейс)",
+    sourceUrl: "https://freelance.habr.com/",
+    savings: 270000,
+  },
+  {
+    id: "stage-montage",
+    title: "8. Модуль «Новые дома и монтаж»",
+    description: "Учет подключенных подъездов домофонного фонда, складской учет установленного оборудования, таймлайн монтажа, выгрузка отчетов в Excel (XLSX).",
+    myMinPrice: 85000,
+    studioPrice: 260000,
+    sourceName: "Kwork / Веб-студии (Производственный учет)",
+    sourceUrl: "https://kwork.ru/",
+    savings: 175000,
+  },
+  {
+    id: "stage-voting",
+    title: "9. Модуль электронных голосований ОСС (217-ФЗ)",
+    description: "Юридически выверенный сервис голосований собственников МКД: расчет кворума по долям площадей, SMS-подтверждение бюллетеней, протоколы.",
+    myMinPrice: 130000,
+    studioPrice: 420000,
+    sourceName: "Рейтинг Рунета (Специализированные порталы)",
+    sourceUrl: "https://ratingruneta.ru/",
+    savings: 290000,
+  },
+  {
+    id: "stage-hr",
+    title: "10. Кадровый контур и соответствие ФЗ-152 (Защита ПДн)",
+    description: "Личные дела сотрудников, допуски к персональным данным жильцов, шифрование логов доступа, клиентское сжатие фото (обход 413).",
+    myMinPrice: 60000,
+    studioPrice: 190000,
+    sourceName: "Хабр Фриланс (Безопасность & ФЗ-152)",
+    sourceUrl: "https://freelance.habr.com/",
+    savings: 130000,
+  },
+  {
+    id: "stage-devops",
+    title: "11. DevOps, контейнеризация Docker & веб-сервер Nginx",
+    description: "Архитектура микросервисов, оркестрация Docker, настройка отказоустойчивого Nginx, автоматическое перевыпускание SSL-сертификатов, скрипты автодеплоя.",
+    myMinPrice: 50000,
+    studioPrice: 170000,
+    sourceName: "Kwork (Системное администрирование Linux)",
+    sourceUrl: "https://kwork.ru/",
+    savings: 120000,
+  },
+  {
+    id: "stage-pwa",
+    title: "12. PWA-версия и мобильная адаптация",
+    description: "Превращение сайта в автономное мобильное приложение: Service Worker, оффлайн-кэширование страниц, push-уведомления, установка на экран смартфона.",
+    myMinPrice: 35000,
+    studioPrice: 120000,
+    sourceName: "Хабр Фриланс (PWA & Мобильный стек)",
+    sourceUrl: "https://freelance.habr.com/",
+    savings: 85000,
+  },
+];
+
+// Итоги по этапам
+export const TOTAL_MY_MIN_PRICE = STAGE_PRICE_LIST.reduce((s, x) => s + x.myMinPrice, 0); // 1 050 000 ₽
+export const TOTAL_STUDIO_PRICE = STAGE_PRICE_LIST.reduce((s, x) => s + x.studioPrice, 0); // 3 390 000 ₽
+export const TOTAL_PRICE_SAVINGS = TOTAL_STUDIO_PRICE - TOTAL_MY_MIN_PRICE; // 2 340 000 ₽
+
 export type Kind = "feature" | "fix" | "improvement" | "infra";
 export type ProjectModule = 
   | "crm_fsm" 
