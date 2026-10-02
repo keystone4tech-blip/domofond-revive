@@ -281,6 +281,16 @@ export const FSMReports: React.FC = () => {
     });
   }, [requests, dateFrom, dateTo]);
 
+  // Только реальные платёжные транзакции для журнала (без служебных заявок с нулём).
+  // Исключаем верификацию и запросы на смену данных, а также обращения без суммы.
+  const paymentTransactions = useMemo(() => {
+    return filteredRequests.filter(r => {
+      if (r.order_type === "verification_request" || r.order_type === "data_change_request") return false;
+      const amount = Number(r.payment_amount) || 0;
+      return amount > 0 || r.payment_status === "paid" || r.order_type === "equipment_order";
+    });
+  }, [filteredRequests]);
+
   // Фильтрация позиций товаров по отфильтрованным заказам
   const filteredRequestItems = useMemo(() => {
     const validRequestIds = new Set(filteredRequests.map(r => r.id));
@@ -968,7 +978,7 @@ export const FSMReports: React.FC = () => {
               <CardTitle className="text-base font-bold flex items-center justify-between">
                 <span>Журнал платёжных транзакций за период</span>
                 <Badge variant="outline" className="font-mono text-xs">
-                  Всего: {filteredRequests.length}
+                  Всего: {paymentTransactions.length}
                 </Badge>
               </CardTitle>
             </CardHeader>
@@ -988,14 +998,14 @@ export const FSMReports: React.FC = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredRequests.length === 0 ? (
+                    {paymentTransactions.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={8} className="text-center py-8 text-muted-foreground text-xs">
                           За выбранный период заказов и платежей не найдено.
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredRequests.map(req => {
+                      paymentTransactions.map(req => {
                         const isPaid = req.payment_status === "paid";
                         const amount = Number(req.payment_amount) || 0;
 

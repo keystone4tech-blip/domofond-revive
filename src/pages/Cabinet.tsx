@@ -411,6 +411,36 @@ const DebtCard = ({
       } else {
         setHouseServed(false);
       }
+
+      // ФОЛБЭК ПО НАШЕМУ ФОНДУ: даже если в базе 1С счёт/дом не нашлись,
+      // проверяем таблицу entrances (наши дома на монтаже/обслуживании).
+      // Если дом в нашем фонде — не показываем «частный клиент».
+      if (!best) {
+        try {
+          const { street: s2, house: h2 } = parseAddressParts(address);
+          const cs = s2.replace(/(?:\b(?:ул\.?|улица)\b|\(ул\))\s*/gi, "").trim();
+          if (cs && h2) {
+            const { data: ents } = await supabase
+              .from("entrances")
+              .select("id, street, house, service_type")
+              .ilike("street", `%${cs}%`)
+              .limit(300);
+            if (ents && ents.length) {
+              const sNorm = normalizeStreet(s2);
+              const hNorm = normalizeHouse(h2);
+              const inFund = ents.some((e: any) =>
+                normalizeStreet(e.street || "") === sNorm && normalizeHouse(e.house || "") === hNorm);
+              if (inFund) {
+                setHouseServed(true);
+                console.log("[Баланс] Дом найден в нашем фонде (entrances) — не частный клиент.");
+              }
+            }
+          }
+        } catch (e) {
+          console.warn("[Баланс] Проверка фонда entrances не удалась:", e);
+        }
+      }
+
       setAccount(best);
       if (setParentAccount) {
         setParentAccount(best);
@@ -506,11 +536,17 @@ const DebtCard = ({
     setCreating(true);
     try {
       const fullAddress = `${address}${apartment ? `, ${apartment}` : ""}`;
+      // Метка статуса адреса — по фактическому состоянию, а не жёстко «частный».
+      const statusNote = account
+        ? `— Абонент на обслуживании, л/с ${account.account_number}`
+        : houseServed
+        ? "— Дом на обслуживании (лицевой счёт не сопоставлен)"
+        : "— Частный клиент (адрес не на обслуживании)";
       const { error } = await supabase.from("requests").insert({
         name: fullName || "Клиент",
         phone: phone || "не указан",
         address: fullAddress,
-        message: `${requestText}\n\n— Частный клиент (адрес не на обслуживании)`,
+        message: `${requestText}\n\n${statusNote}`,
         priority: "medium",
         status: "pending",
       });
