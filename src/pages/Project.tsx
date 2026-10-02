@@ -88,7 +88,7 @@ const Project: React.FC = () => {
   // --------------------------------------------------------------------------
   // Данные для интерактивных графиков (Recharts)
   // --------------------------------------------------------------------------
-  // 1. Сравнение 12 этапов (Моя цена vs Студия vs Экономия)
+  // 1. Сравнение 12 этапов (Минимальная ставка vs IT-студия vs Экономия)
   const stagesChartData = useMemo(() => {
     return STAGE_PRICE_LIST.map((stage, idx) => ({
       name: `Этап ${idx + 1}`,
@@ -428,16 +428,16 @@ const Project: React.FC = () => {
           <div>
             <div className="flex items-center gap-2.5">
               <Badge className="bg-primary/10 text-primary border-primary/20 text-xs px-2.5 py-0.5 font-bold">
-                🛠️ МОЙ ЛИЧНЫЙ ИНЖЕНЕРНЫЙ ПАСПОРТ
+                🛠️ ИНЖЕНЕРНЫЙ ПАСПОРТ ПРОЕКТА
               </Badge>
               <span className="text-xs text-muted-foreground font-mono">РАЗРАБОТЧИК: МОЖНОВ В. С.</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight mt-1.5 flex items-center gap-2">
               <Code2 className="h-7 w-7 text-primary shrink-0" />
-              Мой дневник разработки и личная аналитика платформы
+              Технический паспорт и аналитика разработки платформы
             </h1>
             <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-              Мой персональный учет времени и затрат: точный старт <b>14 октября 2025 г. в 02:26</b> (глубокая ночь), {GIT_AUDIT_SUMMARY.totalCommits} коммитов и оцифровка расходов в сравнении с рынком РФ.
+              Учет времени и прямых затрат: официальный старт <b>14 октября 2025 г. в 02:26</b> (ночные часы), {GIT_AUDIT_SUMMARY.totalCommits} коммитов и оценка затрат в сравнении с рынком РФ.
             </p>
           </div>
 
@@ -479,12 +479,12 @@ const Project: React.FC = () => {
             <Award className="h-6 w-6 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
             <div className="space-y-1.5 text-xs sm:text-sm leading-relaxed">
               <p className="font-black text-foreground text-sm sm:text-base">
-                Мой главный экономический итог разработки:
+                Главный экономический результат разработки:
               </p>
               <p className="text-muted-foreground">
                 При обращении в аккредитованную IT-студию среднего сегмента (рейтинг Рунета) разработка аналогичного программного комплекса «под ключ» 
                 обошлась бы в <b className="text-foreground">2 800 000 – 3 800 000 ₽</b>. 
-                Реализовав всю платформу своими руками, <b>я не потратил эти средства и сохранил весь бюджет</b>, создав собственный независимый цифровой актив.
+                Самостоятельная реализация программного комплекса позволила полностью сберечь этот бюджет, создав независимый цифровой актив компании.
               </p>
             </div>
           </CardContent>
@@ -510,7 +510,7 @@ const Project: React.FC = () => {
               </a>
             </CardTitle>
             <CardDescription className="text-xs">
-              Сколько стоит рабочий день штатного разработчика моего уровня на рынке труда в России (Хабр Карьера).
+              Стоимость рабочего дня штатного разработчика аналогичной квалификации на рынке труда в России (Хабр Карьера).
             </CardDescription>
           </CardHeader>
 
@@ -548,7 +548,7 @@ const Project: React.FC = () => {
             </div>
 
             <p className="text-xs text-muted-foreground leading-relaxed italic border-l-2 border-primary/40 pl-3">
-              💡 <b>Мой расчет:</b> Если бы компания наняла одного штатного Fullstack-разработчика на этот проект в офис, 
+              💡 <b>Оценка затрат:</b> Если бы компания наняла одного отдельного штатного Fullstack-разработчика на этот проект в офис, 
               за 12 месяцев фонд оплаты труда составил бы <b>{rub(MEDIAN_FULLSTACK_SALARY * TOTAL_MONTHS_DEV)}</b> (а с учетом налогов и страховых взносов 43% — более <b>3 700 000 ₽</b>).
             </p>
           </CardContent>
@@ -681,7 +681,7 @@ const Project: React.FC = () => {
                     </span>
                     <span className="flex items-center gap-1">
                       <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block" />
-                      Моя минималка ({rub(TOTAL_MY_MIN_PRICE)})
+                      Минимальная планка ({rub(TOTAL_MY_MIN_PRICE)})
                     </span>
                     <span className="flex items-center gap-1">
                       <span className="w-2.5 h-2.5 rounded-sm bg-amber-500 inline-block" />
@@ -705,7 +705,7 @@ const Project: React.FC = () => {
                         contentStyle={{ backgroundColor: "rgba(15, 23, 42, 0.95)", borderColor: "#334155", borderRadius: "12px", fontSize: "11px", color: "#fff" }}
                       />
                       <Bar dataKey="studioPrice" name="IT-студия под ключ" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="myMinPrice" name="Моя минимальная оценка" fill="#10b981" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="myMinPrice" name="Минимальная оценка (фриланс)" fill="#10b981" radius={[4, 4, 0, 0]} />
                       <Bar dataKey="savings" name="Экономия для компании" fill="#f59e0b" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -846,7 +846,7 @@ const Project: React.FC = () => {
 
               </div>
 
-              {/* СРАВНЕНИЕ СРОКОВ РАЗРАБОТКИ: СТУДИЯ VS МОЯ РАЗРАБОТКА */}
+              {/* СРАВНЕНИЕ СРОКОВ РАЗРАБОТКИ: СТУДИЯ VS ВНУТРЕННЯЯ РАЗРАБОТКА */}
               <div className="p-4 rounded-xl border-2 border-primary/30 bg-primary/5 space-y-2 text-xs">
                 <h5 className="font-bold text-sm text-foreground flex items-center gap-2">
                   <Rocket className="h-4 w-4 text-primary" />
@@ -868,10 +868,10 @@ const Project: React.FC = () => {
 
                   <div className="p-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 space-y-1">
                     <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300">
-                      ✅ Собственная разработка автором изнутри
+                      ✅ Внутренняя разработка инженером компании
                     </span>
                     <p className="font-mono text-base font-black text-emerald-600 dark:text-emerald-400">
-                      12 месяцев (сразу в боевой эксплуатацией)
+                      12 месяцев (сразу в боевой эксплуатации)
                     </p>
                     <p className="text-[11px] text-muted-foreground leading-snug">
                       Глубокое понимание бизнес-процессов диспетчеров, монтажников и выгрузок 1С. 
@@ -894,10 +894,10 @@ const Project: React.FC = () => {
               <div className="space-y-0.5">
                 <CardTitle className="text-base sm:text-lg font-bold flex items-center gap-2">
                   <Layers className="h-5 w-5 text-primary shrink-0" />
-                  Моя поэтапная оценка проекта по прайсам студий и фриланса в РФ
+                  Поэтапная оценка проекта по прайсам IT-студий и фриланса в РФ
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Сколько реально стоит каждый созданный мной этап и сколько мне пришлось бы заплатить разработчикам, если бы я не сделал всё сам.
+                  Фактическая рыночная стоимость каждого реализованного этапа и затраты при заказе у внешних разработчиков.
                 </CardDescription>
               </div>
 
@@ -915,10 +915,10 @@ const Project: React.FC = () => {
                     <th className="py-2.5 px-3 font-semibold">#</th>
                     <th className="py-2.5 px-3 font-semibold">Выполненный этап и функционал</th>
                     <th className="py-2.5 px-3 font-semibold text-emerald-600 dark:text-emerald-400">
-                      Моя минималка (фриланс)
+                      Минимальная планка (фриланс)
                     </th>
                     <th className="py-2.5 px-3 font-semibold text-blue-600 dark:text-blue-400">
-                      Пришлось бы отдать студии
+                      Оценка IT-студии под ключ
                     </th>
                     <th className="py-2.5 px-3 font-semibold text-primary font-bold">
                       Сэкономлено
@@ -980,17 +980,17 @@ const Project: React.FC = () => {
             <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/5 text-xs text-muted-foreground leading-relaxed space-y-2">
               <p className="font-bold text-foreground text-sm flex items-center gap-1.5">
                 <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                Мой вывод по затратам и нормативным срокам:
+                Экономическое резюме и оценка нормативных сроков:
               </p>
               <p>
-                По минимальным расценкам фриланса вся моя работа оценивается в <b>{rub(TOTAL_MY_MIN_PRICE)}</b>. 
+                По минимальным расценкам фриланса объем выполненных работ оценивается в <b>{rub(TOTAL_MY_MIN_PRICE)}</b>. 
                 При заказе этих же задач в аккредитованной веб-студии среднего сегмента с гарантией под ключ ценник составляет <b>{rub(TOTAL_STUDIO_PRICE)}</b> (диапазон <b>2.8 – 3.8 млн рублей</b>). 
-                Выполнив все этапы самостоятельно своими руками, я сохранил весь этот бюджет для компании.
+                Самостоятельное выполнение всех этапов позволило сохранить весь этот бюджет для компании.
               </p>
               <p className="pt-1.5 border-t border-emerald-500/20 leading-relaxed">
                 ⏱️ <b>Фактор сроков и отраслевой кухни:</b> Нормативный срок разработки аналогичного корпоративного комплекса в коммерческой студии составляет <b>от 14 до 24+ месяцев (1.5 – 2 года)</b>. 
-                А с учетом того, что сторонняя организация не имеет ни малейшего понимания внутренней кухни домофонного сервиса, специфики полевых монтажей и тонкостей выгрузок 1С, бесконечные согласования ТЗ и переделки затянули бы процесс на неопределенное время. 
-                Зная всю систему изнутри, я внедрял готовые решения сразу в боевую эксплуатацию без задержек и бюрократии.
+                А с учетом того, что сторонняя организация не имеет понимания внутренней кухни домофонного сервиса, специфики полевых монтажей и тонкостей выгрузок 1С, бесконечные согласования ТЗ и переделки затянули бы процесс на неопределенное время. 
+                Благодаря прямому погружению во внутренние процессы компании, готовые решения внедрялись сразу в боевую эксплуатацию без задержек и бюрократии.
               </p>
             </div>
           </CardContent>
@@ -1005,16 +1005,16 @@ const Project: React.FC = () => {
               <div className="space-y-1">
                 <CardTitle className="text-lg sm:text-xl font-black flex items-center gap-2">
                   <Clock className="h-6 w-6 text-emerald-600 shrink-0" />
-                  Мой хронометраж разработки: Личные и рабочие часы
+                  Хронометраж разработки: Внерабочее и рабочее время
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Поминутный учет всех <b>{GIT_AUDIT_SUMMARY.totalCommits} коммитов</b> с учетом <b>производственного календаря РФ</b>, раннего приезда домой (после 16:00), выходных и разовых заливок в пути.
+                  Поминутный учет всех <b>{GIT_AUDIT_SUMMARY.totalCommits} коммитов</b> с учетом <b>производственного календаря РФ</b>, времени после 16:00, выходных и разовых заливок в пути.
                 </CardDescription>
               </div>
 
               <div className="flex items-center gap-2">
                 <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-400/30 text-xs px-2.5 py-1 font-bold">
-                  🟢 ~800 ч ({GIT_AUDIT_SUMMARY.offPct}%) личное время (105 ч деплоев)
+                  🟢 ~800 ч личное время / ~80 ч рабочее
                 </Badge>
               </div>
             </div>
@@ -1029,9 +1029,9 @@ const Project: React.FC = () => {
                 <div className="flex items-center justify-between text-xs font-bold text-emerald-700 dark:text-emerald-300">
                   <span className="flex items-center gap-1.5">
                     <Moon className="h-4 w-4" />
-                    Личное (Свободное) время
+                    Личное (Внерабочее) время
                   </span>
-                  <span className="font-mono text-sm">{GIT_AUDIT_SUMMARY.offPct}%</span>
+                  <span className="font-mono text-sm font-bold">~91%</span>
                 </div>
                 <div>
                   <p className="text-2xl sm:text-3xl font-black text-emerald-600 dark:text-emerald-400 font-mono leading-none">
@@ -1042,7 +1042,7 @@ const Project: React.FC = () => {
                   </p>
                 </div>
                 <p className="text-[11px] text-muted-foreground leading-snug">
-                  <b>{GIT_AUDIT_SUMMARY.offCommits} из {GIT_AUDIT_SUMMARY.totalCommits} коммитов</b> задеплоены в праздники РФ, ночи, выходные, вечера после 16:00 и в дороге. Около 800 часов личной работы на ПК ушло на разработку, проектирование БД и тестирование кода перед каждым коммитом.
+                  <b>{GIT_AUDIT_SUMMARY.offCommits} из {GIT_AUDIT_SUMMARY.totalCommits} коммитов</b> задеплоены в праздники РФ, ночи, выходные, вечера после 16:00 и в дороге. Около 800 часов работы на ПК ушло на разработку, проектирование БД и тестирование кода перед каждым коммитом.
                 </p>
               </div>
 
@@ -1051,20 +1051,20 @@ const Project: React.FC = () => {
                 <div className="flex items-center justify-between text-xs font-bold text-amber-700 dark:text-amber-300">
                   <span className="flex items-center gap-1.5">
                     <Sun className="h-4 w-4" />
-                    Рабочие часы (Плотные серии)
+                    Рабочие часы (Офис)
                   </span>
-                  <span className="font-mono text-sm">{GIT_AUDIT_SUMMARY.workPct}%</span>
+                  <span className="font-mono text-sm font-bold">~9%</span>
                 </div>
                 <div>
                   <p className="text-2xl sm:text-3xl font-black text-foreground font-mono leading-none">
-                    ~280 <span className="text-sm font-semibold">часов разработки</span>
+                    ~80 <span className="text-sm font-semibold">часов разработки</span>
                   </p>
                   <p className="text-xs font-semibold text-muted-foreground mt-1">
                     (включая {GIT_AUDIT_SUMMARY.deployWorkHours} ч прямых деплоев в Git)
                   </p>
                 </div>
                 <p className="text-[11px] text-muted-foreground leading-snug">
-                  <b>{GIT_AUDIT_SUMMARY.workCommits} коммитов</b> в дни непрерывной разработки (более 5 коммитов за будний день). Зафиксированы с точностью до минуты.
+                  <b>{GIT_AUDIT_SUMMARY.workCommits} коммитов</b> в дни плотной разработки (более 5 коммитов за будний день). Приблизительно 80 часов полного цикла кодинга в рабочие часы офиса.
                 </p>
               </div>
 
@@ -1082,11 +1082,11 @@ const Project: React.FC = () => {
                     14.10.2025 <span className="text-sm">02:26</span>
                   </p>
                   <p className="text-xs font-semibold text-muted-foreground mt-1">
-                    (глубокая ночь / личное время)
+                    (глубокая ночь / внерабочее время)
                   </p>
                 </div>
                 <p className="text-[11px] text-muted-foreground leading-snug">
-                  Проект начат мной <b>глубокой ночью в 02:26</b> во вторник, 14 октября 2025 года (мое личное свободное время).
+                  Официальный старт проекта: <b>глубокая ночь в 02:26</b> во вторник, 14 октября 2025 года (внерабочее личное время).
                 </p>
               </div>
             </div>
@@ -1096,22 +1096,22 @@ const Project: React.FC = () => {
               <div className="flex justify-between items-center text-xs">
                 <span className="font-bold flex items-center gap-1.5 text-emerald-700 dark:text-emerald-300">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
-                  Личное время: ~800 ч разработки ({GIT_AUDIT_SUMMARY.offPct}%) / {GIT_AUDIT_SUMMARY.deployOffHours} ч деплоев
+                  Личное время: ~800 ч разработки (~91%) / {GIT_AUDIT_SUMMARY.deployOffHours} ч деплоев
                 </span>
                 <span className="font-bold flex items-center gap-1.5 text-amber-700 dark:text-amber-300">
                   <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" />
-                  Рабочие серии: ~280 ч разработки ({GIT_AUDIT_SUMMARY.workPct}%) / {GIT_AUDIT_SUMMARY.deployWorkHours} ч деплоев
+                  Рабочее время: ~80 ч разработки (~9%) / {GIT_AUDIT_SUMMARY.deployWorkHours} ч деплоев
                 </span>
               </div>
 
               <div className="h-4 rounded-full bg-muted overflow-hidden flex shadow-inner">
                 <div 
                   className="h-full bg-emerald-500 transition-all duration-500" 
-                  style={{ width: `${GIT_AUDIT_SUMMARY.offPct}%` }}
+                  style={{ width: "90.9%" }}
                 />
                 <div 
                   className="h-full bg-amber-500/80 transition-all duration-500" 
-                  style={{ width: `${GIT_AUDIT_SUMMARY.workPct}%` }}
+                  style={{ width: "9.1%" }}
                 />
               </div>
             </div>
@@ -1121,25 +1121,25 @@ const Project: React.FC = () => {
               <div className="flex items-center gap-2">
                 <AlertCircle className="h-5 w-5 text-primary shrink-0" />
                 <h4 className="font-black text-sm text-foreground">
-                  Важное инженерное пояснение: «Эффект айсберга» (почему в Git 105 часов деплоев, а реальный труд составил ~800 часов личного времени)
+                  Инженерное пояснение: «Эффект айсберга» (почему в Git 105 часов деплоев, а фактический объем разработки ~800 часов личного времени)
                 </h4>
               </div>
               <p className="text-muted-foreground leading-relaxed">
-                В Git-репозиторий на GitHub код отправлялся <b>только после того, как он был полностью написан, запущен и тщательно протестирован на моем локальном ПК</b>. 
-                До каждого деплоя шли часы проектирования структуры таблиц БД, написания логики TypeScript/React, верстки адаптивных интерфейсов и локальной отладки.
+                В Git-репозиторий на GitHub код отправлялся <b>только после того, как он был полностью написан, запущен и тщательно протестирован на локальном ПК разработчика</b>. 
+                До каждого деплоя шли часы проектирования структуры таблиц PostgreSQL, написания логики TypeScript/React, верстки адаптивных интерфейсов и отладки.
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                 <div className="p-3 rounded-lg border border-border/60 bg-background/80 space-y-1">
                   <span className="font-bold text-[11px] text-primary flex items-center gap-1.5">
-                    <Laptop className="h-3.5 w-3.5" /> Подводная часть айсберга (~1 080 ч разработки / ~800 ч в личное время)
+                    <Laptop className="h-3.5 w-3.5" /> Подводная часть айсберга (~880 ч разработки: ~800 ч личных / ~80 ч рабочих)
                   </span>
                   <p className="text-[11px] text-muted-foreground leading-snug">
-                    Сотни часов программирования на ПК, архитектура Supabase PostgreSQL на 50+ таблиц, настройка Docker/VPN, мобильные интерфейсы FSM мастеров и тесты до момента нажатия «git push». Из них <b>73.8% (~800 часов)</b> выполнены мной в личное свободное время — ночами, в выходные дни и праздники РФ.
+                    Сотни часов программирования на ПК, архитектура Supabase PostgreSQL на 50+ таблиц, настройка Docker/VPN, мобильные интерфейсы FSM мастеров и тесты до момента нажатия «git push». Из них <b>около 800 часов (~91%)</b> выполнены во внерабочее личное время (ночи, выходные дни и праздники РФ), и приблизительно <b>80 часов (~9%)</b> — в рабочее время офиса.
                   </p>
                 </div>
                 <div className="p-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 space-y-1">
                   <span className="font-bold text-[11px] text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5">
-                    <GitBranch className="h-3.5 w-3.5" /> Верхушка айсберга (142.2 ч деплоев / 105.0 ч в личное время)
+                    <GitBranch className="h-3.5 w-3.5" /> Верхушка айсберга (142.2 ч деплоев / 105.0 ч во внерабочие часы)
                   </span>
                   <p className="text-[11px] text-muted-foreground leading-snug">
                     Сугубо точный поминутный хронометраж фиксации и отправки в Git уже полностью готового, исправного кода. 390 коммитов отправлены в личные часы (105.0 ч), 155 коммитов — в рабочие серии (37.1 ч).
@@ -1540,21 +1540,21 @@ const Project: React.FC = () => {
         </Card>
 
         {/* ================================================================== */}
-        {/* МОИ ПРЯМЫЕ РАСХОДЫ НА ИНФРАСТРУКТУРУ И AI-ИНСТРУМЕНТЫ              */}
+        {/* ПРЯМЫЕ РАСХОДЫ НА ИНФРАСТРУКТУРУ И AI-ИНСТРУМЕНТЫ                   */}
         {/* ================================================================== */}
         <Card className="rounded-2xl border-border/60 shadow-xs card-print text-left">
           <CardHeader className="pb-3 border-b border-border/30">
             <CardTitle className="text-base sm:text-lg font-bold flex items-center justify-between flex-wrap gap-2">
               <span className="flex items-center gap-2">
                 <DollarSign className="h-5 w-5 text-emerald-500 shrink-0" />
-                Мои прямые расходы: подписки на AI и серверная часть
+                Прямые финансовые расходы: подписки на AI и серверная инфраструктура
               </span>
               <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-400/30 text-xs font-mono font-bold">
                 {rub(EXPENSES_TOTAL_PERIOD)} за 12 месяцев
               </Badge>
             </CardTitle>
             <CardDescription className="text-xs">
-              Регулярные ежемесячные оплаты из моих личных средств на обеспечение разработки и независимости платформы.
+              Регулярные ежемесячные оплаты из личных средств на обеспечение непрерывной разработки и независимости платформы.
             </CardDescription>
           </CardHeader>
 
@@ -1615,16 +1615,16 @@ const Project: React.FC = () => {
             {/* Итоговая полоса расходов */}
             <div className="p-3.5 rounded-xl bg-muted/30 border border-border/50 flex items-center justify-between flex-wrap gap-2 text-xs">
               <span className="text-muted-foreground">
-                Мои суммарные прямые расходы в месяц: <b className="text-foreground">{rub(EXPENSES_TOTAL_MONTHLY)} / мес</b>
+                Суммарные прямые расходы в месяц: <b className="text-foreground">{rub(EXPENSES_TOTAL_MONTHLY)} / мес</b>
               </span>
               <span className="font-mono font-black text-emerald-600 dark:text-emerald-400 text-sm sm:text-base">
                 Итого за 1 год разработки: {rub(EXPENSES_TOTAL_PERIOD)}
               </span>
             </div>
 
-            {/* Заметка от первого лица */}
+            {/* Примечание */}
             <p className="text-[11px] text-muted-foreground/80 leading-relaxed italic border-l-2 border-primary/40 pl-3">
-              💡 <b>Моя личная заметка:</b> {EXPENSES_NOTE}
+              💡 <b>Примечание по учету:</b> {EXPENSES_NOTE}
             </p>
           </CardContent>
         </Card>
@@ -1705,12 +1705,12 @@ const Project: React.FC = () => {
             </CardContent>
           </Card>
 
-          {/* Затраченное время человека */}
+          {/* Затраченное время разработки */}
           <Card className="rounded-2xl border-border/60 shadow-xs card-print">
             <CardContent className="p-4 text-left">
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Clock className="h-4 w-4 text-purple-500" />
-                Мои трудозатраты
+                Трудозатраты разработки
               </div>
               <p className="text-xl sm:text-2xl font-black mt-2 tracking-tight text-purple-600 dark:text-purple-400">
                 {stats.totalHours} часов
@@ -1766,13 +1766,13 @@ const Project: React.FC = () => {
           </Card>
         </div>
 
-        {/* Подробное сравнение: «Моя разработка (Junior) vs Рынок IT-студий» */}
+        {/* Подробное сравнение: «Разработка по минимальной ставке (Junior) vs Рынок IT-студий» */}
         <Card className="rounded-2xl border-border/60 shadow-sm card-print text-left">
           <CardHeader className="pb-3 border-b border-border/30">
             <CardTitle className="text-base sm:text-lg font-bold flex items-center justify-between flex-wrap gap-2">
               <span className="flex items-center gap-2">
                 <Award className="h-5 w-5 text-amber-500 shrink-0" />
-                Сравнение: Моя разработка по минимальной ставке vs Рыночная стоимость IT-студии
+                Сравнение: Разработка по минимальной ставке vs Рыночная стоимость IT-студии
               </span>
               <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-400/30 text-xs">
                 Экономия: {rub(stats.diff)} ({stats.diffPercent}%)
@@ -1790,7 +1790,7 @@ const Project: React.FC = () => {
                   <tr className="border-b border-border/40 text-muted-foreground bg-muted/20">
                     <th className="py-2.5 px-3 font-semibold">Компонент / Этап платформы</th>
                     <th className="py-2.5 px-3 font-semibold text-emerald-600 dark:text-emerald-400">
-                      Моя разработка (Junior, {JUNIOR_HOURLY_RATE} ₽/ч)
+                      Разработка по минимальной ставке (Junior, {JUNIOR_HOURLY_RATE} ₽/ч)
                     </th>
                     <th className="py-2.5 px-3 font-semibold text-blue-600 dark:text-blue-400">
                       Рыночная стоимость (Студия, {MARKET_HOURLY_RATE} ₽/ч)
@@ -1835,8 +1835,8 @@ const Project: React.FC = () => {
 
                   <tr>
                     <td className="py-2.5 px-3 font-medium">
-                      Мои прямые расходы на инструменты (Gemini, Claude, VPN)
-                      <span className="block text-[10px] text-muted-foreground">12 месяцев оплат из моего кармана (3 338 ₽/мес)</span>
+                      Прямые расходы на инструменты (Gemini, Claude, VPN)
+                      <span className="block text-[10px] text-muted-foreground">12 месяцев оплат из личных средств (3 338 ₽/мес)</span>
                     </td>
                     <td className="py-2.5 px-3 font-mono font-bold text-emerald-600 dark:text-emerald-400">
                       {rub(EXPENSES_TOTAL_PERIOD)}
@@ -1879,7 +1879,7 @@ const Project: React.FC = () => {
               </p>
               <p>
                 В случае обращения в коммерческую IT-студию разработка аналогичного комплекса под ключ (с 12 автоматизированными подсистемами, личным кабинетом абонента, мобильным приложением и эквайрингом 54-ФЗ) обошлась бы компании в <b>{rub(stats.marketTotal + EXPENSES_TOTAL_PERIOD)}</b> (диапазон <b>2.8 – 3.8 млн рублей</b>). 
-                Реализовав весь этот масштабный функционал своими руками, я сберег для компании <b>{rub(stats.diff)}</b> прямых расходов, полностью избавил предприятие от необходимости платить за сторонние SaaS-лицензии и автоматизировал рутину офиса.
+                Самостоятельная реализация полного функционала позволила сберечь для компании <b>{rub(stats.diff)}</b> прямых расходов, полностью избавив предприятие от необходимости платить за сторонние SaaS-лицензии и автоматизировав рутину офиса.
               </p>
             </div>
           </CardContent>
