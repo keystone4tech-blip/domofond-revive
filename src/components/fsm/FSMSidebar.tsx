@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { 
   LayoutDashboard, ClipboardList, FileText, Package, 
   Users, Building2, MapPin, BarChart3, ShieldCheck, 
-  Home, LogOut, Shield, User, FileSpreadsheet, DoorClosed, KeyRound, ClipboardCheck, Wrench
+  Home, LogOut, Shield, User, FileSpreadsheet, DoorClosed, KeyRound, ClipboardCheck, Wrench, Construction
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -86,12 +86,14 @@ export const FSMSidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }: FSMSi
       icon: ClipboardList, 
       badge: counts?.pendingTasks || 0 
     },
-    { 
-      id: "requests", 
-      label: "Заявки", 
-      icon: FileText, 
-      badge: counts?.pendingRequests || 0 
+    {
+      id: "requests",
+      label: "Заявки",
+      icon: FileText,
+      badge: counts?.pendingRequests || 0
     },
+    // Объекты на монтаже: заявки, контроль оборудования, история подъездов
+    { id: "new-buildings", label: "Новые дома", icon: Construction },
     // Раздел поквартирной ведомости оборудования по домам для монтажников
     { id: "installer-sheet", label: "Лист монтажника", icon: ClipboardCheck },
     { id: "products", label: "Товары и услуги", icon: Package },

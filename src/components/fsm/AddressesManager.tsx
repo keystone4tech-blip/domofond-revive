@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { logDeletion } from "@/lib/audit";
+import { logEntranceStatus } from "@/lib/newBuildings";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -400,6 +401,10 @@ export const AddressesManager: React.FC = () => {
 
       if (error) throw error;
 
+      // Пишем переход в историю подъезда (для раздела «Новые дома»)
+      const ent = entrances.find(e => e.id === entranceId);
+      if (ent) await logEntranceStatus(ent, serviceType);
+
       const label = serviceType === "installation" ? "«На монтаже» (льготный прайс)" : serviceType === "rent" ? "«Аренда» (розничный прайс)" : "«На ТО» (розничный прайс)";
       toast({ title: "Статус обновлен", description: `Подъезд переведен в статус ${label}` });
 
@@ -423,6 +428,10 @@ export const AddressesManager: React.FC = () => {
         .eq("house", house);
 
       if (error) throw error;
+
+      // Пишем переход в историю для всех подъездов дома
+      const affected = entrances.filter(e => e.city === city && e.street === street && e.house === house);
+      await Promise.all(affected.map(e => logEntranceStatus(e, serviceType)));
 
       const label = serviceType === "installation" ? "«На монтаже» (льготный прайс)" : serviceType === "rent" ? "«Аренда» (розничный прайс)" : "«На ТО» (розничный прайс)";
       toast({ title: "Статус дома обновлен", description: `Все подъезды дома ${street}, д. ${house} переведены в статус ${label}` });
@@ -1000,6 +1009,9 @@ export const AddressesManager: React.FC = () => {
                   </div>
                 </div>
 
+                {/* История статусов подъезда (когда встал на монтаж / на ТО) */}
+                <EntranceStatusHistory entranceId={selectedEntrance.id} />
+
                 {/* Блок управления статусом «Умный дом» */}
                 <div className="p-3 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200/70 dark:border-indigo-800/60 space-y-2">
                   <div className="flex items-center justify-between">
@@ -1267,6 +1279,56 @@ export const AddressesManager: React.FC = () => {
           await loadAllData();
         }}
       />
+    </div>
+  );
+};
+
+// Компактная история статусов подъезда: когда встал на монтаж, когда на ТО и т.д.
+const EntranceStatusHistory: React.FC<{ entranceId: string }> = ({ entranceId }) => {
+  const [rows, setRows] = useState<any[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoaded(false);
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from("entrance_status_history")
+          .select("*")
+          .eq("entrance_id", entranceId)
+          .order("changed_at", { ascending: false });
+        if (!cancelled) { setRows(data || []); setLoaded(true); }
+      } catch {
+        if (!cancelled) { setRows([]); setLoaded(true); }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [entranceId]);
+
+  const label = (s?: string) =>
+    s === "installation" ? "🟡 На монтаже" : s === "rent" ? "🔵 Аренда" : s === "maintenance" ? "🟢 На обслуживании" : (s || "—");
+  const fmt = (d?: string) => d ? new Date(d).toLocaleString("ru-RU") : "—";
+
+  if (loaded && rows.length === 0) return null;
+
+  return (
+    <div className="p-3 rounded-xl bg-slate-50/80 dark:bg-slate-950/60 border border-slate-200/70 dark:border-slate-800">
+      <div className="font-bold text-foreground mb-2 flex items-center gap-1.5">
+        <Info className="h-3.5 w-3.5" /> История статусов
+      </div>
+      {!loaded ? (
+        <div className="text-[11px] text-muted-foreground">Загрузка…</div>
+      ) : (
+        <div className="space-y-1">
+          {rows.map((r) => (
+            <div key={r.id} className="text-[11px] flex items-center justify-between gap-2">
+              <span>{label(r.status)}</span>
+              <span className="text-muted-foreground">{fmt(r.changed_at)}{r.changed_by_name ? ` · ${r.changed_by_name}` : ""}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

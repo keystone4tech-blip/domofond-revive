@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { logDeletion } from "@/lib/audit";
+import { houseKey } from "@/lib/newBuildings";
 import { useToast } from "@/hooks/use-toast";
 import { useUserRole } from "@/hooks/useUserRole";
 import { cn } from "@/lib/utils";
@@ -212,18 +213,37 @@ const RequestsManager = ({
   });
 
   // Локальный маппинг сотрудников для исключения падения PostgREST-запроса из-за джоина внешних ключей
+  // Дома на монтаже: их заявки уходят в раздел «Новые дома» и НЕ показываются здесь.
+  const { data: montageHouseKeys } = useQuery({
+    queryKey: ["montage-house-keys"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("entrances")
+        .select("street, house, service_type")
+        .eq("service_type", "installation");
+      if (error) throw error;
+      const set = new Set<string>();
+      (data || []).forEach((e: any) => set.add(houseKey(e.street, e.house)));
+      return set;
+    },
+  });
+
   const requests = useMemo(() => {
     if (!rawRequests) return null;
-    return rawRequests.map(req => {
-      const assigned = employees?.find(e => e.id === req.assigned_to);
-      const accepted = employees?.find(e => e.id === req.accepted_by);
-      return {
-        ...req,
-        assigned_employee: assigned ? { id: assigned.id, full_name: assigned.full_name, phone: assigned.phone } : null,
-        accepted_employee: accepted ? { id: accepted.id, full_name: accepted.full_name, phone: accepted.phone } : null,
-      };
-    }) as Request[];
-  }, [rawRequests, employees]);
+    const montage = montageHouseKeys || new Set<string>();
+    return rawRequests
+      // Убираем заявки с монтажных адресов — они в разделе «Новые дома»
+      .filter((req: any) => !montage.has(houseKey(req.street, req.house)))
+      .map(req => {
+        const assigned = employees?.find(e => e.id === req.assigned_to);
+        const accepted = employees?.find(e => e.id === req.accepted_by);
+        return {
+          ...req,
+          assigned_employee: assigned ? { id: assigned.id, full_name: assigned.full_name, phone: assigned.phone } : null,
+          accepted_employee: accepted ? { id: accepted.id, full_name: accepted.full_name, phone: accepted.phone } : null,
+        };
+      }) as Request[];
+  }, [rawRequests, employees, montageHouseKeys]);
 
   // Fetch products
   const { data: products } = useQuery({

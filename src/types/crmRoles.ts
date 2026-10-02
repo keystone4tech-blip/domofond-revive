@@ -36,14 +36,20 @@ export const FSM_TABS: FSMTabDefinition[] = [
     description: "Управление сервисными задачами, назначение мастеров, контроль исполнения",
     category: "operations"
   },
-  { 
-    id: "requests", 
-    label: "Заявки клиентов", 
+  {
+    id: "requests",
+    label: "Заявки клиентов",
     description: "Поток заявок от жильцов на монтаж, обслуживание и ключи",
     category: "operations"
   },
-  { 
-    id: "installer-sheet", 
+  {
+    id: "new-buildings",
+    label: "Новые дома",
+    description: "Объекты на монтаже: заявки, контроль оборудования, история подъездов и выгрузки",
+    category: "operations"
+  },
+  {
+    id: "installer-sheet",
     label: "Лист монтажника", 
     description: "Поквартирный учет оборудования по домам и формирование актов выдачи",
     category: "operations"

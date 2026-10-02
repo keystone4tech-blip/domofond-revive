@@ -30,6 +30,7 @@ import FSMReports from "@/components/fsm/FSMReports";
 import RequestsManager from "@/components/fsm/RequestsManager";
 import ProductsManager from "@/components/fsm/ProductsManager";
 import EquipmentMatchingManager from "@/components/fsm/EquipmentMatchingManager";
+import NewBuildingsManager from "@/components/fsm/NewBuildingsManager";
 import UsersManager from "@/components/fsm/UsersManager";
 import AddressesManager from "@/components/fsm/AddressesManager";
 import { AccountsManager } from "@/components/admin/AccountsManager";
@@ -302,6 +303,13 @@ const FSM = () => {
                   initialRequestId={selectedRequestId}
                   onClearInitialRequestId={clearSelectedRequestId}
                 />
+              </TabsContent>
+            )}
+
+            {/* Новые дома: объекты на монтаже */}
+            {hasPermission("new-buildings") && (
+              <TabsContent value="new-buildings" className="mt-0 outline-none">
+                <NewBuildingsManager />
               </TabsContent>
             )}
 
