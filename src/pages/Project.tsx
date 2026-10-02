@@ -1014,7 +1014,7 @@ const Project: React.FC = () => {
 
               <div className="flex items-center gap-2">
                 <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-400/30 text-xs px-2.5 py-1 font-bold">
-                  🟢 ~800 ч личное время / ~80 ч рабочее
+                  🟢 877 ч разработки: 797 ч личное / 80 ч рабочее
                 </Badge>
               </div>
             </div>
@@ -1031,18 +1031,18 @@ const Project: React.FC = () => {
                     <Moon className="h-4 w-4" />
                     Личное (Внерабочее) время
                   </span>
-                  <span className="font-mono text-sm font-bold">~91%</span>
+                  <span className="font-mono text-sm font-bold">90.9%</span>
                 </div>
                 <div>
                   <p className="text-2xl sm:text-3xl font-black text-emerald-600 dark:text-emerald-400 font-mono leading-none">
-                    ~800 <span className="text-sm font-semibold">часов разработки</span>
+                    797 <span className="text-sm font-semibold">часов разработки</span>
                   </p>
                   <p className="text-xs font-semibold text-emerald-700/80 dark:text-emerald-300/80 mt-1">
                     (включая {GIT_AUDIT_SUMMARY.deployOffHours} ч прямых деплоев в Git)
                   </p>
                 </div>
                 <p className="text-[11px] text-muted-foreground leading-snug">
-                  <b>{GIT_AUDIT_SUMMARY.offCommits} из {GIT_AUDIT_SUMMARY.totalCommits} коммитов</b> задеплоены в праздники РФ, ночи, выходные, вечера после 16:00 и в дороге. Около 800 часов работы на ПК ушло на разработку, проектирование БД и тестирование кода перед каждым коммитом.
+                  <b>{GIT_AUDIT_SUMMARY.offCommits} из {GIT_AUDIT_SUMMARY.totalCommits} коммитов</b> задеплоены в праздники РФ, ночи, выходные, вечера после 16:00 и в дороге. Ровно 797 часов работы на ПК ушло на разработку, проектирование БД и тестирование кода перед каждым коммитом.
                 </p>
               </div>
 
@@ -1053,18 +1053,18 @@ const Project: React.FC = () => {
                     <Sun className="h-4 w-4" />
                     Рабочие часы (Офис)
                   </span>
-                  <span className="font-mono text-sm font-bold">~9%</span>
+                  <span className="font-mono text-sm font-bold">9.1%</span>
                 </div>
                 <div>
                   <p className="text-2xl sm:text-3xl font-black text-foreground font-mono leading-none">
-                    ~80 <span className="text-sm font-semibold">часов разработки</span>
+                    80 <span className="text-sm font-semibold">часов разработки</span>
                   </p>
                   <p className="text-xs font-semibold text-muted-foreground mt-1">
                     (включая {GIT_AUDIT_SUMMARY.deployWorkHours} ч прямых деплоев в Git)
                   </p>
                 </div>
                 <p className="text-[11px] text-muted-foreground leading-snug">
-                  <b>{GIT_AUDIT_SUMMARY.workCommits} коммитов</b> в дни плотной разработки (более 5 коммитов за будний день). Приблизительно 80 часов полного цикла кодинга в рабочие часы офиса.
+                  <b>{GIT_AUDIT_SUMMARY.workCommits} коммитов</b> в дни плотной разработки (более 5 коммитов за будний день). Ровно 80 часов полного цикла кодинга в рабочие часы офиса.
                 </p>
               </div>
 
@@ -1096,11 +1096,11 @@ const Project: React.FC = () => {
               <div className="flex justify-between items-center text-xs">
                 <span className="font-bold flex items-center gap-1.5 text-emerald-700 dark:text-emerald-300">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
-                  Личное время: ~800 ч разработки (~91%) / {GIT_AUDIT_SUMMARY.deployOffHours} ч деплоев
+                  Личное время: 797 ч разработки (90.9%) / {GIT_AUDIT_SUMMARY.deployOffHours} ч деплоев
                 </span>
                 <span className="font-bold flex items-center gap-1.5 text-amber-700 dark:text-amber-300">
                   <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" />
-                  Рабочее время: ~80 ч разработки (~9%) / {GIT_AUDIT_SUMMARY.deployWorkHours} ч деплоев
+                  Рабочее время: 80 ч разработки (9.1%) / {GIT_AUDIT_SUMMARY.deployWorkHours} ч деплоев
                 </span>
               </div>
 
@@ -1121,7 +1121,7 @@ const Project: React.FC = () => {
               <div className="flex items-center gap-2">
                 <AlertCircle className="h-5 w-5 text-primary shrink-0" />
                 <h4 className="font-black text-sm text-foreground">
-                  Инженерное пояснение: «Эффект айсберга» (почему в Git 105 часов деплоев, а фактический объем разработки ~800 часов личного времени)
+                  Инженерное пояснение: «Эффект айсберга» (почему в Git 105 часов деплоев, а фактический объем разработки 877 часов)
                 </h4>
               </div>
               <p className="text-muted-foreground leading-relaxed">
@@ -1131,10 +1131,10 @@ const Project: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                 <div className="p-3 rounded-lg border border-border/60 bg-background/80 space-y-1">
                   <span className="font-bold text-[11px] text-primary flex items-center gap-1.5">
-                    <Laptop className="h-3.5 w-3.5" /> Подводная часть айсберга (~880 ч разработки: ~800 ч личных / ~80 ч рабочих)
+                    <Laptop className="h-3.5 w-3.5" /> Подводная часть айсберга (877 ч разработки: 797 ч личных / 80 ч рабочих)
                   </span>
                   <p className="text-[11px] text-muted-foreground leading-snug">
-                    Сотни часов программирования на ПК, архитектура Supabase PostgreSQL на 50+ таблиц, настройка Docker/VPN, мобильные интерфейсы FSM мастеров и тесты до момента нажатия «git push». Из них <b>около 800 часов (~91%)</b> выполнены во внерабочее личное время (ночи, выходные дни и праздники РФ), и приблизительно <b>80 часов (~9%)</b> — в рабочее время офиса.
+                    Сотни часов программирования на ПК, архитектура Supabase PostgreSQL на 50+ таблиц, настройка Docker/VPN, мобильные интерфейсы FSM мастеров и тесты до момента нажатия «git push». Из них <b>797 часов (90.9%)</b> выполнены во внерабочее личное время (ночи, выходные дни и праздники РФ), и ровно <b>80 часов (9.1%)</b> — в рабочее время офиса.
                   </p>
                 </div>
                 <div className="p-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 space-y-1">
