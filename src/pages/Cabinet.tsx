@@ -2024,6 +2024,8 @@ const Cabinet = () => {
   const [profile, setProfile] = useState<any>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [userRoles, setUserRoles] = useState<string[]>([]);
+  // Стейт суперадмина: строго для viruscorp4@gmail.com (доступ к паспорту и коммерческой оценке проекта)
+  const [isSuperadminUser, setIsSuperadminUser] = useState(false);
   // Приглашение сотрудника: если пользователь назначен сотрудником и не заполнил анкету
   const [employeeInvite, setEmployeeInvite] = useState<{ pending: boolean } | null>(null);
   const [showEmployeeAnketa, setShowEmployeeAnketa] = useState(false);
@@ -3410,6 +3412,11 @@ const Cabinet = () => {
         console.log(`[Cabinet Auth] Роли пользователя успешно загружены: ${JSON.stringify(roles)}`);
         setUserRoles(roles);
       }
+
+      // Проверяем, является ли авторизованный пользователь создателем и суперадмином платформы
+      const sessionEmail = String(session.user.email || "").toLowerCase().trim();
+      const isSuper = sessionEmail === "viruscorp4@gmail.com" || (rolesData && rolesData.some((r: any) => r.role === "superadmin"));
+      setIsSuperadminUser(isSuper);
 
       // Загружаем профиль пользователя из таблицы profiles
       console.log("[Cabinet Auth] Загрузка профиля пользователя...");
@@ -4843,6 +4850,16 @@ const Cabinet = () => {
                 >
                   <Shield className="h-3.5 w-3.5 mr-1" />
                   Админ панель
+                </ShinyButton>
+              )}
+              {/* Кнопка паспорта и коммерческой оценки проекта — СТРОГО для суперадмина viruscorp4@gmail.com */}
+              {isSuperadminUser && (
+                <ShinyButton 
+                  onClick={() => navigate("/project")} 
+                  className="py-1 px-3 text-xs rounded-xl h-9 bg-gradient-to-r from-amber-500/15 via-primary/20 to-amber-500/15 text-amber-700 dark:text-amber-300 hover:bg-amber-500/25 border border-amber-500/35 font-bold shadow-xs transition-all"
+                >
+                  <ShieldCheck className="h-3.5 w-3.5 mr-1 text-amber-600 dark:text-amber-400" />
+                  Паспорт проекта
                 </ShinyButton>
               )}
               {/* Кнопка выхода из системы */}
