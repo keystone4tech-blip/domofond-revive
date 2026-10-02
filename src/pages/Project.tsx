@@ -11,7 +11,7 @@ import {
   TrendingUp, Calendar, Lock, FileText, Building2, Scale, Printer, Search,
   Filter, Layers, CheckCircle2, DollarSign, Award, Clock, ArrowRight, GitCommit,
   GitBranch, Laptop, Cpu, Check, SlidersHorizontal, Moon, Sun, Sunrise, Sunset,
-  AlertTriangle, ChevronLeft, ChevronRight, X
+  AlertTriangle, ChevronLeft, ChevronRight, X, Bot, Server, Flag
 } from "lucide-react";
 import {
   SUPERADMIN_EMAIL, OWNER,
@@ -19,10 +19,12 @@ import {
   JUNIOR_BASE_COST, MARKET_BASE_COST,
   PROJECT_START, GITHUB_FIRST_COMMIT_DATE, GITHUB_FIRST_COMMIT_HASH,
   TOTAL_GIT_COMMITS, TOTAL_MONTHS_DEV,
+  EXPENSES_GEMINI_MONTHLY, EXPENSES_CLAUDE_MONTHLY, EXPENSES_VPN_SERVER_MONTHLY,
+  EXPENSES_TOTAL_MONTHLY, EXPENSES_TOTAL_PERIOD, EXPENSES_NOTE,
   PROJECT_CHANGELOG, MODULE_META, KIND_META, Kind, ProjectModule, ProjectEntry
 } from "@/data/projectChangelog";
 import {
-  GIT_AUDIT_SUMMARY, CALENDAR_DAYS, ALL_AUDIT_COMMITS,
+  GIT_AUDIT_SUMMARY, CALENDAR_DAYS, ALL_AUDIT_COMMITS, RUSSIAN_HOLIDAYS_MAP,
   CommitAuditItem, DayAudit, TimeCategory
 } from "@/data/gitCommitAudit";
 
@@ -54,7 +56,7 @@ const Project: React.FC = () => {
   // --------------------------------------------------------------------------
   // Стейты для юридического календаря и аудита времени
   // --------------------------------------------------------------------------
-  // Выбранный месяц для календаря в формате "YYYY-MM" (по умолчанию октябрь 2026 или октябрь 2025)
+  // Выбранный месяц для календаря в формате "YYYY-MM"
   const [selectedMonth, setSelectedMonth] = useState<string>("2026-10");
   // Выбранный день в календаре (при клике показываем поминутный список коммитов)
   const [selectedDayDate, setSelectedDayDate] = useState<string | null>(null);
@@ -65,14 +67,14 @@ const Project: React.FC = () => {
   // Список всех месяцев разработки платформы (с октября 2025 по октябрь 2026)
   const availableMonths = useMemo(() => [
     { key: "2025-10", label: "Октябрь 2025 (Старт проекта 14.10)" },
-    { key: "2025-11", label: "Ноябрь 2025" },
-    { key: "2025-12", label: "Декабрь 2025" },
-    { key: "2026-01", label: "Январь 2026 (FSM-каркас)" },
-    { key: "2026-02", label: "Февраль 2026" },
-    { key: "2026-03", label: "Март 2026 (Биллинг)" },
+    { key: "2025-11", label: "Ноябрь 2025 (Праздник 4 ноября)" },
+    { key: "2025-12", label: "Декабрь 2025 (Новый год 31.12)" },
+    { key: "2026-01", label: "Январь 2026 (Новогодние каникулы 1–8 янв)" },
+    { key: "2026-02", label: "Февраль 2026 (Праздник 23 февраля)" },
+    { key: "2026-03", label: "Март 2026 (Праздник 8 марта)" },
     { key: "2026-04", label: "Апрель 2026 (Пик разработки)" },
-    { key: "2026-05", label: "Май 2026" },
-    { key: "2026-06", label: "Июнь 2026 (Полевая служба FSM)" },
+    { key: "2026-05", label: "Май 2026 (Праздники 1–4 и 9–11 мая)" },
+    { key: "2026-06", label: "Июнь 2026 (День России 12 июня)" },
     { key: "2026-07", label: "Июль 2026" },
     { key: "2026-08", label: "Август 2026" },
     { key: "2026-09", label: "Сентябрь 2026 (Монтаж, ЮKassa)" },
@@ -212,7 +214,7 @@ const Project: React.FC = () => {
   }, [stats.items, search, selectedKind, selectedModule]);
 
   // --------------------------------------------------------------------------
-  // Логика календаря: генерация сетки выбранного месяца
+  // Логика календаря: генерация сетки с учетом официальных праздников РФ
   // --------------------------------------------------------------------------
   const calendarGrid = useMemo(() => {
     const [yearStr, monthStr] = selectedMonth.split("-");
@@ -234,11 +236,13 @@ const Project: React.FC = () => {
       dateStr: string | null;
       data: DayAudit | null;
       isWeekend: boolean;
+      isHoliday: boolean;
+      holidayName: string | null;
     }> = [];
 
     // Пустые ячейки до 1-го числа
     for (let i = 0; i < firstDayOffset; i++) {
-      cells.push({ dayNum: null, dateStr: null, data: null, isWeekend: false });
+      cells.push({ dayNum: null, dateStr: null, data: null, isWeekend: false, isHoliday: false, holidayName: null });
     }
 
     // Дни месяца
@@ -248,12 +252,17 @@ const Project: React.FC = () => {
       const dayOfWeekRaw = new Date(year, month - 1, day).getDay();
       const isWeekend = dayOfWeekRaw === 0 || dayOfWeekRaw === 6; // Вс или Сб
 
+      const holidayName = RUSSIAN_HOLIDAYS_MAP[dateStr] || null;
+      const isHoliday = !!holidayName;
+
       const data = daysDataMap.get(dateStr) || null;
       cells.push({
         dayNum: day,
         dateStr,
         data,
         isWeekend,
+        isHoliday,
+        holidayName,
       });
     }
 
@@ -326,7 +335,7 @@ const Project: React.FC = () => {
               Дневник разработки и аналитический паспорт «Домофондар»
             </h1>
             <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-              Персональный учет времени: точный старт <b>14 октября 2025 г. в 02:26</b> (ночь), 542 коммита и юридический аудит внерабочих часов.
+              Персональный учет времени: точный старт <b>14 октября 2025 г. в 02:26</b> (ночь), 542 коммита и аудит нерабочих часов по производственному календарю РФ.
             </p>
           </div>
 
@@ -361,7 +370,7 @@ const Project: React.FC = () => {
                   Юридический аудит времени: Разработка во внерабочие часы
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Поминутный анализ всех <b>542 коммитов</b> Git. Доказательство того, что разработка велась в личное время (ночи, вечера, выходные).
+                  Поминутный анализ всех <b>542 коммитов</b> Git с учетом <b>официального производственного календаря РФ</b> (праздники 1–8 янв, 23 фев, 8 мар, 1–4 мая, 9–11 мая, 12 июня, сб/вс).
                 </CardDescription>
               </div>
 
@@ -390,11 +399,11 @@ const Project: React.FC = () => {
                   {GIT_AUDIT_SUMMARY.offHours} <span className="text-sm font-semibold">часов</span>
                 </p>
                 <p className="text-[11px] text-muted-foreground leading-snug">
-                  <b>{GIT_AUDIT_SUMMARY.offCommits} из 542 коммитов</b> сделаны глубокой ночью (с 00:00), ранним утром, поздним вечером или в выходные дни (Сб/Вс).
+                  <b>{GIT_AUDIT_SUMMARY.offCommits} из 542 коммитов</b> сделаны в праздничные дни РФ (1–4 мая, 9–11 мая, новогодние каникулы), субботы, воскресенья, ночи и вечера.
                 </p>
               </div>
 
-              {/* Рабочее окно (Будни 09:00 - 17:00) */}
+              {/* Рабочее окно (Обычные будни 09:00 - 17:00) */}
               <div className="p-4 rounded-xl border border-border/60 bg-muted/20 space-y-1.5">
                 <div className="flex items-center justify-between text-xs font-bold text-amber-700 dark:text-amber-300">
                   <span className="flex items-center gap-1.5">
@@ -407,7 +416,7 @@ const Project: React.FC = () => {
                   {GIT_AUDIT_SUMMARY.workHours} <span className="text-sm font-semibold">часов</span>
                 </p>
                 <p className="text-[11px] text-muted-foreground leading-snug">
-                  <b>{GIT_AUDIT_SUMMARY.workCommits} коммитов</b> (точечные фиксы, обеденные перерывы, дни отпусков). Все зафиксированы с точностью до минуты.
+                  <b>{GIT_AUDIT_SUMMARY.workCommits} коммитов</b> (точечные хотфиксы, обеденное время, отпуска). Зафиксированы с точностью до минуты.
                 </p>
               </div>
 
@@ -424,7 +433,7 @@ const Project: React.FC = () => {
                   14.10.2025 <span className="text-sm">02:26</span>
                 </p>
                 <p className="text-[11px] text-muted-foreground leading-snug">
-                  Проект начат <b>глубокой ночью в 02:26</b> во вторник, 14 октября 2025 года (внерабочее время).
+                  Проект начат <b>глубокой ночью в 02:26</b> во вторник, 14 октября 2025 года (нерабочее время).
                 </p>
               </div>
             </div>
@@ -456,47 +465,25 @@ const Project: React.FC = () => {
               </div>
             </div>
 
-            {/* Детализация по 5 категориям времени суток */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
-              <div className="p-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-1">
-                <span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
-                  <Moon className="h-3 w-3 text-emerald-600" /> Ночь (00–06)
+            {/* Детализация по 6 категориям (включая государственные праздники РФ) */}
+            <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 text-xs">
+              {/* Праздники РФ */}
+              <div className="p-2.5 rounded-xl border border-rose-500/40 bg-rose-500/10 space-y-1">
+                <span className="text-[10px] text-rose-700 dark:text-rose-300 font-bold flex items-center gap-1">
+                  <Flag className="h-3 w-3 text-rose-600 shrink-0" /> Праздники РФ
                 </span>
-                <p className="font-mono font-bold text-foreground">
-                  {GIT_AUDIT_SUMMARY.byCategory.night.hours} ч
+                <p className="font-mono font-black text-rose-600 dark:text-rose-400">
+                  {GIT_AUDIT_SUMMARY.byCategory.holiday.hours} ч
                 </p>
                 <p className="text-[10px] text-muted-foreground">
-                  {GIT_AUDIT_SUMMARY.byCategory.night.count} коммитов
+                  {GIT_AUDIT_SUMMARY.byCategory.holiday.count} коммитов
                 </p>
               </div>
 
+              {/* Выходные */}
               <div className="p-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-1">
                 <span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
-                  <Sunrise className="h-3 w-3 text-emerald-600" /> Утро (06–09)
-                </span>
-                <p className="font-mono font-bold text-foreground">
-                  {GIT_AUDIT_SUMMARY.byCategory.morning.hours} ч
-                </p>
-                <p className="text-[10px] text-muted-foreground">
-                  {GIT_AUDIT_SUMMARY.byCategory.morning.count} коммитов
-                </p>
-              </div>
-
-              <div className="p-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-1">
-                <span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
-                  <Sunset className="h-3 w-3 text-emerald-600" /> Вечер (17–00)
-                </span>
-                <p className="font-mono font-bold text-foreground">
-                  {GIT_AUDIT_SUMMARY.byCategory.evening.hours} ч
-                </p>
-                <p className="text-[10px] text-muted-foreground">
-                  {GIT_AUDIT_SUMMARY.byCategory.evening.count} коммитов
-                </p>
-              </div>
-
-              <div className="p-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-1">
-                <span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
-                  <Calendar className="h-3 w-3 text-emerald-600" /> Выходные (Сб/Вс)
+                  <Calendar className="h-3 w-3 text-emerald-600 shrink-0" /> Выходные (Сб/Вс)
                 </span>
                 <p className="font-mono font-bold text-foreground">
                   {GIT_AUDIT_SUMMARY.byCategory.weekend.hours} ч
@@ -506,9 +493,49 @@ const Project: React.FC = () => {
                 </p>
               </div>
 
-              <div className="p-2.5 rounded-xl border border-amber-500/30 bg-amber-500/5 space-y-1 col-span-2 sm:col-span-1">
+              {/* Ночь */}
+              <div className="p-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-1">
                 <span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
-                  <Sun className="h-3 w-3 text-amber-600" /> Будни (09–17)
+                  <Moon className="h-3 w-3 text-emerald-600 shrink-0" /> Ночь (00–06)
+                </span>
+                <p className="font-mono font-bold text-foreground">
+                  {GIT_AUDIT_SUMMARY.byCategory.night.hours} ч
+                </p>
+                <p className="text-[10px] text-muted-foreground">
+                  {GIT_AUDIT_SUMMARY.byCategory.night.count} коммитов
+                </p>
+              </div>
+
+              {/* Утро */}
+              <div className="p-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-1">
+                <span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
+                  <Sunrise className="h-3 w-3 text-emerald-600 shrink-0" /> Утро (06–09)
+                </span>
+                <p className="font-mono font-bold text-foreground">
+                  {GIT_AUDIT_SUMMARY.byCategory.morning.hours} ч
+                </p>
+                <p className="text-[10px] text-muted-foreground">
+                  {GIT_AUDIT_SUMMARY.byCategory.morning.count} коммитов
+                </p>
+              </div>
+
+              {/* Вечер */}
+              <div className="p-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-1">
+                <span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
+                  <Sunset className="h-3 w-3 text-emerald-600 shrink-0" /> Вечер (17–00)
+                </span>
+                <p className="font-mono font-bold text-foreground">
+                  {GIT_AUDIT_SUMMARY.byCategory.evening.hours} ч
+                </p>
+                <p className="text-[10px] text-muted-foreground">
+                  {GIT_AUDIT_SUMMARY.byCategory.evening.count} коммитов
+                </p>
+              </div>
+
+              {/* Будни */}
+              <div className="p-2.5 rounded-xl border border-amber-500/30 bg-amber-500/5 space-y-1">
+                <span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
+                  <Sun className="h-3 w-3 text-amber-600 shrink-0" /> Будни (09–17)
                 </span>
                 <p className="font-mono font-bold text-foreground">
                   {GIT_AUDIT_SUMMARY.byCategory.work_hours.hours} ч
@@ -520,13 +547,13 @@ const Project: React.FC = () => {
             </div>
 
             {/* -------------------------------------------------------------- */}
-            {/* ИНТЕРАКТИВНЫЙ КАЛЕНДАРЬ РАЗРАБОТКИ                            */}
+            {/* ИНТЕРАКТИВНЫЙ КАЛЕНДАРЬ РАЗРАБОТКИ С ГОС. ПРАЗДНИКАМИ РФ       */}
             {/* -------------------------------------------------------------- */}
             <div className="pt-3 border-t border-border/40 space-y-3">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <h3 className="text-sm font-bold flex items-center gap-2 text-foreground">
                   <Calendar className="h-4 w-4 text-primary" />
-                  Интерактивный календарь коммитов по дням
+                  Интерактивный календарь с производственным календарем РФ
                 </h3>
 
                 {/* Выбор месяца */}
@@ -549,15 +576,19 @@ const Project: React.FC = () => {
               {/* Легенда цветов */}
               <div className="flex items-center gap-4 flex-wrap text-[11px] text-muted-foreground">
                 <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-sm bg-rose-500 inline-block" />
+                  Официальный государственный праздник РФ (Нерабочий день)
+                </span>
+                <span className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block" />
                   Только внерабочее время (ночи/вечера или Сб/Вс)
                 </span>
                 <span className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-sm bg-amber-500 inline-block" />
-                  Есть коммиты в интервале 09:00–17:00 (будни)
+                  Есть коммиты в интервале 09:00–17:00 (обычные будни)
                 </span>
                 <span className="flex items-center gap-1.5 text-primary font-medium">
-                  💡 Нажмите на любой день, чтобы открыть поминутный протокол
+                  💡 Нажмите на день для поминутного протокола
                 </span>
               </div>
 
@@ -578,7 +609,7 @@ const Project: React.FC = () => {
                 <div className="grid grid-cols-7 gap-px bg-border/40">
                   {calendarGrid.map((cell, idx) => {
                     if (cell.dayNum === null) {
-                      return <div key={`empty-${idx}`} className="bg-background min-h-[56px] opacity-25" />;
+                      return <div key={`empty-${idx}`} className="bg-background min-h-[58px] opacity-25" />;
                     }
 
                     const hasData = !!cell.data;
@@ -594,24 +625,40 @@ const Project: React.FC = () => {
                             setSelectedDayDate(selectedDayDate === cell.dateStr ? null : cell.dateStr);
                           }
                         }}
-                        className={`p-1.5 text-left min-h-[56px] transition-all flex flex-col justify-between relative ${
+                        className={`p-1.5 text-left min-h-[58px] transition-all flex flex-col justify-between relative ${
                           isSelected 
                             ? "ring-2 ring-primary bg-primary/10 z-10" 
-                            : hasData 
-                              ? "bg-background hover:bg-muted/30 cursor-pointer" 
-                              : "bg-background/60 opacity-60 cursor-default"
+                            : cell.isHoliday
+                              ? "bg-rose-500/5 hover:bg-rose-500/10 cursor-pointer"
+                              : hasData 
+                                ? "bg-background hover:bg-muted/30 cursor-pointer" 
+                                : "bg-background/60 opacity-60 cursor-default"
                         }`}
                       >
                         <div className="flex items-center justify-between w-full">
-                          <span className={`text-xs font-bold ${cell.isWeekend ? "text-rose-500" : "text-foreground"}`}>
+                          <span className={`text-xs font-bold flex items-center gap-1 ${
+                            cell.isHoliday 
+                              ? "text-rose-600 dark:text-rose-400 font-black" 
+                              : cell.isWeekend 
+                                ? "text-rose-500" 
+                                : "text-foreground"
+                          }`}>
                             {cell.dayNum}
+                            {cell.isHoliday && <Flag className="h-2.5 w-2.5 text-rose-500 inline shrink-0" />}
                           </span>
+
                           {hasData && (
                             <span className="text-[10px] font-mono text-muted-foreground font-bold">
                               {cell.data?.totalCommits} комм.
                             </span>
                           )}
                         </div>
+
+                        {cell.isHoliday && (
+                          <div className="text-[8px] text-rose-600 dark:text-rose-400 font-semibold truncate leading-tight mt-0.5" title={cell.holidayName || ""}>
+                            {cell.holidayName?.split(" ")[0]}
+                          </div>
+                        )}
 
                         {hasData && (
                           <div className="mt-1">
@@ -637,9 +684,14 @@ const Project: React.FC = () => {
                 <div className="p-4 rounded-xl border-2 border-primary/50 bg-primary/5 space-y-3 animate-in fade-in">
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <h4 className="text-sm font-bold text-foreground flex items-center gap-2">
+                      <h4 className="text-sm font-bold text-foreground flex items-center gap-2 flex-wrap">
                         <span>📅 Протокол за {activeDayData.date} ({activeDayData.dayOfWeek})</span>
-                        {activeDayData.isWeekend && (
+                        {activeDayData.isHoliday && (
+                          <Badge className="text-[10px] bg-rose-500/20 text-rose-700 dark:text-rose-300 border-rose-400/30">
+                            🚩 {activeDayData.holidayName} (Нерабочий день РФ)
+                          </Badge>
+                        )}
+                        {activeDayData.isWeekend && !activeDayData.isHoliday && (
                           <Badge variant="outline" className="text-[10px] text-rose-500 border-rose-300">
                             Выходной день
                           </Badge>
@@ -738,7 +790,7 @@ const Project: React.FC = () => {
                       auditFilter === "off_hours" ? "bg-emerald-500 text-white shadow-xs" : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    🟢 Личное время (323)
+                    🟢 Личное время (351)
                   </button>
 
                   <button
@@ -748,7 +800,7 @@ const Project: React.FC = () => {
                       auditFilter === "work_hours" ? "bg-amber-500 text-white shadow-xs" : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    🟡 Рабочие часы (219)
+                    🟡 Рабочие часы (191)
                   </button>
                 </div>
               </div>
@@ -770,7 +822,11 @@ const Project: React.FC = () => {
                           <span className="font-mono text-primary font-bold text-[11px] bg-primary/10 px-1.5 py-0.5 rounded">
                             {item.hash}
                           </span>
-                          {item.isWorkTime ? (
+                          {item.isHoliday ? (
+                            <Badge className="text-[10px] py-0 px-1.5 bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-400/30">
+                              🚩 {item.catLabel}
+                            </Badge>
+                          ) : item.isWorkTime ? (
                             <Badge className="text-[10px] py-0 px-1.5 bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-400/30">
                               🟡 {item.catLabel}
                             </Badge>
@@ -793,6 +849,96 @@ const Project: React.FC = () => {
               </div>
             </div>
 
+          </CardContent>
+        </Card>
+
+        {/* ================================================================== */}
+        {/* ПРЯМЫЕ ФИНАНСОВЫЕ РАСХОДЫ АВТОРА (AI-ПОДПИСКИ И СЕРВЕРЫ)          */}
+        {/* ================================================================== */}
+        <Card className="rounded-2xl border-border/60 shadow-xs card-print text-left">
+          <CardHeader className="pb-3 border-b border-border/30">
+            <CardTitle className="text-base sm:text-lg font-bold flex items-center justify-between flex-wrap gap-2">
+              <span className="flex items-center gap-2">
+                <DollarSign className="h-5 w-5 text-emerald-500 shrink-0" />
+                Прямые финансовые расходы автора: AI-инструменты и серверная инфраструктура
+              </span>
+              <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-400/30 text-xs font-mono font-bold">
+                {rub(EXPENSES_TOTAL_PERIOD)} за 12 месяцев
+              </Badge>
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Регулярные ежемесячные оплаты из личных средств автора на обеспечение процесса разработки и независимости платформы.
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent className="pt-4 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Gemini AI */}
+              <div className="p-3.5 rounded-xl border border-border/60 bg-muted/15 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                    <Bot className="h-4 w-4 text-blue-500" />
+                    Gemini AI (Google)
+                  </span>
+                  <Badge variant="outline" className="text-[10px]">Подписка</Badge>
+                </div>
+                <p className="text-lg font-black font-mono text-primary pt-1">
+                  {rub(EXPENSES_GEMINI_MONTHLY)} <span className="text-xs font-normal text-muted-foreground">/ мес</span>
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  За 12 месяцев: <b>{rub(EXPENSES_GEMINI_MONTHLY * TOTAL_MONTHS_DEV)}</b>
+                </p>
+              </div>
+
+              {/* Claude AI */}
+              <div className="p-3.5 rounded-xl border border-border/60 bg-muted/15 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                    <Sparkles className="h-4 w-4 text-amber-500" />
+                    Claude AI (Anthropic)
+                  </span>
+                  <Badge variant="outline" className="text-[10px]">Подписка</Badge>
+                </div>
+                <p className="text-lg font-black font-mono text-primary pt-1">
+                  {rub(EXPENSES_CLAUDE_MONTHLY)} <span className="text-xs font-normal text-muted-foreground">/ мес</span>
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  За 12 месяцев: <b>{rub(EXPENSES_CLAUDE_MONTHLY * TOTAL_MONTHS_DEV)}</b>
+                </p>
+              </div>
+
+              {/* VPN Server */}
+              <div className="p-3.5 rounded-xl border border-border/60 bg-muted/15 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                    <Server className="h-4 w-4 text-purple-500" />
+                    Выделенный сервер VPN
+                  </span>
+                  <Badge variant="outline" className="text-[10px]">Инфраструктура</Badge>
+                </div>
+                <p className="text-lg font-black font-mono text-primary pt-1">
+                  {rub(EXPENSES_VPN_SERVER_MONTHLY)} <span className="text-xs font-normal text-muted-foreground">/ мес</span>
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  За 12 месяцев: <b>{rub(EXPENSES_VPN_SERVER_MONTHLY * TOTAL_MONTHS_DEV)}</b>
+                </p>
+              </div>
+            </div>
+
+            {/* Итоговая полоса расходов */}
+            <div className="p-3.5 rounded-xl bg-muted/30 border border-border/50 flex items-center justify-between flex-wrap gap-2 text-xs">
+              <span className="text-muted-foreground">
+                Суммарные прямые расходы в месяц: <b className="text-foreground">{rub(EXPENSES_TOTAL_MONTHLY)} / мес</b>
+              </span>
+              <span className="font-mono font-black text-emerald-600 dark:text-emerald-400 text-sm sm:text-base">
+                Итого за 1 год разработки: {rub(EXPENSES_TOTAL_PERIOD)}
+              </span>
+            </div>
+
+            {/* Юридическая сноска автора */}
+            <p className="text-[11px] text-muted-foreground/80 leading-relaxed italic border-l-2 border-primary/40 pl-3">
+              💡 <b>Заметка автора:</b> {EXPENSES_NOTE}
+            </p>
           </CardContent>
         </Card>
 
@@ -882,7 +1028,7 @@ const Project: React.FC = () => {
               <p className="text-xl sm:text-2xl font-black mt-2 tracking-tight text-purple-600 dark:text-purple-400">
                 {stats.totalHours} часов
               </p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">экспертный объем разработки</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">экспертный объем платформы</p>
             </CardContent>
           </Card>
 
@@ -1000,16 +1146,32 @@ const Project: React.FC = () => {
                     </td>
                   </tr>
 
+                  <tr>
+                    <td className="py-2.5 px-3 font-medium">
+                      Прямые расходы автора на инструменты (Gemini, Claude, VPN)
+                      <span className="block text-[10px] text-muted-foreground">12 месяцев ежемесячных оплат из личных средств (3 338 ₽/мес)</span>
+                    </td>
+                    <td className="py-2.5 px-3 font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                      {rub(EXPENSES_TOTAL_PERIOD)}
+                    </td>
+                    <td className="py-2.5 px-3 font-mono font-bold text-blue-600 dark:text-blue-400">
+                      {rub(EXPENSES_TOTAL_PERIOD)}
+                    </td>
+                    <td className="py-2.5 px-3 font-mono font-bold text-right text-muted-foreground">
+                      0 ₽
+                    </td>
+                  </tr>
+
                   <tr className="bg-primary/5 font-black text-sm">
                     <td className="py-3 px-3 text-foreground">
                       ИТОГОВАЯ ОЦЕНКА ПЛАТФОРМЫ «ДОМОФОНДАР»
                       <span className="block text-[10px] text-muted-foreground font-normal">1 год непрерывной разработки (14.10.2025 — 02.10.2026)</span>
                     </td>
                     <td className="py-3 px-3 font-mono text-emerald-600 dark:text-emerald-400">
-                      {rub(stats.juniorTotal)}
+                      {rub(stats.juniorTotal + EXPENSES_TOTAL_PERIOD)}
                     </td>
                     <td className="py-3 px-3 font-mono text-blue-600 dark:text-blue-400">
-                      {rub(stats.marketTotal)}
+                      {rub(stats.marketTotal + EXPENSES_TOTAL_PERIOD)}
                     </td>
                     <td className="py-3 px-3 font-mono text-right text-primary">
                       +{rub(stats.diff)}
@@ -1026,10 +1188,10 @@ const Project: React.FC = () => {
               </p>
               <p>
                 Даже если оценивать проект по предельно низкой ставке начинающего стажера (<b>{JUNIOR_HOURLY_RATE} ₽/час</b>), 
-                созданная кодовая база представляет собой самостоятельный цифровой актив стоимостью <b>{rub(stats.juniorTotal)}</b>.
+                созданная кодовая база представляет собой самостоятельный цифровой актив стоимостью <b>{rub(stats.juniorTotal + EXPENSES_TOTAL_PERIOD)}</b>.
               </p>
               <p>
-                В случае обращения в коммерческую IT-студию разработка аналогичного комплекса под ключ с 542 коммитами и интеграцией платежей обошлась бы компании в <b>{rub(stats.marketTotal)}</b>. 
+                В случае обращения в коммерческую IT-студию разработка аналогичного комплекса под ключ с 542 коммитами и интеграцией платежей обошлась бы компании в <b>{rub(stats.marketTotal + EXPENSES_TOTAL_PERIOD)}</b>. 
                 Реализация платформы собственными силами сберегла <b>{rub(stats.diff)}</b>.
               </p>
             </div>
@@ -1072,9 +1234,9 @@ const Project: React.FC = () => {
             </div>
 
             <div className="p-3 rounded-xl bg-muted/30 border border-border/40 flex items-center justify-between flex-wrap gap-2 text-xs">
-              <span className="text-muted-foreground">Оценочная стоимость системы при ставке <b>{customRate} ₽/ч</b>:</span>
+              <span className="text-muted-foreground">Оценочная стоимость системы при ставке <b>{customRate} ₽/ч</b> (+ AI и серверы):</span>
               <span className="font-mono font-black text-primary text-base">
-                {rub(stats.customTotal)}
+                {rub(stats.customTotal + EXPENSES_TOTAL_PERIOD)}
               </span>
             </div>
           </CardContent>

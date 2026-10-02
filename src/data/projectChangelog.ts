@@ -43,6 +43,24 @@ export const GITHUB_FIRST_COMMIT_HASH = "c2cfbfc"; // Первый коммит 
 export const TOTAL_GIT_COMMITS = 542; // Всего коммитов в Git
 export const TOTAL_MONTHS_DEV = 12; // Срок разработки платформы (ровно 1 год)
 
+// ==============================================================================
+// ПРЯМЫЕ ФИНАНСОВЫЕ РАСХОДЫ АВТОРА НА ИНФРАСТРУКТУРУ И AI-ИНСТРУМЕНТЫ
+// ==============================================================================
+export const EXPENSES_GEMINI_MONTHLY = 699;      // Подписка Gemini AI (699 ₽/мес)
+export const EXPENSES_CLAUDE_MONTHLY = 2289;     // Подписка Claude AI (2 289 ₽/мес)
+export const EXPENSES_VPN_SERVER_MONTHLY = 350;  // Аренда выделенного сервера под VPN (350 ₽/мес)
+
+// Суммарные затраты автора в месяц
+export const EXPENSES_TOTAL_MONTHLY = 
+  EXPENSES_GEMINI_MONTHLY + EXPENSES_CLAUDE_MONTHLY + EXPENSES_VPN_SERVER_MONTHLY; // 3 338 ₽/мес
+
+// Суммарные затраты за весь 12-месячный период разработки
+export const EXPENSES_TOTAL_PERIOD = EXPENSES_TOTAL_MONTHLY * TOTAL_MONTHS_DEV; // 40 056 ₽
+
+// Примечание автора о неначисленном времени на администрирование
+export const EXPENSES_NOTE = 
+  "Оплаты производились ежемесячно из личных средств. В сумму не включены сотни часов, затраченные автором на установку, самостоятельную настройку и администрирование серверного программного обеспечения и VPN.";
+
 export type Kind = "feature" | "fix" | "improvement" | "infra";
 export type ProjectModule = 
   | "crm_fsm" 
@@ -88,6 +106,16 @@ export const KIND_META: Record<Kind, { label: string; badgeCls: string }> = {
  * Записи добавляются сверху вниз (самые свежие первыми).
  */
 export const PROJECT_CHANGELOG: ProjectEntry[] = [
+  {
+    id: "stage-2026-10-02-2225",
+    datetime: "2026-10-02 22:25",
+    title: "Интеграция производственного календаря РФ (гос. праздники) и учет расходов на AI/VPN",
+    description: "Внедрение официального производственного календаря РФ в аудит рабочего времени: 40 коммитов (1–4 мая, 9–11 мая, 1–8 янв) переведены в нерабочие праздничные дни, доля личного времени выросла до 64.8% (351 коммит, 143.8 ч). Оцифровка прямых расходов автора на Gemini AI (699 ₽/мес), Claude AI (2 289 ₽/мес) и VPN-сервер (350 ₽/мес) — 40 056 ₽ за 12 месяцев.",
+    module: "security_audit",
+    kind: "improvement",
+    hours: 6,
+    difficulty: "Средняя",
+  },
   {
     id: "stage-2026-10-02-2135",
     datetime: "2026-10-02 21:35",
