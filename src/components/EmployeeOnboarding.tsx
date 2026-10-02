@@ -29,6 +29,41 @@ interface EmployeeOnboardingProps {
   onCompleted?: () => void;
 }
 
+// Сжатие фото в браузере: уменьшаем до maxDim и переводим в JPEG,
+// чтобы итоговый файл был небольшим (nginx режет тело запроса > ~1 МБ).
+async function compressImage(src: Blob, maxDim = 1000, quality = 0.82): Promise<Blob> {
+  try {
+    const dataUrl: string = await new Promise((res, rej) => {
+      const fr = new FileReader();
+      fr.onload = () => res(fr.result as string);
+      fr.onerror = () => rej(new Error("read error"));
+      fr.readAsDataURL(src);
+    });
+    const img: HTMLImageElement = await new Promise((res, rej) => {
+      const im = new Image();
+      im.onload = () => res(im);
+      im.onerror = () => rej(new Error("image error"));
+      im.src = dataUrl;
+    });
+    let w = img.naturalWidth || img.width;
+    let h = img.naturalHeight || img.height;
+    if (Math.max(w, h) > maxDim) {
+      const s = maxDim / Math.max(w, h);
+      w = Math.round(w * s);
+      h = Math.round(h * s);
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return src;
+    ctx.drawImage(img, 0, 0, w, h);
+    const blob: Blob | null = await new Promise((res) => canvas.toBlob((b) => res(b), "image/jpeg", quality));
+    return blob || src;
+  } catch {
+    return src; // при любой ошибке — грузим как есть
+  }
+}
+
 export const EmployeeOnboarding = ({ userId, open, blocking = false, onClose, onCompleted }: EmployeeOnboardingProps) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -188,9 +223,9 @@ export const EmployeeOnboarding = ({ userId, open, blocking = false, onClose, on
       // Если выбран новый снимок/файл — загружаем его и получаем URL
       let photoUrl: string | null = existingPhotoUrl;
       if (photoBlob) {
-        const named = photoBlob instanceof File
-          ? photoBlob
-          : new File([photoBlob], `selfie_${Date.now()}.jpg`, { type: "image/jpeg" });
+        // Сжимаем перед загрузкой, чтобы уложиться в лимит сервера
+        const compressed = await compressImage(photoBlob);
+        const named = new File([compressed], `employee_${Date.now()}.jpg`, { type: "image/jpeg" });
         photoUrl = await uploadFile(named, "employees");
       }
 
