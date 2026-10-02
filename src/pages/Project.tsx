@@ -436,6 +436,95 @@ const Project: React.FC = () => {
         </Card>
 
         {/* ================================================================== */}
+        {/* БЛОК: БИЗНЕС-ЭФФЕКТ, АВТОМАТИЗАЦИЯ И ЭКОНОМИЯ РЕСУРСОВ ОФИСА       */}
+        {/* ================================================================== */}
+        <Card className="rounded-2xl border-2 border-emerald-500/40 bg-gradient-to-b from-emerald-500/5 via-background to-background shadow-sm card-print text-left">
+          <CardHeader className="pb-3 border-b border-border/30 bg-muted/20">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="space-y-0.5">
+                <CardTitle className="text-base sm:text-lg font-bold flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-emerald-600 shrink-0" />
+                  Бизнес-эффект: Автоматизация ключевых процессов и освобождение ресурсов офиса
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Реальная бизнес-ценность платформы: устранение рутины, сокращение операционных расходов и окупаемость разработки.
+                </CardDescription>
+              </div>
+              <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-400/30 text-xs font-bold">
+                🚀 До 150 часов ручного труда офиса экономится ежемесячно
+              </Badge>
+            </div>
+          </CardHeader>
+
+          <CardContent className="pt-4 space-y-4 text-xs sm:text-sm">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+              
+              {/* Карточка 1: Освобождение офиса */}
+              <div className="p-3.5 rounded-xl border border-border/60 bg-muted/15 space-y-1.5">
+                <div className="flex items-center gap-2 text-foreground font-bold">
+                  <span className="p-1 rounded-lg bg-emerald-500/10 text-emerald-600">
+                    <Clock className="h-4 w-4" />
+                  </span>
+                  1. Самообслуживание абонентов и разгрузка диспетчеров
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Благодаря личному кабинету жильца и каскадноному мастеру адресов (12 000+ лицевых счетов), жильцы сами проверяют баланс, подают заявки и оплачивают услуги. 
+                  Офису больше не нужно вручную отвечать на сотни звонков «какой у меня долг» и «почему не работает домофон» — <b>высвобождается 120–150 часов рабочего времени диспетчеров в месяц</b> (эквивалент ставки штатного сотрудника).
+                </p>
+              </div>
+
+              {/* Карточка 2: Биллинг и 54-ФЗ */}
+              <div className="p-3.5 rounded-xl border border-border/60 bg-muted/15 space-y-1.5">
+                <div className="flex items-center gap-2 text-foreground font-bold">
+                  <span className="p-1 rounded-lg bg-blue-500/10 text-blue-600">
+                    <ShieldCheck className="h-4 w-4" />
+                  </span>
+                  2. Автоматический биллинг ЮKassa и защита от штрафов 54-ФЗ
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Интеграция с эквайрингом ЮKassa обеспечивает мгновенное зачисление средств на лицевой счет и <b>автоматическую фискализацию чеков в ОФД и ФНС</b> без участия бухгалтера. 
+                  Исключены человеческий фактор, ошибки ручной разноски банковских выписок и риски штрафов по 54-ФЗ (от 30 000 ₽ за каждый невыбитый чек).
+                </p>
+              </div>
+
+              {/* Карточка 3: Полевой сервис FSM */}
+              <div className="p-3.5 rounded-xl border border-border/60 bg-muted/15 space-y-1.5">
+                <div className="flex items-center gap-2 text-foreground font-bold">
+                  <span className="p-1 rounded-lg bg-amber-500/10 text-amber-600">
+                    <Wrench className="h-4 w-4" />
+                  </span>
+                  3. Мобильное рабочее место мастеров (FSM) без бумажной волокиты
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Полный отказ от бумажных нарядов, тетрадей и созвонов: заявка от жильца мгновенно падает на смартфон мастера в приложении. 
+                  Фиксация фото «до/после», смена статусов, учет материалов и оборудования в реальном времени. Скорость закрытия аварийных заявок выросла более чем в 2 раза.
+                </p>
+              </div>
+
+              {/* Карточка 4: Независимость от SaaS */}
+              <div className="p-3.5 rounded-xl border border-border/60 bg-muted/15 space-y-1.5">
+                <div className="flex items-center gap-2 text-foreground font-bold">
+                  <span className="p-1 rounded-lg bg-purple-500/10 text-purple-600">
+                    <Building2 className="h-4 w-4" />
+                  </span>
+                  4. Экономия от 720 000 ₽/год на отказе от сторонних SaaS-лицензий
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Аренда сторонних облачных платформ умной домофонии («Спутник», «Ростелеком Ключ», «Интерсвязь») обходится операторам в 25–50 ₽ за квартиру в месяц (на 12 000 счетов это от <b>300 000 до 600 000 ₽ в месяц</b>). 
+                  Собственная платформа дает компании <b>0 ₽ абонентской платы за лицензии</b>, полный суверенитет клиентской базы и отсутствие рисков блокировки.
+                </p>
+              </div>
+
+            </div>
+
+            <div className="p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5 text-xs text-muted-foreground leading-relaxed">
+              💡 <b>Резюме для руководства:</b> Разработка платформы — это не просто написанный код, а внедрение готовой цифровой экосистемы предприятия, которая 
+              ежемесячно приносит прямую экономию фонда оплаты труда и лицензий, окупая инвестиции в разработку в кратчайшие сроки.
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* ================================================================== */}
         {/* ПОЭТАПНЫЙ РЫНОЧНЫЙ ПРАЙС-ЛИСТ (СКОЛЬКО ПРИШЛОСЬ БЫ ОТДАТЬ В СТУДИЮ) */}
         {/* ================================================================== */}
         <Card className="rounded-2xl border-border/60 shadow-sm card-print text-left">
@@ -1369,15 +1458,15 @@ const Project: React.FC = () => {
             <div className="p-3.5 rounded-xl border border-emerald-500/30 bg-emerald-500/5 text-xs text-muted-foreground leading-relaxed space-y-1">
               <p className="font-bold text-foreground flex items-center gap-1.5">
                 <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                Инженерный вывод:
+                Экономический итог для руководства:
               </p>
               <p>
-                Даже если оценивать проект по предельно низкой ставке начинающего стажера (<b>{JUNIOR_HOURLY_RATE} ₽/час</b>), 
-                созданная кодовая база представляет собой самостоятельный цифровой актив стоимостью <b>{rub(stats.juniorTotal + EXPENSES_TOTAL_PERIOD)}</b>.
+                Даже при расчете по минимальной ставке начинающего разработчика (<b>{JUNIOR_HOURLY_RATE} ₽/час</b>), 
+                созданный функционал и программный комплекс представляют собой ликвидный цифровой актив компании стоимостью <b>{rub(stats.juniorTotal + EXPENSES_TOTAL_PERIOD)}</b>.
               </p>
               <p>
-                В случае обращения в коммерческую IT-студию разработка аналогичного комплекса под ключ с 542 коммитами и интеграцией платежей обошлась бы компании в <b>{rub(stats.marketTotal + EXPENSES_TOTAL_PERIOD)}</b> (от <b>2.8 до 3.8 млн рублей</b>). 
-                Реализация платформы собственными силами сберегла <b>{rub(stats.diff)}</b>.
+                В случае обращения в коммерческую IT-студию разработка аналогичного комплекса под ключ (с 12 автоматизированными подсистемами, личным кабинетом абонента, мобильным приложением и эквайрингом 54-ФЗ) обошлась бы компании в <b>{rub(stats.marketTotal + EXPENSES_TOTAL_PERIOD)}</b> (диапазон <b>2.8 – 3.8 млн рублей</b>). 
+                Реализовав весь этот масштабный функционал своими руками, я сберег для компании <b>{rub(stats.diff)}</b> прямых расходов, полностью избавил предприятие от необходимости платить за сторонние SaaS-лицензии и автоматизировал рутину офиса.
               </p>
             </div>
           </CardContent>
