@@ -17,19 +17,21 @@ jobs:
       - name: 🚚 Checkout кодовой базы
         uses: actions/checkout@v4
 
-      - name: 🧹 Исключение несерверных и тяжелых файлов из деплоя
-        run: rm -rf mobile .git dist apk_android "Claude outputs" media/app
+      - name: 📦 Упаковка серверного проекта в единый архив
+        run: |
+          tar --exclude='./mobile' --exclude='./.git' --exclude='./dist' --exclude='./node_modules' --exclude='./apk_android' --exclude='./Claude outputs' --exclude='./media/app' -czf deploy_bundle.tar.gz .
+          ls -lh deploy_bundle.tar.gz
 
-      - name: 📂 Копирование файлов на сервер по SSH
+      - name: 📂 Передача архива на сервер по SSH
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
-          source: "."
-          target: "/opt/domofondar"
+          source: "deploy_bundle.tar.gz"
+          target: "/tmp"
 
-      - name: 🚀 Развертывание Docker Compose на сервере
+      - name: 🚀 Распаковка и перезапуск Docker на сервере
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -37,7 +39,10 @@ jobs:
           password: ${{ secrets.VPS_PASSWORD }}
           script: |
             set -e
-            echo "[CI/CD] Переход в директорию проекта /opt/domofondar..."
+            echo "[CI/CD] Распаковка обновлений в /opt/domofondar..."
+            mkdir -p /opt/domofondar
+            tar -xzf /tmp/deploy_bundle.tar.gz -C /opt/domofondar
+            rm -f /tmp/deploy_bundle.tar.gz
             cd /opt/domofondar
 
             # 1. Проверяем наличие Docker
