@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo, useRef, Component, ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { streetQuery, aptDigits, matchAccount } from "@/lib/addressMatch";
 import { notify } from "@/lib/notify";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -411,6 +412,35 @@ const DebtCard = ({
         }
       } else {
         setHouseServed(false);
+      }
+
+      // ДОП. ПОДБОР СЧЁТА (устойчивый матчер): ловит форматы, которые основной перебор мог пропустить
+      // ("ул Казбекская", корпуса "д. 3к1"/"д. 3, корп. 1", "им. генерала ..."). Точечный запрос: улица + №квартиры.
+      if (!best) {
+        try {
+          const stq = streetQuery(address);
+          const aptN = aptDigits(apartment || "", address);
+          if (stq && aptN) {
+            const { data: accs2 } = await supabase
+              .from("accounts")
+              .select("account_number, period, debt_amount, address, apartment, tariff_name, tariff_price, has_handset, has_lk, is_smart_home, status, contract_terminated")
+              .ilike("address", `%${stq}%`)
+              .eq("apartment", aptN)
+              .order("period", { ascending: false })
+              .limit(50);
+            const accNum = matchAccount({ address, apartment }, accs2 || []);
+            if (accNum) {
+              best = (accs2 || []).find((a: any) => a.account_number === accNum) || null;
+              if (best) {
+                const cd = Number(best.debt_amount) || 0;
+                setPayAmount(cd > 0 ? cd.toFixed(2) : "300");
+                console.log(`[Баланс] Доп. подбор: найден счёт ${best.account_number} по адресу.`);
+              }
+            }
+          }
+        } catch (e) {
+          console.warn("[Баланс] Доп. подбор счёта не удался:", e);
+        }
       }
 
       // ФОЛБЭК ПО НАШЕМУ ФОНДУ: даже если в базе 1С счёт/дом не нашлись,

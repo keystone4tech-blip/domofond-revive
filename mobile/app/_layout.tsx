@@ -9,6 +9,7 @@ import { useColorScheme, View, ActivityIndicator } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useAuthStore } from '@/store/auth.store';
+import { UpdateCheckerModal } from '@/components/UpdateCheckerModal';
 
 // Инициализация клиента кэширования серверных запросов
 const queryClient = new QueryClient({
@@ -84,6 +85,8 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         </Stack>
         <StatusBar style="light" backgroundColor="#0F172A" />
+        {/* Глобальное модальное окно автопроверки и установки обновлений приложения */}
+        <UpdateCheckerModal />
       </ThemeProvider>
     </QueryClientProvider>
   );

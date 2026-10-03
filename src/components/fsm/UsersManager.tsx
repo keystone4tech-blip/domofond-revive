@@ -16,52 +16,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { Search, Users, Trash2, ShieldCheck, ShieldAlert, Phone, Mail, Hash, RefreshCw, Pencil, Loader2, Link2 } from "lucide-react";
-
-// Нормализация адреса — ТА ЖЕ логика, что в кабинете (DebtCard), чтобы привязка совпадала 1:1.
-const normStreet = (str: string) => {
-  if (!str) return "";
-  let c = str.toLowerCase().trim();
-  if (c.includes(",")) { const parts = c.split(","); if (parts.length >= 2) c = parts[1].trim(); }
-  return c
-    .replace(/^(г\.|город|пос\.|поселок|аул|п\.|х\.|хутор|ст\.|станица)\s+[^,]+/gi, "")
-    .replace(/(?:\b(?:ул\.?|улица|пер\.?|переулок|проспект|пр-кт|пр\.?|аллея|бульвар|тракт|шоссе)\b|\(ул\))\s*/gi, "")
-    .replace(/(?:^|\s)(?:им\.?|имени|генерала?|академика?|маршала?|улице)(?:\s|$)/gi, "")
-    .replace(/[^а-яa-z0-9]/g, "")
-    .trim();
-};
-const normHouse = (h: string) =>
-  (h || "").toLowerCase().trim()
-    .replace(/^(д\.\s*|дом\s*)/i, "")
-    .replace(/(?:корп\.?|корпус)\s*/gi, "к")
-    .replace(/[^а-яa-z0-9]/g, "").trim();
-const normApt = (a: string) =>
-  (a || "").toLowerCase().trim()
-    .replace(/^(кв\.\s*|квартира\s*)/i, "")
-    .replace(/[^а-яa-z0-9]/g, "").trim();
-const extractApt = (addr: string) => {
-  const m = (addr || "").match(/,\s*(?:кв\.?|квартира)\s*([а-яa-z0-9-+]+)/i);
-  return m ? m[1].trim() : "";
-};
-// Подбор лицевого счёта из списка accounts по нормализованным улице+дому+квартире.
-const findAccountNumber = (u: any, accounts: any[]): string | null => {
-  const uStreet = normStreet(u.address || "");
-  const hm = (u.address || "").match(/д\.?\s*(\d+[а-яa-z]?)/i);
-  const uHouse = normHouse(hm ? hm[1] : "");
-  const uApt = normApt((u.apartment || "").toString() || extractApt(u.address || ""));
-  if (!uStreet || !uHouse || !uApt) return null;
-  for (const a of accounts) {
-    const dbParts = (a.address || "").split(",");
-    if (dbParts.length < 3) continue;
-    const dbStreet = normStreet(dbParts[1]);
-    const dbHouseFull = dbParts.slice(2).join(", ")
-      .replace(/,\s*(?:п(?:одъезд)?\.?\s*\d+).*$/i, "")
-      .replace(/,\s*(?:кв\.?\s*[а-яa-z0-9-+]+).*$/i, "");
-    const dbHouse = normHouse(dbHouseFull);
-    const dbApt = normApt((a.apartment || "").toString().trim() || extractApt(a.address || ""));
-    if (dbStreet === uStreet && dbHouse === uHouse && dbApt === uApt) return a.account_number;
-  }
-  return null;
-};
+import { streetQuery, aptDigits, matchAccount } from "@/lib/addressMatch";
 
 // Личные кабинеты: все зарегистрированные пользователи с полной информацией, поиском,
 // фильтрами и мягким удалением (с подтверждением и записью «кто удалил»).
@@ -77,6 +32,7 @@ export const UsersManager: React.FC = () => {
   const [editUser, setEditUser] = useState<any | null>(null);
   const [editForm, setEditForm] = useState({ full_name: "", phone: "", address: "", apartment: "", floor: "", account_number: "" });
   const [saving, setSaving] = useState(false);
+  const [findingAcc, setFindingAcc] = useState(false);
 
   // Массовая автопривязка лицевых счетов по адресу (решает backlog непривязанных профилей)
   const [linking, setLinking] = useState(false);
@@ -92,6 +48,37 @@ export const UsersManager: React.FC = () => {
       account_number: u.account_number || "",
     });
     setEditUser(u);
+  };
+
+  // Поиск лицевого счёта по текущему адресу+квартире в диалоге редактирования.
+  const findAccountForEdit = async () => {
+    const addr = editForm.address;
+    const street = streetQuery(addr || "");
+    const apt = aptDigits(editForm.apartment || "", addr || "");
+    if (!street || !apt) {
+      toast({ title: "Недостаточно данных", description: "Нужны улица с домом и номер квартиры.", variant: "destructive" });
+      return;
+    }
+    setFindingAcc(true);
+    try {
+      const { data: accs } = await supabase
+        .from("accounts")
+        .select("account_number, address, apartment")
+        .ilike("address", `%${street}%`)
+        .eq("apartment", apt)
+        .limit(50);
+      const acc = matchAccount({ address: addr, apartment: editForm.apartment }, accs || []);
+      if (acc) {
+        setEditForm((f) => ({ ...f, account_number: acc }));
+        toast({ title: "Счёт найден", description: `Лицевой счёт ${acc} подставлен. Нажмите «Сохранить».` });
+      } else {
+        toast({ title: "Счёт не найден", description: "По этому адресу и квартире счёт в базе 1С не найден. Проверьте адрес/квартиру.", variant: "destructive" });
+      }
+    } catch (e: any) {
+      toast({ title: "Ошибка поиска", description: e.message, variant: "destructive" });
+    } finally {
+      setFindingAcc(false);
+    }
   };
 
   const saveEdit = async () => {
@@ -127,19 +114,16 @@ export const UsersManager: React.FC = () => {
       const candidates = users.filter((u) => !u.account_number && u.address);
       const matches: any[] = [];
       for (const u of candidates) {
-        const uStreet = normStreet(u.address || "");
-        const hm = (u.address || "").match(/д\.?\s*(\d+[а-яa-z]?)/i);
-        const house = hm ? hm[1] : "";
-        const uApt = normApt((u.apartment || "").toString() || extractApt(u.address || ""));
-        if (!uStreet || !house || !uApt) continue;
-        const rawStreet = ((u.address || "").split(",")[1] || "").replace(/(?:\bул\.?\b|улица|\(ул\))/gi, "").trim();
-        if (!rawStreet) continue;
+        const street = streetQuery(u.address || "");
+        const apt = aptDigits(u.apartment || "", u.address || "");
+        if (!street || !apt) continue;
         const { data: accs } = await supabase
           .from("accounts")
           .select("account_number, address, apartment")
-          .ilike("address", `%${rawStreet}%${house}%`)
-          .limit(500);
-        const acc = findAccountNumber(u, accs || []);
+          .ilike("address", `%${street}%`)
+          .eq("apartment", apt)
+          .limit(50);
+        const acc = matchAccount(u, accs || []);
         if (acc) matches.push({ id: u.id, name: u.full_name || u.phone || u.id, address: u.address, apartment: u.apartment, account_number: acc });
       }
       setLinkPreview({ matches });
@@ -349,8 +333,13 @@ export const UsersManager: React.FC = () => {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-bold">Лицевой счёт</Label>
-              <Input value={editForm.account_number} onChange={(e) => setEditForm({ ...editForm, account_number: e.target.value })} placeholder="напр.: 0000011155" className="font-mono" />
-              <p className="text-[11px] text-muted-foreground">Привязка лицевого счёта уберёт статус «частный клиент» и подтянет баланс.</p>
+              <div className="flex gap-2">
+                <Input value={editForm.account_number} onChange={(e) => setEditForm({ ...editForm, account_number: e.target.value })} placeholder="напр.: 0000011155" className="font-mono" />
+                <Button type="button" variant="outline" onClick={findAccountForEdit} disabled={findingAcc} className="shrink-0 gap-1.5" title="Подобрать лицевой счёт по адресу и квартире">
+                  {findingAcc ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />} Найти
+                </Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">Кнопка «Найти» подберёт счёт по адресу и квартире. Привязка уберёт «частный клиент» и подтянет баланс.</p>
             </div>
           </div>
           <DialogFooter>

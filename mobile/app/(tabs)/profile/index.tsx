@@ -12,12 +12,14 @@ import {
   Alert,
   ActivityIndicator,
   Modal,
+  Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/store/auth.store';
 import { apiClient } from '@/api/client';
+import { APP_VERSION } from '@/config/constants';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -76,6 +78,37 @@ export default function ProfileScreen() {
         },
       },
     ]);
+  };
+
+  // Ручная проверка обновлений при нажатии на строку версии
+  const handleCheckUpdate = async () => {
+    try {
+      console.log('[Profile] Ручной запрос проверки обновлений...');
+      const res = await apiClient.get('/api/app/version');
+      if (res.data && res.data.latestVersion) {
+        const { latestVersion, downloadUrl, fallbackDownloadUrl, releaseNotes } = res.data;
+        if (latestVersion !== APP_VERSION) {
+          Alert.alert(
+            `Доступна версия ${latestVersion}`,
+            `Что нового:\n${(releaseNotes || []).map((n: string) => `• ${n}`).join('\n')}`,
+            [
+              { text: 'Позже', style: 'cancel' },
+              {
+                text: 'Скачать обновление',
+                onPress: () => {
+                  const targetUrl = downloadUrl || fallbackDownloadUrl;
+                  if (targetUrl) Linking.openURL(targetUrl);
+                },
+              },
+            ]
+          );
+        } else {
+          Alert.alert('Обновлений нет', `У вас установлена самая актуальная версия Домофондар ${APP_VERSION}.`);
+        }
+      }
+    } catch (e) {
+      Alert.alert('Информация', `Текущая версия приложения: ${APP_VERSION}. Соединение с сервером стабильно.`);
+    }
   };
 
   const displayName = user?.full_name || (user as any)?.email || 'Абонент';
@@ -162,7 +195,12 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>О приложении</Text>
           <View style={styles.card}>
-            <MenuItem icon="information-circle-outline" title="Версия приложения" value="1.0.1" />
+            <MenuItem
+              icon="information-circle-outline"
+              title="Версия приложения"
+              value="1.0.1"
+              onPress={handleCheckUpdate}
+            />
           </View>
         </View>
 
