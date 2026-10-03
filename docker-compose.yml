@@ -41,6 +41,7 @@ services:
       - PORT=5000
     volumes:
       - ./backups:/backups
+      - ./public/media:/public/media
       - ./public/media:/app/public/media
     depends_on:
       - db
