@@ -19,7 +19,9 @@ jobs:
 
       - name: 📦 Упаковка серверного проекта в единый архив
         run: |
-          tar --exclude='./mobile' --exclude='./.git' --exclude='./dist' --exclude='./node_modules' --exclude='./apk_android' --exclude='./Claude outputs' --exclude='./media/app' -czf deploy_bundle.tar.gz .
+          mkdir -p ../bundle_tmp
+          tar -czf ../bundle_tmp/deploy_bundle.tar.gz --exclude='./mobile' --exclude='./dist' --exclude='./node_modules' --exclude='./apk_android' --exclude='./Claude outputs' --exclude='./.git' .
+          mv ../bundle_tmp/deploy_bundle.tar.gz ./deploy_bundle.tar.gz
           ls -lh deploy_bundle.tar.gz
 
       - name: 📂 Передача архива на сервер по SSH
