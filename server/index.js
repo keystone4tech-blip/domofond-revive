@@ -180,19 +180,20 @@ app.get('/api/health', (req, res) => {
 // Публичный эндпоинт проверки обновлений мобильного приложения «Домофондар»
 app.get('/api/app/version', (req, res) => {
   res.json({
-    latestVersion: '1.0.1',
-    versionCode: 2,
+    latestVersion: '1.1.0',
+    versionCode: 3,
     minSupportedVersion: '1.0.0',
     downloadUrl: 'https://github.com/keystone4tech-blip/domofond-revive/releases/download/app-latest/domofondar.apk',
     fallbackDownloadUrl: 'https://xn--80aha5afebav9a.xn--p1ai/media/app/domofondar.apk',
     releaseNotes: [
-      'Изоляция личных обращений абонента и защита счетов',
-      'Адаптация SafeArea: отсутствие обрезания по высоте челкой и жестами',
-      'Очистка служебной информации в профиле абонента',
-      'Встроенная система обновлений в один клик'
+      'Премиальный кибер-стиль Domofondar CyberShield (Cyber Dark & Clean Tech)',
+      'Мгновенное переключение тем прямо из шапки экрана и профиля',
+      '4 быстрых действия абонента: Ремонт домофона, Заказ трубки, Заказ ключей и связь с диспетчером',
+      'Интерактивный каталог привязанного оборудования и ступенчатый расчет цен чипов',
+      'Официальная маркировка нарядов и заказов для CRM мастеров'
     ],
     isMandatory: false,
-    publishedAt: '2026-10-03T23:00:00.000Z'
+    publishedAt: '2026-10-04T00:00:00.000Z'
   });
 });
 
@@ -923,15 +924,138 @@ app.get('/api/user/my-requests', authenticateToken, async (req, res) => {
   }
 });
 
-// Создать новую заявку с автоматической привязкой client_id
+// ------------------------------------------------------------------------------
+// КАТАЛОГ ОБОРУДОВАНИЯ, УСЛУГ И КЛЮЧЕЙ (С ПРИВЯЗКОЙ К ПОДЪЕЗДУ)
+// ------------------------------------------------------------------------------
+app.get('/api/catalog/products', async (req, res) => {
+  const { account_number, entrance_id } = req.query;
+  console.log(`[Бэкенд: Каталог] Запрос каталога (л/с: ${account_number || 'нет'}, подъезд: ${entrance_id || 'нет'})`);
+
+  try {
+    let targetEntranceId = entrance_id || null;
+
+    // 1. Если передан лицевой счет, определяем подъезд через адрес
+    if (!targetEntranceId && account_number) {
+      try {
+        const accRes = await pool.query(
+          'SELECT address FROM accounts WHERE account_number = $1 LIMIT 1',
+          [account_number]
+        );
+        if (accRes.rows.length > 0 && accRes.rows[0].address) {
+          const rawAddr = accRes.rows[0].address.toLowerCase();
+          // Ищем совпадение в таблице подъездов entrances
+          const entRes = await pool.query(
+            'SELECT id, street, house, entrance FROM entrances'
+          );
+          for (const ent of entRes.rows) {
+            const st = (ent.street || '').toLowerCase().trim();
+            const h = (ent.house || '').toLowerCase().trim();
+            const e = (ent.entrance || '').toLowerCase().trim();
+            if (st && h && rawAddr.includes(st) && rawAddr.includes(h)) {
+              if (!e || rawAddr.includes(`п.${e}`) || rawAddr.includes(`подъезд ${e}`) || rawAddr.includes(`под. ${e}`)) {
+                targetEntranceId = ent.id;
+                console.log(`[Бэкенд: Каталог] Найден подъезд ID ${targetEntranceId} для адреса: ${accRes.rows[0].address}`);
+                break;
+              }
+            }
+          }
+        }
+      } catch (findErr) {
+        console.warn('[Бэкенд: Каталог] Не удалось сопоставить подъезд по л/с:', findErr.message);
+      }
+    }
+
+    // 2. Загружаем активные товары из таблицы products
+    const prodRes = await pool.query(
+      'SELECT id, name, description, price, category, image_url, is_active FROM products WHERE is_active = true ORDER BY name ASC'
+    );
+    const allProducts = prodRes.rows;
+
+    // 3. Загружаем привязки к подъезду (если подъезд определен)
+    let customPricing = {};
+    if (targetEntranceId) {
+      try {
+        const bindRes = await pool.query(
+          'SELECT product_id, price_type, custom_price FROM entrance_products WHERE entrance_id = $1',
+          [targetEntranceId]
+        );
+        bindRes.rows.forEach(b => {
+          customPricing[b.product_id] = {
+            price_type: b.price_type,
+            custom_price: b.custom_price != null ? Number(b.custom_price) : null
+          };
+        });
+      } catch (bErr) {
+        console.warn('[Бэкенд: Каталог] Ошибка при чтении entrance_products:', bErr.message);
+      }
+    }
+
+    // 4. Формируем эффективный список с расчетом цен
+    const enriched = allProducts.map(p => {
+      let finalPrice = Number(p.price || 0);
+      const pricing = customPricing[p.id];
+      if (pricing && pricing.custom_price != null && pricing.custom_price > 0) {
+        finalPrice = pricing.custom_price;
+      }
+      return {
+        ...p,
+        price: finalPrice,
+        base_price: Number(p.price || 0)
+      };
+    });
+
+    // 5. Разделяем на категории для удобного отображения в мобильном приложении
+    const handsets = enriched.filter(p => 
+      p.category === 'equipment' || 
+      /трубк|ткп|домофон/i.test(p.name)
+    );
+
+    const services = enriched.filter(p => 
+      p.category === 'service' || 
+      /установк|замен|монтаж|подключен/i.test(p.name)
+    );
+
+    const keys = enriched.filter(p => 
+      p.category === 'key' || 
+      /ключ|чип|брелок|rfid/i.test(p.name)
+    );
+
+    res.json({
+      success: true,
+      entrance_id: targetEntranceId,
+      handsets: handsets.length > 0 ? handsets : enriched.filter(p => /трубк|ткп/i.test(p.name)),
+      services: services.length > 0 ? services : [
+        { id: 'srv-install', name: 'Установка новой трубки с прокладкой кабеля', price: 500, category: 'service' },
+        { id: 'srv-replace', name: 'Замена существующей трубки', price: 300, category: 'service' }
+      ],
+      keys: keys.length > 0 ? keys : [
+        { id: 'key-rfid', name: 'Электронный чип-ключ Домофондар (бесконтактный)', price: 250, category: 'key' }
+      ],
+      all: enriched
+    });
+  } catch (err) {
+    console.error('[Бэкенд: Каталог] Ошибка формирования каталога:', err.message);
+    res.status(500).json({ error: 'Ошибка получения каталога продуктов' });
+  }
+});
+
+// Создать новую заявку с автоматической привязкой client_id и маркировкой источника
 app.post('/api/requests', authenticateToken, async (req, res) => {
-  const { name, phone, address, message, priority, status } = req.body;
+  let { name, phone, address, message, priority, status, is_mobile, source } = req.body;
   const clientId = req.user?.id || null;
+
+  // Обязательная метка: любая заявка из мобильного приложения четко маркируется для CRM и мастеров
+  const isFromMobile = is_mobile === true || source === 'mobile_app' || req.headers['x-client-platform'] === 'mobile';
+  if (isFromMobile && message && !message.startsWith('📱 [Мобильное приложение]')) {
+    message = `📱 [Мобильное приложение Домофондар]\n${message}`;
+  }
+
   try {
     const result = await pool.query(
       'INSERT INTO requests (name, phone, address, message, priority, status, client_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
       [name, phone, address, message, priority || 'medium', status || 'new', clientId]
     );
+    console.log(`[Бэкенд: Заявки] ✅ Создана заявка #${result.rows[0].id} (клиент: ${clientId || 'нет'}, моб: ${isFromMobile ? 'ДА' : 'НЕТ'})`);
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error('[Бэкенд: Заявки] Ошибка при создании заявки:', err.message);
@@ -998,6 +1122,11 @@ async function processSuccessfulPayment(yooData, fallbackPayment = null) {
 
       console.log(`[Бэкенд: ЮKassa Заказ] Оплата получена! Создание официальной заявки наряда в БД для абонента: ${order.name || 'Абонент'}, адрес: ${order.address}`);
 
+      let orderMsg = order.message || 'Заказ оборудования и услуг (оплачено онлайн через ЮKassa)';
+      if ((order.is_mobile || order.source === 'mobile_app' || combinedMeta.is_mobile === 'true') && !orderMsg.includes('📱 [Мобильное приложение]')) {
+        orderMsg = `📱 [Мобильное приложение Домофондар]\n${orderMsg}`;
+      }
+
       const reqInsert = await pool.query(
         `INSERT INTO requests (
           name, phone, address, street, house, entrance, floor, apartment,
@@ -1014,7 +1143,7 @@ async function processSuccessfulPayment(yooData, fallbackPayment = null) {
           order.entrance || null,
           order.floor || null,
           order.apartment || null,
-          order.message || 'Заказ оборудования и услуг (оплачено онлайн через ЮKassa)',
+          orderMsg,
           order.amount || paidAmount,
           order.user_id || paymentRecord?.user_id || null
         ]

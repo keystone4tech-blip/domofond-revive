@@ -2,9 +2,12 @@ import { Tabs } from 'expo-router';
 import { Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAppTheme } from '@/theme';
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
+  const { colors, isDark } = useAppTheme();
+
   // Вычисляем реальный отступ снизу под полоску жестов смартфона
   const bottomPadding = insets.bottom > 0 ? insets.bottom : (Platform.OS === 'android' ? 10 : 8);
   const barHeight = 56 + bottomPadding;
@@ -13,19 +16,23 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#10B981',
-        tabBarInactiveTintColor: '#94A3B8',
+        tabBarActiveTintColor: colors.primaryContainer,
+        tabBarInactiveTintColor: colors.textMuted,
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: '600',
           marginBottom: 4,
         },
         tabBarStyle: {
-          backgroundColor: '#0F172A',
+          backgroundColor: isDark ? '#171b26' : '#ffffff',
           position: 'absolute',
           borderTopWidth: 1,
-          borderTopColor: 'rgba(148, 163, 184, 0.12)',
-          elevation: 8,
+          borderTopColor: colors.border,
+          elevation: 10,
+          shadowColor: isDark ? '#000000' : '#0b1c30',
+          shadowOffset: { width: 0, height: -3 },
+          shadowOpacity: isDark ? 0.4 : 0.08,
+          shadowRadius: 8,
           height: barHeight,
           paddingTop: 6,
           paddingBottom: bottomPadding,

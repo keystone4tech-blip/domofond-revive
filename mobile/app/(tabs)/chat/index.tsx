@@ -1,36 +1,51 @@
+// mobile/app/(tabs)/chat/index.tsx — Экран поддержки и связи с диспетчерской в стиле Domofondar CyberShield
+
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Linking } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Linking, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAppTheme } from '@/theme';
 
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
+  const { colors, isDark } = useAppTheme();
 
   // Официальный номер диспетчерской службы Домофондар
   const handleSupport = () => {
-    Linking.openURL('tel:+79034118393');
+    const phone = '+79034118393';
+    Linking.openURL(`tel:${phone}`).catch(() => {
+      Alert.alert('Диспетчерская', 'Номер телефона: +7 (903) 411-83-93');
+    });
   };
 
   const safeTop = Math.max(insets.top, 16) + 8;
   const safeBottom = Math.max(insets.bottom, 12) + 75;
 
   return (
-    <View style={[styles.safeArea, { paddingTop: safeTop, paddingBottom: safeBottom }]}>
+    <View style={[styles.safeArea, { backgroundColor: colors.background, paddingTop: safeTop, paddingBottom: safeBottom }]}>
       <View style={styles.header}>
-        <Text style={styles.title}>Поддержка</Text>
-      </View>
-      
-      <View style={styles.container}>
-        <View style={styles.iconContainer}>
-          <Ionicons name="chatbubbles-outline" size={80} color="#10B981" />
-        </View>
-        <Text style={styles.heading}>Связь с диспетчерской</Text>
-        <Text style={styles.description}>
-          Чат с диспетчером появится в следующем релизе. Для оперативного решения любых вопросов вы можете сразу позвонить в круглосуточную службу.
+        <Text style={[styles.title, { color: colors.text }]}>Поддержка</Text>
+        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+          Круглосуточная диспетчерская служба «Домофондар»
         </Text>
-        
-        <TouchableOpacity style={styles.button} onPress={handleSupport} activeOpacity={0.85}>
-          <Ionicons name="call-outline" size={20} color="#FFF" />
+      </View>
+
+      <View style={styles.container}>
+        <View style={[styles.iconContainer, { backgroundColor: isDark ? '#1c1f2a' : '#eff4ff', borderColor: colors.border }]}>
+          <Ionicons name="headset" size={48} color={colors.primaryContainer} />
+        </View>
+
+        <Text style={[styles.heading, { color: colors.text }]}>Прямая связь с оператором</Text>
+        <Text style={[styles.description, { color: colors.textSecondary }]}>
+          Если у вас возник экстренный вопрос, пропало питание подъезда или требуется консультация по начислениям, дежурный диспетчер ответит вам прямо сейчас.
+        </Text>
+
+        <TouchableOpacity
+          style={[styles.button, { backgroundColor: colors.primaryContainer }]}
+          onPress={handleSupport}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="call" size={20} color="#FFFFFF" style={{ marginRight: 10 }} />
           <Text style={styles.buttonText}>Позвонить: +7 (903) 411-83-93</Text>
         </TouchableOpacity>
       </View>
@@ -39,13 +54,33 @@ export default function ChatScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#0F172A' },
-  header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12 },
-  title: { fontSize: 26, fontWeight: 'bold', color: '#F8FAFC' },
-  container: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 30 },
-  iconContainer: { marginBottom: 24, opacity: 0.85 },
-  heading: { fontSize: 22, fontWeight: 'bold', color: '#F8FAFC', marginBottom: 12, textAlign: 'center' },
-  description: { fontSize: 15, color: '#94A3B8', textAlign: 'center', lineHeight: 22, marginBottom: 32 },
-  button: { flexDirection: 'row', backgroundColor: '#10B981', paddingVertical: 15, paddingHorizontal: 24, borderRadius: 12, alignItems: 'center' },
-  buttonText: { color: '#FFFFFF', fontSize: 15, fontWeight: 'bold', marginLeft: 10 }
+  safeArea: { flex: 1 },
+  header: { paddingHorizontal: 20, marginBottom: 12 },
+  title: { fontSize: 24, fontWeight: '800' },
+  subtitle: { fontSize: 13, marginTop: 2 },
+  container: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  iconContainer: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  heading: { fontSize: 20, fontWeight: '700', marginBottom: 10, textAlign: 'center' },
+  description: { fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 28 },
+  button: {
+    flexDirection: 'row',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 14,
+    alignItems: 'center',
+    elevation: 3,
+    shadowColor: '#0ea5e9',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+  },
+  buttonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
 });

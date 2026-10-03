@@ -1,5 +1,5 @@
 // mobile/app/(tabs)/requests/create.tsx — Экран создания новой заявки абонента «Домофондар»
-// Отправляет реальную заявку в базу данных PostgreSQL через эндпоинт POST /api/requests
+// Отправляет реальную заявку с обязательной маркировкой мобильного приложения: 📱 [Мобильное приложение Домофондар]
 
 import React, { useState } from 'react';
 import {
@@ -18,30 +18,33 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/store/auth.store';
+import { useAppTheme } from '@/theme';
 import { apiClient } from '@/api/client';
 
 const REQUEST_TYPES = [
-  'Ремонт домофона / не открывает',
+  'Ремонт домофона / не открывает дверь',
   'Не работает аудиотрубка в квартире',
-  'Заказ электронных ключей (чипов)',
-  'Заказ и установка новой трубки',
-  'Техническое обслуживание',
-  'Другой вопрос',
+  'Заказ дополнительных ключей (чипов)',
+  'Заказ и замена трубки домофона',
+  'Регулировка доводчика двери подъезда',
+  'Другой вопрос по домофонии',
 ];
 
 export default function CreateRequestScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
+  const { colors, isDark } = useAppTheme();
 
   const [selectedType, setSelectedType] = useState(REQUEST_TYPES[0]);
-  const [address, setAddress] = useState('');
+  const [address, setAddress] = useState((user as any)?.address || '');
   const [phone, setPhone] = useState(user?.phone || '');
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async () => {
     if (!address.trim()) {
-      Alert.alert('Внимание', 'Пожалуйста, укажите адрес (улицу, дом, квартиру)');
+      Alert.alert('Внимание', 'Пожалуйста, укажите адрес (улицу, дом, подъезд, квартиру)');
       return;
     }
     if (!phone.trim()) {
@@ -49,7 +52,7 @@ export default function CreateRequestScreen() {
       return;
     }
     if (!description.trim()) {
-      Alert.alert('Внимание', 'Опишите суть проблемы или количество ключей');
+      Alert.alert('Внимание', 'Опишите суть неисправности');
       return;
     }
 
@@ -59,17 +62,21 @@ export default function CreateRequestScreen() {
         name: user?.full_name || 'Абонент',
         phone: phone.trim(),
         address: address.trim(),
-        message: `[${selectedType}] ${description.trim()}`,
+        message: `[${selectedType}]\n${description.trim()}`,
         priority: 'medium',
         status: 'new',
+        is_mobile: true,
+        source: 'mobile_app',
       };
 
-      console.log('[CreateRequest] Отправка заявки на сервер:', payload);
+      console.log('[CreateRequest CyberShield] Отправка заявки на сервер:', payload);
       await apiClient.post('/api/requests', payload);
 
-      Alert.alert('Заявка принята!', 'Ваша заявка успешно зарегистрирована в системе. Диспетчер свяжется с вами.', [
-        { text: 'Отлично', onPress: () => router.back() },
-      ]);
+      Alert.alert(
+        'Заявка принята!',
+        'Ваша заявка успешно зарегистрирована в системе. Диспетчерская служба и мастер уведомлены.',
+        [{ text: 'Отлично', onPress: () => router.back() }]
+      );
     } catch (err: any) {
       console.error('[CreateRequest] Ошибка отправки заявки:', err);
       const msg = err.response?.data?.error || 'Не удалось отправить заявку. Проверьте интернет-соединение.';
@@ -83,7 +90,7 @@ export default function CreateRequestScreen() {
   const safeBottom = Math.max(insets.bottom, 16) + 20;
 
   return (
-    <View style={[styles.safeArea, { paddingTop: safeTop }]}>
+    <View style={[styles.safeArea, { backgroundColor: colors.background, paddingTop: safeTop }]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
@@ -91,29 +98,46 @@ export default function CreateRequestScreen() {
         {/* Шапка */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="#F8FAFC" />
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
-          <Text style={styles.title}>Новая заявка</Text>
+          <Text style={[styles.title, { color: colors.text }]}>Новая заявка</Text>
           <View style={{ width: 24 }} />
         </View>
 
         <ScrollView
           contentContainerStyle={[styles.container, { paddingBottom: safeBottom }]}
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
           {/* Тип заявки */}
-          <Text style={styles.label}>Тип обращения / заказа</Text>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>Тип обращения / неисправности</Text>
           <View style={styles.typesContainer}>
             {REQUEST_TYPES.map((t) => {
               const isSelected = selectedType === t;
               return (
                 <TouchableOpacity
                   key={t}
-                  style={[styles.typeChip, isSelected && styles.typeChipSelected]}
+                  style={[
+                    styles.typeChip,
+                    {
+                      backgroundColor: isSelected
+                        ? (isDark ? '#262a35' : '#e0f2fe')
+                        : (isDark ? '#1c1f2a' : '#f8f9ff'),
+                      borderColor: isSelected ? colors.primaryContainer : colors.border,
+                    },
+                  ]}
                   onPress={() => setSelectedType(t)}
                   activeOpacity={0.7}
                 >
-                  <Text style={[styles.typeChipText, isSelected && styles.typeChipTextSelected]}>
+                  <Text
+                    style={[
+                      styles.typeChipText,
+                      {
+                        color: isSelected ? colors.primaryContainer : colors.text,
+                        fontWeight: isSelected ? '700' : '500',
+                      },
+                    ]}
+                  >
                     {t}
                   </Text>
                 </TouchableOpacity>
@@ -122,52 +146,63 @@ export default function CreateRequestScreen() {
           </View>
 
           {/* Адрес */}
-          <Text style={styles.label}>Адрес (улица, дом, подъезд, квартира)</Text>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>Адрес (улица, дом, подъезд, квартира)</Text>
           <TextInput
-            style={styles.input}
+            style={[
+              styles.input,
+              { backgroundColor: isDark ? '#1c1f2a' : '#f8f9ff', borderColor: colors.border, color: colors.text },
+            ]}
             value={address}
             onChangeText={setAddress}
-            placeholder="например: ул. Красная, д. 10, кв. 25"
-            placeholderTextColor="#64748B"
+            placeholder="г. Нальчик, ул. Ленина, д. 10, кв. 42"
+            placeholderTextColor={colors.textMuted}
           />
 
           {/* Телефон */}
-          <Text style={styles.label}>Контактный телефон</Text>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>Контактный телефон</Text>
           <TextInput
-            style={styles.input}
+            style={[
+              styles.input,
+              { backgroundColor: isDark ? '#1c1f2a' : '#f8f9ff', borderColor: colors.border, color: colors.text },
+            ]}
             value={phone}
             onChangeText={setPhone}
             placeholder="+7 (___) ___-__-__"
-            placeholderTextColor="#64748B"
+            placeholderTextColor={colors.textMuted}
             keyboardType="phone-pad"
           />
 
-          {/* Описание проблемы / заказ */}
-          <Text style={styles.label}>Подробное описание</Text>
+          {/* Описание проблемы */}
+          <Text style={[styles.label, { color: colors.textSecondary }]}>Суть проблемы / описание</Text>
           <TextInput
-            style={[styles.input, styles.multiline]}
+            style={[
+              styles.input,
+              styles.textArea,
+              { backgroundColor: isDark ? '#1c1f2a' : '#f8f9ff', borderColor: colors.border, color: colors.text },
+            ]}
             value={description}
             onChangeText={setDescription}
-            placeholder="Опишите неисправность или укажите количество ключей для заказа..."
-            placeholderTextColor="#64748B"
+            placeholder="Опишите, что происходит с домофоном, укажите код или удобное время"
+            placeholderTextColor={colors.textMuted}
             multiline
             numberOfLines={4}
+            textAlignVertical="top"
           />
 
           {/* Кнопка отправки */}
           <TouchableOpacity
-            style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
+            style={[styles.submitButton, { backgroundColor: colors.primaryContainer }]}
             onPress={handleSubmit}
             disabled={isSubmitting}
-            activeOpacity={0.85}
+            activeOpacity={0.8}
           >
             {isSubmitting ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <ActivityIndicator color="#ffffff" />
             ) : (
-              <View style={styles.buttonInner}>
-                <Ionicons name="send" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
-                <Text style={styles.submitButtonText}>Отправить диспетчеру</Text>
-              </View>
+              <>
+                <Ionicons name="send-outline" size={20} color="#ffffff" style={{ marginRight: 8 }} />
+                <Text style={styles.submitButtonText}>Отправить заявку мастеру</Text>
+              </>
             )}
           </TouchableOpacity>
         </ScrollView>
@@ -177,59 +212,60 @@ export default function CreateRequestScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#0F172A' },
+  safeArea: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(148, 163, 184, 0.1)',
+    paddingHorizontal: 16,
+    paddingBottom: 16,
   },
   backButton: { padding: 4 },
-  title: { fontSize: 20, fontWeight: 'bold', color: '#F8FAFC' },
-  container: { padding: 20 },
-  label: { color: '#E2E8F0', fontSize: 14, fontWeight: '600', marginBottom: 8, marginTop: 12 },
-  typesContainer: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8 },
+  title: { fontSize: 20, fontWeight: '700' },
+  container: { paddingHorizontal: 16 },
+  label: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 8,
+    marginTop: 14,
+  },
+  typesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 6,
+  },
   typeChip: {
-    backgroundColor: '#1E293B',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#334155',
-    marginRight: 8,
-    marginBottom: 8,
   },
-  typeChipSelected: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    borderColor: '#10B981',
-  },
-  typeChipText: { color: '#94A3B8', fontSize: 13 },
-  typeChipTextSelected: { color: '#10B981', fontWeight: 'bold' },
+  typeChipText: { fontSize: 13 },
   input: {
-    backgroundColor: '#1E293B',
-    color: '#F8FAFC',
+    height: 48,
     borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-    fontSize: 15,
     borderWidth: 1,
-    borderColor: '#334155',
+    paddingHorizontal: 16,
+    fontSize: 14,
   },
-  multiline: {
-    minHeight: 100,
-    textAlignVertical: 'top',
+  textArea: {
+    height: 100,
+    paddingTop: 12,
+    paddingBottom: 12,
   },
   submitButton: {
-    backgroundColor: '#10B981',
-    borderRadius: 12,
-    paddingVertical: 16,
+    height: 52,
+    borderRadius: 14,
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 28,
+    justifyContent: 'center',
+    marginTop: 24,
+    elevation: 3,
+    shadowColor: '#0ea5e9',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
   },
-  submitButtonDisabled: { opacity: 0.6 },
-  buttonInner: { flexDirection: 'row', alignItems: 'center' },
-  submitButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
+  submitButtonText: { color: '#ffffff', fontSize: 16, fontWeight: '700' },
 });

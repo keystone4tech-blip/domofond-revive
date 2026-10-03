@@ -16,6 +16,7 @@ interface ThemeState {
   setTheme: (mode: ThemeMode) => Promise<void>;
   loadTheme: () => Promise<void>;
   updateResolvedTheme: () => void;
+  toggleTheme: () => Promise<void>;
 }
 
 export const useThemeStore = create<ThemeState>((set, get) => ({
@@ -32,7 +33,7 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
         colorScheme: mode,
         resolvedTheme: mode === 'system' ? (isSystemDark ? 'dark' : 'light') : mode,
       });
-      console.log(`[THEME] Тема изменена на: ${mode}`);
+      console.log(`[THEME] Тема переключена на: ${mode}`);
     } catch (error) {
       console.error('[THEME ERROR] Ошибка сохранения темы:', error);
     }
@@ -54,12 +55,19 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
     }
   },
 
-  // Обновление вычисленной темы (например, при смене системной темы)
+  // Обновление вычисленной темы при изменении системной
   updateResolvedTheme: () => {
     const { colorScheme } = get();
     if (colorScheme === 'system') {
       const isSystemDark = Appearance.getColorScheme() === 'dark';
       set({ resolvedTheme: isSystemDark ? 'dark' : 'light' });
     }
-  }
+  },
+
+  // Быстрое переключение между светлой и темной темами
+  toggleTheme: async () => {
+    const current = get().resolvedTheme;
+    const nextMode: ThemeMode = current === 'dark' ? 'light' : 'dark';
+    await get().setTheme(nextMode);
+  },
 }));

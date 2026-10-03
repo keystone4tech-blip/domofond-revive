@@ -50,5 +50,33 @@ export const darkTheme = {
   isDark: true,
 };
 
-// Экспортируем тип темы для использования в Styled Components / хуках
+// Экспортируем тип темы для использования в компонентах
 export type AppTheme = typeof lightTheme;
+
+/**
+ * Хук для использования текущей активной темы Domofondar CyberShield в любых компонентах
+ */
+import { useThemeStore } from '../store/theme.store';
+
+export function useAppTheme() {
+  const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
+  const colorScheme = useThemeStore((state) => state.colorScheme);
+  const setTheme = useThemeStore((state) => state.setTheme);
+  const toggleTheme = useThemeStore((state) => state.toggleTheme);
+
+  const isDark = resolvedTheme === 'dark';
+  const theme = isDark ? darkTheme : lightTheme;
+  const colors = theme.colors;
+
+  return {
+    isDark,
+    theme,
+    colors,
+    colorScheme,
+    setTheme,
+    toggleTheme,
+    spacing,
+    borderRadius,
+    typography,
+  };
+}

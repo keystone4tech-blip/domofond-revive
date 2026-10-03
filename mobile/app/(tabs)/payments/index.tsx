@@ -1,5 +1,5 @@
 // mobile/app/(tabs)/payments/index.tsx — Экран оплаты и истории платежей «Домофондар»
-// Интегрирован с ЮKassa (СБП, банковские карты, SberPay) и базой данных PostgreSQL
+// В дизайне Domofondar CyberShield с поддержкой тем Cyber Dark и Clean Tech
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
@@ -17,11 +17,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
 import { apiClient } from '@/api/client';
-import { useAuthStore } from '@/store/auth.store';
+import { useAppTheme } from '@/theme';
 
 export default function PaymentsScreen() {
   const insets = useSafeAreaInsets();
-  const { user } = useAuthStore();
+  const { colors, isDark } = useAppTheme();
+
   const [account, setAccount] = useState<any>(null);
   const [payments, setPayments] = useState<any[]>([]);
   const [customAmount, setCustomAmount] = useState('');
@@ -32,28 +33,25 @@ export default function PaymentsScreen() {
   // Загрузка персонального лицевого счета и истории платежей текущего жильца
   const loadPaymentData = useCallback(async () => {
     try {
-      console.log('[Payments UI] Загрузка персонального счёта текущего абонента...');
-      // 1. Получаем строго персональный лицевой счёт жильца (защита от утечки чужих данных)
+      console.log('[Payments CyberShield] Загрузка данных счета абонента...');
       const accRes = await apiClient.get('/api/user/my-account');
       if (accRes.data && accRes.data.account_number) {
         const primaryAcc = accRes.data;
         setAccount(primaryAcc);
-        console.log(`[Payments UI] Персональный лицевой счёт: ${primaryAcc.account_number}`);
 
-        // 2. Получаем историю платежей по этому лицевому счету
         try {
           const histRes = await apiClient.get(`/api/payments/yookassa/history/${primaryAcc.account_number}`);
           if (Array.isArray(histRes.data)) {
             setPayments(histRes.data);
           }
         } catch (histErr) {
-          console.warn('[Payments UI] История платежей пока пуста');
+          console.warn('[Payments CyberShield] История платежей пока пуста');
         }
       } else {
         setAccount(null);
       }
     } catch (err) {
-      console.warn('[Payments UI] Ошибка загрузки счетов:', err);
+      console.warn('[Payments CyberShield] Ошибка загрузки счетов:', err);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -71,38 +69,37 @@ export default function PaymentsScreen() {
 
   // Инициализация платежа через ЮKassa
   const handlePay = async (amountToPay: number) => {
-    if (!amountToPay || amountToPay <= 0) {
-      Alert.alert('Внимание', 'Пожалуйста, укажите сумму к оплате');
+    if (!amountToPay || isNaN(amountToPay) || amountToPay <= 0) {
+      Alert.alert('Внимание', 'Пожалуйста, укажите корректную сумму к оплате');
       return;
     }
 
     setPaying(true);
     try {
       const accNum = account?.account_number || '';
-      console.log(`[Payments UI] Инициализация платежа на сумму: ${amountToPay} ₽ (л/с: ${accNum})`);
+      console.log(`[Payments CyberShield] Инициализация оплаты ${amountToPay} ₽ (л/с: ${accNum})...`);
 
       const payload = {
         amount: amountToPay,
         account_number: accNum,
-        description: `Оплата обслуживания домофона, л/с ${accNum || 'не указан'}`,
-        return_url: 'http://45.8.99.238/cabinet?check_payment=1',
+        description: `Оплата ТО домофона, л/с ${accNum || 'не указан'}`,
+        return_url: 'https://домофондар.рф/cabinet?check_payment=1',
+        is_order: false,
       };
 
       const res = await apiClient.post('/api/payments/yookassa/create', payload);
       const confirmationUrl = res.data?.confirmation_url || res.data?.payment?.confirmation?.confirmation_url;
 
       if (confirmationUrl) {
-        console.log('[Payments UI] Открытие платёжного шлюза ЮKassa:', confirmationUrl);
-        // Открываем защищенное окно браузера с поддержкой СБП и банковских карт
+        console.log('[Payments CyberShield] Переход в шлюз ЮKassa:', confirmationUrl);
         await WebBrowser.openBrowserAsync(confirmationUrl);
-        // После закрытия окна обновляем баланс
         loadPaymentData();
       } else {
         Alert.alert('Ошибка', 'Не удалось получить ссылку на оплату от шлюза');
       }
     } catch (err: any) {
-      console.error('[Payments UI] Ошибка создания платежа:', err);
-      const msg = err.response?.data?.error || 'Ошибка при обращении к платежному шлюзу ЮKassa';
+      console.error('[Payments CyberShield] Ошибка платежа:', err);
+      const msg = err.response?.data?.error || 'Ошибка при обращении к платёжному шлюзу';
       Alert.alert('Ошибка оплаты', msg);
     } finally {
       setPaying(false);
@@ -125,24 +122,42 @@ export default function PaymentsScreen() {
       : '';
 
     return (
-      <View style={styles.historyCard}>
-        <View style={styles.historyIcon}>
+      <View style={[styles.historyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View
+          style={[
+            styles.historyIcon,
+            {
+              backgroundColor: isSuccess
+                ? (isDark ? 'rgba(16, 185, 129, 0.15)' : '#ecfdf5')
+                : isCanceled
+                ? (isDark ? 'rgba(239, 68, 68, 0.15)' : '#fee2e2')
+                : (isDark ? 'rgba(245, 158, 11, 0.15)' : '#fef3c7'),
+            },
+          ]}
+        >
           <Ionicons
-            name={isSuccess ? 'checkmark-circle' : isCanceled ? 'close-circle' : 'time'}
-            size={28}
-            color={isSuccess ? '#10B981' : isCanceled ? '#EF4444' : '#F59E0B'}
+            name={isSuccess ? 'checkmark' : isCanceled ? 'close' : 'time'}
+            size={20}
+            color={isSuccess ? colors.secondary : isCanceled ? colors.error : colors.warning}
           />
         </View>
         <View style={styles.historyInfo}>
-          <Text style={styles.historyType}>{item.description || 'Оплата ТО'}</Text>
-          <Text style={styles.historyDate}>{dateStr}</Text>
+          <Text style={[styles.historyType, { color: colors.text }]} numberOfLines={1}>
+            {item.description || 'Оплата ТО домофона'}
+          </Text>
+          <Text style={[styles.historyDate, { color: colors.textMuted }]}>{dateStr}</Text>
         </View>
         <View style={styles.historyRight}>
-          <Text style={[styles.historyAmount, { color: isSuccess ? '#10B981' : '#F8FAFC' }]}>
+          <Text style={[styles.historyAmount, { color: isSuccess ? colors.secondary : colors.text }]}>
             {amountVal} ₽
           </Text>
-          <Text style={[styles.historyStatus, { color: isSuccess ? '#10B981' : isCanceled ? '#EF4444' : '#F59E0B' }]}>
-            {isSuccess ? 'Оплачено' : isCanceled ? 'Отменён' : 'В обработке'}
+          <Text
+            style={[
+              styles.historyStatus,
+              { color: isSuccess ? colors.secondary : isCanceled ? colors.error : colors.warning },
+            ]}
+          >
+            {isSuccess ? 'Зачислено' : isCanceled ? 'Отменён' : 'В обработке'}
           </Text>
         </View>
       </View>
@@ -153,15 +168,20 @@ export default function PaymentsScreen() {
   const safeBottom = Math.max(insets.bottom, 12) + 75;
 
   return (
-    <View style={[styles.safeArea, { paddingTop: safeTop }]}>
+    <View style={[styles.safeArea, { backgroundColor: colors.background, paddingTop: safeTop }]}>
       <View style={styles.header}>
-        <Text style={styles.title}>Оплата и счета</Text>
+        <Text style={[styles.title, { color: colors.text }]}>Оплата и счета</Text>
+        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+          Техническое обслуживание домофонии
+        </Text>
       </View>
 
       {loading ? (
         <View style={styles.centered}>
-          <ActivityIndicator color="#10B981" size="large" />
-          <Text style={styles.loadingText}>Загрузка данных лицевого счета...</Text>
+          <ActivityIndicator color={colors.primaryContainer} size="large" />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+            Загрузка состояния лицевого счета...
+          </Text>
         </View>
       ) : (
         <FlatList
@@ -169,51 +189,64 @@ export default function PaymentsScreen() {
           keyExtractor={(item, idx) => item.id?.toString() || idx.toString()}
           renderItem={renderPaymentItem}
           contentContainerStyle={[styles.container, { paddingBottom: safeBottom }]}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#10B981" />}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primaryContainer}
+            />
+          }
+          showsVerticalScrollIndicator={false}
           ListHeaderComponent={
             <>
-              {/* Карточка баланса */}
-              <View style={styles.balanceCard}>
+              {/* Карточка баланса в стиле CyberShield */}
+              <View style={[styles.balanceCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <View style={styles.balanceTopRow}>
                   <View>
-                    <Text style={styles.accountTitle}>Лицевой счёт</Text>
-                    <Text style={styles.accountNumber}>
-                      {account ? account.account_number : 'Не привязан'}
+                    <Text style={[styles.accountTitle, { color: colors.textSecondary }]}>Номер лицевого счёта</Text>
+                    <Text style={[styles.accountNumber, { color: colors.text }]}>
+                      {account ? `№ ${account.account_number}` : 'Не привязан'}
                     </Text>
                   </View>
-                  <View style={styles.bankLogos}>
-                    <Text style={styles.sbpBadge}>СБП • Мир</Text>
+                  <View style={[styles.sbpBadge, { backgroundColor: isDark ? '#262a35' : '#eff4ff', borderColor: colors.border }]}>
+                    <Ionicons name="card" size={14} color={colors.primaryContainer} style={{ marginRight: 4 }} />
+                    <Text style={[styles.sbpBadgeText, { color: colors.primaryContainer }]}>СБП • Мир</Text>
                   </View>
                 </View>
 
                 {account?.address && (
-                  <Text style={styles.accountAddress} numberOfLines={1}>
+                  <Text style={[styles.accountAddress, { color: colors.textMuted }]} numberOfLines={1}>
                     📍 {account.address}
                   </Text>
                 )}
 
-                <View style={styles.divider} />
+                <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
-                <Text style={styles.balanceText}>
-                  {hasDebt ? 'Текущая задолженность:' : 'Баланс счета:'}
+                <Text style={[styles.balanceText, { color: colors.textSecondary }]}>
+                  {hasDebt ? 'Текущая задолженность по ТО:' : 'Состояние счета:'}
                 </Text>
-                <Text style={[styles.balanceAmount, { color: hasDebt ? '#EF4444' : '#10B981' }]}>
+                <Text
+                  style={[
+                    styles.balanceAmount,
+                    { color: hasDebt ? colors.error : colors.primaryContainer },
+                  ]}
+                >
                   {hasDebt ? `${debt.toFixed(2)} ₽` : 'Задолженности нет • 0.00 ₽'}
                 </Text>
 
-                {/* Быстрая кнопка оплаты задолженности */}
+                {/* Быстрая кнопка погашения долга */}
                 {hasDebt && (
                   <TouchableOpacity
-                    style={[styles.payButton, paying && styles.payButtonDisabled]}
+                    style={[styles.payButton, { backgroundColor: colors.error }]}
                     onPress={() => handlePay(debt)}
                     disabled={paying}
                     activeOpacity={0.85}
                   >
                     {paying ? (
-                      <ActivityIndicator color="#FFFFFF" />
+                      <ActivityIndicator color="#ffffff" />
                     ) : (
                       <>
-                        <Ionicons name="flash" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+                        <Ionicons name="flash" size={18} color="#ffffff" style={{ marginRight: 8 }} />
                         <Text style={styles.payButtonText}>Погасить долг ({debt.toFixed(2)} ₽)</Text>
                       </>
                     )}
@@ -223,15 +256,18 @@ export default function PaymentsScreen() {
                 {/* Оплата произвольной суммы */}
                 <View style={styles.customPayRow}>
                   <TextInput
-                    style={styles.customInput}
+                    style={[
+                      styles.customInput,
+                      { backgroundColor: isDark ? '#171b26' : '#f8f9ff', borderColor: colors.border, color: colors.text },
+                    ]}
                     placeholder="Сумма, ₽"
-                    placeholderTextColor="#64748B"
+                    placeholderTextColor={colors.textMuted}
                     keyboardType="numeric"
                     value={customAmount}
                     onChangeText={setCustomAmount}
                   />
                   <TouchableOpacity
-                    style={[styles.customPayButton, paying && styles.payButtonDisabled]}
+                    style={[styles.customPayButton, { backgroundColor: colors.primaryContainer }]}
                     onPress={() => handlePay(parseFloat(customAmount))}
                     disabled={paying}
                     activeOpacity={0.85}
@@ -241,13 +277,17 @@ export default function PaymentsScreen() {
                 </View>
               </View>
 
-              <Text style={styles.sectionTitle}>История операций</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>История операций</Text>
             </>
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Ionicons name="receipt-outline" size={40} color="#475569" />
-              <Text style={styles.emptyText}>История платежей пока пуста</Text>
+              <View style={[styles.emptyIconCircle, { backgroundColor: isDark ? '#1c1f2a' : '#eff4ff' }]}>
+                <Ionicons name="receipt-outline" size={32} color={colors.primaryContainer} />
+              </View>
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                История платежей пока пуста
+              </Text>
             </View>
           }
         />
@@ -257,88 +297,103 @@ export default function PaymentsScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#0F172A' },
-  header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12 },
-  title: { fontSize: 26, fontWeight: 'bold', color: '#F8FAFC' },
-  container: { padding: 20, paddingBottom: 100 },
+  safeArea: { flex: 1 },
+  header: { paddingHorizontal: 16, marginBottom: 14 },
+  title: { fontSize: 24, fontWeight: '800' },
+  subtitle: { fontSize: 13, marginTop: 2 },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  loadingText: { marginTop: 12, fontSize: 14 },
+  container: { paddingHorizontal: 16 },
   balanceCard: {
-    backgroundColor: 'rgba(30, 41, 59, 0.8)',
-    borderRadius: 20,
-    padding: 22,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(148, 163, 184, 0.15)',
-    marginBottom: 28,
+    padding: 16,
+    marginBottom: 20,
+    elevation: 3,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
   },
-  balanceTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  accountTitle: { color: '#94A3B8', fontSize: 13 },
-  accountNumber: { color: '#F8FAFC', fontSize: 20, fontWeight: 'bold', marginTop: 2 },
-  accountAddress: { color: '#94A3B8', fontSize: 13, marginTop: 6 },
-  bankLogos: { flexDirection: 'row', alignItems: 'center' },
+  balanceTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  accountTitle: { fontSize: 12, fontWeight: '500' },
+  accountNumber: { fontSize: 18, fontWeight: '800', marginTop: 2 },
   sbpBadge: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    color: '#10B981',
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 6,
-    fontSize: 12,
-    fontWeight: 'bold',
+    borderRadius: 8,
+    borderWidth: 1,
   },
-  divider: { height: 1, backgroundColor: 'rgba(148, 163, 184, 0.1)', marginVertical: 16 },
-  balanceText: { color: '#94A3B8', fontSize: 13 },
-  balanceAmount: { fontSize: 28, fontWeight: 'bold', marginTop: 4, marginBottom: 16 },
+  sbpBadgeText: { fontSize: 11, fontWeight: '700' },
+  accountAddress: { fontSize: 13, marginTop: 6 },
+  divider: { height: 1, marginVertical: 12 },
+  balanceText: { fontSize: 12, fontWeight: '500' },
+  balanceAmount: { fontSize: 24, fontWeight: '800', marginVertical: 4 },
   payButton: {
-    backgroundColor: '#10B981',
+    height: 48,
     borderRadius: 12,
-    paddingVertical: 14,
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    justifyContent: 'center',
+    marginTop: 10,
+    marginBottom: 10,
   },
-  payButtonDisabled: { opacity: 0.6 },
-  payButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: 'bold' },
-  customPayRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+  payButtonText: { color: '#ffffff', fontSize: 15, fontWeight: '700' },
+  customPayRow: { flexDirection: 'row', gap: 10, marginTop: 4 },
   customInput: {
     flex: 1,
-    backgroundColor: '#1E293B',
-    color: '#F8FAFC',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 15,
+    height: 46,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#334155',
-    marginRight: 10,
+    paddingHorizontal: 12,
+    fontSize: 15,
+    fontWeight: '600',
   },
   customPayButton: {
-    backgroundColor: '#334155',
-    borderRadius: 12,
     paddingHorizontal: 20,
-    paddingVertical: 13,
-    justifyContent: 'center',
+    height: 46,
+    borderRadius: 10,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  customPayButtonText: { color: '#F8FAFC', fontSize: 14, fontWeight: '600' },
-  sectionTitle: { color: '#F8FAFC', fontSize: 18, fontWeight: '700', marginBottom: 16 },
+  customPayButtonText: { color: '#ffffff', fontSize: 14, fontWeight: '700' },
+  sectionTitle: { fontSize: 17, fontWeight: '700', marginBottom: 12 },
+  emptyContainer: { alignItems: 'center', paddingVertical: 40 },
+  emptyIconCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  emptyText: { fontSize: 14 },
   historyCard: {
-    backgroundColor: 'rgba(30, 41, 59, 0.6)',
-    borderRadius: 14,
-    padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    padding: 12,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(148, 163, 184, 0.08)',
+    marginBottom: 10,
   },
-  historyIcon: { marginRight: 14 },
-  historyInfo: { flex: 1 },
-  historyType: { color: '#F8FAFC', fontSize: 15, fontWeight: '600' },
-  historyDate: { color: '#94A3B8', fontSize: 12, marginTop: 4 },
+  historyIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  historyInfo: { flex: 1, marginRight: 8 },
+  historyType: { fontSize: 14, fontWeight: '600' },
+  historyDate: { fontSize: 11, marginTop: 2 },
   historyRight: { alignItems: 'flex-end' },
-  historyAmount: { fontSize: 15, fontWeight: 'bold' },
-  historyStatus: { fontSize: 12, marginTop: 2 },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { color: '#94A3B8', marginTop: 12, fontSize: 14 },
-  emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingTop: 40 },
-  emptyText: { color: '#64748B', fontSize: 14, marginTop: 10 },
+  historyAmount: { fontSize: 14, fontWeight: '700' },
+  historyStatus: { fontSize: 11, marginTop: 2, fontWeight: '600' },
 });
