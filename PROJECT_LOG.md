@@ -11,6 +11,31 @@
 > 
 > **Пользователь НЕ ДОЛЖЕН ничего вносить вручную.** Вся статистика и история пополняется ИИ автоматически при каждой задаче.
 
+# 2026-10-04 02:55 — Деплой на боевой сервер (SSH), фикс заявок в БД и релиз мобильного приложения v1.1.1 (Build 4)
+
+## 1. Задачи и бизнес-ценность
+- **Серверный деплой через SSH на 45.8.99.238**:
+  * Свежий код из ветки `main` стянут в директорию `/opt/domofondar`.
+  * Выполнена пересборка и запуск контейнеров `docker compose up -d --build` (бэкенд Node.js и фронтенд Nginx с production бандлом).
+- **Починка застрявших мобильных заявок**:
+  * В контейнере `domofondar_postgres` выполнен SQL-запрос `UPDATE requests SET status='pending' WHERE status='new'`.
+  * Обновлено 2 застрявшие заявки, которые теперь моментально отображаются во вкладке «Новые» CRM FSM для диспетчеров и мастеров.
+- **Подготовка релиза v1.1.1 (Build 4)**:
+  * В `mobile/app.config.ts`: `versionCode: 4`, `buildNumber: '4'`, `version: '1.1.1'`.
+  * В `mobile/src/config/constants.ts`: `APP_VERSION = '1.1.1'`.
+  * В `mobile/package.json`: `"version": "1.1.1"`.
+  * На бэкенде в `/api/app/version`: `latestVersion: '1.1.1'`, `versionCode: 4`.
+  * Запущена автоматическая сборка релизного APK в GitHub Actions (workflow `build-apk.yml`), которая собирает оптимизированный APK и загружает его в релиз и на сервер.
+
+## 2. Измененные файлы
+- [`scripts/server_deploy_and_fix.py`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/scripts/server_deploy_and_fix.py) — Скрипт автоматизированного SSH-деплоя и применения SQL-запросов к Postgres.
+- [`mobile/app.config.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/app.config.ts) — Повышен versionCode до 4, version до 1.1.1.
+- [`mobile/src/config/constants.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/src/config/constants.ts) — APP_VERSION обновлен до 1.1.1.
+- [`mobile/package.json`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/package.json) — Версия 1.1.1.
+- [`server/index.js`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/server/index.js) — Эндпоинт `/api/app/version` возвращает versionCode: 4 и latestVersion: 1.1.1.
+- [`src/data/projectChangelog.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/data/projectChangelog.ts) — Внесена новая запись в паспорт проекта.
+- [`PROJECT_LOG.md`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/PROJECT_LOG.md) — Обновлен журнал проекта.
+
 # 2026-10-04 00:00 — Мобильное приложение v1.1.0: дизайн-система «Domofondar CyberShield» (Dark & Light) и реальный функционал ЛК
 
 ## 1. Задачи и бизнес-ценность

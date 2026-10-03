@@ -258,6 +258,16 @@ export const KIND_META: Record<Kind, { label: string; badgeCls: string }> = {
  */
 export const PROJECT_CHANGELOG: ProjectEntry[] = [
   {
+    id: "stage-2026-10-04-0255",
+    datetime: "2026-10-04 02:55",
+    title: "Деплой на боевой сервер (SSH), перевод заявок в статус pending и релиз APK v1.1.1 (Build 4)",
+    description: "Выполнено развертывание на боевом сервере 45.8.99.238 через SSH: подтянуты свежие изменения из Git, пересобраны и запущены Docker-контейнеры бэкенда и фронтенда. В базе данных PostgreSQL domofondar выполнен прямой SQL-запрос UPDATE requests SET status='pending' WHERE status='new', разблокировавший застрявшие мобильные заявки (2 заявки переведены в статус pending и теперь доступны мастерам во вкладке «Новые» в FSM). Код версии мобильного приложения повышен до versionCode: 4 (v1.1.1) в app.config.ts, package.json, constants.ts и на бэкенде /api/app/version. Запущена автоматическая сборка релизного APK в GitHub Actions.",
+    module: "infra_mobile",
+    kind: "infra",
+    hours: 2,
+    difficulty: "Средняя",
+  },
+  {
     id: "stage-2026-10-04-0000",
     datetime: "2026-10-04 00:00",
     title: "Мобильное приложение v1.1.0: премиальный кибер-стиль Domofondar CyberShield (Dark & Light) и реальный функционал ЛК",
