@@ -180,8 +180,8 @@ app.get('/api/health', (req, res) => {
 // Публичный эндпоинт проверки обновлений мобильного приложения «Домофондар»
 app.get('/api/app/version', (req, res) => {
   res.json({
-    latestVersion: '1.1.0',
-    versionCode: 3,
+    latestVersion: '1.1.1',
+    versionCode: 4,
     minSupportedVersion: '1.0.0',
     downloadUrl: 'https://github.com/keystone4tech-blip/domofond-revive/releases/download/app-latest/domofondar.apk',
     fallbackDownloadUrl: 'https://xn--80aha5afebav9a.xn--p1ai/media/app/domofondar.apk',
@@ -1046,16 +1046,20 @@ app.post('/api/requests', authenticateToken, async (req, res) => {
 
   // Обязательная метка: любая заявка из мобильного приложения четко маркируется для CRM и мастеров
   const isFromMobile = is_mobile === true || source === 'mobile_app' || req.headers['x-client-platform'] === 'mobile';
-  if (isFromMobile && message && !message.startsWith('📱 [Мобильное приложение]')) {
+  if (isFromMobile && message && !message.includes('Мобильное приложение')) {
     message = `📱 [Мобильное приложение Домофондар]\n${message}`;
   }
 
+  // Входящая клиентская заявка ВСЕГДА создаётся со статусом 'pending' — это приёмная очередь CRM
+  // (сайт и приложение едины). Любой иной статус от клиента ('new' и т.п.) игнорируется, иначе
+  // заявка не попадёт ни в одну вкладку CRM и её нельзя будет «принять».
+  const intakeStatus = 'pending';
   try {
     const result = await pool.query(
       'INSERT INTO requests (name, phone, address, message, priority, status, client_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
-      [name, phone, address, message, priority || 'medium', status || 'new', clientId]
+      [name, phone, address, message, priority || 'medium', intakeStatus, clientId]
     );
-    console.log(`[Бэкенд: Заявки] ✅ Создана заявка #${result.rows[0].id} (клиент: ${clientId || 'нет'}, моб: ${isFromMobile ? 'ДА' : 'НЕТ'})`);
+    console.log(`[Бэкенд: Заявки] ✅ Создана заявка #${result.rows[0].id} (статус: ${intakeStatus}, клиент: ${clientId || 'нет'}, моб: ${isFromMobile ? 'ДА' : 'НЕТ'})`);
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error('[Бэкенд: Заявки] Ошибка при создании заявки:', err.message);
