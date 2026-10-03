@@ -10,7 +10,7 @@ export const API_URL = 'https://xn--80aha5afebav9a.xn--p1ai/backend-api';
 export const WS_URL = 'wss://xn--80aha5afebav9a.xn--p1ai/ws';
 
 // Текущая версия приложения
-export const APP_VERSION = '1.0.0';
+export const APP_VERSION = '1.0.1';
 
 // URL для возврата после оплаты через YooKassa
 export const YOOKASSA_RETURN_URL = 'domofondar://payment/return';

@@ -6,7 +6,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
   TextInput,
@@ -16,6 +15,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/store/auth.store';
 import { apiClient } from '@/api/client';
 
@@ -104,13 +104,16 @@ export default function ProfileScreen() {
     </TouchableOpacity>
   );
 
+  const safeTop = Math.max(insets.top, 16) + 8;
+  const safeBottom = Math.max(insets.bottom, 12) + 75;
+
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={[styles.safeArea, { paddingTop: safeTop }]}>
       <View style={styles.header}>
         <Text style={styles.title}>Профиль</Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView contentContainerStyle={[styles.container, { paddingBottom: safeBottom }]}>
         {/* Карточка пользователя */}
         <View style={styles.profileHeader}>
           <View style={styles.avatar}>
@@ -155,15 +158,11 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Приложение */}
+        {/* Приложение (только версия, без серверных IP и технических баз) */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>О системе</Text>
+          <Text style={styles.sectionTitle}>О приложении</Text>
           <View style={styles.card}>
-            <MenuItem icon="server-outline" title="Сервер" value="45.8.99.238" />
-            <View style={styles.divider} />
-            <MenuItem icon="shield-checkmark-outline" title="Статус базы" value="Подключена" />
-            <View style={styles.divider} />
-            <MenuItem icon="information-circle-outline" title="Версия приложения" value="1.0.0" />
+            <MenuItem icon="information-circle-outline" title="Версия приложения" value="1.0.1" />
           </View>
         </View>
 
@@ -244,7 +243,7 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 

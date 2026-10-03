@@ -8,18 +8,19 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  SafeAreaView,
   TextInput,
   Alert,
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
 import { apiClient } from '@/api/client';
 import { useAuthStore } from '@/store/auth.store';
 
 export default function PaymentsScreen() {
+  const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
   const [account, setAccount] = useState<any>(null);
   const [payments, setPayments] = useState<any[]>([]);
@@ -28,28 +29,28 @@ export default function PaymentsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [paying, setPaying] = useState(false);
 
-  // Загрузка лицевого счета и истории платежей
+  // Загрузка персонального лицевого счета и истории платежей текущего жильца
   const loadPaymentData = useCallback(async () => {
     try {
-      console.log('[Payments UI] Загрузка счетов и истории платежей...');
-      // 1. Получаем лицевой счёт жильца
-      const accRes = await apiClient.get('/api/accounts');
-      if (Array.isArray(accRes.data) && accRes.data.length > 0) {
-        const primaryAcc = accRes.data[0];
+      console.log('[Payments UI] Загрузка персонального счёта текущего абонента...');
+      // 1. Получаем строго персональный лицевой счёт жильца (защита от утечки чужих данных)
+      const accRes = await apiClient.get('/api/user/my-account');
+      if (accRes.data && accRes.data.account_number) {
+        const primaryAcc = accRes.data;
         setAccount(primaryAcc);
-        console.log(`[Payments UI] Лицевой счёт: ${primaryAcc.account_number}`);
+        console.log(`[Payments UI] Персональный лицевой счёт: ${primaryAcc.account_number}`);
 
         // 2. Получаем историю платежей по этому лицевому счету
-        if (primaryAcc.account_number) {
-          try {
-            const histRes = await apiClient.get(`/api/payments/yookassa/history/${primaryAcc.account_number}`);
-            if (Array.isArray(histRes.data)) {
-              setPayments(histRes.data);
-            }
-          } catch (histErr) {
-            console.warn('[Payments UI] История платежей пока пуста');
+        try {
+          const histRes = await apiClient.get(`/api/payments/yookassa/history/${primaryAcc.account_number}`);
+          if (Array.isArray(histRes.data)) {
+            setPayments(histRes.data);
           }
+        } catch (histErr) {
+          console.warn('[Payments UI] История платежей пока пуста');
         }
+      } else {
+        setAccount(null);
       }
     } catch (err) {
       console.warn('[Payments UI] Ошибка загрузки счетов:', err);
@@ -148,8 +149,11 @@ export default function PaymentsScreen() {
     );
   };
 
+  const safeTop = Math.max(insets.top, 16) + 8;
+  const safeBottom = Math.max(insets.bottom, 12) + 75;
+
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={[styles.safeArea, { paddingTop: safeTop }]}>
       <View style={styles.header}>
         <Text style={styles.title}>Оплата и счета</Text>
       </View>
@@ -164,7 +168,7 @@ export default function PaymentsScreen() {
           data={payments}
           keyExtractor={(item, idx) => item.id?.toString() || idx.toString()}
           renderItem={renderPaymentItem}
-          contentContainerStyle={styles.container}
+          contentContainerStyle={[styles.container, { paddingBottom: safeBottom }]}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#10B981" />}
           ListHeaderComponent={
             <>
@@ -248,7 +252,7 @@ export default function PaymentsScreen() {
           }
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 

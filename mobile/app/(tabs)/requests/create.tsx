@@ -8,7 +8,6 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  SafeAreaView,
   ScrollView,
   Alert,
   ActivityIndicator,
@@ -17,6 +16,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/store/auth.store';
 import { apiClient } from '@/api/client';
 
@@ -79,8 +79,11 @@ export default function CreateRequestScreen() {
     }
   };
 
+  const safeTop = Math.max(insets.top, 16) + 8;
+  const safeBottom = Math.max(insets.bottom, 16) + 20;
+
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={[styles.safeArea, { paddingTop: safeTop }]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
@@ -94,7 +97,10 @@ export default function CreateRequestScreen() {
           <View style={{ width: 24 }} />
         </View>
 
-        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={[styles.container, { paddingBottom: safeBottom }]}
+          keyboardShouldPersistTaps="handled"
+        >
           {/* Тип заявки */}
           <Text style={styles.label}>Тип обращения / заказа</Text>
           <View style={styles.typesContainer}>
@@ -166,7 +172,7 @@ export default function CreateRequestScreen() {
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 

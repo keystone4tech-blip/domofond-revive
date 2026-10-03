@@ -765,6 +765,7 @@ app.delete('/api/admin/backups/:filename', authenticateToken, requireAdmin, (req
 // ------------------------------------------------------------------------------
 
 // Получить список лицевых счетов абонентов
+// Получить список лицевых счетов (только для служебного поиска администратором/диспетчером)
 app.get('/api/accounts', authenticateToken, async (req, res) => {
   const { search } = req.query;
   try {
@@ -774,6 +775,12 @@ app.get('/api/accounts', authenticateToken, async (req, res) => {
     if (search) {
       query += ' WHERE address ILIKE $1 OR account_number ILIKE $1 OR phone ILIKE $1';
       params.push(`%${search}%`);
+    } else {
+      // Запрещаем выгрузку всех 100 счетов без фильтра обычным клиентам
+      const userRole = req.user?.role;
+      if (!['admin', 'superadmin', 'director', 'dispatcher'].includes(userRole)) {
+        return res.json([]);
+      }
     }
 
     query += ' ORDER BY address ASC, apartment ASC LIMIT 100';
@@ -785,9 +792,80 @@ app.get('/api/accounts', authenticateToken, async (req, res) => {
   }
 });
 
-// Получить список заявок
-app.get('/api/requests', authenticateToken, async (req, res) => {
+// Получить лицевой счёт СТРОГО текущего авторизованного пользователя
+app.get('/api/user/my-account', authenticateToken, async (req, res) => {
+  const userId = req.user?.id;
   try {
+    if (!userId) return res.json(null);
+
+    // 1. Ищем данные в таблице profiles
+    const profRes = await pool.query(
+      'SELECT account_number, phone, address, apartment FROM profiles WHERE id = $1 LIMIT 1',
+      [userId]
+    );
+    const profile = profRes.rows[0];
+    if (!profile) return res.json(null);
+
+    // А. Если в профиле уже привязан account_number
+    if (profile.account_number) {
+      const accRes = await pool.query(
+        'SELECT account_number, period, debt_amount, address, apartment, phone, full_name, has_handset, payment_type FROM accounts WHERE account_number = $1 LIMIT 1',
+        [profile.account_number]
+      );
+      if (accRes.rows.length > 0) return res.json(accRes.rows[0]);
+    }
+
+    // Б. Если номер не привязан, пробуем найти по номеру телефона абонента
+    const rawPhone = profile.phone || req.user?.phone || '';
+    const cleanPhone = rawPhone.replace(/\D/g, '').slice(-10);
+    if (cleanPhone) {
+      const accPhoneRes = await pool.query(
+        "SELECT account_number, period, debt_amount, address, apartment, phone, full_name, has_handset, payment_type FROM accounts WHERE phone IS NOT NULL AND regexp_replace(phone, '\\D', '', 'g') LIKE $1 LIMIT 1",
+        [`%${cleanPhone}%`]
+      );
+      if (accPhoneRes.rows.length > 0) {
+        // Сохраняем найденный л/с в профиль
+        await pool.query('UPDATE profiles SET account_number = $1 WHERE id = $2', [accPhoneRes.rows[0].account_number, userId]);
+        return res.json(accPhoneRes.rows[0]);
+      }
+    }
+
+    // В. Лицевой счёт не привязан — возвращаем null (строго исключаем чужие счета!)
+    res.json(null);
+  } catch (err) {
+    console.error('[Бэкенд: Мой счёт] Ошибка поиска лицевого счета:', err.message);
+    res.json(null);
+  }
+});
+
+// Получить список заявок (общий список CRM для персонала или с фильтрацией)
+app.get('/api/requests', authenticateToken, async (req, res) => {
+  const userRole = req.user?.role;
+  const isStaff = ['admin', 'superadmin', 'director', 'dispatcher', 'master', 'engineer'].includes(userRole);
+  const mineOnly = req.query.mine === 'true';
+
+  try {
+    // Если запрос личных обращений или пользователь обычный жилец — отдаем только его заявки
+    if (mineOnly || !isStaff) {
+      const userId = req.user?.id;
+      const cleanPhone = (req.user?.phone || '').replace(/\D/g, '').slice(-10);
+      
+      let query = '';
+      let params = [];
+      if (cleanPhone && userId) {
+        query = "SELECT * FROM requests WHERE client_id = $1 OR (phone IS NOT NULL AND phone != '' AND regexp_replace(phone, '\\D', '', 'g') LIKE $2) ORDER BY created_at DESC LIMIT 50";
+        params = [userId, `%${cleanPhone}%`];
+      } else if (userId) {
+        query = 'SELECT * FROM requests WHERE client_id = $1 ORDER BY created_at DESC LIMIT 50';
+        params = [userId];
+      } else {
+        return res.json([]);
+      }
+      const result = await pool.query(query, params);
+      return res.json(result.rows);
+    }
+
+    // Персонал CRM (диспетчеры/мастера) в общем списке видит заявки CRM
     const result = await pool.query('SELECT * FROM requests ORDER BY created_at DESC LIMIT 200');
     res.json(result.rows);
   } catch (err) {
@@ -796,13 +874,40 @@ app.get('/api/requests', authenticateToken, async (req, res) => {
   }
 });
 
-// Создать новую заявку
+// Получить список СТРОГО СВОИХ обращений (для мобильного приложения абонента)
+app.get('/api/user/my-requests', authenticateToken, async (req, res) => {
+  const userId = req.user?.id;
+  const cleanPhone = (req.user?.phone || '').replace(/\D/g, '').slice(-10);
+
+  try {
+    let query = '';
+    let params = [];
+    if (cleanPhone && userId) {
+      query = "SELECT * FROM requests WHERE client_id = $1 OR (phone IS NOT NULL AND phone != '' AND regexp_replace(phone, '\\D', '', 'g') LIKE $2) ORDER BY created_at DESC LIMIT 50";
+      params = [userId, `%${cleanPhone}%`];
+    } else if (userId) {
+      query = 'SELECT * FROM requests WHERE client_id = $1 ORDER BY created_at DESC LIMIT 50';
+      params = [userId];
+    } else {
+      return res.json([]);
+    }
+
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('[Бэкенд: Мои заявки] Ошибка:', err.message);
+    res.json([]);
+  }
+});
+
+// Создать новую заявку с автоматической привязкой client_id
 app.post('/api/requests', authenticateToken, async (req, res) => {
   const { name, phone, address, message, priority, status } = req.body;
+  const clientId = req.user?.id || null;
   try {
     const result = await pool.query(
-      'INSERT INTO requests (name, phone, address, message, priority, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [name, phone, address, message, priority || 'medium', status || 'new']
+      'INSERT INTO requests (name, phone, address, message, priority, status, client_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+      [name, phone, address, message, priority || 'medium', status || 'new', clientId]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {

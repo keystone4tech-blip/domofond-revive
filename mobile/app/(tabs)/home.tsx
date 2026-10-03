@@ -1,6 +1,3 @@
-// mobile/app/(tabs)/home.tsx — Главный экран личного кабинета абонента «Домофондар»
-// Привязывает лицевой счёт жильца по телефону/адресу, отображает долг и быстрые действия
-
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -9,16 +6,17 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  SafeAreaView,
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/store/auth.store';
 import { apiClient } from '@/api/client';
 
 export default function HomeScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { user, loadProfile } = useAuthStore();
 
   const [refreshing, setRefreshing] = useState(false);
@@ -31,64 +29,41 @@ export default function HomeScreen() {
   } | null>(null);
   const [recentRequests, setRecentRequests] = useState<any[]>([]);
 
-  // Загрузка реальных данных из базы данных сервера
+  // Загрузка реальных данных из базы данных сервера (строгая изоляция личного кабинета)
   const loadDashboardData = useCallback(async () => {
     try {
-      console.log('[Home UI] Загрузка данных абонента с сервера...');
+      console.log('[Home UI] Загрузка персональных данных абонента...');
 
       // 1. Обновляем профиль пользователя
       await loadProfile();
 
-      // 2. Ищем лицевой счёт жильца
-      let foundAccount = null;
-      const cleanPhone = user?.phone ? user.phone.replace(/\D/g, '').slice(-10) : '';
-
-      // А. Сначала ищем по номеру телефона
-      if (cleanPhone) {
-        try {
-          const resPhone = await apiClient.get(`/api/accounts?search=${cleanPhone}`);
-          if (Array.isArray(resPhone.data) && resPhone.data.length > 0) {
-            foundAccount = resPhone.data[0];
-            console.log(`[Home UI] Лицевой счёт найден по телефону: ${foundAccount.account_number}`);
-          }
-        } catch (e) {
-          console.warn('[Home UI] Поиск по телефону не дал результатов');
-        }
-      }
-
-      // Б. Если не найден по телефону, ищем по адресу из профиля
-      if (!foundAccount && (user as any)?.address) {
-        try {
-          const resAddr = await apiClient.get(`/api/accounts?search=${encodeURIComponent((user as any).address)}`);
-          if (Array.isArray(resAddr.data) && resAddr.data.length > 0) {
-            foundAccount = resAddr.data[0];
-            console.log(`[Home UI] Лицевой счёт найден по адресу: ${foundAccount.account_number}`);
-          }
-        } catch (e) {
-          console.warn('[Home UI] Поиск по адресу не дал результатов');
-        }
-      }
-
-      // В. Если поиск с фильтром пуст, берем первый доступный для демонстрации
-      if (!foundAccount) {
-        try {
-          const allRes = await apiClient.get('/api/accounts');
-          if (Array.isArray(allRes.data) && allRes.data.length > 0) {
-            foundAccount = allRes.data[0];
-          }
-        } catch (e) {}
-      }
-
-      setAccount(foundAccount);
-
-      // 3. Получаем последние заявки жильца
+      // 2. Ищем лицевой счёт СТРОГО текущего жильца через защищенный эндпоинт
       try {
-        const requestsRes = await apiClient.get('/api/requests');
+        const myAccRes = await apiClient.get('/api/user/my-account');
+        if (myAccRes.data && myAccRes.data.account_number) {
+          console.log(`[Home UI] Лицевой счёт абонента подтвержден: ${myAccRes.data.account_number}`);
+          setAccount(myAccRes.data);
+        } else {
+          console.log('[Home UI] Лицевой счёт к профилю пока не привязан');
+          setAccount(null);
+        }
+      } catch (accErr) {
+        console.warn('[Home UI] Ошибка при запросе лицевого счёта:', accErr);
+        setAccount(null);
+      }
+
+      // 3. Получаем последние заявки СТРОГО текущего жильца
+      try {
+        const requestsRes = await apiClient.get('/api/user/my-requests');
         if (Array.isArray(requestsRes.data)) {
+          console.log(`[Home UI] Загружено личных заявок абонента: ${requestsRes.data.length}`);
           setRecentRequests(requestsRes.data.slice(0, 3));
+        } else {
+          setRecentRequests([]);
         }
       } catch (reqErr) {
-        console.warn('[Home UI] Заявки пока отсутствуют');
+        console.warn('[Home UI] Личные заявки пока отсутствуют');
+        setRecentRequests([]);
       }
     } catch (err) {
       console.warn('[Home UI] Ошибка при загрузке данных с сервера:', err);
@@ -96,7 +71,7 @@ export default function HomeScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [user?.phone, (user as any)?.address]);
+  }, [loadProfile]);
 
   useEffect(() => {
     loadDashboardData();
@@ -111,10 +86,14 @@ export default function HomeScreen() {
   const debt = account ? Number(account.debt_amount || 0) : 0;
   const hasDebt = debt > 0;
 
+  // Динамические безопасные отступы сверху и снизу
+  const safeTopPadding = Math.max(insets.top, 16) + 10;
+  const safeBottomPadding = 80 + (insets.bottom > 0 ? insets.bottom : 16);
+
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.safeArea}>
       <ScrollView
-        contentContainerStyle={styles.container}
+        contentContainerStyle={[styles.container, { paddingTop: safeTopPadding, paddingBottom: safeBottomPadding }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#10B981" />}
       >
         {/* Шапка с приветствием */}

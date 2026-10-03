@@ -9,28 +9,30 @@ import {
   FlatList,
   TouchableOpacity,
   RefreshControl,
-  SafeAreaView,
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiClient } from '@/api/client';
 
 export default function RequestsScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Загружаем только обращения авторизованного пользователя для защиты конфиденциальности
   const fetchRequests = useCallback(async () => {
     try {
-      console.log('[Requests UI] Запрос списка заявок...');
-      const res = await apiClient.get('/api/requests');
+      console.log('[Requests UI] Запрос личных заявок пользователя через /api/user/my-requests...');
+      const res = await apiClient.get('/api/user/my-requests');
       if (Array.isArray(res.data)) {
         setRequests(res.data);
       }
     } catch (err) {
-      console.warn('[Requests UI] Ошибка загрузки заявок:', err);
+      console.warn('[Requests UI] Ошибка загрузки личных заявок:', err);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -99,8 +101,11 @@ export default function RequestsScreen() {
     );
   };
 
+  const safeTop = Math.max(insets.top, 16) + 8;
+  const safeBottom = Math.max(insets.bottom, 12) + 75;
+
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={[styles.safeArea, { paddingTop: safeTop }]}>
       <View style={styles.header}>
         <Text style={styles.title}>Мои заявки</Text>
         <TouchableOpacity
@@ -122,7 +127,7 @@ export default function RequestsScreen() {
           data={requests}
           renderItem={renderItem}
           keyExtractor={(item, idx) => item.id?.toString() || idx.toString()}
-          contentContainerStyle={styles.listContainer}
+          contentContainerStyle={[styles.listContainer, { paddingBottom: safeBottom }]}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#10B981" />}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
@@ -135,7 +140,7 @@ export default function RequestsScreen() {
           }
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
