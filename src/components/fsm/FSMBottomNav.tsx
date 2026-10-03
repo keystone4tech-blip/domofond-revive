@@ -166,9 +166,9 @@ const FSMBottomNav = ({ activeTab, onTabChange, isManager }: FSMBottomNavProps) 
         />
       )}
 
-      {/* Выпадающее подменю для Задач или Заявок */}
+      {/* Выпадающее подменю для Задач или Заявок (открывается прямо над фиксированной нижней панелью) */}
       {showSubmenu && (
-        <div className="fixed bottom-16 left-4 right-4 z-50 lg:hidden bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200/50 dark:border-slate-800/50 rounded-2xl shadow-2xl p-4 animate-in slide-in-from-bottom-4 duration-300">
+        <div className="fixed bottom-20 left-3 right-3 z-50 lg:hidden bg-card/95 dark:bg-slate-900/95 backdrop-blur-xl border border-border/80 dark:border-slate-800 rounded-3xl shadow-2xl p-4 animate-in slide-in-from-bottom-5 duration-300">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-bold text-foreground text-sm tracking-wide uppercase">
               {showTasksSubmenu ? "Фильтр задач" : "Фильтр заявок"}
@@ -213,9 +213,9 @@ const FSMBottomNav = ({ activeTab, onTabChange, isManager }: FSMBottomNavProps) 
         </div>
       )}
 
-      {/* Шторка "Еще" (Дополнительное меню менеджера) */}
+      {/* Шторка "Еще" (Дополнительное меню менеджера, открывается над фиксированной панелью) */}
       {showMoreMenu && (
-        <div className="fixed bottom-16 left-4 right-4 z-50 lg:hidden bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200/50 dark:border-slate-800/50 rounded-2xl shadow-2xl p-4 animate-in slide-in-from-bottom-4 duration-300 max-h-[70vh] overflow-y-auto custom-scrollbar">
+        <div className="fixed bottom-20 left-3 right-3 z-50 lg:hidden bg-card/95 dark:bg-slate-900/95 backdrop-blur-xl border border-border/80 dark:border-slate-800 rounded-3xl shadow-2xl p-4 animate-in slide-in-from-bottom-5 duration-300 max-h-[75vh] overflow-y-auto custom-scrollbar">
           <div className="flex items-center justify-between mb-4 border-b border-slate-100 dark:border-slate-800/80 pb-2">
             <h3 className="font-bold text-foreground text-sm tracking-wide uppercase">Дополнительные разделы</h3>
             <button
@@ -396,9 +396,9 @@ const FSMBottomNav = ({ activeTab, onTabChange, isManager }: FSMBottomNavProps) 
         </div>
       )}
 
-      {/* Основной стеклянный нижний навигационный бар */}
-      <nav className="fixed bottom-3 left-4 right-4 z-50 lg:hidden bg-white/75 dark:bg-slate-900/75 backdrop-blur-lg border border-white/20 dark:border-slate-800/50 shadow-2xl rounded-2xl transition-all duration-300">
-        <div className="flex justify-around items-center h-16 px-2">
+      {/* Фиксированный нижний навигационный бар (жестко закреплен внизу экрана, идентично основному сайту) */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-t border-border safe-area-inset-bottom shadow-lg">
+        <div className="flex justify-around items-center h-16 px-1">
           
           {/* Основные кнопки */}
           {mainItems.map((item) => {

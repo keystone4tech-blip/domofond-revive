@@ -258,6 +258,16 @@ export const KIND_META: Record<Kind, { label: string; badgeCls: string }> = {
  */
 export const PROJECT_CHANGELOG: ProjectEntry[] = [
   {
+    id: "stage-2026-10-03-2230",
+    datetime: "2026-10-03 22:30",
+    title: "Мобильная адаптация: жесткая фиксация нижних навигационных панелей в CRM FSM и Админ-панели",
+    description: "Устранено нежелательное 'плавание' и дрожание нижних навигационных панелей на смартфонах в разделах /fsm и /admin. В FSMBottomNav.tsx убран плавающий островной стиль, панель закреплена намертво к нижнему краю экрана (fixed bottom-0 left-0 right-0 z-50 safe-area-inset-bottom, backdrop-blur-md) по единому эталону главного сайта. В Admin.tsx панель вынесена из внутреннего скроллируемого контейнера с transition-all на корневой уровень разметки, что устранило баг скролла мобильных браузеров. Подменю и фильтры согласованы по отступу bottom-20.",
+    module: "crm_fsm",
+    kind: "improvement",
+    hours: 2,
+    difficulty: "Средняя",
+  },
+  {
     id: "stage-2026-10-03-2215",
     datetime: "2026-10-03 22:15",
     title: "Ремонт и оптимизация Android APK: схемы подписи v1/v2, сжатие .so и прямая выгрузка в GitHub Releases",

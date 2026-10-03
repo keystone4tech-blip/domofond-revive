@@ -15,7 +15,53 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { Search, Users, Trash2, ShieldCheck, ShieldAlert, Phone, Mail, Hash, RefreshCw, Pencil, Loader2 } from "lucide-react";
+import { Search, Users, Trash2, ShieldCheck, ShieldAlert, Phone, Mail, Hash, RefreshCw, Pencil, Loader2, Link2 } from "lucide-react";
+
+// Нормализация адреса — ТА ЖЕ логика, что в кабинете (DebtCard), чтобы привязка совпадала 1:1.
+const normStreet = (str: string) => {
+  if (!str) return "";
+  let c = str.toLowerCase().trim();
+  if (c.includes(",")) { const parts = c.split(","); if (parts.length >= 2) c = parts[1].trim(); }
+  return c
+    .replace(/^(г\.|город|пос\.|поселок|аул|п\.|х\.|хутор|ст\.|станица)\s+[^,]+/gi, "")
+    .replace(/(?:\b(?:ул\.?|улица|пер\.?|переулок|проспект|пр-кт|пр\.?|аллея|бульвар|тракт|шоссе)\b|\(ул\))\s*/gi, "")
+    .replace(/(?:^|\s)(?:им\.?|имени|генерала?|академика?|маршала?|улице)(?:\s|$)/gi, "")
+    .replace(/[^а-яa-z0-9]/g, "")
+    .trim();
+};
+const normHouse = (h: string) =>
+  (h || "").toLowerCase().trim()
+    .replace(/^(д\.\s*|дом\s*)/i, "")
+    .replace(/(?:корп\.?|корпус)\s*/gi, "к")
+    .replace(/[^а-яa-z0-9]/g, "").trim();
+const normApt = (a: string) =>
+  (a || "").toLowerCase().trim()
+    .replace(/^(кв\.\s*|квартира\s*)/i, "")
+    .replace(/[^а-яa-z0-9]/g, "").trim();
+const extractApt = (addr: string) => {
+  const m = (addr || "").match(/,\s*(?:кв\.?|квартира)\s*([а-яa-z0-9-+]+)/i);
+  return m ? m[1].trim() : "";
+};
+// Подбор лицевого счёта из списка accounts по нормализованным улице+дому+квартире.
+const findAccountNumber = (u: any, accounts: any[]): string | null => {
+  const uStreet = normStreet(u.address || "");
+  const hm = (u.address || "").match(/д\.?\s*(\d+[а-яa-z]?)/i);
+  const uHouse = normHouse(hm ? hm[1] : "");
+  const uApt = normApt((u.apartment || "").toString() || extractApt(u.address || ""));
+  if (!uStreet || !uHouse || !uApt) return null;
+  for (const a of accounts) {
+    const dbParts = (a.address || "").split(",");
+    if (dbParts.length < 3) continue;
+    const dbStreet = normStreet(dbParts[1]);
+    const dbHouseFull = dbParts.slice(2).join(", ")
+      .replace(/,\s*(?:п(?:одъезд)?\.?\s*\d+).*$/i, "")
+      .replace(/,\s*(?:кв\.?\s*[а-яa-z0-9-+]+).*$/i, "");
+    const dbHouse = normHouse(dbHouseFull);
+    const dbApt = normApt((a.apartment || "").toString().trim() || extractApt(a.address || ""));
+    if (dbStreet === uStreet && dbHouse === uHouse && dbApt === uApt) return a.account_number;
+  }
+  return null;
+};
 
 // Личные кабинеты: все зарегистрированные пользователи с полной информацией, поиском,
 // фильтрами и мягким удалением (с подтверждением и записью «кто удалил»).
@@ -31,6 +77,10 @@ export const UsersManager: React.FC = () => {
   const [editUser, setEditUser] = useState<any | null>(null);
   const [editForm, setEditForm] = useState({ full_name: "", phone: "", address: "", apartment: "", floor: "", account_number: "" });
   const [saving, setSaving] = useState(false);
+
+  // Массовая автопривязка лицевых счетов по адресу (решает backlog непривязанных профилей)
+  const [linking, setLinking] = useState(false);
+  const [linkPreview, setLinkPreview] = useState<{ matches: any[] } | null>(null);
 
   const openEdit = (u: any) => {
     setEditForm({
@@ -68,6 +118,54 @@ export const UsersManager: React.FC = () => {
     } finally {
       setSaving(false);
     }
+  };
+
+  // Подбор счетов: для каждого профиля без account_number ищем совпадение в accounts по адресу.
+  const scanAccounts = async () => {
+    setLinking(true);
+    try {
+      const candidates = users.filter((u) => !u.account_number && u.address);
+      const matches: any[] = [];
+      for (const u of candidates) {
+        const uStreet = normStreet(u.address || "");
+        const hm = (u.address || "").match(/д\.?\s*(\d+[а-яa-z]?)/i);
+        const house = hm ? hm[1] : "";
+        const uApt = normApt((u.apartment || "").toString() || extractApt(u.address || ""));
+        if (!uStreet || !house || !uApt) continue;
+        const rawStreet = ((u.address || "").split(",")[1] || "").replace(/(?:\bул\.?\b|улица|\(ул\))/gi, "").trim();
+        if (!rawStreet) continue;
+        const { data: accs } = await supabase
+          .from("accounts")
+          .select("account_number, address, apartment")
+          .ilike("address", `%${rawStreet}%${house}%`)
+          .limit(500);
+        const acc = findAccountNumber(u, accs || []);
+        if (acc) matches.push({ id: u.id, name: u.full_name || u.phone || u.id, address: u.address, apartment: u.apartment, account_number: acc });
+      }
+      setLinkPreview({ matches });
+    } catch (e: any) {
+      toast({ title: "Ошибка подбора счетов", description: e.message, variant: "destructive" });
+    } finally {
+      setLinking(false);
+    }
+  };
+
+  // Применяем подобранные привязки: записываем account_number в профили.
+  const applyLink = async () => {
+    if (!linkPreview) return;
+    setLinking(true);
+    let ok = 0, fail = 0;
+    for (const m of linkPreview.matches) {
+      try {
+        const { error } = await supabase.from("profiles").update({ account_number: m.account_number }).eq("id", m.id);
+        if (error) throw error;
+        ok++;
+      } catch { fail++; }
+    }
+    toast({ title: "Привязка завершена", description: `Привязано счетов: ${ok}${fail ? `, ошибок: ${fail}` : ""}.` });
+    setLinkPreview(null);
+    setLinking(false);
+    refetch();
   };
 
   const { data: users = [], isLoading, refetch } = useQuery({
@@ -134,7 +232,12 @@ export const UsersManager: React.FC = () => {
           <h2 className="text-xl font-bold flex items-center gap-2"><Users className="h-5 w-5 text-primary" /> Личные кабинеты</h2>
           <p className="text-sm text-muted-foreground">Все зарегистрированные пользователи. Найдено: {filtered.length} из {users.length}.</p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => refetch()} className="gap-1.5"><RefreshCw className="h-4 w-4" /> Обновить</Button>
+        <div className="flex gap-1.5">
+          <Button variant="outline" size="sm" onClick={scanAccounts} disabled={linking} className="gap-1.5" title="Автоматически найти и привязать лицевые счета по адресу для профилей без счёта">
+            {linking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />} Привязать счета
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => refetch()} className="gap-1.5"><RefreshCw className="h-4 w-4" /> Обновить</Button>
+        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-2">
@@ -255,6 +358,45 @@ export const UsersManager: React.FC = () => {
             <Button onClick={saveEdit} disabled={saving} className="gap-1.5">
               {saving && <Loader2 className="h-4 w-4 animate-spin" />} Сохранить
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Диалог предпросмотра и подтверждения массовой привязки счетов */}
+      <Dialog open={!!linkPreview} onOpenChange={(o) => { if (!o) setLinkPreview(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Link2 className="h-4 w-4 text-primary" /> Привязка лицевых счетов</DialogTitle>
+          </DialogHeader>
+          {linkPreview && linkPreview.matches.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-2">
+              Автоматических совпадений по адресу не найдено. Лицевой счёт можно привязать вручную через кнопку «Изменить» у нужного пользователя.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-sm">
+                Найдено совпадений по адресу: <b>{linkPreview?.matches.length}</b>. Проверьте список — счёт будет записан в профиль, и баланс подтянется и в кабинете, и в заявках.
+              </p>
+              <div className="max-h-[320px] overflow-y-auto divide-y border rounded-md">
+                {linkPreview?.matches.map((m) => (
+                  <div key={m.id} className="p-2 text-xs flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">{m.name}</div>
+                      <div className="text-muted-foreground truncate">{m.address}{m.apartment ? `, кв. ${m.apartment}` : ""}</div>
+                    </div>
+                    <Badge variant="outline" className="font-mono gap-1 shrink-0"><Hash className="h-3 w-3" />{m.account_number}</Badge>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLinkPreview(null)} disabled={linking}>Закрыть</Button>
+            {linkPreview && linkPreview.matches.length > 0 && (
+              <Button onClick={applyLink} disabled={linking} className="gap-1.5">
+                {linking && <Loader2 className="h-4 w-4 animate-spin" />} Привязать {linkPreview.matches.length}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

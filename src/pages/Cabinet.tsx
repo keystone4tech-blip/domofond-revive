@@ -442,6 +442,18 @@ const DebtCard = ({
         }
       }
 
+      // Автопривязка: счёт найден по адресу, а в профиле он ещё не сохранён —
+      // записываем account_number обратно в профиль, чтобы привязка стала постоянной
+      // и л/с с балансом отображались везде (в т.ч. в заявках CRM), без повторного перебора.
+      if (best && userId && !accountNumber) {
+        try {
+          await supabase.from("profiles").update({ account_number: best.account_number }).eq("id", userId);
+          console.log(`[Баланс] Автопривязка: лицевой счёт ${best.account_number} сохранён в профиль ${userId}`);
+        } catch (linkErr) {
+          console.warn("[Баланс] Не удалось автоматически привязать счёт к профилю:", linkErr);
+        }
+      }
+
       setAccount(best);
       if (setParentAccount) {
         setParentAccount(best);

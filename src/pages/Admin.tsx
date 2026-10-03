@@ -297,64 +297,64 @@ const Admin = () => {
             </TabsContent>
           </Tabs>
         </main>
-
-        {/* Компактный нижний тулбар администратора для мобильных экранов (lg:hidden) */}
-        <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-md border-t border-border safe-area-inset-bottom shadow-lg">
-          <div className="flex items-center justify-around h-16 px-1.5">
-            {/* 1. Кнопка открытия всех 17 разделов */}
-            <button
-              onClick={() => setIsMobileSidebarOpen(true)}
-              className="flex flex-col items-center justify-center flex-1 h-full gap-0.5 text-muted-foreground hover:text-foreground active:scale-95 transition-all"
-            >
-              <Menu className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-              <span className="text-[10px] font-bold text-foreground">Разделы</span>
-            </button>
-
-            {/* 2. Расчёты тарифов */}
-            <button
-              onClick={() => setActiveTab("calculations")}
-              className={cn(
-                "flex flex-col items-center justify-center flex-1 h-full gap-0.5 transition-all active:scale-95",
-                activeTab === "calculations" ? "text-purple-600 dark:text-purple-400 font-bold" : "text-muted-foreground"
-              )}
-            >
-              <Calculator className="h-5 w-5" />
-              <span className="text-[10px] font-medium">Расчёты</span>
-            </button>
-
-            {/* 3. Лицевые счета */}
-            <button
-              onClick={() => setActiveTab("accounts")}
-              className={cn(
-                "flex flex-col items-center justify-center flex-1 h-full gap-0.5 transition-all active:scale-95",
-                activeTab === "accounts" ? "text-purple-600 dark:text-purple-400 font-bold" : "text-muted-foreground"
-              )}
-            >
-              <CreditCard className="h-5 w-5" />
-              <span className="text-[10px] font-medium">Счета</span>
-            </button>
-
-            {/* 4. CRM FSM */}
-            <Link
-              to="/fsm"
-              className="flex flex-col items-center justify-center flex-1 h-full gap-0.5 text-blue-600 dark:text-blue-400 hover:text-blue-700 active:scale-95 transition-all"
-            >
-              <LayoutDashboard className="h-5 w-5" />
-              <span className="text-[10px] font-semibold">CRM FSM</span>
-            </Link>
-
-            {/* 5. Личный кабинет */}
-            <Link
-              to="/cabinet"
-              className="flex flex-col items-center justify-center flex-1 h-full gap-0.5 text-muted-foreground hover:text-foreground active:scale-95 transition-all"
-            >
-              <User className="h-5 w-5" />
-              <span className="text-[10px] font-semibold">Кабинет</span>
-            </Link>
-          </div>
-        </nav>
-
       </div>
+
+      {/* Компактный нижний тулбар администратора для мобильных экранов (lg:hidden) */}
+      {/* Вынесен на корневой уровень страницы для исключения конфликтов с transition-all и скроллом */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-t border-border safe-area-inset-bottom shadow-lg">
+        <div className="flex items-center justify-around h-16 px-1">
+          {/* 1. Кнопка открытия всех 17 разделов */}
+          <button
+            onClick={() => setIsMobileSidebarOpen(true)}
+            className="flex flex-col items-center justify-center flex-1 h-full gap-0.5 text-muted-foreground hover:text-foreground active:scale-95 transition-all"
+          >
+            <Menu className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+            <span className="text-[10px] font-bold text-foreground">Разделы</span>
+          </button>
+
+          {/* 2. Расчёты тарифов */}
+          <button
+            onClick={() => setActiveTab("calculations")}
+            className={cn(
+              "flex flex-col items-center justify-center flex-1 h-full gap-0.5 transition-all active:scale-95",
+              activeTab === "calculations" ? "text-purple-600 dark:text-purple-400 font-bold" : "text-muted-foreground"
+            )}
+          >
+            <Calculator className="h-5 w-5" />
+            <span className="text-[10px] font-medium">Расчёты</span>
+          </button>
+
+          {/* 3. Лицевые счета */}
+          <button
+            onClick={() => setActiveTab("accounts")}
+            className={cn(
+              "flex flex-col items-center justify-center flex-1 h-full gap-0.5 transition-all active:scale-95",
+              activeTab === "accounts" ? "text-purple-600 dark:text-purple-400 font-bold" : "text-muted-foreground"
+            )}
+          >
+            <CreditCard className="h-5 w-5" />
+            <span className="text-[10px] font-medium">Счета</span>
+          </button>
+
+          {/* 4. CRM FSM */}
+          <Link
+            to="/fsm"
+            className="flex flex-col items-center justify-center flex-1 h-full gap-0.5 text-blue-600 dark:text-blue-400 hover:text-blue-700 active:scale-95 transition-all"
+          >
+            <LayoutDashboard className="h-5 w-5" />
+            <span className="text-[10px] font-semibold">CRM FSM</span>
+          </Link>
+
+          {/* 5. Личный кабинет */}
+          <Link
+            to="/cabinet"
+            className="flex flex-col items-center justify-center flex-1 h-full gap-0.5 text-muted-foreground hover:text-foreground active:scale-95 transition-all"
+          >
+            <User className="h-5 w-5" />
+            <span className="text-[10px] font-semibold">Кабинет</span>
+          </Link>
+        </div>
+      </nav>
     </div>
   );
 };
