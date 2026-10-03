@@ -17,8 +17,8 @@ jobs:
       - name: 🚚 Checkout кодовой базы
         uses: actions/checkout@v4
 
-      - name: 🧹 Исключение мобильного приложения из серверного деплоя
-        run: rm -rf mobile .git
+      - name: 🧹 Исключение несерверных и тяжелых файлов из деплоя
+        run: rm -rf mobile .git dist apk_android "Claude outputs" media/app
 
       - name: 📂 Копирование файлов на сервер по SSH
         uses: appleboy/scp-action@master
