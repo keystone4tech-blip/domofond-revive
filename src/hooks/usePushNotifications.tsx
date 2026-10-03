@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
-const VAPID_PUBLIC_KEY = 'BKnzAAYc68ghFIetuQXHvo4e2qRUzBmbrQ1xUs_GQsahkrVZd3JX3rCfxUnTah0rRwwzu6xNN-ibL5KoH6UdkSg';
+const VAPID_PUBLIC_KEY = 'BMtT_rV9lCDsuzvpv85rWY2my2lbmLXN36E4LDUnR9pQJM0aMiCAEFMQ0yKYAw4UoUoZktLP6GXDXNzATAc_IsA';
 
 type BadgeNavigator = Navigator & {
   clearAppBadge?: () => Promise<void>;

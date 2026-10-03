@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useUserRole } from "@/hooks/useUserRole";
 import EmployeeOnboarding from "@/components/EmployeeOnboarding";
+import PushNotificationToggle from "@/components/fsm/PushNotificationToggle";
 import { Loader2, LogOut, CheckCircle, Check, AlertCircle, AlertTriangle, ClipboardList, Calendar, Shield, CreditCard, Wallet, Pencil, Trash2, UserCheck, Plus, Minus, Clock, Wrench, CheckCircle2, XCircle, Send, Smartphone, KeyRound, PhoneCall, Headphones, DoorOpen, DoorClosed, Info, User, Phone, Mail, Lock, Lightbulb, Hash, MapPin, Building, Home, Building2, History, FileSpreadsheet, Copy, Eye, EyeOff, ShieldCheck, Sparkles, LayoutDashboard, Zap, Printer, Receipt, FileText, ShoppingBag, HeartHandshake } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -4862,6 +4863,8 @@ const Cabinet = () => {
                   Дневник разработки
                 </ShinyButton>
               )}
+              {/* Push-уведомления (показывается на мобильных устройствах) */}
+              <PushNotificationToggle />
               {/* Кнопка выхода из системы */}
               <ShinyButton onClick={handleLogout} className="py-1 px-3 text-xs rounded-xl h-9">
                 <LogOut className="h-3.5 w-3.5 mr-1" />

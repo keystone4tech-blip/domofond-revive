@@ -1934,7 +1934,7 @@ app.post('/api/voting/submit', async (req, res) => {
 // Работает при заданных VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY в .env; иначе просто логирует.
 // ------------------------------------------------------------------------------
 let webpush = null;
-const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || 'BKnzAAYc68ghFIetuQXHvo4e2qRUzBmbrQ1xUs_GQsahkrVZd3JX3rCfxUnTah0rRwwzu6xNN-ibL5KoH6UdkSg';
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || 'BMtT_rV9lCDsuzvpv85rWY2my2lbmLXN36E4LDUnR9pQJM0aMiCAEFMQ0yKYAw4UoUoZktLP6GXDXNzATAc_IsA';
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || '';
 try {
   webpush = require('web-push');
