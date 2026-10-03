@@ -22,7 +22,15 @@ jobs:
           mkdir -p ../bundle_tmp
           tar -czf ../bundle_tmp/deploy_bundle.tar.gz --exclude='./mobile' --exclude='./dist' --exclude='./node_modules' --exclude='./apk_android' --exclude='./Claude outputs' --exclude='./.git' .
           mv ../bundle_tmp/deploy_bundle.tar.gz ./deploy_bundle.tar.gz
-          ls -lh deploy_bundle.tar.gz
+      - name: 🔍 Проверка подключения SSH к серверу
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          script: |
+            echo "SSH УСПЕШНО ПОДКЛЮЧЕН! Хост: $(hostname)"
+            docker ps --format "table {{.Names}}\t{{.Status}}"
 
       - name: 📂 Передача архива на сервер по SSH
         uses: appleboy/scp-action@master
