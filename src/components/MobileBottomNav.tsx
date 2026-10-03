@@ -83,6 +83,9 @@ const MobileBottomNav = () => {
     ["admin", "director", "superadmin"].includes(r)
   );
 
+  // Доступ к Инженерному паспорту строго закрыт для всех и открыт ИСКЛЮЧИТЕЛЬНО суперадмину
+  const isSuperAdmin = ((user?.email || "").toLowerCase().trim() === "viruscorp4@gmail.com") || userRoles.includes("superadmin");
+
   // На страницах админки (/admin) и CRM (/fsm) глобальную нижнюю панель скрываем,
   // так как там используются свои специализированные мобильные тулбары
   if (location.pathname.startsWith("/fsm") || location.pathname.startsWith("/admin")) {
@@ -359,8 +362,8 @@ const MobileBottomNav = () => {
                 </button>
               )}
 
-              {/* Инженерный паспорт — строго ТОЛЬКО ДЛЯ АДМИНИСТРАТОРА (по требованию) */}
-              {isAdmin && (
+              {/* Инженерный паспорт — СТРОГО ТОЛЬКО ДЛЯ СУПЕРАДМИНИСТРАТОРА */}
+              {isSuperAdmin && (
                 <button
                   onClick={() => handleNavigate("/project")}
                   className="w-full flex items-center justify-between p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 font-semibold text-xs border border-amber-500/20 active:scale-95 transition-transform"

@@ -38,8 +38,15 @@ const menuItems = [
   { id: "deleted", label: "🗑️ Корзина удалённых", icon: Trash2 },
 ];
 
+import { useUserRole } from "@/hooks/useUserRole";
+import { SUPERADMIN_EMAIL } from "@/data/projectChangelog";
+
 export const AdminSidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }: AdminSidebarProps) => {
   const navigate = useNavigate();
+  const { user, isSuperAdmin: isSuperAdminRole } = useUserRole();
+
+  // Доступ к Инженерному паспорту строго закрыт для всех и разрешен ИСКЛЮЧИТЕЛЬНО суперадмину
+  const isSuperAdmin = ((user?.email || "").toLowerCase().trim() === SUPERADMIN_EMAIL) || isSuperAdminRole;
 
   // Логирование и переключение активной вкладки
   const handleTabClick = (tabId: string) => {
@@ -113,15 +120,17 @@ export const AdminSidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }: Adm
       {/* Нижний блок быстрых переходов: Инженерный паспорт (только для админа), CRM, ЛК, Сайт и Выход */}
       <div className="p-3 border-t border-slate-100 dark:border-slate-800/80 space-y-1 bg-slate-50/60 dark:bg-slate-900/60">
         
-        {/* Инженерный паспорт платформы — доступен ТОЛЬКО администраторам */}
-        <Link 
-          to="/project" 
-          onClick={() => setIsOpen && setIsOpen(false)}
-          className="flex items-center gap-3 px-3.5 py-2 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-400 bg-amber-50/80 dark:bg-amber-950/30 border border-amber-300/40 dark:border-amber-800/40 hover:bg-amber-100/80 transition-all"
-        >
-          <FileCode2 className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-          <span className="truncate">Инженерный паспорт (877 ч)</span>
-        </Link>
+        {/* Инженерный паспорт платформы — доступен СТРОГО СУПЕРАДМИНИСТРАТОРУ */}
+        {isSuperAdmin && (
+          <Link 
+            to="/project" 
+            onClick={() => setIsOpen && setIsOpen(false)}
+            className="flex items-center gap-3 px-3.5 py-2 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-400 bg-amber-50/80 dark:bg-amber-950/30 border border-amber-300/40 dark:border-amber-800/40 hover:bg-amber-100/80 transition-all"
+          >
+            <FileCode2 className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+            <span className="truncate">Инженерный паспорт (877 ч)</span>
+          </Link>
+        )}
 
         {/* Переход в CRM FSM */}
         <Link 
