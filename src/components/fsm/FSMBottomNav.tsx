@@ -20,7 +20,7 @@ interface FSMBottomNavProps {
 const FSMBottomNav = ({ activeTab, onTabChange, isManager }: FSMBottomNavProps) => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { hasPermission } = useUserRole();
+  const { hasPermission, isAdmin } = useUserRole();
   const [showTasksSubmenu, setShowTasksSubmenu] = useState(false);
   const [showRequestsSubmenu, setShowRequestsSubmenu] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false); // Для дополнительных разделов менеджера
@@ -344,15 +344,44 @@ const FSMBottomNav = ({ activeTab, onTabChange, isManager }: FSMBottomNavProps) 
             )}
           </div>
 
-          {/* Быстрые действия: на сайт / выход */}
+          {/* Быстрые действия: ЛК, Админка, На сайт, Выход */}
           <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 grid grid-cols-2 gap-2">
             <Link 
-              to="/" 
-              className="flex items-center justify-center gap-2 p-2 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-semibold text-muted-foreground"
+              to="/cabinet" 
+              className="flex items-center justify-center gap-2 p-2 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-semibold text-foreground"
             >
-              <Home className="h-3.5 w-3.5" />
-              <span>На сайт</span>
+              <User className="h-3.5 w-3.5 text-primary" />
+              <span>Личный кабинет</span>
             </Link>
+
+            {isAdmin ? (
+              <Link 
+                to="/admin" 
+                className="flex items-center justify-center gap-2 p-2 rounded-xl border border-purple-200 dark:border-purple-950/40 bg-purple-50/50 dark:bg-purple-950/20 hover:bg-purple-100 text-xs font-bold text-purple-700 dark:text-purple-300"
+              >
+                <ShieldCheck className="h-3.5 w-3.5 text-purple-600" />
+                <span>Админ панель</span>
+              </Link>
+            ) : (
+              <Link 
+                to="/" 
+                className="flex items-center justify-center gap-2 p-2 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-semibold text-muted-foreground"
+              >
+                <Home className="h-3.5 w-3.5" />
+                <span>На сайт</span>
+              </Link>
+            )}
+
+            {isAdmin && (
+              <Link 
+                to="/" 
+                className="flex items-center justify-center gap-2 p-2 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-semibold text-muted-foreground"
+              >
+                <Home className="h-3.5 w-3.5" />
+                <span>На сайт</span>
+              </Link>
+            )}
+
             <button
               onClick={async () => {
                 await supabase.auth.signOut();

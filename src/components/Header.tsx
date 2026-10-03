@@ -156,14 +156,14 @@ const Header = () => {
 
         {/* Правый блок: телефон, переключатель темы и кнопки кабинета */}
         <div className="flex items-center gap-1 sm:gap-2 lg:gap-4 shrink-0">
-          {/* Телефон для мобильных устройств: кликабельная компактная плашка с четким номером без искажений */}
+          {/* Телефон для мобильных устройств: кликабельная компактная плашка с четким номером */}
           <a 
             href="tel:+79034118393" 
             aria-label="Позвонить: +7 (903) 411-83-93" 
             className="flex md:hidden items-center gap-1 sm:gap-1.5 px-2 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800/40 text-xs sm:text-sm font-semibold whitespace-nowrap shrink-0 hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-colors"
           >
             <Phone className="h-3.5 w-3.5 shrink-0 fill-current" />
-            <span className="tabular-nums tracking-tight font-bold">+7 (903) 411-83-93</span>
+            <span className="hidden xs:inline sm:inline tabular-nums tracking-tight font-bold">+7 (903) 411-83-93</span>
           </a>
 
           <ThemeToggle />
@@ -173,32 +173,31 @@ const Header = () => {
               {isAdmin && (
                 <ShinyButton
                   onClick={() => navigate("/admin")}
-                  className="py-1 px-2 text-xs rounded-xl bg-purple-600 hover:bg-purple-700 text-white shadow-sm shrink-0"
+                  className="hidden sm:inline-flex py-1 px-2 text-xs rounded-xl bg-purple-600 hover:bg-purple-700 text-white shadow-sm shrink-0"
                 >
                   <ShieldCheck className="h-3.5 w-3.5 sm:mr-1" />
-                  <span className="hidden sm:inline">Админ</span>
+                  <span>Админ</span>
                 </ShinyButton>
               )}
               {isFSMUser && (
                 <ShinyButton
                   onClick={() => navigate("/fsm")}
-                  className="py-1 px-2 text-xs rounded-xl shrink-0"
+                  className="hidden sm:inline-flex py-1 px-2 text-xs rounded-xl shrink-0"
                 >
                   <LayoutDashboard className="h-3.5 w-3.5 sm:mr-1" />
-                  <span className="hidden sm:inline">CRM</span>
+                  <span>CRM</span>
                 </ShinyButton>
               )}
               <ShinyButton
                 onClick={() => navigate("/cabinet")}
-                className="py-1 px-2 text-xs rounded-xl shrink-0"
+                className="py-1 px-2 sm:px-2.5 text-xs rounded-xl shrink-0"
               >
                 <User className="h-3.5 w-3.5 sm:mr-1" />
                 <span className="hidden sm:inline">Кабинет</span>
               </ShinyButton>
             </div>
           ) : (
-            // Кнопка входа для десктопа (на мобильных устройствах скрыта hidden md:inline-flex, 
-            // так как вынесена в нижний дашборд с эффектным переливом)
+            // Кнопка входа для десктопа (на мобильных устройствах вынесена в нижний бар)
             <ShinyButton
               onClick={() => {
                 console.log("[Header] Нажата кнопка входа (десктоп)");

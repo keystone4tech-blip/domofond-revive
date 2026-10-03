@@ -267,8 +267,8 @@ const FSM = () => {
           </div>
         </header>
 
-        {/* Главная рабочая область контента: отображаем только те вкладки, к которым есть доступ */}
-        <main className="flex-1 p-3 sm:p-4 lg:p-6 w-full overflow-x-hidden min-w-0">
+        {/* Главная рабочая область контента: pb-28 sm:pb-32 lg:pb-8 предотвращает перекрытие контента плавающим нижним меню */}
+        <main className="flex-1 p-3 sm:p-4 lg:p-6 pb-28 sm:pb-32 lg:pb-8 w-full overflow-x-hidden min-w-0">
           <Tabs
             value={activeTab}
             onValueChange={(val) => handleTabChange(val)}
