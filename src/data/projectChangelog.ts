@@ -258,6 +258,16 @@ export const KIND_META: Record<Kind, { label: string; badgeCls: string }> = {
  */
 export const PROJECT_CHANGELOG: ProjectEntry[] = [
   {
+    id: "stage-2026-10-03-2150",
+    datetime: "2026-10-03 21:50",
+    title: "Редизайн и генерация фирменного логотипа «ДОМОФОНДАР»",
+    description: "Разработан и внедрен обновленный фирменный логотип бренда: симметричный кибер-щит со смарт-камерой видеонаблюдения, устранение лишних элементов, русскоязычная неоновая типографика 'ДОМОФОНДАР' (гротеск Bahnschrift). Нарезаны форматы favicon.ico, pwa-192x192, pwa-512x512, apple-touch-icon и logo.png.",
+    module: "infra_mobile",
+    kind: "improvement",
+    hours: 2,
+    difficulty: "Средняя",
+  },
+  {
     id: "stage-2026-10-03-2135",
     datetime: "2026-10-03 21:35",
     title: "Активация Web-Push уведомлений: настройка VAPID на сервере",
