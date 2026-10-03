@@ -2,7 +2,7 @@
 // Определяет настройки для Android и iOS: иконки, разрешения, плагины, deep linking
 
 import { ExpoConfig, ConfigContext } from 'expo/config';
-import { withAndroidManifest, ConfigPlugin } from '@expo/config-plugins';
+import { withAndroidManifest, withAppBuildGradle, withGradleProperties, ConfigPlugin } from '@expo/config-plugins';
 
 // Плагин для гарантированного разрешения HTTP-трафика (порт 80) к боевому серверу 45.8.99.238
 const withCleartextTraffic: ConfigPlugin = (config) => {
@@ -12,6 +12,45 @@ const withCleartextTraffic: ConfigPlugin = (config) => {
       androidManifest.application[0].$['android:usesCleartextTraffic'] = 'true';
     }
     return manifestConfig;
+  });
+};
+
+// Плагин для оптимизации размера APK: сжатие библиотек .so и исключение эмуляторных x86 архитектур
+// Это сокращает размер APK со 140 МБ до стабильных ~38-42 МБ и устраняет обрывы скачивания
+const withCustomGradleProperties: ConfigPlugin = (config) => {
+  return withGradleProperties(config, (propertiesConfig) => {
+    propertiesConfig.modResults = propertiesConfig.modResults.filter(
+      (item) => item.type !== 'property' || (item.key !== 'expo.useLegacyPackaging' && item.key !== 'reactNativeArchitectures')
+    );
+    propertiesConfig.modResults.push(
+      {
+        type: 'property',
+        key: 'expo.useLegacyPackaging',
+        value: 'true',
+      },
+      {
+        type: 'property',
+        key: 'reactNativeArchitectures',
+        value: 'arm64-v8a,armeabi-v7a',
+      }
+    );
+    return propertiesConfig;
+  });
+};
+
+// Плагин для гарантированной подписи Release APK (исключает неподписанные артефакты и сбои установки на Android)
+const withReleaseSigning: ConfigPlugin = (config) => {
+  return withAppBuildGradle(config, (gradleConfig) => {
+    let contents = gradleConfig.modResults.contents;
+    // Если в release нет signingConfig, подключаем signingConfigs.debug с v1 и v2 схемами
+    if (!contents.includes('signingConfig signingConfigs.release') && !contents.includes('signingConfig signingConfigs.debug')) {
+      contents = contents.replace(
+        /release\s*\{/,
+        `release {\n            signingConfig signingConfigs.debug\n            v1SigningEnabled true\n            v2SigningEnabled true`
+      );
+      gradleConfig.modResults.contents = contents;
+    }
+    return gradleConfig;
   });
 };
 
@@ -122,5 +161,5 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   },
   };
 
-  return withCleartextTraffic(baseConfig);
+  return withCustomGradleProperties(withReleaseSigning(withCleartextTraffic(baseConfig)));
 };

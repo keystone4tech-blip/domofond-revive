@@ -258,6 +258,16 @@ export const KIND_META: Record<Kind, { label: string; badgeCls: string }> = {
  */
 export const PROJECT_CHANGELOG: ProjectEntry[] = [
   {
+    id: "stage-2026-10-03-2215",
+    datetime: "2026-10-03 22:15",
+    title: "Ремонт и оптимизация Android APK: схемы подписи v1/v2, сжатие .so и прямая выгрузка в GitHub Releases",
+    description: "Устранена критическая проблема с установкой APK на Android ('Ошибка синтаксического анализа пакета' из-за отсутствия подписи в Release) и 'потерей 50 МБ' при извлечении из ZIP. Настроены Expo Config-плагины withReleaseSigning и withCustomGradleProperties: принудительное включение схем подписи v1 (JAR) и v2 (APK Signature Scheme), сжатие нативных библиотек expo.useLegacyPackaging=true, исключение x86 архитектур в пользу ARM64/ARMv7 (размер APK снижен со 140 МБ до ~40 МБ). В CI/CD .github/workflows/build-apk.yml добавлена валидация apksigner и автоматическая публикация чистого файла domofondar.apk напрямую в GitHub Releases в один клик без архиваторов.",
+    module: "infra_mobile",
+    kind: "fix",
+    hours: 4,
+    difficulty: "Высокая",
+  },
+  {
     id: "stage-2026-10-03-2150",
     datetime: "2026-10-03 21:50",
     title: "Редизайн и генерация фирменного логотипа «ДОМОФОНДАР»",

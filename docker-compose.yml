@@ -41,6 +41,7 @@ services:
       - PORT=5000
     volumes:
       - ./backups:/backups
+      - ./public/media:/app/public/media
     depends_on:
       - db
     expose:
@@ -83,6 +84,7 @@ services:
       # Сертификаты Let's Encrypt и ACME challenge
       - ./certbot/conf:/etc/letsencrypt:ro
       - ./certbot/www:/var/www/certbot:ro
+      - ./public/media:/usr/share/nginx/html/media:ro
     depends_on:
       - backend
       - postgrest
