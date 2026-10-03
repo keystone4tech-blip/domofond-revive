@@ -54,8 +54,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'npm'
-          cache-dependency-path: mobile/package-lock.json
 
       # 3. Настройка Java JDK 17
       - name: ☕ Настройка Java JDK 17
@@ -63,11 +61,6 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-          cache: 'gradle'
-
-      # 4. Настройка Android SDK Build-Tools и кеширование Gradle
-      - name: 🤖 Подготовка Android SDK
-        uses: android-actions/setup-android@v3
 
       # 5. Установка npm зависимостей мобильного приложения
       - name: 📦 Установка зависимостей мобильного приложения
