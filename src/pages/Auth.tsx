@@ -18,7 +18,7 @@ const Auth = () => {
   const [confirmPassword, setConfirmPassword] = useState(""); // Стейт для подтверждения пароля (повторный ввод)
   const [fullName, setFullName] = useState(""); // Стейт для полного имени (передается пустым при регистрации)
   const [loading, setLoading] = useState(false); // Стейт процесса загрузки запроса к API
-  const [agreedToTerms, setAgreedToTerms] = useState(true); // Стейт согласия на обработку персональных данных (ФЗ-152 РФ, включен по умолчанию)
+  const [agreedToTerms, setAgreedToTerms] = useState(false); // Согласие на обработку ПД (ФЗ-152): ПО УМОЛЧАНИЮ ВЫКЛЮЧЕНО — пользователь должен поставить галочку сам (предустановленная галочка не является надлежащим согласием по 152-ФЗ)
   const [legalModalOpen, setLegalModalOpen] = useState(false); // Стейт показа модального окна документов
   const [legalDocId, setLegalDocId] = useState<"privacy-policy" | "data-consent" | "public-offer">("data-consent"); // Выбранный документ
 
