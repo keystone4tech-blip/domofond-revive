@@ -1,0 +1,13 @@
+<svg width="96" height="96" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Домофондар">
+  <defs>
+    <linearGradient id="dfdMark" x1="6" y1="6" x2="90" y2="90" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1E63E9"/>
+      <stop offset="1" stop-color="#19B6E8"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="92" height="92" rx="26" fill="url(#dfdMark)"/>
+  <rect x="34" y="22" width="28" height="52" rx="9" fill="#FFFFFF"/>
+  <circle cx="48" cy="31" r="3.4" fill="#1E63E9"/>
+  <rect x="40" y="37" width="16" height="15" rx="3.5" fill="#BFE2FB"/>
+  <circle cx="48" cy="63" r="5" fill="#F7A61B"/>
+</svg>

@@ -7,11 +7,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Search, Users, Trash2, ShieldCheck, ShieldAlert, Phone, Mail, Hash, RefreshCw } from "lucide-react";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
+import { Search, Users, Trash2, ShieldCheck, ShieldAlert, Phone, Mail, Hash, RefreshCw, Pencil, Loader2 } from "lucide-react";
 
 // Личные кабинеты: все зарегистрированные пользователи с полной информацией, поиском,
 // фильтрами и мягким удалением (с подтверждением и записью «кто удалил»).
@@ -23,12 +27,55 @@ export const UsersManager: React.FC = () => {
   const [filter, setFilter] = useState<FilterKey>("all");
   const [deleting, setDeleting] = useState<string | null>(null);
 
+  // Редактирование профиля пользователя (ФИО, телефон, адрес с подъездом, квартира, этаж, лицевой счёт)
+  const [editUser, setEditUser] = useState<any | null>(null);
+  const [editForm, setEditForm] = useState({ full_name: "", phone: "", address: "", apartment: "", floor: "", account_number: "" });
+  const [saving, setSaving] = useState(false);
+
+  const openEdit = (u: any) => {
+    setEditForm({
+      full_name: u.full_name || "",
+      phone: u.phone || "",
+      address: u.address || "",
+      apartment: u.apartment || "",
+      floor: u.floor || "",
+      account_number: u.account_number || "",
+    });
+    setEditUser(u);
+  };
+
+  const saveEdit = async () => {
+    if (!editUser) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          full_name: editForm.full_name.trim() || null,
+          phone: editForm.phone.trim() || null,
+          address: editForm.address.trim() || null,
+          apartment: editForm.apartment.trim() || null,
+          floor: editForm.floor.trim() || null,
+          account_number: editForm.account_number.trim() || null,
+        })
+        .eq("id", editUser.id);
+      if (error) throw error;
+      toast({ title: "Данные сохранены", description: editForm.full_name || editUser.id });
+      setEditUser(null);
+      refetch();
+    } catch (e: any) {
+      toast({ title: "Ошибка сохранения", description: e.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const { data: users = [], isLoading, refetch } = useQuery({
     queryKey: ["cabinet_users"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, full_name, phone, email, address, apartment, account_number, is_verified, verification_status, has_intercom, created_at, deleted_at")
+        .select("id, full_name, phone, email, address, apartment, floor, account_number, is_verified, verification_status, has_intercom, created_at, deleted_at")
         .is("deleted_at", null)
         .order("created_at", { ascending: false })
         .limit(100000);
@@ -133,9 +180,13 @@ export const UsersManager: React.FC = () => {
                     {u.address && <div className="text-[11px] text-muted-foreground mt-0.5 truncate max-w-[520px]">{u.address}{u.apartment ? `, кв. ${u.apartment}` : ""}</div>}
                   </div>
 
+                  <div className="flex items-center gap-1 shrink-0">
+                  <Button variant="ghost" size="sm" className="h-8 gap-1" onClick={() => openEdit(u)}>
+                    <Pencil className="h-4 w-4" /> Изменить
+                  </Button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0 h-8 gap-1">
+                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 gap-1">
                         <Trash2 className="h-4 w-4" /> Удалить
                       </Button>
                     </AlertDialogTrigger>
@@ -155,12 +206,58 @@ export const UsersManager: React.FC = () => {
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
+                  </div>
                 </div>
               ))}
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Диалог редактирования профиля пользователя */}
+      <Dialog open={!!editUser} onOpenChange={(o) => { if (!o) setEditUser(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Pencil className="h-4 w-4 text-primary" /> Редактировать данные</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold">ФИО</Label>
+              <Input value={editForm.full_name} onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold">Телефон</Label>
+              <Input value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} placeholder="+7 (___) ___-__-__" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold">Адрес (улица, дом, подъезд)</Label>
+              <Input value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} placeholder="напр.: Казбекская (ул), д. 13, п. 2" />
+              <p className="text-[11px] text-muted-foreground">Подъезд указывается здесь, в тексте адреса (например «п. 2»).</p>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold">Квартира</Label>
+                <Input value={editForm.apartment} onChange={(e) => setEditForm({ ...editForm, apartment: e.target.value })} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold">Этаж</Label>
+                <Input value={editForm.floor} onChange={(e) => setEditForm({ ...editForm, floor: e.target.value })} />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold">Лицевой счёт</Label>
+              <Input value={editForm.account_number} onChange={(e) => setEditForm({ ...editForm, account_number: e.target.value })} placeholder="напр.: 0000011155" className="font-mono" />
+              <p className="text-[11px] text-muted-foreground">Привязка лицевого счёта уберёт статус «частный клиент» и подтянет баланс.</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditUser(null)} disabled={saving}>Отмена</Button>
+            <Button onClick={saveEdit} disabled={saving} className="gap-1.5">
+              {saving && <Loader2 className="h-4 w-4 animate-spin" />} Сохранить
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

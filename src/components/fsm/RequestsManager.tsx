@@ -37,6 +37,7 @@ import {
   MoreHorizontal,
   Phone,
   MapPin,
+  Hash,
   Clock,
   CheckCircle2,
   AlertCircle,
@@ -227,6 +228,46 @@ const RequestsManager = ({
       return set;
     },
   });
+
+  // Лицевой счёт клиента по заявке: client_id → профиль → account_number
+  const { data: clientAccounts } = useQuery({
+    queryKey: ["req-client-accounts", (rawRequests || []).length],
+    enabled: !!rawRequests,
+    queryFn: async () => {
+      const ids = Array.from(new Set((rawRequests || []).map((r: any) => r.client_id).filter(Boolean)));
+      if (!ids.length) return {} as Record<string, string>;
+      const { data } = await supabase.from("profiles").select("id, account_number").in("id", ids as string[]);
+      const m: Record<string, string> = {};
+      (data || []).forEach((p: any) => { if (p.account_number) m[p.id] = p.account_number; });
+      return m;
+    },
+  });
+
+  // Долг/переплата по лицевому счёту (берём последний период)
+  const { data: debtByAccount } = useQuery({
+    queryKey: ["req-accounts-debt", Object.values(clientAccounts || {}).sort().join(",")],
+    enabled: !!clientAccounts && Object.keys(clientAccounts || {}).length > 0,
+    queryFn: async () => {
+      const accs = Array.from(new Set(Object.values(clientAccounts || {})));
+      if (!accs.length) return {} as Record<string, number>;
+      const { data } = await supabase
+        .from("accounts")
+        .select("account_number, debt_amount, period")
+        .in("account_number", accs as string[])
+        .order("period", { ascending: false });
+      const m: Record<string, number> = {};
+      (data || []).forEach((a: any) => { if (!(a.account_number in m)) m[a.account_number] = Number(a.debt_amount) || 0; });
+      return m;
+    },
+  });
+
+  // Баланс по заявке для отображения (л/с + долг/переплата)
+  const getBalance = (req: any): { acc: string; debt: number | null } | null => {
+    const acc = clientAccounts?.[req.client_id];
+    if (!acc) return null;
+    const d = debtByAccount?.[acc];
+    return { acc, debt: typeof d === "number" ? d : null };
+  };
 
   const requests = useMemo(() => {
     if (!rawRequests) return null;
@@ -880,6 +921,24 @@ const RequestsManager = ({
                     <MapPin className="h-3.5 w-3.5 text-primary/70 shrink-0 mt-0.5" />
                     <span className="truncate" title={request.address}>{request.address}</span>
                   </div>
+                  {(() => {
+                    const bal = getBalance(request);
+                    if (!bal) return null;
+                    return (
+                      <div className="flex items-center gap-2 text-[11px] flex-wrap">
+                        <span className="inline-flex items-center gap-1 font-mono text-muted-foreground">
+                          <Hash className="h-3 w-3" />{bal.acc}
+                        </span>
+                        {bal.debt === null ? null : bal.debt > 0 ? (
+                          <span className="inline-flex items-center gap-1 font-semibold text-red-600 dark:text-red-400">Долг {bal.debt.toFixed(0)} ₽</span>
+                        ) : bal.debt < 0 ? (
+                          <span className="inline-flex items-center gap-1 font-semibold text-emerald-600 dark:text-emerald-400">Переплата {Math.abs(bal.debt).toFixed(0)} ₽</span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">Нет долга</span>
+                        )}
+                      </div>
+                    );
+                  })()}
                   {request.message && (
                     <p className="text-[11px] text-muted-foreground truncate" title={request.message}>
                       {request.message}

@@ -1,0 +1,23 @@
+<svg width="540" height="112" viewBox="0 0 540 112" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Домофондар">
+  <defs>
+    <linearGradient id="dfdBg" x1="10" y1="10" x2="102" y2="102" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1E63E9"/>
+      <stop offset="1" stop-color="#19B6E8"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Знак: видеодомофон (камера + экран + кнопка вызова) -->
+  <g transform="translate(8,8)">
+    <rect x="2" y="2" width="92" height="92" rx="26" fill="url(#dfdBg)"/>
+    <rect x="34" y="22" width="28" height="52" rx="9" fill="#FFFFFF"/>
+    <circle cx="48" cy="31" r="3.4" fill="#1E63E9"/>
+    <rect x="40" y="37" width="16" height="15" rx="3.5" fill="#BFE2FB"/>
+    <circle cx="48" cy="63" r="5" fill="#F7A61B"/>
+  </g>
+
+  <!-- Логотип -->
+  <text x="120" y="58" font-family="Montserrat, 'Segoe UI', Arial, sans-serif" font-size="47" font-weight="800" letter-spacing="-1">
+    <tspan fill="#0F1B2D">Домофон</tspan><tspan fill="#F7A61B">дар</tspan>
+  </text>
+  <text x="122" y="82" font-family="Montserrat, Arial, sans-serif" font-size="11.5" font-weight="600" letter-spacing="1.6" fill="#64748B">УМНЫЕ ДОМОФОНЫ · ВИДЕОНАБЛЮДЕНИЕ</text>
+</svg>
