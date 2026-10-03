@@ -4865,6 +4865,32 @@ const Cabinet = () => {
               )}
               {/* Push-уведомления (показывается на мобильных устройствах) */}
               <PushNotificationToggle />
+              {/* Подписка на рекламные рассылки (акции/скидки/новинки) — вкл/выкл в любой момент (ФЗ «О рекламе» ст.18) */}
+              {userId && (
+                <ShinyButton
+                  onClick={async () => {
+                    const next = !(profile?.marketing_consent);
+                    try {
+                      await supabase.from("profiles").update({
+                        marketing_consent: next,
+                        marketing_consent_at: next ? new Date().toISOString() : null,
+                      }).eq("id", userId);
+                      setProfile((prev: any) => prev ? { ...prev, marketing_consent: next } : prev);
+                      toast({ title: next ? "Подписка на акции включена 🔔" : "Подписка на акции отключена" });
+                    } catch (e: any) {
+                      toast({ title: "Ошибка", description: e.message, variant: "destructive" });
+                    }
+                  }}
+                  className={`py-1 px-3 text-xs rounded-xl h-9 border ${
+                    profile?.marketing_consent
+                      ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30"
+                      : "bg-muted/40 text-muted-foreground border-border/60"
+                  }`}
+                >
+                  <Sparkles className="h-3.5 w-3.5 mr-1" />
+                  {profile?.marketing_consent ? "Акции: вкл" : "Акции: выкл"}
+                </ShinyButton>
+              )}
               {/* Кнопка выхода из системы */}
               <ShinyButton onClick={handleLogout} className="py-1 px-3 text-xs rounded-xl h-9">
                 <LogOut className="h-3.5 w-3.5 mr-1" />

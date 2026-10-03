@@ -10,6 +10,7 @@ import { Loader2 } from "lucide-react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { LegalDocumentsModal } from "@/components/LegalDocumentsModal";
+import { supabase } from "@/integrations/supabase/client";
 
 const Auth = () => {
   const [loginInput, setLoginInput] = useState(""); // Стейт для логина входа (Email или телефон)
@@ -19,11 +20,12 @@ const Auth = () => {
   const [fullName, setFullName] = useState(""); // Стейт для полного имени (передается пустым при регистрации)
   const [loading, setLoading] = useState(false); // Стейт процесса загрузки запроса к API
   const [agreedToTerms, setAgreedToTerms] = useState(false); // Согласие на обработку ПД (ФЗ-152): ПО УМОЛЧАНИЮ ВЫКЛЮЧЕНО — пользователь должен поставить галочку сам (предустановленная галочка не является надлежащим согласием по 152-ФЗ)
+  const [marketingConsent, setMarketingConsent] = useState(false); // Согласие на рекламную рассылку (ФЗ «О рекламе» ст.18): НЕОБЯЗАТЕЛЬНОЕ, по умолчанию выключено, не блокирует регистрацию
   const [legalModalOpen, setLegalModalOpen] = useState(false); // Стейт показа модального окна документов
-  const [legalDocId, setLegalDocId] = useState<"privacy-policy" | "data-consent" | "public-offer">("data-consent"); // Выбранный документ
+  const [legalDocId, setLegalDocId] = useState<"privacy-policy" | "data-consent" | "public-offer" | "advertising-consent">("data-consent"); // Выбранный документ
 
   // Функция открытия модального окна для конкретного юридического документа
-  const openLegalDoc = (docId: "privacy-policy" | "data-consent" | "public-offer") => {
+  const openLegalDoc = (docId: "privacy-policy" | "data-consent" | "public-offer" | "advertising-consent") => {
     console.log(`[Auth] Открытие модального окна документа: ${docId}`);
     setLegalDocId(docId);
     setLegalModalOpen(true);
@@ -199,6 +201,18 @@ const Auth = () => {
         sessionStorage.setItem("auth_token", data.token);
         sessionStorage.setItem("user", JSON.stringify(data.user));
         localStorage.setItem("remember_me", "false");
+      }
+
+      // Сохраняем согласие на рекламную рассылку (если отмечено) — отдельно от согласия на ОПД
+      if (marketingConsent && data.user?.id) {
+        try {
+          await supabase.from("profiles").update({
+            marketing_consent: true,
+            marketing_consent_at: new Date().toISOString(),
+          }).eq("id", data.user.id);
+        } catch (e) {
+          console.warn("[Регистрация] Не удалось сохранить согласие на рассылку:", e);
+        }
       }
 
       // Генерируем событие для мгновенного реактивного обновления сессии в шапке сайта
@@ -480,6 +494,32 @@ const Auth = () => {
                         публичной оферты
                       </button>
                       .
+                    </Label>
+                  </div>
+
+                  {/* НЕОБЯЗАТЕЛЬНАЯ галочка согласия на рекламную рассылку (ФЗ «О рекламе» ст.18) */}
+                  <div className="flex items-start gap-2.5 pb-1 text-left">
+                    <input
+                      id="signup-marketing"
+                      type="checkbox"
+                      checked={marketingConsent}
+                      onChange={(e) => setMarketingConsent(e.target.checked)}
+                      className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary shrink-0 cursor-pointer"
+                    />
+                    <Label htmlFor="signup-marketing" className="text-xs text-muted-foreground leading-normal select-none">
+                      Хочу получать информацию об акциях, скидках и новинках и даю{" "}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          openLegalDoc("advertising-consent");
+                        }}
+                        className="text-primary hover:underline font-semibold focus:outline-none inline cursor-pointer text-left"
+                      >
+                        согласие на рекламную рассылку
+                      </button>{" "}
+                      (необязательно, можно отключить в кабинете в любой момент).
                     </Label>
                   </div>
 

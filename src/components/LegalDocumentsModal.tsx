@@ -9,7 +9,7 @@ import { useNavigate } from "react-router-dom";
 interface LegalDocumentsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  initialDocumentId?: "privacy-policy" | "data-consent" | "public-offer";
+  initialDocumentId?: "privacy-policy" | "data-consent" | "public-offer" | "advertising-consent";
 }
 
 /**
