@@ -258,6 +258,16 @@ export const KIND_META: Record<Kind, { label: string; badgeCls: string }> = {
  */
 export const PROJECT_CHANGELOG: ProjectEntry[] = [
   {
+    id: "stage-2026-10-03-2135",
+    datetime: "2026-10-03 21:35",
+    title: "Активация Web-Push уведомлений: настройка VAPID на сервере",
+    description: "На боевом сервере 45.8.99.238 сконфигурированы переменные VAPID-ключей для модуля web-push в Express API. Контейнер domofondar_backend перезапущен со статусом 'Web-Push настроен'. Обеспечена единая инфраструктура пуш-уведомлений для мобильного PWA/WebView и нативного клиента без попадания приватного ключа в систему контроля версий.",
+    module: "infra_mobile",
+    kind: "infra",
+    hours: 1,
+    difficulty: "Средняя",
+  },
+  {
     id: "stage-2026-10-03-2115",
     datetime: "2026-10-03 21:15",
     title: "152-ФЗ: Явное согласие на обработку ПД (opt-in) при регистрации",
