@@ -88,7 +88,7 @@ export const RepairModal: React.FC<RepairModalProps> = ({
         address: address.trim(),
         message: fullMessage,
         priority: 'medium',
-        status: 'new',
+        status: 'pending',
         is_mobile: true,
         source: 'mobile_app',
       };

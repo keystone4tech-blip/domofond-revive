@@ -83,9 +83,12 @@ export const HandsetOrderModal: React.FC<HandsetOrderModalProps> = ({
     }
   };
 
-  // Стоимость услуги монтажа
-  const installServiceCost = serviceAction === 'install' ? 500 : 300;
-  const serviceTitle = serviceAction === 'install' ? 'Установка трубки с прокладкой кабеля' : 'Замена существующей трубки';
+  // Стоимость услуги монтажа — из реального каталога подъезда (как на сайте), не хардкод
+  const installService = services.find((s) => /установ|монтаж|проклад/i.test(s.name));
+  const replaceService = services.find((s) => /замен/i.test(s.name));
+  const activeService = serviceAction === 'install' ? installService : replaceService;
+  const installServiceCost = activeService ? Number(activeService.price) : (serviceAction === 'install' ? 500 : 300);
+  const serviceTitle = activeService?.name || (serviceAction === 'install' ? 'Установка трубки с прокладкой кабеля' : 'Замена существующей трубки');
 
   // Выбранная модель трубки
   const selectedHandset = handsets.find((h) => h.id === selectedHandsetId) || handsets[0];
@@ -121,7 +124,7 @@ export const HandsetOrderModal: React.FC<HandsetOrderModalProps> = ({
           price: handsetPrice,
         },
         {
-          product_id: null,
+          product_id: activeService?.id || null,
           name: serviceTitle,
           quantity: 1,
           price: installServiceCost,

@@ -1,5 +1,6 @@
-// mobile/app/(tabs)/profile/index.tsx — Экран профиля и настроек в стиле Domofondar CyberShield
-// Поддерживает выбор темы (Clean Tech / Cyber Dark / Системная), редактирование адреса и проверку обновлений
+// mobile/app/(tabs)/profile/index.tsx — Экран профиля и данных жильца «Домофондар»
+// Позволяет просматривать и редактировать адрес, квартиру и телефон для привязки лицевого счёта.
+// Полностью поддерживает светлую/тёмную/системную тему.
 
 import React, { useState } from 'react';
 import {
@@ -13,15 +14,15 @@ import {
   ActivityIndicator,
   Modal,
   Linking,
-  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/store/auth.store';
 import { useAppTheme } from '@/theme';
 import { apiClient } from '@/api/client';
-import { APP_VERSION } from '@/config/constants';
+import { APP_VERSION, APP_DOWNLOAD_URL } from '@/config/constants';
+import type { ThemeMode } from '@/store/theme.store';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -48,7 +49,6 @@ export default function ProfileScreen() {
   const handleSaveProfile = async () => {
     setIsSaving(true);
     try {
-      console.log('[Profile CyberShield] Сохранение данных профиля:', { fullName, phone, address, apartment });
       await apiClient.put('/api/user/profile', {
         full_name: fullName.trim(),
         phone: phone.trim(),
@@ -56,15 +56,73 @@ export default function ProfileScreen() {
         apartment: apartment.trim(),
       });
 
+      // Отправляем диспетчеру заявку на сверку/изменение данных абонента (как на сайте),
+      // чтобы адрес и привязка к лицевому счёту были актуализированы сотрудником.
+      try {
+        const changeMsg =
+          `Запрос на изменение данных абонента:\n` +
+          `• ФИО: ${fullName.trim() || '—'}\n` +
+          `• Телефон: ${phone.trim() || '—'}\n` +
+          `• Адрес: ${address.trim() || '—'}\n` +
+          `• Квартира: ${apartment.trim() || '—'}\n` +
+          `Просьба проверить и обновить данные/привязку лицевого счёта.`;
+        await apiClient.post('/api/requests', {
+          name: fullName.trim() || user?.full_name || 'Абонент',
+          phone: phone.trim() || user?.phone || '',
+          address: address.trim(),
+          message: changeMsg,
+          priority: 'medium',
+          status: 'pending',
+          is_mobile: true,
+          source: 'mobile_app',
+        });
+      } catch (reqErr) {
+        console.warn('[Profile UI] Не удалось отправить заявку диспетчеру:', reqErr);
+      }
+
       await loadProfile();
       setIsEditModalOpen(false);
-      Alert.alert('Успешно', 'Данные адреса и профиля обновлены');
+      Alert.alert(
+        'Данные отправлены',
+        'Данные сохранены в вашем профиле, а диспетчеру направлена заявка на сверку и обновление информации.'
+      );
     } catch (err: any) {
-      console.error('[Profile CyberShield] Ошибка сохранения профиля:', err);
+      console.error('[Profile UI] Ошибка сохранения профиля:', err);
       const msg = err.response?.data?.error || 'Не удалось сохранить данные';
       Alert.alert('Ошибка', msg);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // Ручная проверка обновлений при нажатии на версию в профиле
+  const handleCheckUpdateManual = async () => {
+    try {
+      console.log('[Профиль] Пользователь запросил проверку обновлений...');
+      const response = await apiClient.get<any>('/api/app/version');
+      const latest = response.data?.latestVersion;
+      if (latest && latest !== APP_VERSION) {
+        Alert.alert(
+          'Доступно обновление',
+          `Доступна версия ${latest}. Обновить приложение сейчас?`,
+          [
+            { text: 'Позже', style: 'cancel' },
+            {
+              text: 'Обновить',
+              onPress: () => {
+                const targetUrl = response.data?.downloadUrl || APP_DOWNLOAD_URL;
+                console.log('[Профиль] Запуск скачивания APK с официального сайта:', targetUrl);
+                Linking.openURL(targetUrl);
+              },
+            },
+          ]
+        );
+      } else {
+        Alert.alert('Обновление не требуется', `У вас установлена последняя версия (${APP_VERSION}).`);
+      }
+    } catch (e) {
+      console.warn('[Профиль] Ошибка проверки обновлений:', e);
+      Alert.alert('Версия приложения', `У вас установлена версия ${APP_VERSION}.`);
     }
   };
 
@@ -75,43 +133,11 @@ export default function ProfileScreen() {
         text: 'Выйти',
         style: 'destructive',
         onPress: async () => {
-          console.log('[Profile] Очистка сессии и выход...');
           await logout();
           router.replace('/(auth)/login');
         },
       },
     ]);
-  };
-
-  // Ручная проверка обновлений
-  const handleCheckUpdate = async () => {
-    try {
-      console.log('[Profile] Проверка обновлений...');
-      const res = await apiClient.get('/api/app/version');
-      if (res.data && res.data.latestVersion) {
-        const { latestVersion, downloadUrl, fallbackDownloadUrl, releaseNotes } = res.data;
-        if (latestVersion !== APP_VERSION) {
-          Alert.alert(
-            `Доступна версия ${latestVersion}`,
-            `Что нового:\n${(releaseNotes || []).map((n: string) => `• ${n}`).join('\n')}`,
-            [
-              { text: 'Позже', style: 'cancel' },
-              {
-                text: 'Скачать обновление',
-                onPress: () => {
-                  const targetUrl = downloadUrl || fallbackDownloadUrl;
-                  if (targetUrl) Linking.openURL(targetUrl);
-                },
-              },
-            ]
-          );
-        } else {
-          Alert.alert('Обновлений нет', `У вас установлена самая актуальная версия Домофондар ${APP_VERSION}.`);
-        }
-      }
-    } catch (e) {
-      Alert.alert('Информация', `Текущая версия приложения: ${APP_VERSION}.`);
-    }
   };
 
   const displayName = user?.full_name || (user as any)?.email || 'Абонент';
@@ -127,173 +153,117 @@ export default function ProfileScreen() {
     .map((w: string) => w[0].toUpperCase())
     .join('') || 'ДД';
 
-  const safeTop = Math.max(insets.top, 16) + 8;
-  const safeBottom = Math.max(insets.bottom, 12) + 75;
+  const themeOptions: { mode: ThemeMode; label: string; icon: any }[] = [
+    { mode: 'system', label: 'Система', icon: 'phone-portrait-outline' },
+    { mode: 'light', label: 'Светлая', icon: 'sunny-outline' },
+    { mode: 'dark', label: 'Тёмная', icon: 'moon-outline' },
+  ];
+
+  const MenuItem = ({ icon, title, value = '', isDestructive = false, onPress }: any) => (
+    <TouchableOpacity style={styles.menuItem} onPress={onPress} activeOpacity={onPress ? 0.7 : 1}>
+      <View style={styles.menuItemLeft}>
+        <Ionicons name={icon} size={22} color={isDestructive ? colors.error : colors.textMuted} />
+        <Text style={[styles.menuItemTitle, { color: isDestructive ? colors.error : colors.text }]}>{title}</Text>
+      </View>
+      <View style={styles.menuItemRight}>
+        {value ? <Text style={[styles.menuItemValue, { color: colors.textSecondary }]}>{value}</Text> : null}
+        {onPress ? <Ionicons name="chevron-forward" size={18} color={colors.textMuted} /> : null}
+      </View>
+    </TouchableOpacity>
+  );
 
   return (
-    <View style={[styles.safeArea, { backgroundColor: colors.background, paddingTop: safeTop }]}>
+    <View style={[styles.safeArea, { backgroundColor: colors.background, paddingTop: Math.max(insets.top, 16) }]}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>Профиль абонента</Text>
+        <Text style={[styles.title, { color: colors.text }]}>Профиль</Text>
       </View>
 
-      <ScrollView contentContainerStyle={[styles.container, { paddingBottom: safeBottom }]} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 90 + insets.bottom }]}>
         {/* Карточка пользователя */}
         <View style={[styles.profileHeader, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={[styles.avatar, { backgroundColor: isDark ? '#262a35' : '#e0f2fe' }]}>
-            <Text style={[styles.avatarText, { color: colors.primaryContainer }]}>{initials}</Text>
+          <View style={[styles.avatar, { backgroundColor: isDark ? 'rgba(16,185,129,0.2)' : '#dcfce7', borderColor: colors.secondary }]}>
+            <Text style={[styles.avatarText, { color: colors.secondary }]}>{initials}</Text>
           </View>
           <View style={styles.profileInfo}>
             <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>{displayName}</Text>
             <Text style={[styles.phone, { color: colors.textSecondary }]}>{displayPhone}</Text>
-            <Text style={[styles.addressSub, { color: colors.primaryContainer }]} numberOfLines={1}>
-              📍 {displayAddress}
-            </Text>
+            <Text style={[styles.addressSub, { color: colors.secondary }]} numberOfLines={1}>📍 {displayAddress}</Text>
           </View>
         </View>
 
         {/* Кнопка быстрого редактирования адреса */}
         <TouchableOpacity
-          style={[styles.editAddressButton, { backgroundColor: colors.card, borderColor: colors.border }]}
+          style={[styles.editAddressButton, { backgroundColor: isDark ? 'rgba(16,185,129,0.12)' : '#ecfdf5', borderColor: isDark ? 'rgba(16,185,129,0.3)' : colors.secondary }]}
           onPress={handleOpenEdit}
           activeOpacity={0.85}
         >
-          <Ionicons name="home-outline" size={20} color={colors.primaryContainer} style={{ marginRight: 8 }} />
-          <Text style={[styles.editAddressButtonText, { color: colors.primaryContainer }]}>
-            Указать или изменить адрес квартиры
-          </Text>
+          <Ionicons name="home-outline" size={20} color={colors.secondary} style={{ marginRight: 8 }} />
+          <Text style={[styles.editAddressButtonText, { color: colors.secondary }]}>Указать или изменить адрес квартиры</Text>
         </TouchableOpacity>
-
-        {/* Оформление темы приложения */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Тема оформления (CyberShield)</Text>
-          <View style={[styles.themeSelectorBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <TouchableOpacity
-              style={[
-                styles.themeOptionBtn,
-                colorScheme === 'dark' && [styles.themeOptionActive, { backgroundColor: isDark ? '#262a35' : '#eff4ff', borderColor: colors.primaryContainer }],
-              ]}
-              onPress={() => setTheme('dark')}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="moon" size={18} color={colorScheme === 'dark' ? colors.primaryContainer : colors.textMuted} />
-              <Text style={[styles.themeOptionText, { color: colorScheme === 'dark' ? colors.text : colors.textSecondary, fontWeight: colorScheme === 'dark' ? '700' : '500' }]}>
-                Cyber Dark
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.themeOptionBtn,
-                colorScheme === 'light' && [styles.themeOptionActive, { backgroundColor: isDark ? '#262a35' : '#eff4ff', borderColor: colors.primaryContainer }],
-              ]}
-              onPress={() => setTheme('light')}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="sunny" size={18} color={colorScheme === 'light' ? colors.primaryContainer : colors.textMuted} />
-              <Text style={[styles.themeOptionText, { color: colorScheme === 'light' ? colors.text : colors.textSecondary, fontWeight: colorScheme === 'light' ? '700' : '500' }]}>
-                Clean Tech
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.themeOptionBtn,
-                colorScheme === 'system' && [styles.themeOptionActive, { backgroundColor: isDark ? '#262a35' : '#eff4ff', borderColor: colors.primaryContainer }],
-              ]}
-              onPress={() => setTheme('system')}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="phone-portrait-outline" size={18} color={colorScheme === 'system' ? colors.primaryContainer : colors.textMuted} />
-              <Text style={[styles.themeOptionText, { color: colorScheme === 'system' ? colors.text : colors.textSecondary, fontWeight: colorScheme === 'system' ? '700' : '500' }]}>
-                Системная
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
 
         {/* Данные абонента */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Данные абонента</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Данные абонента</Text>
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <TouchableOpacity style={styles.menuItem} onPress={handleOpenEdit} activeOpacity={0.7}>
-              <View style={styles.menuItemLeft}>
-                <Ionicons name="person-outline" size={20} color={colors.primaryContainer} />
-                <Text style={[styles.menuItemTitle, { color: colors.text }]}>ФИО и телефон</Text>
-              </View>
-              <View style={styles.menuItemRight}>
-                <Text style={[styles.menuItemValue, { color: colors.textSecondary }]}>
-                  {user?.full_name ? 'Заполнено' : 'Не указано'}
-                </Text>
-                <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-              </View>
-            </TouchableOpacity>
-
+            <MenuItem icon="person-outline" title="ФИО и телефон" value={user?.full_name ? 'Заполнено' : 'Не указано'} onPress={handleOpenEdit} />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-            <View style={styles.menuItem}>
-              <View style={styles.menuItemLeft}>
-                <Ionicons name="mail-outline" size={20} color={colors.primaryContainer} />
-                <Text style={[styles.menuItemTitle, { color: colors.text }]}>Электронная почта</Text>
-              </View>
-              <View style={styles.menuItemRight}>
-                <Text style={[styles.menuItemValue, { color: colors.textSecondary }]}>
-                  {(user as any)?.email || 'Не указана'}
-                </Text>
-              </View>
-            </View>
-
+            <MenuItem icon="mail-outline" title="Электронная почта" value={(user as any)?.email || 'Не указана'} />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-            <TouchableOpacity style={styles.menuItem} onPress={handleOpenEdit} activeOpacity={0.7}>
-              <View style={styles.menuItemLeft}>
-                <Ionicons name="location-outline" size={20} color={colors.primaryContainer} />
-                <Text style={[styles.menuItemTitle, { color: colors.text }]}>Адрес подключения</Text>
-              </View>
-              <View style={styles.menuItemRight}>
-                <Text style={[styles.menuItemValue, { color: colors.textSecondary }]}>
-                  {(user as any)?.address ? 'Привязан' : 'Требуется'}
-                </Text>
-                <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-              </View>
-            </TouchableOpacity>
+            <MenuItem icon="location-outline" title="Адрес подключения" value={(user as any)?.address ? 'Привязан' : 'Требуется'} onPress={handleOpenEdit} />
           </View>
         </View>
 
-        {/* Версия приложения */}
+        {/* Оформление / тема */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>О приложении</Text>
-          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <TouchableOpacity style={styles.menuItem} onPress={handleCheckUpdate} activeOpacity={0.7}>
-              <View style={styles.menuItemLeft}>
-                <Ionicons name="information-circle-outline" size={20} color={colors.primaryContainer} />
-                <Text style={[styles.menuItemTitle, { color: colors.text }]}>Версия приложения</Text>
-              </View>
-              <View style={styles.menuItemRight}>
-                <Text style={[styles.menuItemValue, { color: colors.secondary, fontWeight: '700' }]}>
-                  {APP_VERSION}
-                </Text>
-                <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-              </View>
-            </TouchableOpacity>
+          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Оформление</Text>
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, padding: 12 }]}>
+            <Text style={[styles.themeHint, { color: colors.textSecondary }]}>Тема приложения</Text>
+            <View style={[styles.segment, { backgroundColor: isDark ? '#171b26' : '#eff4ff', borderColor: colors.border }]}>
+              {themeOptions.map((opt) => {
+                const active = colorScheme === opt.mode;
+                return (
+                  <TouchableOpacity
+                    key={opt.mode}
+                    style={[styles.segmentBtn, active && { backgroundColor: colors.primaryContainer }]}
+                    onPress={() => setTheme(opt.mode)}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name={opt.icon} size={16} color={active ? '#ffffff' : colors.textSecondary} style={{ marginRight: 5 }} />
+                    <Text style={{ color: active ? '#ffffff' : colors.textSecondary, fontWeight: active ? '700' : '500', fontSize: 13 }}>
+                      {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
         </View>
 
-        {/* Выход из аккаунта */}
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 4 }]}>
-          <TouchableOpacity style={styles.menuItem} onPress={handleLogout} activeOpacity={0.7}>
-            <View style={styles.menuItemLeft}>
-              <Ionicons name="log-out-outline" size={20} color={colors.error} />
-              <Text style={[styles.menuItemTitle, { color: colors.error }]}>Выйти из аккаунта</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-          </TouchableOpacity>
+        {/* О приложении */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>О приложении</Text>
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <MenuItem icon="shield-checkmark-outline" title="Служба поддержки" value="+7 (903) 411-83-93" />
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            <MenuItem
+              icon="information-circle-outline"
+              title="Версия приложения"
+              value={APP_VERSION}
+              onPress={handleCheckUpdateManual}
+            />
+          </View>
+        </View>
+
+        {/* Выход */}
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <MenuItem icon="log-out-outline" title="Выйти из аккаунта" isDestructive onPress={handleLogout} />
         </View>
       </ScrollView>
 
       {/* Модальное окно редактирования адреса и профиля */}
-      <Modal visible={isEditModalOpen} animationType="slide" transparent onRequestClose={() => setIsEditModalOpen(false)}>
+      <Modal visible={isEditModalOpen} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: isDark ? '#171b26' : '#ffffff', borderColor: colors.border }]}>
+          <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>Данные квартиры</Text>
               <TouchableOpacity onPress={() => setIsEditModalOpen(false)}>
@@ -301,55 +271,42 @@ export default function ProfileScreen() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView keyboardShouldPersistTaps="handled">
               <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>ФИО абонента</Text>
               <TextInput
-                style={[styles.modalInput, { backgroundColor: isDark ? '#1c1f2a' : '#f8f9ff', borderColor: colors.border, color: colors.text }]}
-                value={fullName}
-                onChangeText={setFullName}
-                placeholder="Иванов Иван Иванович"
-                placeholderTextColor={colors.textMuted}
+                style={[styles.modalInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
+                value={fullName} onChangeText={setFullName}
+                placeholder="Иванов Иван Иванович" placeholderTextColor={colors.textMuted}
               />
 
               <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Номер телефона</Text>
               <TextInput
-                style={[styles.modalInput, { backgroundColor: isDark ? '#1c1f2a' : '#f8f9ff', borderColor: colors.border, color: colors.text }]}
-                value={phone}
-                onChangeText={setPhone}
-                placeholder="+7 (___) ___-__-__"
-                placeholderTextColor={colors.textMuted}
+                style={[styles.modalInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
+                value={phone} onChangeText={setPhone}
+                placeholder="+7 (___) ___-__-__" placeholderTextColor={colors.textMuted}
                 keyboardType="phone-pad"
               />
 
-              <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Адрес (город, улица, номер дома)</Text>
+              <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Адрес (город, улица, дом, подъезд)</Text>
               <TextInput
-                style={[styles.modalInput, { backgroundColor: isDark ? '#1c1f2a' : '#f8f9ff', borderColor: colors.border, color: colors.text }]}
-                value={address}
-                onChangeText={setAddress}
-                placeholder="например: г. Нальчик, ул. Ленина, д. 10"
-                placeholderTextColor={colors.textMuted}
+                style={[styles.modalInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
+                value={address} onChangeText={setAddress}
+                placeholder="например: г. Краснодар, ул. Казбекская, д. 13, п. 2" placeholderTextColor={colors.textMuted}
               />
 
               <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Номер квартиры</Text>
               <TextInput
-                style={[styles.modalInput, { backgroundColor: isDark ? '#1c1f2a' : '#f8f9ff', borderColor: colors.border, color: colors.text }]}
-                value={apartment}
-                onChangeText={setApartment}
-                placeholder="например: 45"
-                placeholderTextColor={colors.textMuted}
+                style={[styles.modalInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
+                value={apartment} onChangeText={setApartment}
+                placeholder="например: 116" placeholderTextColor={colors.textMuted}
                 keyboardType="numeric"
               />
 
               <TouchableOpacity
-                style={[styles.saveBtn, { backgroundColor: colors.primaryContainer }]}
-                onPress={handleSaveProfile}
-                disabled={isSaving}
+                style={[styles.saveButton, { backgroundColor: colors.secondaryContainer }, isSaving && styles.saveButtonDisabled]}
+                onPress={handleSaveProfile} disabled={isSaving} activeOpacity={0.85}
               >
-                {isSaving ? (
-                  <ActivityIndicator color="#ffffff" />
-                ) : (
-                  <Text style={styles.saveBtnText}>Сохранить адрес</Text>
-                )}
+                {isSaving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.saveButtonText}>Сохранить данные</Text>}
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -361,121 +318,46 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
-  header: { paddingHorizontal: 16, marginBottom: 12 },
-  title: { fontSize: 24, fontWeight: '800' },
-  container: { paddingHorizontal: 16 },
+  header: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12 },
+  title: { fontSize: 28, fontWeight: 'bold' },
+  container: { padding: 20 },
   profileHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    marginBottom: 12,
+    flexDirection: 'row', alignItems: 'center', borderRadius: 20, padding: 20,
+    marginBottom: 16, borderWidth: 1,
   },
   avatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 14,
+    width: 60, height: 60, borderRadius: 30, borderWidth: 2,
+    justifyContent: 'center', alignItems: 'center', marginRight: 16,
   },
-  avatarText: { fontSize: 20, fontWeight: '700' },
+  avatarText: { fontSize: 22, fontWeight: 'bold' },
   profileInfo: { flex: 1 },
-  name: { fontSize: 17, fontWeight: '700', marginBottom: 2 },
-  phone: { fontSize: 13, marginBottom: 4 },
-  addressSub: { fontSize: 12, fontWeight: '600' },
+  name: { fontSize: 18, fontWeight: 'bold' },
+  phone: { fontSize: 14, marginTop: 4 },
+  addressSub: { fontSize: 13, marginTop: 4 },
   editAddressButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 16,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderRadius: 14, paddingVertical: 14, marginBottom: 24,
   },
   editAddressButtonText: { fontSize: 14, fontWeight: '600' },
-  section: { marginBottom: 16 },
-  sectionTitle: { fontSize: 14, fontWeight: '700', marginBottom: 8, paddingHorizontal: 4 },
-  themeSelectorBox: {
-    flexDirection: 'row',
-    padding: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 6,
-  },
-  themeOptionBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  themeOptionActive: {},
-  themeOptionText: { fontSize: 12 },
-  card: {
-    borderRadius: 14,
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-  },
-  menuItemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  menuItemRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  menuItemTitle: { fontSize: 14, fontWeight: '500' },
-  menuItemValue: { fontSize: 13 },
-  divider: { height: 1 },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(10, 14, 24, 0.75)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    borderTopWidth: 1,
-    padding: 20,
-    maxHeight: '85%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  modalTitle: { fontSize: 18, fontWeight: '700' },
-  inputLabel: { fontSize: 13, fontWeight: '600', marginBottom: 6, marginTop: 10 },
-  modalInput: {
-    height: 46,
-    borderRadius: 10,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    fontSize: 14,
-  },
-  saveBtn: {
-    height: 48,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 20,
-    marginBottom: Platform.OS === 'ios' ? 20 : 10,
-  },
-  saveBtnText: { color: '#ffffff', fontSize: 15, fontWeight: '700' },
+  section: { marginBottom: 24 },
+  sectionTitle: { fontSize: 13, fontWeight: '600', textTransform: 'uppercase', marginBottom: 10, marginLeft: 4 },
+  card: { borderRadius: 16, overflow: 'hidden', borderWidth: 1 },
+  menuItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16, paddingHorizontal: 16 },
+  menuItemLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  menuItemTitle: { fontSize: 15, marginLeft: 12, fontWeight: '500' },
+  menuItemRight: { flexDirection: 'row', alignItems: 'center' },
+  menuItemValue: { fontSize: 14, marginRight: 8 },
+  divider: { height: 1, marginLeft: 50 },
+  themeHint: { fontSize: 13, fontWeight: '600', marginBottom: 10, marginLeft: 4 },
+  segment: { flexDirection: 'row', borderRadius: 12, borderWidth: 1, padding: 4, gap: 4 },
+  segmentBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 9, borderRadius: 9 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.7)', justifyContent: 'flex-end' },
+  modalContent: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '85%', borderWidth: 1 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  modalTitle: { fontSize: 20, fontWeight: 'bold' },
+  inputLabel: { fontSize: 13, fontWeight: '600', marginBottom: 6, marginTop: 12 },
+  modalInput: { borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, fontSize: 15, borderWidth: 1 },
+  saveButton: { borderRadius: 12, paddingVertical: 16, alignItems: 'center', marginTop: 24, marginBottom: 20 },
+  saveButtonDisabled: { opacity: 0.6 },
+  saveButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
 });

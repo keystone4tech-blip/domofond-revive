@@ -1,6 +1,6 @@
 // mobile/src/components/UpdateCheckerModal.tsx
 // Компонент автоматической проверки и уведомления об обновлениях мобильного приложения «Домофондар»
-// Позволяет обновлять APK поверх установленного приложения в один клик без перехода на сторонние ресурсы
+// Реализует чистое и лаконичное окно уведомления и прямое скачивание APK с официального сайта компании
 
 import React, { useState, useEffect } from 'react';
 import {
@@ -10,23 +10,23 @@ import {
   Modal,
   TouchableOpacity,
   Linking,
-  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { apiClient } from '@/api/client';
-import { APP_VERSION } from '@/config/constants';
+import { APP_VERSION, APP_DOWNLOAD_URL } from '@/config/constants';
+import { useAppTheme } from '@/theme';
 
 interface VersionInfo {
   latestVersion: string;
   versionCode: number;
   downloadUrl: string;
   fallbackDownloadUrl?: string;
-  releaseNotes: string[];
-  isMandatory: boolean;
+  releaseNotes?: string[];
+  isMandatory?: boolean;
 }
 
 /**
- * Сравнивает две семантические версии (например: "1.0.1" > "1.0.0")
+ * Сравнивает две семантические версии (например: "1.1.1" > "1.1.0")
  * Возвращает 1 если v1 > v2, -1 если v1 < v2, 0 если равны
  */
 function compareVersions(v1: string, v2: string): number {
@@ -44,24 +44,25 @@ function compareVersions(v1: string, v2: string): number {
 }
 
 export function UpdateCheckerModal() {
+  const { colors, isDark } = useAppTheme();
   const [visible, setVisible] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<VersionInfo | null>(null);
 
   useEffect(() => {
-    // Выполняем проверку обновлений при старте приложения
+    // Выполняем проверку наличия обновлений при запуске приложения
     checkAppUpdate();
   }, []);
 
   const checkAppUpdate = async () => {
     try {
-      console.log(`[UpdateChecker] Текущая версия: v${APP_VERSION}. Проверка обновлений на сервере...`);
+      console.log(`[UpdateChecker] Текущая установленная версия: v${APP_VERSION}. Проверяем сервер...`);
       const response = await apiClient.get<VersionInfo>('/api/app/version');
 
       if (response.data && response.data.latestVersion) {
         const info = response.data;
         const isNewer = compareVersions(info.latestVersion, APP_VERSION) > 0;
 
-        console.log(`[UpdateChecker] Сервер вернул версию: v${info.latestVersion}. Есть обновление: ${isNewer}`);
+        console.log(`[UpdateChecker] Сервер вернул версию: v${info.latestVersion}. Требуется обновление: ${isNewer}`);
 
         if (isNewer) {
           setUpdateInfo(info);
@@ -69,33 +70,43 @@ export function UpdateCheckerModal() {
         }
       }
     } catch (err) {
-      console.warn('[UpdateChecker] Не удалось проверить обновления:', err);
+      console.warn('[UpdateChecker] Не удалось проверить обновления на сервере:', err);
     }
   };
 
+  /**
+   * Обработчик нажатия кнопки «Обновить»
+   * Гарантирует прямое скачивание APK с официального сайта компании
+   */
   const handleUpdate = async () => {
-    if (!updateInfo) return;
+    // В приоритете используем прямую ссылку на APK с нашего сайта
+    const targetUrl = updateInfo?.downloadUrl?.includes('домофондар') || updateInfo?.downloadUrl?.includes('xn--80aha5afebav9a')
+      ? updateInfo.downloadUrl
+      : APP_DOWNLOAD_URL;
 
-    const url = updateInfo.downloadUrl || updateInfo.fallbackDownloadUrl;
-    if (url) {
-      console.log('[UpdateChecker] Открытие ссылки на скачивание обновления APK:', url);
-      try {
-        await Linking.openURL(url);
-      } catch (e) {
-        console.error('[UpdateChecker] Ошибка открытия ссылки:', e);
-        if (updateInfo.fallbackDownloadUrl) {
-          await Linking.openURL(updateInfo.fallbackDownloadUrl);
-        }
+    console.log('[UpdateChecker] Запуск прямого скачивания APK с официального сайта:', targetUrl);
+
+    try {
+      await Linking.openURL(targetUrl);
+    } catch (e) {
+      console.error('[UpdateChecker] Ошибка открытия прямой ссылки:', e);
+      // Если возникла непредвиденная ошибка, пробуем запасной адрес
+      if (updateInfo?.downloadUrl) {
+        await Linking.openURL(updateInfo.downloadUrl);
       }
     }
 
-    // Если обновление не обязательное, скрываем модалку после перехода
-    if (!updateInfo.isMandatory) {
+    // Если обновление не принудительное, закрываем окно
+    if (!updateInfo?.isMandatory) {
       setVisible(false);
     }
   };
 
+  /**
+   * Закрытие окна по кнопке «Позже»
+   */
   const handleDismiss = () => {
+    console.log('[UpdateChecker] Пользователь отложил обновление');
     setVisible(false);
   };
 
@@ -113,45 +124,62 @@ export function UpdateCheckerModal() {
       }}
     >
       <View style={styles.overlay}>
-        <View style={styles.card}>
-          {/* Иконка обновления */}
-          <View style={styles.iconCircle}>
-            <Ionicons name="sparkles" size={32} color="#10B981" />
+        <View style={[
+          styles.card,
+          {
+            backgroundColor: isDark ? '#161922' : '#FFFFFF',
+            borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)',
+          }
+        ]}>
+          {/* Аккуратная иконка обновления */}
+          <View style={[
+            styles.iconCircle,
+            {
+              backgroundColor: isDark ? 'rgba(78, 222, 163, 0.12)' : 'rgba(16, 185, 129, 0.1)',
+              borderColor: isDark ? 'rgba(78, 222, 163, 0.25)' : 'rgba(16, 185, 129, 0.2)',
+            }
+          ]}>
+            <Ionicons name="cloud-download-outline" size={32} color={isDark ? '#4EDE93' : '#10B981'} />
           </View>
 
-          {/* Заголовок */}
-          <Text style={styles.title}>Доступно обновление</Text>
-          <View style={styles.badgeRow}>
-            <View style={styles.versionBadge}>
-              <Text style={styles.versionBadgeText}>Версия {updateInfo.latestVersion}</Text>
-            </View>
-            <Text style={styles.currentVersionText}>У вас: v{APP_VERSION}</Text>
-          </View>
-
-          <Text style={styles.subtitle}>
-            Мы подготовили важное улучшение для стабильной работы и безопасности приложения:
+          {/* Лаконичный заголовок */}
+          <Text style={[styles.title, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+            Доступно обновление
           </Text>
 
-          {/* Список изменений */}
-          <ScrollView style={styles.notesContainer}>
-            {updateInfo.releaseNotes?.map((note, index) => (
-              <View key={index} style={styles.noteItem}>
-                <Ionicons name="checkmark-circle" size={18} color="#10B981" style={styles.noteIcon} />
-                <Text style={styles.noteText}>{note}</Text>
-              </View>
-            ))}
-          </ScrollView>
+          {/* Простое понятное описание без лишних списков */}
+          <Text style={[styles.subtitle, { color: isDark ? '#94A3B8' : '#64748B' }]}>
+            Пожалуйста, обновите приложение до актуальной версии {updateInfo.latestVersion} для стабильной и быстрой работы сервисов.
+          </Text>
 
-          {/* Кнопки действий */}
+          {/* Блок кнопок */}
           <View style={styles.actionsContainer}>
-            <TouchableOpacity style={styles.updateButton} onPress={handleUpdate} activeOpacity={0.85}>
-              <Ionicons name="cloud-download-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-              <Text style={styles.updateButtonText}>Обновить сейчас</Text>
+            <TouchableOpacity
+              style={[
+                styles.updateButton,
+                { backgroundColor: isDark ? '#4EDE93' : '#10B981' }
+              ]}
+              onPress={handleUpdate}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="download-outline" size={20} color={isDark ? '#081510' : '#FFFFFF'} style={{ marginRight: 8 }} />
+              <Text style={[
+                styles.updateButtonText,
+                { color: isDark ? '#081510' : '#FFFFFF' }
+              ]}>
+                Обновить
+              </Text>
             </TouchableOpacity>
 
             {!updateInfo.isMandatory && (
-              <TouchableOpacity style={styles.laterButton} onPress={handleDismiss} activeOpacity={0.7}>
-                <Text style={styles.laterButtonText}>Напомнить позже</Text>
+              <TouchableOpacity
+                style={styles.laterButton}
+                onPress={handleDismiss}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.laterButtonText, { color: isDark ? '#828C9E' : '#64748B' }]}>
+                  Позже
+                </Text>
               </TouchableOpacity>
             )}
           </View>
@@ -164,118 +192,63 @@ export function UpdateCheckerModal() {
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    backgroundColor: 'rgba(7, 10, 16, 0.78)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
   },
   card: {
-    backgroundColor: '#1E293B',
     borderRadius: 24,
-    padding: 24,
+    paddingHorizontal: 24,
+    paddingTop: 28,
+    paddingBottom: 20,
     width: '100%',
-    maxWidth: 380,
+    maxWidth: 340,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(148, 163, 184, 0.15)',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.4,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.3,
     shadowRadius: 20,
-    elevation: 10,
+    elevation: 12,
   },
   iconCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    width: 68,
+    height: 68,
+    borderRadius: 34,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
   },
   title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#F8FAFC',
+    fontSize: 20,
+    fontWeight: '700',
     textAlign: 'center',
-    marginBottom: 8,
-  },
-  badgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  versionBadge: {
-    backgroundColor: '#10B981',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    marginRight: 8,
-  },
-  versionBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  currentVersionText: {
-    color: '#64748B',
-    fontSize: 12,
+    marginBottom: 10,
+    letterSpacing: -0.3,
   },
   subtitle: {
     fontSize: 14,
-    color: '#94A3B8',
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: 24,
     lineHeight: 20,
-  },
-  notesContainer: {
-    maxHeight: 160,
-    width: '100%',
-    backgroundColor: 'rgba(15, 23, 42, 0.5)',
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(148, 163, 184, 0.08)',
-  },
-  noteItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 10,
-  },
-  noteIcon: {
-    marginTop: 2,
-    marginRight: 8,
-  },
-  noteText: {
-    fontSize: 13,
-    color: '#E2E8F0',
-    flex: 1,
-    lineHeight: 18,
+    paddingHorizontal: 4,
   },
   actionsContainer: {
     width: '100%',
   },
   updateButton: {
-    backgroundColor: '#10B981',
     borderRadius: 14,
     paddingVertical: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
   },
   updateButtonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '700',
   },
   laterButton: {
     paddingVertical: 12,
@@ -284,8 +257,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   laterButtonText: {
-    color: '#64748B',
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
   },
 });

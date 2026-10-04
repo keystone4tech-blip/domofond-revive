@@ -180,8 +180,8 @@ app.get('/api/health', (req, res) => {
 // Публичный эндпоинт проверки обновлений мобильного приложения «Домофондар»
 app.get('/api/app/version', (req, res) => {
   res.json({
-    latestVersion: '1.1.1',
-    versionCode: 4,
+    latestVersion: '1.1.0',
+    versionCode: 3,
     minSupportedVersion: '1.0.0',
     downloadUrl: 'https://github.com/keystone4tech-blip/domofond-revive/releases/download/app-latest/domofondar.apk',
     fallbackDownloadUrl: 'https://xn--80aha5afebav9a.xn--p1ai/media/app/domofondar.apk',
@@ -927,37 +927,77 @@ app.get('/api/user/my-requests', authenticateToken, async (req, res) => {
 // ------------------------------------------------------------------------------
 // КАТАЛОГ ОБОРУДОВАНИЯ, УСЛУГ И КЛЮЧЕЙ (С ПРИВЯЗКОЙ К ПОДЪЕЗДУ)
 // ------------------------------------------------------------------------------
+// Нормализация адреса для сопоставления подъезда (без \b — он не работает с кириллицей).
+const _catTypeTokens = new Set(['ул','ул.','улица','пер','пер.','переулок','проспект','пр-кт','пр','пр.','аллея','бульвар','тракт','шоссе','(ул)','им','им.','имени','генерала','генерал','академика','маршала','дом']);
+function catNormStreet(addr) {
+  if (!addr) return '';
+  const s = addr.toLowerCase().replace(/ё/g, 'е');
+  const segs = s.split(',').map(x => x.trim()).filter(Boolean);
+  const streetSegs = segs.filter(seg =>
+    !/краснодар|^г\.|^город|^пос|^поселок|^аул\b|^х\.|^хутор|^ст\.|^станица/.test(seg) &&
+    !/^д\.?\s*\d/.test(seg) && !/^дом\s*\d/.test(seg) &&
+    !/^корп/.test(seg) && !/^к\s*\d/.test(seg) && !/^к\d/.test(seg) &&
+    !/^п\.?\s*\d/.test(seg) && !/^подъезд/.test(seg) &&
+    !/^кв/.test(seg) && !/^квартира/.test(seg) && !/^эт/.test(seg)
+  );
+  const seg = streetSegs[0] || '';
+  return seg.replace(/[().]/g, ' ').split(/\s+/).filter(Boolean)
+    .filter(t => !_catTypeTokens.has(t) && !_catTypeTokens.has(t.replace(/\.$/, '')))
+    .join('').replace(/[^а-яa-z0-9]/g, '');
+}
+function catNormHouse(addr) {
+  const i = (addr || '').search(/д\.?\s*\d/i);
+  let chunk = i >= 0 ? addr.slice(i) : (addr || '');
+  chunk = chunk.replace(/,\s*(?:п(?:одъезд)?)\.?\s*\d+.*$/i, '').replace(/,\s*(?:кв\.?|квартира)\s*.*$/i, '');
+  let s = chunk.toLowerCase().replace(/ё/g, 'е').replace(/^.*?д\.?\s*/, '').replace(/корп\.?|корпус/g, 'к');
+  const digits = s.match(/\d+/g) || [];
+  const hasK = /к/.test(s);
+  if (!digits.length) return '';
+  let r = digits[0];
+  if (hasK && digits[1]) r += 'к' + digits[1];
+  return r;
+}
+function catEntranceNum(addr) {
+  // Подъезд: "п" должен стоять после запятой/пробела/начала, чтобы не поймать «корп. 1»
+  const m = (addr || '').match(/(?:^|[\s,])(?:подъезд|под|п)\.?\s*(\d+)/i);
+  return m ? m[1] : '';
+}
+
 app.get('/api/catalog/products', async (req, res) => {
   const { account_number, entrance_id } = req.query;
   console.log(`[Бэкенд: Каталог] Запрос каталога (л/с: ${account_number || 'нет'}, подъезд: ${entrance_id || 'нет'})`);
 
   try {
     let targetEntranceId = entrance_id || null;
+    let isInstallation = false;
 
-    // 1. Если передан лицевой счет, определяем подъезд через адрес
-    if (!targetEntranceId && account_number) {
+    // 1. Определяем подъезд: по переданному entrance_id, либо по адресу лицевого счёта (устойчивое сопоставление)
+    if (targetEntranceId) {
       try {
-        const accRes = await pool.query(
-          'SELECT address FROM accounts WHERE account_number = $1 LIMIT 1',
-          [account_number]
-        );
+        const er = await pool.query('SELECT service_type FROM entrances WHERE id = $1 LIMIT 1', [targetEntranceId]);
+        isInstallation = er.rows[0]?.service_type === 'installation';
+      } catch (e) { /* не критично */ }
+    } else if (account_number) {
+      try {
+        const accRes = await pool.query('SELECT address FROM accounts WHERE account_number = $1 LIMIT 1', [account_number]);
         if (accRes.rows.length > 0 && accRes.rows[0].address) {
-          const rawAddr = accRes.rows[0].address.toLowerCase();
-          // Ищем совпадение в таблице подъездов entrances
-          const entRes = await pool.query(
-            'SELECT id, street, house, entrance FROM entrances'
-          );
+          const addr = accRes.rows[0].address;
+          const aStreet = catNormStreet(addr), aHouse = catNormHouse(addr), aEnt = catEntranceNum(addr);
+          const entRes = await pool.query('SELECT id, street, house, entrance, service_type FROM entrances');
+          let exact = null, loose = null;
           for (const ent of entRes.rows) {
-            const st = (ent.street || '').toLowerCase().trim();
-            const h = (ent.house || '').toLowerCase().trim();
-            const e = (ent.entrance || '').toLowerCase().trim();
-            if (st && h && rawAddr.includes(st) && rawAddr.includes(h)) {
-              if (!e || rawAddr.includes(`п.${e}`) || rawAddr.includes(`подъезд ${e}`) || rawAddr.includes(`под. ${e}`)) {
-                targetEntranceId = ent.id;
-                console.log(`[Бэкенд: Каталог] Найден подъезд ID ${targetEntranceId} для адреса: ${accRes.rows[0].address}`);
-                break;
-              }
+            const es = catNormStreet(ent.street || ''), eh = catNormHouse(ent.house || '');
+            const ee = String(ent.entrance || '').replace(/\D/g, '');
+            if (es && eh && es === aStreet && eh === aHouse) {
+              if (ee && aEnt && ee === aEnt) { exact = ent; break; }
+              if (!loose) loose = ent;
             }
+          }
+          const entranceRow = exact || loose;
+          if (entranceRow) {
+            targetEntranceId = entranceRow.id;
+            isInstallation = entranceRow.service_type === 'installation';
+            console.log(`[Бэкенд: Каталог] Подъезд ${targetEntranceId} (${entranceRow.street} ${entranceRow.house} п.${entranceRow.entrance}), монтаж: ${isInstallation}`);
           }
         }
       } catch (findErr) {
@@ -965,13 +1005,16 @@ app.get('/api/catalog/products', async (req, res) => {
       }
     }
 
-    // 2. Загружаем активные товары из таблицы products
+    // 2. Загружаем активные товары со ВСЕМИ полями цен (как использует сайт)
     const prodRes = await pool.query(
-      'SELECT id, name, description, price, category, image_url, is_active FROM products WHERE is_active = true ORDER BY name ASC'
+      `SELECT id, name, description, price, promo_price, is_tiered_promo, tiered_pricing, installation_price,
+              category, image_url, device_type_id, folder_id, unit, code_1c, is_active
+       FROM products WHERE is_active = true ORDER BY name ASC`
     );
     const allProducts = prodRes.rows;
 
-    // 3. Загружаем привязки к подъезду (если подъезд определен)
+    // 3. Привязки к подъезду: набор товаров и индивидуальные цены
+    let boundIds = null;
     let customPricing = {};
     if (targetEntranceId) {
       try {
@@ -979,59 +1022,59 @@ app.get('/api/catalog/products', async (req, res) => {
           'SELECT product_id, price_type, custom_price FROM entrance_products WHERE entrance_id = $1',
           [targetEntranceId]
         );
-        bindRes.rows.forEach(b => {
-          customPricing[b.product_id] = {
-            price_type: b.price_type,
-            custom_price: b.custom_price != null ? Number(b.custom_price) : null
-          };
-        });
+        if (bindRes.rows.length > 0) {
+          boundIds = new Set();
+          bindRes.rows.forEach(b => {
+            boundIds.add(b.product_id);
+            customPricing[b.product_id] = {
+              price_type: b.price_type,
+              custom_price: b.custom_price != null ? Number(b.custom_price) : null,
+            };
+          });
+        }
       } catch (bErr) {
         console.warn('[Бэкенд: Каталог] Ошибка при чтении entrance_products:', bErr.message);
       }
     }
 
-    // 4. Формируем эффективный список с расчетом цен
-    const enriched = allProducts.map(p => {
-      let finalPrice = Number(p.price || 0);
+    // 4. Если есть привязки к подъезду — показываем ТОЛЬКО товары этого подъезда (как на сайте),
+    //    иначе (подъезд не определён) — весь активный каталог как запасной вариант.
+    const sourceProducts = boundIds ? allProducts.filter(p => boundIds.has(p.id)) : allProducts;
+
+    const enriched = sourceProducts.map(p => {
       const pricing = customPricing[p.id];
-      if (pricing && pricing.custom_price != null && pricing.custom_price > 0) {
-        finalPrice = pricing.custom_price;
-      }
+      let finalPrice = Number(p.price || 0);
+      if (pricing && pricing.custom_price != null && pricing.custom_price > 0) finalPrice = pricing.custom_price;
       return {
         ...p,
         price: finalPrice,
-        base_price: Number(p.price || 0)
+        base_price: Number(p.price || 0),
+        promo_price: p.promo_price != null ? Number(p.promo_price) : null,
+        installation_price: p.installation_price != null ? Number(p.installation_price) : null,
+        bound: !!boundIds,
+        price_type: pricing?.price_type || null,
       };
     });
 
-    // 5. Разделяем на категории для удобного отображения в мобильном приложении
-    const handsets = enriched.filter(p => 
-      p.category === 'equipment' || 
-      /трубк|ткп|домофон/i.test(p.name)
-    );
+    // 5. Категоризация (ключи / трубки / услуги)
+    const isKey = (p) => p.category === 'key' || /ключ|чип|брелок|rfid|uid/i.test(p.name);
+    const isService = (p) => p.category === 'service' || /установк|замен|монтаж|проклад|подключен/i.test(p.name);
+    const isHandset = (p) => !isKey(p) && !isService(p) && (/трубк|ткп|voice|домофон/i.test(p.name) || (!!p.device_type_id && p.category === 'equipment'));
 
-    const services = enriched.filter(p => 
-      p.category === 'service' || 
-      /установк|замен|монтаж|подключен/i.test(p.name)
-    );
-
-    const keys = enriched.filter(p => 
-      p.category === 'key' || 
-      /ключ|чип|брелок|rfid/i.test(p.name)
-    );
+    // ключи: сперва акционные (с тарифной сеткой), трубки: по возрастанию цены
+    const keys = enriched.filter(isKey).sort((a, b) => (b.is_tiered_promo ? 1 : 0) - (a.is_tiered_promo ? 1 : 0));
+    const services = enriched.filter(isService);
+    const handsets = enriched.filter(isHandset).sort((a, b) => Number(a.price) - Number(b.price));
 
     res.json({
       success: true,
       entrance_id: targetEntranceId,
-      handsets: handsets.length > 0 ? handsets : enriched.filter(p => /трубк|ткп/i.test(p.name)),
-      services: services.length > 0 ? services : [
-        { id: 'srv-install', name: 'Установка новой трубки с прокладкой кабеля', price: 500, category: 'service' },
-        { id: 'srv-replace', name: 'Замена существующей трубки', price: 300, category: 'service' }
-      ],
-      keys: keys.length > 0 ? keys : [
-        { id: 'key-rfid', name: 'Электронный чип-ключ Домофондар (бесконтактный)', price: 250, category: 'key' }
-      ],
-      all: enriched
+      is_installation: isInstallation,
+      has_bindings: !!boundIds,
+      handsets,
+      services,
+      keys,
+      all: enriched,
     });
   } catch (err) {
     console.error('[Бэкенд: Каталог] Ошибка формирования каталога:', err.message);

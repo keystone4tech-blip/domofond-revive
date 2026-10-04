@@ -21,11 +21,12 @@ import { useAuthStore } from '@/store/auth.store';
 import { useAppTheme } from '@/theme';
 import { apiClient } from '@/api/client';
 
+// Заявки на ремонт/обслуживание. Заказ ключей и трубки — отдельные оплачиваемые разделы
+// на главном экране (чтобы не дублировать и не путать с бесплатным вызовом мастера).
 const REQUEST_TYPES = [
   'Ремонт домофона / не открывает дверь',
   'Не работает аудиотрубка в квартире',
-  'Заказ дополнительных ключей (чипов)',
-  'Заказ и замена трубки домофона',
+  'Помехи / плохая слышимость',
   'Регулировка доводчика двери подъезда',
   'Другой вопрос по домофонии',
 ];
@@ -64,7 +65,7 @@ export default function CreateRequestScreen() {
         address: address.trim(),
         message: `[${selectedType}]\n${description.trim()}`,
         priority: 'medium',
-        status: 'new',
+        status: 'pending',
         is_mobile: true,
         source: 'mobile_app',
       };
@@ -154,7 +155,7 @@ export default function CreateRequestScreen() {
             ]}
             value={address}
             onChangeText={setAddress}
-            placeholder="г. Нальчик, ул. Ленина, д. 10, кв. 42"
+            placeholder="г. Краснодар, ул. Казбекская, д. 13, п. 2, кв. 116"
             placeholderTextColor={colors.textMuted}
           />
 

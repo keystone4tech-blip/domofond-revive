@@ -20,6 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 import { useAppTheme } from '@/theme';
 import { apiClient } from '@/api/client';
+import { calculateKeyPriceDetails, parseTieredPricing } from '@/utils/pricing';
 
 interface KeyOrderModalProps {
   visible: boolean;
@@ -45,6 +46,7 @@ export const KeyOrderModal: React.FC<KeyOrderModalProps> = ({
   const [phone, setPhone] = useState(user?.phone || '');
   const [comment, setComment] = useState('');
   const [keyProduct, setKeyProduct] = useState<any>(null);
+  const [isInstallation, setIsInstallation] = useState(false);
   const [loadingCatalog, setLoadingCatalog] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -66,6 +68,7 @@ export const KeyOrderModal: React.FC<KeyOrderModalProps> = ({
       if (res.data?.keys && res.data.keys.length > 0) {
         setKeyProduct(res.data.keys[0]);
       }
+      setIsInstallation(!!res.data?.is_installation);
     } catch (err) {
       console.warn('[Ключи] Ошибка загрузки каталога ключей:', err);
     } finally {
@@ -73,33 +76,27 @@ export const KeyOrderModal: React.FC<KeyOrderModalProps> = ({
     }
   };
 
-  // Ступенчатый расчет стоимости ключей (как на официальном сайте в Cabinet.tsx)
-  const baseKeyPrice = Number(keyProduct?.price || 250);
+  // Реальные параметры цены из номенклатуры (как на сайте): ступени, акция, льгота монтажа
+  const baseKeyPrice = Number(keyProduct?.base_price ?? keyProduct?.price ?? 300);
+  const keyTiers = parseTieredPricing(keyProduct?.tiered_pricing);
+  const promoEnabled = keyProduct ? !!keyProduct.is_tiered_promo : true;
+  const keyInstallPrice = keyProduct?.installation_price != null ? Number(keyProduct.installation_price) : null;
 
   const calculateKeyPricing = (qty: number) => {
-    let unitPrice = baseKeyPrice;
-    let tierText = 'Базовый тариф';
-    let discountPercent = 0;
-
-    if (qty >= 5) {
-      unitPrice = Math.round(baseKeyPrice * 0.76); // ~190 ₽ при базе 250 ₽
-      discountPercent = 24;
-      tierText = 'Оптовая скидка 24%';
-    } else if (qty >= 3) {
-      unitPrice = Math.round(baseKeyPrice * 0.88); // ~220 ₽ при базе 250 ₽
-      discountPercent = 12;
-      tierText = 'Скидка от 3 шт (12%)';
-    }
-
-    const baseSum = qty * unitPrice;
-    // Эквайринг 5% (как на сайте)
-    const feeSum = Math.round(baseSum * 0.05 * 100) / 100;
+    const d = calculateKeyPriceDetails(qty, baseKeyPrice, isInstallation, keyInstallPrice, promoEnabled, keyTiers);
+    const baseSum = d.totalPrice;
+    const feeSum = Math.round(baseSum * 0.05 * 100) / 100; // эквайринг 5%, как на сайте
     const totalSum = Math.round((baseSum + feeSum) * 100) / 100;
-
-    return { unitPrice, baseSum, feeSum, totalSum, tierText, discountPercent };
+    const tierText = isInstallation
+      ? 'Льготная цена монтажа'
+      : d.isPromoApplied ? `Акция • ${d.unitPrice} ₽/шт` : 'Базовый тариф';
+    return { unitPrice: d.unitPrice, baseSum, feeSum, totalSum, tierText, discountPercent: 0 };
   };
 
   const pricing = calculateKeyPricing(quantity);
+  // Цена ступени для отображения (из реальной сетки товара)
+  const tierUnit = (minQty: number) =>
+    calculateKeyPriceDetails(minQty, baseKeyPrice, isInstallation, keyInstallPrice, promoEnabled, keyTiers).unitPrice;
 
   const handleIncrement = () => {
     if (quantity < 20) setQuantity(quantity + 1);
@@ -227,44 +224,27 @@ export const KeyOrderModal: React.FC<KeyOrderModalProps> = ({
               </View>
             </View>
 
-            {/* Ступени скидок */}
+            {/* Ступени цен — реальная сетка из номенклатуры товара */}
             <View style={styles.tiersRow}>
-              <View
-                style={[
-                  styles.tierChip,
-                  {
-                    backgroundColor: quantity < 3 ? (isDark ? '#262a35' : '#dbeafe') : (isDark ? '#171b26' : '#f1f5f9'),
-                    borderColor: quantity < 3 ? colors.primaryContainer : colors.border,
-                  },
-                ]}
-              >
-                <Text style={[styles.tierTitle, { color: colors.text }]}>1–2 шт</Text>
-                <Text style={[styles.tierPrice, { color: colors.textSecondary }]}>{baseKeyPrice} ₽</Text>
-              </View>
-              <View
-                style={[
-                  styles.tierChip,
-                  {
-                    backgroundColor: quantity >= 3 && quantity < 5 ? (isDark ? '#262a35' : '#dbeafe') : (isDark ? '#171b26' : '#f1f5f9'),
-                    borderColor: quantity >= 3 && quantity < 5 ? colors.primaryContainer : colors.border,
-                  },
-                ]}
-              >
-                <Text style={[styles.tierTitle, { color: colors.text }]}>3–4 шт (-12%)</Text>
-                <Text style={[styles.tierPrice, { color: colors.textSecondary }]}>{Math.round(baseKeyPrice * 0.88)} ₽</Text>
-              </View>
-              <View
-                style={[
-                  styles.tierChip,
-                  {
-                    backgroundColor: quantity >= 5 ? (isDark ? '#262a35' : '#dbeafe') : (isDark ? '#171b26' : '#f1f5f9'),
-                    borderColor: quantity >= 5 ? colors.primaryContainer : colors.border,
-                  },
-                ]}
-              >
-                <Text style={[styles.tierTitle, { color: colors.text }]}>5+ шт (-24%)</Text>
-                <Text style={[styles.tierPrice, { color: colors.textSecondary }]}>{Math.round(baseKeyPrice * 0.76)} ₽</Text>
-              </View>
+              {[
+                { label: '1 шт', q: 1, active: quantity === 1 },
+                { label: '2 шт', q: 2, active: quantity === 2 },
+                { label: '3+ шт', q: 3, active: quantity >= 3 },
+              ].map((t) => (
+                <View
+                  key={t.q}
+                  style={[
+                    styles.tierChip,
+                    {
+                      backgroundColor: t.active ? (isDark ? '#262a35' : '#dbeafe') : (isDark ? '#171b26' : '#f1f5f9'),
+                      borderColor: t.active ? colors.primaryContainer : colors.border,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.tierTitle, { color: colors.text }]}>{t.label}</Text>
+                  <Text style={[styles.tierPrice, { color: colors.textSecondary }]}>{tierUnit(t.q)} ₽</Text>
+                </View>
+              ))}
             </View>
 
             {/* Адрес и контакты */}

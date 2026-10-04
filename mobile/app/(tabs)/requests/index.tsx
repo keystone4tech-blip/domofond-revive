@@ -11,20 +11,22 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
-import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiClient } from '@/api/client';
 import { useAppTheme } from '@/theme';
+import { useAuthStore } from '@/store/auth.store';
+import { RepairModal } from '@/components/RepairModal';
 
 export default function RequestsScreen() {
-  const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useAppTheme();
+  const { user } = useAuthStore();
 
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [repairOpen, setRepairOpen] = useState(false);
 
   // Загружаем только обращения авторизованного пользователя
   const fetchRequests = useCallback(async () => {
@@ -124,7 +126,7 @@ export default function RequestsScreen() {
 
         <TouchableOpacity
           style={[styles.createButton, { backgroundColor: colors.primaryContainer }]}
-          onPress={() => router.push('/(tabs)/requests/create')}
+          onPress={() => setRepairOpen(true)}
           activeOpacity={0.8}
         >
           <Ionicons name="add" size={20} color="#ffffff" />
@@ -148,7 +150,7 @@ export default function RequestsScreen() {
           </Text>
           <TouchableOpacity
             style={[styles.emptyButton, { backgroundColor: colors.primaryContainer }]}
-            onPress={() => router.push('/(tabs)/requests/create')}
+            onPress={() => setRepairOpen(true)}
             activeOpacity={0.8}
           >
             <Text style={styles.emptyButtonText}>Создать заявку</Text>
@@ -170,6 +172,15 @@ export default function RequestsScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
+
+      {/* Единое окно создания заявки (вызов мастера / обращение) */}
+      <RepairModal
+        visible={repairOpen}
+        onClose={() => setRepairOpen(false)}
+        onSuccess={fetchRequests}
+        user={user}
+        defaultAddress={(user as any)?.address || ''}
+      />
     </View>
   );
 }

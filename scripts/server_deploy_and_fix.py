@@ -40,39 +40,34 @@ def run():
 
     # 2. Починка застрявших мобильных заявок (status='new' -> status='pending')
     print("\n--- [ШАГ 2] Перевод заявок со статусом 'new' в 'pending' ---")
-    
-    # Определяем точное имя контейнера Postgres
-    stdin, stdout, stderr = client.exec_command("docker ps --filter name=postgres --format '{{.Names}}'", timeout=20)
-    db_container = stdout.read().decode('utf-8', errors='ignore').strip()
-    if not db_container:
-        db_container = "domofondar_postgres"
+    db_container = "domofondar_postgres"
     print(f"Контейнер базы данных: {db_container}")
 
-    # Пробуем через пользователя postgres или domofondar
     sql_update = "UPDATE requests SET status='pending' WHERE status='new';"
-    cmd_sql = f'docker exec {db_container} psql -U domofondar -d domofondar -c "{sql_update}"'
+    cmd_sql = f'docker exec {db_container} psql -U postgres -d domofondar -c "{sql_update}"'
+    print(f"Выполняем SQL: {cmd_sql}")
     stdin, stdout, stderr = client.exec_command(cmd_sql, timeout=30)
-    res_sql = stdout.read().decode('utf-8', errors='ignore')
-    err_sql = stderr.read().decode('utf-8', errors='ignore')
+    res_sql = stdout.read().decode('utf-8', errors='replace')
+    err_sql = stderr.read().decode('utf-8', errors='replace')
 
     if "FATAL" in err_sql or "does not exist" in err_sql:
-        cmd_sql = f'docker exec {db_container} psql -U postgres -d domofondar -c "{sql_update}"'
+        cmd_sql = f'docker exec {db_container} psql -U domofondar -d domofondar -c "{sql_update}"'
         stdin, stdout, stderr = client.exec_command(cmd_sql, timeout=30)
-        res_sql = stdout.read().decode('utf-8', errors='ignore')
-        err_sql = stderr.read().decode('utf-8', errors='ignore')
+        res_sql = stdout.read().decode('utf-8', errors='replace')
+        err_sql = stderr.read().decode('utf-8', errors='replace')
 
     print(f"Результат обновления SQL: {res_sql.strip()} {err_sql.strip()}")
 
     # Проверка статистики заявок
     print("\n--- [ШАГ 3] Актуальная статистика статусов в таблице requests ---")
     stat_sql = "SELECT status, COUNT(*) FROM requests GROUP BY status;"
-    cmd_stat = f'docker exec {db_container} psql -U domofondar -d domofondar -c "{stat_sql}"'
+    cmd_stat = f'docker exec {db_container} psql -U postgres -d domofondar -c "{stat_sql}"'
     stdin, stdout, stderr = client.exec_command(cmd_stat, timeout=30)
-    res_stat = stdout.read().decode('utf-8', errors='ignore')
+    res_stat = stdout.read().decode('utf-8', errors='replace')
     if "FATAL" in res_stat or not res_stat.strip():
-        cmd_stat = f'docker exec {db_container} psql -U postgres -d domofondar -c "{stat_sql}"'
+        cmd_stat = f'docker exec {db_container} psql -U domofondar -d domofondar -c "{stat_sql}"'
         stdin, stdout, stderr = client.exec_command(cmd_stat, timeout=30)
-        res_stat = stdout.read().decode('utf-8', errors='ignore')
+        res_stat = stdout.read().decode('utf-8', errors='replace')
 
     print(res_stat)
 
