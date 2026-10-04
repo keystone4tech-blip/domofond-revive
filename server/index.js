@@ -179,12 +179,19 @@ app.get('/api/health', (req, res) => {
 
 // Публичный эндпоинт проверки обновлений мобильного приложения «Домофондар»
 app.get('/api/app/version', (req, res) => {
+  // Прямая ссылка на APK с официального сайта компании (скачивается моментально без перехода на сторонние ресурсы)
+  const siteDownloadUrl = 'https://xn--80aha5afebav9a.xn--p1ai/media/app/domofondar.apk';
+  const githubFallbackUrl = 'https://github.com/keystone4tech-blip/domofond-revive/releases/download/app-latest/domofondar.apk';
+
+  console.log('[Бэкенд: Версия приложения] Запрос проверки обновлений с мобильного клиента');
+
   res.json({
-    latestVersion: '1.1.0',
-    versionCode: 3,
+    latestVersion: '1.1.1',
+    versionCode: 4,
     minSupportedVersion: '1.0.0',
-    downloadUrl: 'https://github.com/keystone4tech-blip/domofond-revive/releases/download/app-latest/domofondar.apk',
-    fallbackDownloadUrl: 'https://xn--80aha5afebav9a.xn--p1ai/media/app/domofondar.apk',
+    // Основная ссылка — прямое скачивание установочного APK-файла с нашего официального сервера
+    downloadUrl: siteDownloadUrl,
+    fallbackDownloadUrl: githubFallbackUrl,
     releaseNotes: [
       'Премиальный кибер-стиль Domofondar CyberShield (Cyber Dark & Clean Tech)',
       'Мгновенное переключение тем прямо из шапки экрана и профиля',
