@@ -64,6 +64,8 @@ export function UpdateCheckerModal() {
 
   // Ссылка на объект загрузки для возможности отмены
   const downloadTaskRef = useRef<FileSystem.DownloadResumable | null>(null);
+  // Аппаратный мьютекс от дребезга нажатий (исключает 2-3 параллельных скачивания при повторных кликах)
+  const isDownloadingRef = useRef(false);
 
   useEffect(() => {
     // Выполняем проверку наличия обновлений при запуске приложения
@@ -98,6 +100,13 @@ export function UpdateCheckerModal() {
    * Фоновое скачивание APK прямо в приложении с индикацией прогресса
    */
   const startNativeDownload = async () => {
+    // Строгая блокировка от повторных параллельных вызовов
+    if (isDownloadingRef.current) {
+      console.log('[UpdateChecker] Скачивание уже выполняется, повторный клик отклонён');
+      return;
+    }
+    isDownloadingRef.current = true;
+
     // Целевой URL для загрузки (гарантированный бэкенд эндпоинт без перехвата Service Worker)
     const targetUrl = updateInfo?.downloadUrl || APP_DOWNLOAD_URL;
 
@@ -109,6 +118,20 @@ export function UpdateCheckerModal() {
 
     // Локальный путь сохранения APK в файловой системе устройства
     const targetFilePath = `${FileSystem.cacheDirectory || FileSystem.documentDirectory}domofondar_${updateInfo?.latestVersion || 'latest'}.apk`;
+
+    // 1. Проверяем, возможно файл этой версии уже полностью скачан
+    try {
+      const existing = await FileSystem.getInfoAsync(targetFilePath);
+      if (existing.exists && existing.size && existing.size > 20 * 1024 * 1024) {
+        console.log('[UpdateChecker] Файл обновления уже сохранен на диске:', targetFilePath);
+        setDownloadProgress(100);
+        setDownloadBytesText('Файл готов к установке');
+        await launchApkInstaller(targetFilePath);
+        return;
+      }
+    } catch (checkErr) {
+      console.log('[UpdateChecker] Проверка имеющегося файла:', checkErr);
+    }
 
     try {
       const downloadResumable = FileSystem.createDownloadResumable(
@@ -149,6 +172,7 @@ export function UpdateCheckerModal() {
       console.error('[UpdateChecker] Сбой при нативном скачивании APK:', err);
       setDownloadError('Не удалось автоматически загрузить файл. Попробуйте скачать через браузер.');
       setIsDownloading(false);
+      isDownloadingRef.current = false;
     }
   };
 
@@ -184,6 +208,7 @@ export function UpdateCheckerModal() {
       );
     } finally {
       setIsDownloading(false);
+      isDownloadingRef.current = false;
     }
   };
 
@@ -219,6 +244,7 @@ export function UpdateCheckerModal() {
       }
     }
     setIsDownloading(false);
+    isDownloadingRef.current = false;
     setDownloadProgress(0);
     setDownloadBytesText('');
     setDownloadError(null);
@@ -332,9 +358,11 @@ export function UpdateCheckerModal() {
                 <TouchableOpacity
                   style={[
                     styles.updateButton,
-                    { backgroundColor: isDark ? '#4EDE93' : '#10B981' }
+                    { backgroundColor: isDark ? '#4EDE93' : '#10B981' },
+                    isDownloading && { opacity: 0.6 }
                   ]}
                   onPress={startNativeDownload}
+                  disabled={isDownloading}
                   activeOpacity={0.85}
                 >
                   <Ionicons name="download-outline" size={20} color={isDark ? '#081510' : '#FFFFFF'} style={{ marginRight: 8 }} />
