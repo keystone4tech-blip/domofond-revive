@@ -76,7 +76,14 @@ export default defineConfig(({ mode }) => ({
       workbox: {
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
-        navigateFallbackDenylist: [/^\/~oauth/],
+        // Исключаем из перехвата Service Worker авторизационные callback, медиа-файлы, бэкенд API и файлы приложений (.apk)
+        navigateFallbackDenylist: [
+          /^\/~oauth/,
+          /^\/media\//,
+          /^\/backend-api\//,
+          /^\/api\//,
+          /\.apk$/i,
+        ],
         importScripts: ['/sw-push.js'],
         runtimeCaching: [
           {

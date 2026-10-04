@@ -11,6 +11,40 @@
 > 
 > **Пользователь НЕ ДОЛЖЕН ничего вносить вручную.** Вся статистика и история пополняется ИИ автоматически при каждой задаче.
 
+# 2026-10-04 04:00 — Нативное фоновое обновление APK в приложении и устранение ошибки 404 «Страница не найдена»
+
+## 1. Задачи и бизнес-ценность
+- **Причина ошибки 404 («Страница не найдена»)**:
+  * Ранее при нажатии «Обновить» приложение перенаправляло внешний браузер по ссылке `https://домофондар.рф/media/app/domofondar.apk`.
+  * Браузер абонента хранил активный PWA Service Worker (`sw.js`). Так как навигационные запросы к статическим файлам не были исключены из Workbox `navigateFallbackDenylist`, Service Worker перехватывал запрос и отдавал HTML-шаблон Single Page Application (React).
+  * React Router не находил маршрута `/media/app/domofondar.apk` и отрисовывал страницу «Страница не найдена».
+- **Нативное фоновое скачивание прямо в мобильном приложении**:
+  * В диалоговом окне обновления `UpdateCheckerModal.tsx` встроен фоновый загрузчик на базе `expo-file-system` (`FileSystem.createDownloadResumable`).
+  * Теперь при нажатии «Обновить сейчас» переход в браузер **не происходит**:
+    - Отображается интерактивный индикатор загрузки с прогресс-баром и процентами (0% → 100%).
+    - Показывается реальный объем скачанных данных (например, «18.4 МБ / 45.2 МБ»).
+    - Присутствует кнопка мягкой отмены загрузки.
+    - По завершении скачивания автоматически открывается системный установщик Android (`Sharing.shareAsync` с MIME-типом `application/vnd.android.package-archive`).
+- **Выделенный серверный эндпоинт прямого скачивания**:
+  * В `server/index.js` добавлен эндпоинт `GET /api/app/download` (доступен через `/backend-api/api/app/download`).
+  * Принудительно выставляет заголовки:
+    - `Content-Type: application/vnd.android.package-archive`
+    - `Content-Disposition: attachment; filename="domofondar.apk"`
+    - `Cache-Control: no-cache, must-revalidate`
+  * Если локальный файл временно отсутствует, выполняется безопасный редирект на GitHub Releases.
+- **Корректировка PWA и Nginx**:
+  * В `vite.config.ts`: в `workbox.navigateFallbackDenylist` добавлены шаблоны `/^\/media\//`, `/^\/backend-api\//`, `/^\/api\//` и `/\.apk$/i`.
+  * В `nginx.conf`: добавлен блок `location ~* \.apk$` с заголовками принудительного скачивания.
+
+## 2. Измененные файлы
+- [`mobile/src/components/UpdateCheckerModal.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/src/components/UpdateCheckerModal.tsx) — Внедрение нативного скачивания с прогресс-баром, процентами и запуском установщика.
+- [`mobile/src/config/constants.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/src/config/constants.ts) — Ссылка `APP_DOWNLOAD_URL` переведена на надежный бэкенд-эндпоинт `/backend-api/api/app/download`.
+- [`server/index.js`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/server/index.js) — Добавлен эндпоинт `GET /api/app/download` и обновлен `/api/app/version`.
+- [`vite.config.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/vite.config.ts) — Исключение APK и API путей из Service Worker.
+- [`nginx.conf`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/nginx.conf) — Конфигурация Nginx для раздачи `.apk` с заголовками attachment.
+- [`src/data/projectChangelog.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/data/projectChangelog.ts) — Внесена запись в паспорт проекта.
+- [`PROJECT_LOG.md`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/PROJECT_LOG.md) — Обновлен журнал проекта.
+
 # 2026-10-04 03:45 — Релиз мобильного приложения v1.1.2 (Build 5): экраны входа и регистрации CyberShield, 152-ФЗ и согласия
 
 ## 1. Задачи и бизнес-ценность

@@ -41,7 +41,7 @@ export const KeyOrderModal: React.FC<KeyOrderModalProps> = ({
 }) => {
   const { colors, isDark } = useAppTheme();
 
-  const [quantity, setQuantity] = useState(2); // По умолчанию 2 ключа
+  const [quantity, setQuantity] = useState(1); // Количество ключей (минимум 1)
   const [address, setAddress] = useState(defaultAddress);
   const [phone, setPhone] = useState(user?.phone || '');
   const [comment, setComment] = useState('');
@@ -224,28 +224,38 @@ export const KeyOrderModal: React.FC<KeyOrderModalProps> = ({
               </View>
             </View>
 
-            {/* Ступени цен — реальная сетка из номенклатуры товара */}
-            <View style={styles.tiersRow}>
-              {[
-                { label: '1 шт', q: 1, active: quantity === 1 },
-                { label: '2 шт', q: 2, active: quantity === 2 },
-                { label: '3+ шт', q: 3, active: quantity >= 3 },
-              ].map((t) => (
-                <View
-                  key={t.q}
-                  style={[
-                    styles.tierChip,
-                    {
-                      backgroundColor: t.active ? (isDark ? '#262a35' : '#dbeafe') : (isDark ? '#171b26' : '#f1f5f9'),
-                      borderColor: t.active ? colors.primaryContainer : colors.border,
-                    },
-                  ]}
-                >
-                  <Text style={[styles.tierTitle, { color: colors.text }]}>{t.label}</Text>
-                  <Text style={[styles.tierPrice, { color: colors.textSecondary }]}>{tierUnit(t.q)} ₽</Text>
-                </View>
-              ))}
-            </View>
+            {isInstallation ? (
+              /* Дом на монтаже — действует льготная единая цена, ступенчатая акция не применяется */
+              <View style={[styles.installBanner, { backgroundColor: isDark ? 'rgba(16,185,129,0.12)' : '#ecfdf5', borderColor: colors.secondary }]}>
+                <Ionicons name="pricetag" size={16} color={colors.secondary} style={{ marginRight: 6 }} />
+                <Text style={[styles.installBannerText, { color: colors.secondary }]}>
+                  Ваш дом на монтаже — льготная цена {pricing.unitPrice} ₽ за ключ
+                </Text>
+              </View>
+            ) : (
+              /* Ступени цен — реальная сетка из номенклатуры товара */
+              <View style={styles.tiersRow}>
+                {[
+                  { label: '1 шт', q: 1, active: quantity === 1 },
+                  { label: '2 шт', q: 2, active: quantity === 2 },
+                  { label: '3+ шт', q: 3, active: quantity >= 3 },
+                ].map((t) => (
+                  <View
+                    key={t.q}
+                    style={[
+                      styles.tierChip,
+                      {
+                        backgroundColor: t.active ? (isDark ? '#262a35' : '#dbeafe') : (isDark ? '#171b26' : '#f1f5f9'),
+                        borderColor: t.active ? colors.primaryContainer : colors.border,
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.tierTitle, { color: colors.text }]}>{t.label}</Text>
+                    <Text style={[styles.tierPrice, { color: colors.textSecondary }]}>{tierUnit(t.q)} ₽</Text>
+                  </View>
+                ))}
+              </View>
+            )}
 
             {/* Адрес и контакты */}
             <Text style={[styles.label, { color: colors.textSecondary, marginTop: 14 }]}>Куда доставить ключи:</Text>
@@ -430,6 +440,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     marginBottom: 6,
+  },
+  installBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 6,
+  },
+  installBannerText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   tierChip: {
     flex: 1,

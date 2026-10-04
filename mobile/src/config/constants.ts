@@ -12,8 +12,9 @@ export const WS_URL = 'wss://xn--80aha5afebav9a.xn--p1ai/ws';
 // Текущая версия приложения
 export const APP_VERSION = '1.1.2';
 
-// Прямая ссылка для скачивания последней версии APK с официального сайта домофондар.рф
-export const APP_DOWNLOAD_URL = 'https://xn--80aha5afebav9a.xn--p1ai/media/app/domofondar.apk';
+// Прямая ссылка для скачивания последней версии APK с официального сервера компании
+// Используется бэкенд-эндпоинт с заголовками attachment для предотвращения перехвата Service Worker браузера
+export const APP_DOWNLOAD_URL = 'https://xn--80aha5afebav9a.xn--p1ai/backend-api/api/app/download';
 
 // URL для возврата после оплаты через YooKassa
 export const YOOKASSA_RETURN_URL = 'domofondar://payment/return';

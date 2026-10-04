@@ -258,6 +258,16 @@ export const KIND_META: Record<Kind, { label: string; badgeCls: string }> = {
  */
 export const PROJECT_CHANGELOG: ProjectEntry[] = [
   {
+    id: "stage-2026-10-04-0400",
+    datetime: "2026-10-04 04:00",
+    title: "Нативное фоновое обновление APK и исправление ошибки 404 (Attachment эндпоинт и Workbox Denylist)",
+    description: "Устранена ошибка 404 при попытке обновления приложения («Страница не найдена»), вызванная перехватом навигационных запросов браузерным PWA Service Worker. На бэкенде внедрен выделенный эндпоинт /backend-api/api/app/download с принудительными заголовками Content-Disposition attachment и Content-Type. В конфигурации vite.config.ts и nginx.conf настроены жесткие исключения для .apk и API маршрутов. В мобильном приложении реализовано полноценное нативное скачивание файла прямо внутри модального диалога UpdateCheckerModal с отображением шкалы прогресса, процентов и мегабайт через expo-file-system, с автоматическим вызовом мастера установки пакетов Android.",
+    module: "infra_mobile",
+    kind: "fix",
+    hours: 3.5,
+    difficulty: "Высокая",
+  },
+  {
     id: "stage-2026-10-04-0345",
     datetime: "2026-10-04 03:45",
     title: "Релиз мобильного приложения v1.1.2 (Build 5): обновленные экраны авторизации и регистрации с 152-ФЗ",

@@ -179,8 +179,10 @@ app.get('/api/health', (req, res) => {
 
 // Публичный эндпоинт проверки обновлений мобильного приложения «Домофондар»
 app.get('/api/app/version', (req, res) => {
-  // Прямая ссылка на APK с официального сайта компании (скачивается моментально без перехода на сторонние ресурсы)
-  const siteDownloadUrl = 'https://xn--80aha5afebav9a.xn--p1ai/media/app/domofondar.apk';
+  // Прямая ссылка на APK через бэкенд Express с принудительными заголовками скачивания
+  // Это исключает перехват Service Worker и гарантирует моментальный старт загрузки
+  const siteDownloadUrl = 'https://xn--80aha5afebav9a.xn--p1ai/backend-api/api/app/download';
+  const directMediaUrl = 'https://xn--80aha5afebav9a.xn--p1ai/media/app/domofondar.apk';
   const githubFallbackUrl = 'https://github.com/keystone4tech-blip/domofond-revive/releases/download/app-latest/domofondar.apk';
 
   console.log('[Бэкенд: Версия приложения] Запрос проверки обновлений с мобильного клиента');
@@ -189,8 +191,9 @@ app.get('/api/app/version', (req, res) => {
     latestVersion: '1.1.2',
     versionCode: 5,
     minSupportedVersion: '1.0.0',
-    // Основная ссылка — прямое скачивание установочного APK-файла с нашего официального сервера
+    // Основная ссылка — прямое скачивание через Express API (гарантированный attachment)
     downloadUrl: siteDownloadUrl,
+    directMediaUrl: directMediaUrl,
     fallbackDownloadUrl: githubFallbackUrl,
     releaseNotes: [
       'Премиальный кибер-стиль Domofondar CyberShield (Cyber Dark & Clean Tech)',
@@ -202,6 +205,41 @@ app.get('/api/app/version', (req, res) => {
     isMandatory: false,
     publishedAt: '2026-10-04T00:00:00.000Z'
   });
+});
+
+// Выделенный эндпоинт для прямого скачивания APK с гарантированными заголовками attachment
+app.get('/api/app/download', (req, res) => {
+  console.log('[Бэкенд: Скачивание APK] Получен запрос на скачивание APK-файла приложения');
+
+  // Возможные пути к скомпилированному APK файлу на сервере и в контейнерах
+  const candidatePaths = [
+    path.join(__dirname, '..', 'public', 'media', 'app', 'domofondar.apk'),
+    '/usr/share/nginx/html/media/app/domofondar.apk',
+    '/public/media/app/domofondar.apk',
+    path.join(process.cwd(), 'public', 'media', 'app', 'domofondar.apk')
+  ];
+
+  let resolvedPath = null;
+  for (const p of candidatePaths) {
+    if (fs.existsSync(p)) {
+      resolvedPath = p;
+      break;
+    }
+  }
+
+  const githubFallbackUrl = 'https://github.com/keystone4tech-blip/domofond-revive/releases/download/app-latest/domofondar.apk';
+
+  if (resolvedPath) {
+    console.log(`[Бэкенд: Скачивание APK] Успешно найден файл на диске: ${resolvedPath}. Отдаем клиенту.`);
+    res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+    res.setHeader('Content-Disposition', 'attachment; filename="domofondar.apk"');
+    res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+    return res.sendFile(resolvedPath);
+  }
+
+  // Резервное перенаправление на GitHub Releases, если локальный файл еще не скопирован
+  console.warn('[Бэкенд: Скачивание APK] Локальный файл APK не найден на сервере. Перенаправление на резервный GitHub Release');
+  return res.redirect(githubFallbackUrl);
 });
 
 // ------------------------------------------------------------------------------
