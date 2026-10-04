@@ -46,52 +46,60 @@ export default function ProfileScreen() {
     setIsEditModalOpen(true);
   };
 
-  const handleSaveProfile = async () => {
+  // Отправка изменений: у абонента с заведёнными данными — через модерацию диспетчера
+  // (живые данные НЕ меняются до подтверждения, как на сайте); первичное заполнение — сразу.
+  const submitProfileChange = async () => {
     setIsSaving(true);
     try {
-      await apiClient.put('/api/user/profile', {
-        full_name: fullName.trim(),
-        phone: phone.trim(),
-        address: address.trim(),
-        apartment: apartment.trim(),
-      });
-
-      // Отправляем диспетчеру заявку на сверку/изменение данных абонента (как на сайте),
-      // чтобы адрес и привязка к лицевому счёту были актуализированы сотрудником.
-      try {
-        const changeMsg =
-          `Запрос на изменение данных абонента:\n` +
-          `• ФИО: ${fullName.trim() || '—'}\n` +
-          `• Телефон: ${phone.trim() || '—'}\n` +
-          `• Адрес: ${address.trim() || '—'}\n` +
-          `• Квартира: ${apartment.trim() || '—'}\n` +
-          `Просьба проверить и обновить данные/привязку лицевого счёта.`;
-        await apiClient.post('/api/requests', {
-          name: fullName.trim() || user?.full_name || 'Абонент',
-          phone: phone.trim() || user?.phone || '',
+      const isExisting = !!(user?.is_verified || (user as any)?.address || (user as any)?.account_number);
+      if (isExisting) {
+        await apiClient.post('/api/user/request-data-change', {
+          full_name: fullName.trim(),
+          phone: phone.trim(),
           address: address.trim(),
-          message: changeMsg,
-          priority: 'medium',
-          status: 'pending',
-          is_mobile: true,
-          source: 'mobile_app',
+          apartment: apartment.trim(),
         });
-      } catch (reqErr) {
-        console.warn('[Profile UI] Не удалось отправить заявку диспетчеру:', reqErr);
+        setIsEditModalOpen(false);
+        Alert.alert(
+          'Отправлено на проверку',
+          'Заявка на изменение данных направлена диспетчеру. Новые данные вступят в силу после подтверждения.'
+        );
+      } else {
+        await apiClient.put('/api/user/profile', {
+          full_name: fullName.trim(),
+          phone: phone.trim(),
+          address: address.trim(),
+          apartment: apartment.trim(),
+        });
+        await loadProfile();
+        setIsEditModalOpen(false);
+        Alert.alert('Сохранено', 'Данные профиля сохранены.');
       }
-
-      await loadProfile();
-      setIsEditModalOpen(false);
-      Alert.alert(
-        'Данные отправлены',
-        'Данные сохранены в вашем профиле, а диспетчеру направлена заявка на сверку и обновление информации.'
-      );
     } catch (err: any) {
       console.error('[Profile UI] Ошибка сохранения профиля:', err);
       const msg = err.response?.data?.error || 'Не удалось сохранить данные';
       Alert.alert('Ошибка', msg);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSaveProfile = () => {
+    if (!fullName.trim()) { Alert.alert('Внимание', 'Укажите ФИО'); return; }
+    if (!address.trim()) { Alert.alert('Внимание', 'Укажите адрес'); return; }
+    const isExisting = !!(user?.is_verified || (user as any)?.address || (user as any)?.account_number);
+    if (isExisting) {
+      // Предупреждение + модерация: данные не меняются молча
+      Alert.alert(
+        'Изменение данных абонента',
+        'Данные меняются только после проверки диспетчером. Отправить заявку на изменение?',
+        [
+          { text: 'Отмена', style: 'cancel' },
+          { text: 'Отправить на проверку', onPress: submitProfileChange },
+        ]
+      );
+    } else {
+      submitProfileChange();
     }
   };
 
