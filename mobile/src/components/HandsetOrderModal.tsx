@@ -90,9 +90,16 @@ export const HandsetOrderModal: React.FC<HandsetOrderModalProps> = ({
   const installServiceCost = activeService ? Number(activeService.price) : (serviceAction === 'install' ? 500 : 300);
   const serviceTitle = activeService?.name || (serviceAction === 'install' ? 'Установка трубки с прокладкой кабеля' : 'Замена существующей трубки');
 
+  // Эффективная цена трубки с учётом акции (promo_price), как на сайте
+  const effectivePrice = (p: any) => {
+    const base = Number(p?.price || 0);
+    const promo = p?.promo_price != null ? Number(p.promo_price) : null;
+    return promo != null && promo > 0 && promo < base ? promo : base;
+  };
+
   // Выбранная модель трубки
   const selectedHandset = handsets.find((h) => h.id === selectedHandsetId) || handsets[0];
-  const handsetPrice = Number(selectedHandset?.price || 1200);
+  const handsetPrice = selectedHandset ? effectivePrice(selectedHandset) : 1200;
 
   // Расчет сумм с эквайрингом 5%
   const baseAmount = handsetPrice + installServiceCost;
@@ -304,22 +311,32 @@ export const HandsetOrderModal: React.FC<HandsetOrderModalProps> = ({
                       activeOpacity={0.8}
                     >
                       <View style={styles.handsetRow}>
-                        <Ionicons
-                          name={isSelected ? 'radio-button-on' : 'radio-button-off'}
-                          size={20}
-                          color={isSelected ? colors.primaryContainer : colors.textMuted}
-                        />
-                        <View style={{ flex: 1, paddingHorizontal: 6 }}>
-                          <Text style={[styles.handsetName, { color: colors.text }]}>{item.name}</Text>
+                        <View style={[styles.handsetThumb, { backgroundColor: isDark ? '#0f131d' : '#eef4ff', borderColor: colors.border }]}>
+                          {item.image_url ? (
+                            <Image source={{ uri: item.image_url }} style={styles.handsetThumbImg} resizeMode="contain" />
+                          ) : (
+                            <Ionicons name="call" size={24} color={colors.primaryContainer} />
+                          )}
+                        </View>
+                        <View style={{ flex: 1, paddingHorizontal: 8 }}>
+                          <Text style={[styles.handsetName, { color: colors.text }]} numberOfLines={2}>{item.name}</Text>
                           {item.description ? (
-                            <Text style={[styles.handsetDesc, { color: colors.textSecondary }]} numberOfLines={2}>
+                            <Text style={[styles.handsetDesc, { color: colors.textSecondary }]} numberOfLines={1}>
                               {item.description}
                             </Text>
                           ) : null}
+                          <View style={styles.handsetPriceRow}>
+                            {effectivePrice(item) < Number(item.price || 0) ? (
+                              <Text style={[styles.handsetOldPrice, { color: colors.textMuted }]}>{Number(item.price)} ₽</Text>
+                            ) : null}
+                            <Text style={[styles.handsetPrice, { color: colors.primaryContainer }]}>{effectivePrice(item)} ₽</Text>
+                          </View>
                         </View>
-                        <Text style={[styles.handsetPrice, { color: colors.primaryContainer }]}>
-                          {Number(item.price || 0)} ₽
-                        </Text>
+                        <Ionicons
+                          name={isSelected ? 'checkmark-circle' : 'ellipse-outline'}
+                          size={22}
+                          color={isSelected ? colors.primaryContainer : colors.textMuted}
+                        />
                       </View>
                     </TouchableOpacity>
                   );
@@ -532,6 +549,29 @@ const styles = StyleSheet.create({
   handsetPrice: {
     fontSize: 15,
     fontWeight: '700',
+  },
+  handsetThumb: {
+    width: 48,
+    height: 48,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  handsetThumbImg: {
+    width: '100%',
+    height: '100%',
+  },
+  handsetPriceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 3,
+  },
+  handsetOldPrice: {
+    fontSize: 12,
+    textDecorationLine: 'line-through',
   },
   input: {
     height: 46,

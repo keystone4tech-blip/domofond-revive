@@ -186,8 +186,8 @@ app.get('/api/app/version', (req, res) => {
   console.log('[Бэкенд: Версия приложения] Запрос проверки обновлений с мобильного клиента');
 
   res.json({
-    latestVersion: '1.1.1',
-    versionCode: 4,
+    latestVersion: '1.1.2',
+    versionCode: 5,
     minSupportedVersion: '1.0.0',
     // Основная ссылка — прямое скачивание установочного APK-файла с нашего официального сервера
     downloadUrl: siteDownloadUrl,
@@ -456,6 +456,65 @@ app.put('/api/user/profile', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error('[Бэкенд: Профиль] Ошибка обновления профиля:', err.message);
     res.status(500).json({ error: 'Ошибка обновления профиля' });
+  }
+});
+
+// Запрос на изменение данных абонента — ЧЕРЕЗ МОДЕРАЦИЮ диспетчера (как на сайте, ProfileWizard).
+// Живые данные профиля НЕ меняются: сохраняем pending_data_change и создаём заявку data_change_request.
+app.post('/api/user/request-data-change', authenticateToken, async (req, res) => {
+  const { full_name, phone, address, apartment, floor, account_number } = req.body;
+  const uid = req.user.id;
+  try {
+    const cur = await pool.query(
+      'SELECT full_name, phone, address, apartment, account_number FROM profiles WHERE id = $1 LIMIT 1',
+      [uid]
+    );
+    const old = cur.rows[0] || {};
+    const pending = {
+      full_name: (full_name || '').trim(),
+      phone: (phone || '').trim(),
+      address: (address || '').trim(),
+      apartment: (apartment || '').trim(),
+      floor: (floor || '').trim(),
+      account_number: account_number || null,
+      submitted_at: new Date().toISOString(),
+      source: 'mobile_app',
+      old_data: {
+        full_name: old.full_name || '', phone: old.phone || '', address: old.address || '',
+        apartment: old.apartment || '', account_number: old.account_number || '',
+      },
+    };
+    await pool.query('UPDATE profiles SET pending_data_change = $1 WHERE id = $2', [JSON.stringify(pending), uid]);
+    const msg = `📱 [Мобильное приложение Домофондар]\n📝 Заявка на изменение данных абонента.\n` +
+      `Новый адрес: ${pending.address || '-'}, кв. ${pending.apartment || '-'}\n` +
+      `ФИО: ${pending.full_name || '-'}\nТелефон: ${pending.phone || '-'}\nЛицевой счёт: ${pending.account_number || '-'}`;
+    await pool.query(
+      `INSERT INTO requests (name, phone, address, apartment, message, status, priority, order_type, client_id, notes)
+       VALUES ($1, $2, $3, $4, $5, 'pending', 'medium', 'data_change_request', $6, $7)`,
+      [pending.full_name || old.full_name || 'Абонент', pending.phone || old.phone || '',
+       pending.address, pending.apartment || null, msg, uid, JSON.stringify(pending)]
+    );
+    console.log(`[Бэкенд: Профиль] Заявка на изменение данных от ${uid} отправлена на модерацию диспетчеру`);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[Бэкенд: Профиль] Ошибка заявки на изменение данных:', err.message);
+    res.status(500).json({ error: 'Не удалось отправить заявку на изменение данных' });
+  }
+});
+
+// Согласие на рекламную рассылку (ФЗ «О рекламе» ст. 18) — вкл/выкл из приложения/кабинета.
+app.post('/api/user/marketing-consent', authenticateToken, async (req, res) => {
+  const enabled = req.body?.enabled === true || req.body?.enabled === 'true';
+  try {
+    await pool.query(
+      'UPDATE profiles SET marketing_consent = $1, marketing_consent_at = $2 WHERE id = $3',
+      [enabled, enabled ? new Date().toISOString() : null, req.user.id]
+    );
+    res.json({ ok: true, marketing_consent: enabled });
+  } catch (err) {
+    // Колонки может не быть, если миграция ещё не применена — не критично для регистрации
+    console.warn('[Бэкенд: Профиль] Не удалось сохранить согласие на рассылку:', err.message);
+    res.json({ ok: false, note: 'not_persisted' });
   }
 });
 

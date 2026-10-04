@@ -11,6 +11,36 @@
 > 
 > **Пользователь НЕ ДОЛЖЕН ничего вносить вручную.** Вся статистика и история пополняется ИИ автоматически при каждой задаче.
 
+# 2026-10-04 03:45 — Релиз мобильного приложения v1.1.2 (Build 5): экраны входа и регистрации CyberShield, 152-ФЗ и согласия
+
+## 1. Задачи и бизнес-ценность
+- **Редизайн экрана авторизации (Вход)**:
+  * Внедрена фирменная бренд-шапка со щит-логотипом «ДОМОФОНДАР», аккуратная карточка и синий технологичный акцент.
+  * Полная поддержка светлой Clean Tech и тёмной Cyber Dark тем.
+  * Интерактивное скрытие/показ пароля по нажатию на иконку глаза.
+- **Редизайн экрана регистрации и юридические согласия 152-ФЗ**:
+  * Обязательное согласие на обработку персональных данных (ФЗ-152) и публичную оферту: кнопка «Зарегистрироваться» активна только после подтверждения.
+  * Опциональный чекбокс согласия на рекламную рассылку («Хочу получать информацию об акциях…»).
+  * Ссылки на документы открывают встроенный модал `LegalModal` с полными текстами регламентов (перенесены с сайта `legalDocuments.ts`).
+- **Бэкенд**:
+  * Эндпоинт `POST /api/user/marketing-consent` для сохранения статуса согласия на рассылку.
+  * Эндпоинт `POST /api/user/request-data-change` для безопасной модерации профиля абонента диспетчером.
+  * Эндпоинт `/api/app/version` обновлен: `latestVersion: '1.1.2'`, `versionCode: 5`.
+- **Сборка APK**:
+  * `versionCode: 5`, `buildNumber: '5'`, `version: '1.1.2'`.
+
+## 2. Измененные файлы
+- [`mobile/app/(auth)/login.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/app/%28auth%29/login.tsx) — Экран входа в стиле CyberShield.
+- [`mobile/app/(auth)/register.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/app/%28auth%29/register.tsx) — Экран регистрации с чекбоксами согласий.
+- [`mobile/src/components/LegalModal.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/src/components/LegalModal.tsx) — Модальное окно просмотра правовых документов.
+- [`mobile/src/data/legalDocuments.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/src/data/legalDocuments.ts) — Тексты правовых регламентов и политики 152-ФЗ.
+- [`mobile/app.config.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/app.config.ts) — versionCode: 5, version: 1.1.2.
+- [`mobile/src/config/constants.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/src/config/constants.ts) — APP_VERSION = '1.1.2'.
+- [`mobile/package.json`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/package.json) — Версия 1.1.2.
+- [`server/index.js`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/server/index.js) — Поддержка marketing-consent и версия 1.1.2.
+- [`src/data/projectChangelog.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/data/projectChangelog.ts) — Запись в паспорте проекта.
+- [`PROJECT_LOG.md`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/PROJECT_LOG.md) — Обновлен журнал проекта.
+
 # 2026-10-04 03:10 — Минималистичное окно автообновления и прямая загрузка APK с сайта компании
 
 ## 1. Задачи и бизнес-ценность
