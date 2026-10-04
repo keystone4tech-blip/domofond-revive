@@ -11,6 +11,37 @@
 > 
 > **Пользователь НЕ ДОЛЖЕН ничего вносить вручную.** Вся статистика и история пополняется ИИ автоматически при каждой задаче.
 
+# 2026-10-04 04:20 — Релиз мобильного приложения v1.1.3 (Build 6): реальные услуги каталога, полноэкранный зум фото и чистый расчет
+
+## 1. Задачи и бизнес-ценность
+- **Реальные услуги каталога вместо хардкода**:
+  * В модальном окне заказа трубок `HandsetOrderModal.tsx` полностью убран захардкоженный список «Замена старой 300 / Монтаж с нуля 500».
+  * Услуги подтягиваются динамически из каталога подъезда абонента (по адресу МКД) с их настоящими названиями и ценами из таблицы `products`.
+  * Длинные названия услуг теперь корректно переносятся по строкам внутри карточек без наплыва текста.
+- **Полноэкранный просмотр фото трубок**:
+  * По клику на миниатюру изображения трубки открывается полноэкранный модальный просмотрщик с удобной кнопкой закрытия.
+  * На миниатюре добавлен визуальный бейдж с иконкой разворота.
+- **Честный расчет сумм без выдуманных комиссий в кнопке**:
+  * В интерфейсах заказа трубок и ключей убрана отдельная строка с комиссией 5%.
+  * В кнопке «Оплатить» и строке «Итого» отображается чистая базовая стоимость заказа.
+  * Под итогом размещена прозрачная поясняющая подпись: «При оплате картой ЮKassa добавит комиссию эквайринга 5%».
+  * При создании платежа ЮKassa сумма рассчитывается корректно (`amount = база + 5%`, `credit_amount = база`).
+- **Повышение версии приложения**:
+  * `mobile/app.config.ts`: `versionCode: 6`, `buildNumber: '6'`, `version: '1.1.3'`.
+  * `mobile/package.json`: `"version": "1.1.3"`.
+  * `mobile/src/config/constants.ts`: `APP_VERSION = '1.1.3'`.
+  * `server/index.js`: `latestVersion: '1.1.3'`, `versionCode: 6`.
+
+## 2. Измененные файлы
+- [`mobile/src/components/HandsetOrderModal.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/src/components/HandsetOrderModal.tsx) — Реальные услуги из БД, перенос текста, зум фото, честная сумма в кнопке.
+- [`mobile/src/components/KeyOrderModal.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/src/components/KeyOrderModal.tsx) — Льготная цена при монтаже, чистая сумма в кнопке заказа ключей.
+- [`mobile/app.config.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/app.config.ts) — Повышен versionCode до 6, версия 1.1.3.
+- [`mobile/package.json`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/package.json) — Версия 1.1.3.
+- [`mobile/src/config/constants.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/src/config/constants.ts) — APP_VERSION: '1.1.3'.
+- [`server/index.js`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/server/index.js) — /api/app/version: v1.1.3, versionCode: 6.
+- [`src/data/projectChangelog.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/data/projectChangelog.ts) — Запись в паспорте проекта.
+- [`PROJECT_LOG.md`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/PROJECT_LOG.md) — Обновлен журнал проекта.
+
 # 2026-10-04 04:00 — Нативное фоновое обновление APK в приложении и устранение ошибки 404 «Страница не найдена»
 
 ## 1. Задачи и бизнес-ценность

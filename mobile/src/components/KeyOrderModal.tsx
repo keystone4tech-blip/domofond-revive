@@ -307,21 +307,20 @@ export const KeyOrderModal: React.FC<KeyOrderModalProps> = ({
               placeholderTextColor={colors.textMuted}
             />
 
-            {/* Расчет стоимости */}
+            {/* Расчет стоимости (комиссия эквайринга 5% добавляется на стороне ЮKassa при оплате) */}
             <View style={[styles.summaryBox, { backgroundColor: isDark ? '#1c1f2a' : '#f8f9ff', borderColor: colors.border }]}>
               <View style={styles.summaryRow}>
-                <Text style={[styles.summaryText, { color: colors.textSecondary }]}>Стоимость ({quantity} шт.):</Text>
+                <Text style={[styles.summaryText, { color: colors.textSecondary }]}>Ключи ({quantity} шт. × {pricing.unitPrice} ₽):</Text>
                 <Text style={[styles.summaryText, { color: colors.text, fontWeight: '600' }]}>{pricing.baseSum} ₽</Text>
-              </View>
-              <View style={styles.summaryRow}>
-                <Text style={[styles.summaryText, { color: colors.textSecondary }]}>Эквайринг ЮKassa (5%):</Text>
-                <Text style={[styles.summaryText, { color: colors.textSecondary }]}>{pricing.feeSum} ₽</Text>
               </View>
               <View style={[styles.divider, { backgroundColor: colors.border }]} />
               <View style={styles.summaryRow}>
-                <Text style={[styles.totalLabel, { color: colors.text }]}>К оплате:</Text>
-                <Text style={[styles.totalValue, { color: colors.primaryContainer }]}>{pricing.totalSum} ₽</Text>
+                <Text style={[styles.totalLabel, { color: colors.text }]}>Итого:</Text>
+                <Text style={[styles.totalValue, { color: colors.primaryContainer }]}>{pricing.baseSum} ₽</Text>
               </View>
+              <Text style={[styles.feeNote, { color: colors.textMuted }]}>
+                При оплате картой ЮKassa добавит комиссию эквайринга 5%.
+              </Text>
             </View>
           </ScrollView>
 
@@ -338,7 +337,7 @@ export const KeyOrderModal: React.FC<KeyOrderModalProps> = ({
               ) : (
                 <>
                   <Ionicons name="card" size={18} color="#ffffff" style={{ marginRight: 8 }} />
-                  <Text style={styles.submitBtnText}>Оплатить {pricing.totalSum} ₽ (ЮKassa)</Text>
+                  <Text style={styles.submitBtnText}>Оплатить {pricing.baseSum} ₽</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -488,6 +487,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginTop: 14,
     marginBottom: 10,
+  },
+  feeNote: {
+    fontSize: 11,
+    marginTop: 8,
+    lineHeight: 15,
   },
   summaryRow: {
     flexDirection: 'row',

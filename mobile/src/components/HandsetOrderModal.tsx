@@ -41,7 +41,6 @@ export const HandsetOrderModal: React.FC<HandsetOrderModalProps> = ({
 }) => {
   const { colors, isDark } = useAppTheme();
 
-  const [serviceAction, setServiceAction] = useState<'install' | 'replace'>('replace');
   const [address, setAddress] = useState(defaultAddress);
   const [phone, setPhone] = useState(user?.phone || '');
   const [comment, setComment] = useState('');
@@ -49,6 +48,8 @@ export const HandsetOrderModal: React.FC<HandsetOrderModalProps> = ({
   const [handsets, setHandsets] = useState<any[]>([]);
   const [selectedHandsetId, setSelectedHandsetId] = useState<string | null>(null);
   const [services, setServices] = useState<any[]>([]);
+  const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
+  const [zoomImage, setZoomImage] = useState<string | null>(null);
 
   const [loadingCatalog, setLoadingCatalog] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -74,7 +75,9 @@ export const HandsetOrderModal: React.FC<HandsetOrderModalProps> = ({
         if (hList.length > 0) {
           setSelectedHandsetId(hList[0].id);
         }
-        setServices(res.data.services || []);
+        const sList = res.data.services || [];
+        setServices(sList);
+        if (sList.length > 0) setSelectedServiceId(sList[0].id);
       }
     } catch (err) {
       console.warn('[Заказ трубки] Ошибка загрузки каталога:', err);
@@ -83,25 +86,24 @@ export const HandsetOrderModal: React.FC<HandsetOrderModalProps> = ({
     }
   };
 
-  // Стоимость услуги монтажа — из реального каталога подъезда (как на сайте), не хардкод
-  const installService = services.find((s) => /установ|монтаж|проклад/i.test(s.name));
-  const replaceService = services.find((s) => /замен/i.test(s.name));
-  const activeService = serviceAction === 'install' ? installService : replaceService;
-  const installServiceCost = activeService ? Number(activeService.price) : (serviceAction === 'install' ? 500 : 300);
-  const serviceTitle = activeService?.name || (serviceAction === 'install' ? 'Установка трубки с прокладкой кабеля' : 'Замена существующей трубки');
-
-  // Эффективная цена трубки с учётом акции (promo_price), как на сайте
+  // Эффективная цена с учётом акции (promo_price), как на сайте
   const effectivePrice = (p: any) => {
     const base = Number(p?.price || 0);
     const promo = p?.promo_price != null ? Number(p.promo_price) : null;
     return promo != null && promo > 0 && promo < base ? promo : base;
   };
 
+  // Услуга — реальная позиция из каталога подъезда (никакого хардкода)
+  const activeService = services.find((s) => s.id === selectedServiceId) || services[0] || null;
+  const installServiceCost = activeService ? effectivePrice(activeService) : 0;
+  const serviceTitle = activeService?.name || '';
+
   // Выбранная модель трубки
   const selectedHandset = handsets.find((h) => h.id === selectedHandsetId) || handsets[0];
-  const handsetPrice = selectedHandset ? effectivePrice(selectedHandset) : 1200;
+  const handsetPrice = selectedHandset ? effectivePrice(selectedHandset) : 0;
 
-  // Расчет сумм с эквайрингом 5%
+  // Базовая сумма (без комиссии — её показываем абоненту). Комиссия 5% добавляется
+  // ТОЛЬКО при создании платежа ЮKassa, как на сайте (amount = база + 5%).
   const baseAmount = handsetPrice + installServiceCost;
   const feeAmount = Math.round(baseAmount * 0.05 * 100) / 100;
   const totalAmount = Math.round((baseAmount + feeAmount) * 100) / 100;
@@ -154,7 +156,7 @@ export const HandsetOrderModal: React.FC<HandsetOrderModalProps> = ({
         amount: totalAmount,
         credit_amount: baseAmount,
         fee_amount: feeAmount,
-        description: `Заказ трубки домофона (${serviceAction === 'install' ? 'установка' : 'замена'}), ${address.trim()}`,
+        description: `Заказ трубки домофона${serviceTitle ? ` (${serviceTitle})` : ''}, ${address.trim()}`.slice(0, 128),
         account_number: account?.account_number || undefined,
         is_order: true,
         order_data: orderPayload,
@@ -182,6 +184,7 @@ export const HandsetOrderModal: React.FC<HandsetOrderModalProps> = ({
   };
 
   return (
+    <>
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -207,57 +210,38 @@ export const HandsetOrderModal: React.FC<HandsetOrderModalProps> = ({
           </View>
 
           <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
-            {/* Переключатель: Установка / Замена */}
-            <Text style={[styles.label, { color: colors.textSecondary }]}>Тип необходимых работ:</Text>
-            <View style={[styles.switchContainer, { backgroundColor: isDark ? '#1c1f2a' : '#f1f5f9', borderColor: colors.border }]}>
-              <TouchableOpacity
-                style={[
-                  styles.switchBtn,
-                  serviceAction === 'replace' && [styles.switchBtnActive, { backgroundColor: colors.primaryContainer }],
-                ]}
-                onPress={() => setServiceAction('replace')}
-                activeOpacity={0.8}
-              >
-                <Ionicons
-                  name="sync"
-                  size={16}
-                  color={serviceAction === 'replace' ? '#ffffff' : colors.textSecondary}
-                  style={{ marginRight: 6 }}
-                />
-                <Text
-                  style={[
-                    styles.switchBtnText,
-                    { color: serviceAction === 'replace' ? '#ffffff' : colors.textSecondary, fontWeight: serviceAction === 'replace' ? '700' : '500' },
-                  ]}
-                >
-                  Замена старой (300 ₽)
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.switchBtn,
-                  serviceAction === 'install' && [styles.switchBtnActive, { backgroundColor: colors.primaryContainer }],
-                ]}
-                onPress={() => setServiceAction('install')}
-                activeOpacity={0.8}
-              >
-                <Ionicons
-                  name="hammer"
-                  size={16}
-                  color={serviceAction === 'install' ? '#ffffff' : colors.textSecondary}
-                  style={{ marginRight: 6 }}
-                />
-                <Text
-                  style={[
-                    styles.switchBtnText,
-                    { color: serviceAction === 'install' ? '#ffffff' : colors.textSecondary, fontWeight: serviceAction === 'install' ? '700' : '500' },
-                  ]}
-                >
-                  Монтаж с нуля (500 ₽)
-                </Text>
-              </TouchableOpacity>
-            </View>
+            {/* Тип работ — реальные услуги из каталога подъезда (без выдуманных цен) */}
+            <Text style={[styles.label, { color: colors.textSecondary }]}>Тип работ:</Text>
+            {services.length === 0 ? (
+              <Text style={[styles.handsetDesc, { color: colors.textMuted }]}>
+                Для вашего подъезда услугу монтажа подберёт диспетчер после оформления заявки.
+              </Text>
+            ) : (
+              <View style={{ gap: 8 }}>
+                {services.map((s) => {
+                  const sel = activeService?.id === s.id;
+                  const price = effectivePrice(s);
+                  return (
+                    <TouchableOpacity
+                      key={s.id}
+                      onPress={() => setSelectedServiceId(s.id)}
+                      activeOpacity={0.8}
+                      style={[
+                        styles.serviceCard,
+                        {
+                          backgroundColor: sel ? (isDark ? '#262a35' : '#e0f2fe') : (isDark ? '#1c1f2a' : '#f8f9ff'),
+                          borderColor: sel ? colors.primaryContainer : colors.border,
+                        },
+                      ]}
+                    >
+                      <Ionicons name={sel ? 'radio-button-on' : 'radio-button-off'} size={20} color={sel ? colors.primaryContainer : colors.textMuted} style={{ marginTop: 1 }} />
+                      <Text style={[styles.serviceName, { color: colors.text }]}>{s.name}</Text>
+                      <Text style={[styles.servicePrice, { color: colors.primaryContainer }]}>{price} ₽</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
 
             {/* Выбор совместимой модели трубки */}
             <Text style={[styles.label, { color: colors.textSecondary, marginTop: 14 }]}>
@@ -311,13 +295,22 @@ export const HandsetOrderModal: React.FC<HandsetOrderModalProps> = ({
                       activeOpacity={0.8}
                     >
                       <View style={styles.handsetRow}>
-                        <View style={[styles.handsetThumb, { backgroundColor: isDark ? '#0f131d' : '#eef4ff', borderColor: colors.border }]}>
+                        <TouchableOpacity
+                          activeOpacity={item.image_url ? 0.7 : 1}
+                          onPress={() => { if (item.image_url) setZoomImage(item.image_url); }}
+                          style={[styles.handsetThumb, { backgroundColor: isDark ? '#0f131d' : '#eef4ff', borderColor: colors.border }]}
+                        >
                           {item.image_url ? (
-                            <Image source={{ uri: item.image_url }} style={styles.handsetThumbImg} resizeMode="contain" />
+                            <>
+                              <Image source={{ uri: item.image_url }} style={styles.handsetThumbImg} resizeMode="contain" />
+                              <View style={styles.zoomBadge}>
+                                <Ionicons name="expand" size={11} color="#ffffff" />
+                              </View>
+                            </>
                           ) : (
                             <Ionicons name="call" size={24} color={colors.primaryContainer} />
                           )}
-                        </View>
+                        </TouchableOpacity>
                         <View style={{ flex: 1, paddingHorizontal: 8 }}>
                           <Text style={[styles.handsetName, { color: colors.text }]} numberOfLines={2}>{item.name}</Text>
                           {item.description ? (
@@ -394,34 +387,35 @@ export const HandsetOrderModal: React.FC<HandsetOrderModalProps> = ({
               placeholderTextColor={colors.textMuted}
             />
 
-            {/* Итоговый расчет */}
+            {/* Итоговый расчет (комиссия эквайринга 5% добавляется на стороне ЮKassa при оплате) */}
             <View style={[styles.summaryBox, { backgroundColor: isDark ? '#1c1f2a' : '#f8f9ff', borderColor: colors.border }]}>
               <View style={styles.summaryRow}>
-                <Text style={[styles.summaryText, { color: colors.textSecondary }]}>Аудиотрубка:</Text>
+                <Text style={[styles.summaryText, { color: colors.textSecondary }]} numberOfLines={1}>Трубка:</Text>
                 <Text style={[styles.summaryText, { color: colors.text, fontWeight: '600' }]}>{handsetPrice} ₽</Text>
               </View>
-              <View style={styles.summaryRow}>
-                <Text style={[styles.summaryText, { color: colors.textSecondary }]}>Работа мастера:</Text>
-                <Text style={[styles.summaryText, { color: colors.text, fontWeight: '600' }]}>{installServiceCost} ₽</Text>
-              </View>
-              <View style={styles.summaryRow}>
-                <Text style={[styles.summaryText, { color: colors.textSecondary }]}>Эквайринг ЮKassa (5%):</Text>
-                <Text style={[styles.summaryText, { color: colors.textSecondary }]}>{feeAmount} ₽</Text>
-              </View>
+              {activeService ? (
+                <View style={styles.summaryRow}>
+                  <Text style={[styles.summaryText, { color: colors.textSecondary, flex: 1, marginRight: 10 }]} numberOfLines={2}>{serviceTitle}:</Text>
+                  <Text style={[styles.summaryText, { color: colors.text, fontWeight: '600' }]}>{installServiceCost} ₽</Text>
+                </View>
+              ) : null}
               <View style={[styles.divider, { backgroundColor: colors.border }]} />
               <View style={styles.summaryRow}>
-                <Text style={[styles.totalLabel, { color: colors.text }]}>Итого к оплате:</Text>
-                <Text style={[styles.totalValue, { color: colors.primaryContainer }]}>{totalAmount} ₽</Text>
+                <Text style={[styles.totalLabel, { color: colors.text }]}>Итого:</Text>
+                <Text style={[styles.totalValue, { color: colors.primaryContainer }]}>{baseAmount} ₽</Text>
               </View>
+              <Text style={[styles.feeNote, { color: colors.textMuted }]}>
+                При оплате картой ЮKassa добавит комиссию эквайринга 5%.
+              </Text>
             </View>
           </ScrollView>
 
-          {/* Кнопка оплаты */}
+          {/* Кнопка оплаты — показываем базовую сумму, комиссия добавится на ЮKassa */}
           <View style={[styles.footer, { borderTopColor: colors.border }]}>
             <TouchableOpacity
-              style={[styles.submitBtn, { backgroundColor: colors.primaryContainer }]}
+              style={[styles.submitBtn, { backgroundColor: colors.primaryContainer }, (submitting || !selectedHandset) && { opacity: 0.6 }]}
               onPress={handlePayment}
-              disabled={submitting}
+              disabled={submitting || !selectedHandset}
               activeOpacity={0.85}
             >
               {submitting ? (
@@ -429,7 +423,7 @@ export const HandsetOrderModal: React.FC<HandsetOrderModalProps> = ({
               ) : (
                 <>
                   <Ionicons name="card" size={18} color="#ffffff" style={{ marginRight: 8 }} />
-                  <Text style={styles.submitBtnText}>Оплатить {totalAmount} ₽ (ЮKassa)</Text>
+                  <Text style={styles.submitBtnText}>Оплатить {baseAmount} ₽</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -437,6 +431,17 @@ export const HandsetOrderModal: React.FC<HandsetOrderModalProps> = ({
         </View>
       </KeyboardAvoidingView>
     </Modal>
+
+    {/* Полноэкранный просмотр фото трубки */}
+    <Modal visible={!!zoomImage} transparent animationType="fade" onRequestClose={() => setZoomImage(null)}>
+      <TouchableOpacity style={styles.zoomOverlay} activeOpacity={1} onPress={() => setZoomImage(null)}>
+        {zoomImage ? <Image source={{ uri: zoomImage }} style={styles.zoomImage} resizeMode="contain" /> : null}
+        <View style={styles.zoomClose}>
+          <Ionicons name="close" size={26} color="#ffffff" />
+        </View>
+      </TouchableOpacity>
+    </Modal>
+    </>
   );
 };
 
@@ -572,6 +577,60 @@ const styles = StyleSheet.create({
   handsetOldPrice: {
     fontSize: 12,
     textDecorationLine: 'line-through',
+  },
+  serviceCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  serviceName: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 18,
+  },
+  servicePrice: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginLeft: 6,
+  },
+  feeNote: {
+    fontSize: 11,
+    marginTop: 8,
+    lineHeight: 15,
+  },
+  zoomBadge: {
+    position: 'absolute',
+    right: 2,
+    bottom: 2,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 6,
+    paddingHorizontal: 3,
+    paddingVertical: 2,
+  },
+  zoomOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.92)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  zoomImage: {
+    width: '92%',
+    height: '80%',
+  },
+  zoomClose: {
+    position: 'absolute',
+    top: 48,
+    right: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   input: {
     height: 46,
