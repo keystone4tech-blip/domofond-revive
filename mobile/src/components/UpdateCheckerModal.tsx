@@ -16,10 +16,12 @@ import {
   Linking,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import * as IntentLauncher from 'expo-intent-launcher';
 import { apiClient } from '@/api/client';
 import { APP_VERSION, APP_DOWNLOAD_URL } from '@/config/constants';
 import { useAppTheme } from '@/theme';
@@ -177,33 +179,60 @@ export function UpdateCheckerModal() {
   };
 
   /**
-   * Открытие скачанного файла через установщик пакетов Android
+   * Открытие скачанного файла через нативный установщик пакетов Android (Package Installer)
    */
   const launchApkInstaller = async (fileUri: string) => {
     try {
-      console.log('[UpdateChecker] Открытие APK для установки:', fileUri);
+      console.log('[UpdateChecker] Подготовка к вызову системного установщика для:', fileUri);
 
-      // Проверяем доступность системного шаринга/открытия файлов
-      const isSharingAvailable = await Sharing.isAvailableAsync();
+      if (Platform.OS === 'android') {
+        // Преобразуем локальный file:// путь в защищенный content:// URI через Android FileProvider
+        const contentUri = await FileSystem.getContentUriAsync(fileUri);
+        console.log('[UpdateChecker] Сформирован Android Content URI:', contentUri);
 
-      if (isSharingAvailable) {
-        await Sharing.shareAsync(fileUri, {
-          mimeType: 'application/vnd.android.package-archive',
-          dialogTitle: 'Установка обновления Домофондар',
-          UTI: 'com.android.package-archive',
+        // Запуск системного интента ACTION_VIEW для установки пакета приложения
+        // Флаг 1 (FLAG_GRANT_READ_URI_PERMISSION) дает установщику права на чтение файла APK
+        await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+          data: contentUri,
+          flags: 1,
+          type: 'application/vnd.android.package-archive',
         });
+        console.log('[UpdateChecker] Системный установщик пакетов Android успешно запущен');
       } else {
-        // Если модуль недоступен, открываем локальный URI через Linking
-        await Linking.openURL(fileUri);
+        // Резерв для других платформ через Sharing
+        const isSharingAvailable = await Sharing.isAvailableAsync();
+        if (isSharingAvailable) {
+          await Sharing.shareAsync(fileUri, {
+            mimeType: 'application/vnd.android.package-archive',
+            dialogTitle: 'Установка обновления Домофондар',
+          });
+        } else {
+          await Linking.openURL(fileUri);
+        }
       }
-    } catch (openErr) {
-      console.warn('[UpdateChecker] Не удалось напрямую вызвать установщик:', openErr);
+    } catch (openErr: any) {
+      console.warn('[UpdateChecker] Не удалось напрямую вызвать PackageInstaller:', openErr);
       Alert.alert(
         'Файл загружен',
-        'Обновление сохранено на устройстве. Если установка не началась автоматически, откройте файл из папки "Загрузки" или воспользуйтесь прямой ссылкой.',
+        'Обновление успешно загружено. Нажмите «Установить» для открытия файла установщиком.',
         [
+          {
+            text: 'Установить',
+            onPress: async () => {
+              try {
+                const cUri = await FileSystem.getContentUriAsync(fileUri);
+                await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+                  data: cUri,
+                  flags: 1,
+                  type: 'application/vnd.android.package-archive',
+                });
+              } catch (e) {
+                handleFallbackBrowserDownload();
+              }
+            }
+          },
           { text: 'Открыть ссылку', onPress: handleFallbackBrowserDownload },
-          { text: 'Понятно', style: 'cancel' }
+          { text: 'Отмена', style: 'cancel' }
         ]
       );
     } finally {
