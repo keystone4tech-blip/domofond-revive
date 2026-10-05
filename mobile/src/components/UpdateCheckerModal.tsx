@@ -190,7 +190,7 @@ export function UpdateCheckerModal() {
         const contentUri = await FileSystem.getContentUriAsync(fileUri);
         console.log('[UpdateChecker] Сформирован Android Content URI:', contentUri);
 
-        // Флаги:
+        // Флаги Android Intent:
         // FLAG_GRANT_READ_URI_PERMISSION = 1 (чтение URI установщиком)
         // FLAG_ACTIVITY_NEW_TASK = 268435456 (0x10000000) (запуск в новом стеке задач поверх текущего экрана)
         // Сумма = 268435457
@@ -201,7 +201,7 @@ export function UpdateCheckerModal() {
         });
         console.log('[UpdateChecker] Системный установщик пакетов Android успешно запущен');
         
-        // Закрываем модальное окно, чтобы оно не перекрывало экран после возврата из установщика
+        // Закрываем модальное окно, чтобы оно не перекрывало экран
         setVisible(false);
       } else {
         // Резерв для других платформ через Sharing
@@ -218,28 +218,18 @@ export function UpdateCheckerModal() {
       }
     } catch (openErr: any) {
       console.warn('[UpdateChecker] Не удалось напрямую вызвать PackageInstaller:', openErr);
+      // При ошибке синтаксического анализа удаляем потенциально повреждённый кэшированный APK
+      try {
+        await FileSystem.deleteAsync(fileUri, { idempotent: true });
+        console.log('[UpdateChecker] Повреждённый локальный APK удалён из кэша');
+      } catch {}
+
       Alert.alert(
-        'Установка обновления',
-        'Файл загружен. Если окно установщика не открылось или сразу закрылось:\n\n1. Удалите старую версию приложения, если она была установлена ранее из тестовой сборки.\n2. Или скачайте APK через браузер в папку «Загрузки».',
+        'Ошибка обработки пакета',
+        'Android сообщил: «Не удалось обработать пакет».\n\nЭто происходит, если загруженный файл повреждён либо старая версия установлена с другим сертификатом/подписью.\n\nРешение:\n1. Скачать APK напрямую через браузер.\n2. При необходимости удалить старую версию перед установкой новой.',
         [
-          {
-            text: 'Повторить запуск',
-            onPress: async () => {
-              try {
-                const cUri = await FileSystem.getContentUriAsync(fileUri);
-                await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
-                  data: cUri,
-                  flags: 268435457,
-                  type: 'application/vnd.android.package-archive',
-                });
-                setVisible(false);
-              } catch (e) {
-                handleFallbackBrowserDownload();
-              }
-            }
-          },
-          { text: 'Открыть в браузере', onPress: handleFallbackBrowserDownload },
-          { text: 'Позже', style: 'cancel', onPress: () => setVisible(false) }
+          { text: 'Скачать через браузер', onPress: handleFallbackBrowserDownload },
+          { text: 'Отмена', style: 'cancel', onPress: () => setVisible(false) }
         ]
       );
     } finally {

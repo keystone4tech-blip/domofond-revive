@@ -31,8 +31,8 @@ permissions:
   contents: write
 
 concurrency:
-  group: android-build-${{ github.ref }}
-  cancel-in-progress: true
+  group: android-build-${{ github.workflow }}-${{ github.run_id }}
+  cancel-in-progress: false
 
 env:
   ANDROID_HOME: /usr/local/lib/android/sdk
