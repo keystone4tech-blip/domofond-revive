@@ -75,7 +75,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   // === Основные параметры приложения ===
   name: 'Домофондар',                         // Название в меню телефона
   slug: 'domofondar',                          // Уникальный идентификатор проекта
-  version: '1.2.0',                            // Версия приложения
+  version: '1.2.1',                            // Версия приложения
   orientation: 'portrait',                     // Портретная ориентация
   icon: './assets/images/icon.png',            // Иконка приложения (1024x1024)
   scheme: 'domofondar',                        // URL-схема для deep linking (domofondar://)
@@ -92,7 +92,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   ios: {
     supportsTablet: true,                      // Поддержка iPad
     bundleIdentifier: 'ru.domofondar.app',     // Уникальный Bundle ID для App Store
-    buildNumber: '3',                          // Номер сборки
+    buildNumber: '4',                          // Номер сборки
     infoPlist: {
       // Описания для запросов разрешений (обязательно для App Store)
       NSCameraUsageDescription: 'Камера нужна для фото заявок и верификации документов',
@@ -113,7 +113,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       backgroundColor: '#0F172A',                           // Фон адаптивной иконки
     },
     package: 'ru.domofondar.app',              // Уникальный Package Name для Google Play
-    versionCode: 7,                            // Код версии (увеличивать при каждом релизе)
+    versionCode: 8,                            // Код версии (увеличивать при каждом релизе)
     permissions: [
       'CAMERA',                                // Камера для фото
       'READ_MEDIA_IMAGES',                     // Чтение изображений (Android 13+)

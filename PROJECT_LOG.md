@@ -11,6 +11,39 @@
 > 
 > **Пользователь НЕ ДОЛЖЕН ничего вносить вручную.** Вся статистика и история пополняется ИИ автоматически при каждой задаче.
 
+# 2026-10-05 22:30 — Релиз мобильного приложения v1.2.1 (Build 8): валидация профиля в формах заказа и ремонта, полноэкранная модалка ТО
+
+## 1. Задачи и бизнес-ценность
+- **Заказ ключей (`KeyOrderModal.tsx`)**:
+  * Адрес доставки, получатель и телефон берутся строго из профиля в режиме «только для чтения» (без возможности ручной ошибки).
+  * Исключена ошибочная подстановка чужого телефонного номера из договоров (`account.phone`).
+  * Если телефона в профиле нет — активируется обязательное контактное поле «Контактный номер для связи», без которого заказ не отправляется.
+  * Поле примечания переименовано: «Сообщите дополнительную информацию или дополнительный номер для связи».
+- **Ремонт домофона (`RepairModal.tsx`)**:
+  * Переведён в полноэкранный формат (аналогично заказу ключей и аудиотрубки) с нижней панелью «Отменить / Отправить заявку».
+  * Адрес, заявитель и телефон берутся из профиля без редактирования; при отсутствии телефона — обязательный ввод контакта.
+  * Поле допинформации расширено для указания кода, этажа или удобного времени.
+- **Заказ аудиотрубки (`HandsetOrderModal.tsx`)**:
+  * Адрес, получатель и телефон — строго из профиля в режиме «только для чтения»; обязательное контактное поле при отсутствии номера.
+  * Поле примечания: «Сообщите дополнительную информацию или дополнительный номер для связи».
+- **Валидация адреса и контакта**:
+  * Во всех трёх формах выводится предупреждение, если адрес не заполнен в профиле, с предложением привязать адрес на главном экране.
+- **Улучшение обновления (`UpdateCheckerModal.tsx`)**:
+  * Автоматическое закрытие окна обновления при вызове системного установщика Android для чистого UX.
+- **Версионность**:
+  * Версия повышена до `1.2.1`, `versionCode: 8`, `buildNumber: 4`.
+
+## 2. Измененные файлы
+- [`mobile/app.config.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/app.config.ts) — Повышение версии до 1.2.1 (versionCode: 8).
+- [`mobile/package.json`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/package.json) — Версия 1.2.1.
+- [`mobile/src/config/constants.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/src/config/constants.ts) — APP_VERSION = '1.2.1'.
+- [`server/index.js`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/server/index.js) — latestVersion 1.2.1, versionCode 8, обновлены releaseNotes.
+- [`mobile/src/components/KeyOrderModal.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/src/components/KeyOrderModal.tsx) — Readonly поля профиля, валидация.
+- [`mobile/src/components/HandsetOrderModal.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/src/components/HandsetOrderModal.tsx) — Readonly поля профиля, валидация.
+- [`mobile/src/components/RepairModal.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/src/components/RepairModal.tsx) — Полноэкранный дизайн, кнопки, валидация профиля.
+- [`mobile/src/components/UpdateCheckerModal.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/src/components/UpdateCheckerModal.tsx) — Закрытие модалки при установке.
+- [`src/data/projectChangelog.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/data/projectChangelog.ts) — Реестр доработок.
+
 # 2026-10-05 21:00 — Комплексный релиз мобильного приложения v1.2.0 (Build 7): полный паритет с сайтом, мастер адреса, Push и геолокация
 
 ## 1. Задачи и бизнес-ценность

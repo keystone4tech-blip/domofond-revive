@@ -200,6 +200,9 @@ export function UpdateCheckerModal() {
           type: 'application/vnd.android.package-archive',
         });
         console.log('[UpdateChecker] Системный установщик пакетов Android успешно запущен');
+        
+        // Закрываем модальное окно, чтобы оно не перекрывало экран после возврата из установщика
+        setVisible(false);
       } else {
         // Резерв для других платформ через Sharing
         const isSharingAvailable = await Sharing.isAvailableAsync();
@@ -211,15 +214,16 @@ export function UpdateCheckerModal() {
         } else {
           await Linking.openURL(fileUri);
         }
+        setVisible(false);
       }
     } catch (openErr: any) {
       console.warn('[UpdateChecker] Не удалось напрямую вызвать PackageInstaller:', openErr);
       Alert.alert(
         'Установка обновления',
-        'Файл обновления успешно загружен на устройство. Если система запросила «Разрешить установку из этого источника» — включите тумблер и нажмите «Установить».',
+        'Файл загружен. Если окно установщика не открылось или сразу закрылось:\n\n1. Удалите старую версию приложения, если она была установлена ранее из тестовой сборки.\n2. Или скачайте APK через браузер в папку «Загрузки».',
         [
           {
-            text: 'Запустить установку',
+            text: 'Повторить запуск',
             onPress: async () => {
               try {
                 const cUri = await FileSystem.getContentUriAsync(fileUri);
@@ -228,25 +232,14 @@ export function UpdateCheckerModal() {
                   flags: 268435457,
                   type: 'application/vnd.android.package-archive',
                 });
+                setVisible(false);
               } catch (e) {
-                // Если система заблокировала прямой вызов, открываем диалог системного шаринга/открытия файла
-                try {
-                  const shareAvail = await Sharing.isAvailableAsync();
-                  if (shareAvail) {
-                    await Sharing.shareAsync(fileUri, {
-                      mimeType: 'application/vnd.android.package-archive',
-                    });
-                  } else {
-                    handleFallbackBrowserDownload();
-                  }
-                } catch {
-                  handleFallbackBrowserDownload();
-                }
+                handleFallbackBrowserDownload();
               }
             }
           },
-          { text: 'Скачать через браузер', onPress: handleFallbackBrowserDownload },
-          { text: 'Отмена', style: 'cancel' }
+          { text: 'Открыть в браузере', onPress: handleFallbackBrowserDownload },
+          { text: 'Позже', style: 'cancel', onPress: () => setVisible(false) }
         ]
       );
     } finally {

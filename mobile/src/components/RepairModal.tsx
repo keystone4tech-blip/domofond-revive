@@ -1,6 +1,7 @@
 // mobile/src/components/RepairModal.tsx
-// Модальное окно бесплатного вызова мастера по ТО «Домофондар»
-// Создает наряд в CRM с обязательной меткой: 📱 [Мобильное приложение Домофондар]
+// Полноэкранное окно бесплатного вызова мастера по ТО «Домофондар».
+// Адрес, получатель и телефон берутся ИЗ ПРОФИЛЯ без возможности редактирования.
+// Если телефона в профиле нет — обязательное поле контактного номера.
 
 import React, { useState, useEffect } from 'react';
 import {
@@ -17,6 +18,7 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/theme';
 import { apiClient } from '@/api/client';
 
@@ -25,6 +27,7 @@ interface RepairModalProps {
   onClose: () => void;
   onSuccess: () => void;
   user: any;
+  account?: any;
   defaultAddress?: string;
 }
 
@@ -43,32 +46,40 @@ export const RepairModal: React.FC<RepairModalProps> = ({
   onClose,
   onSuccess,
   user,
+  account,
   defaultAddress = '',
 }) => {
   const { colors, isDark } = useAppTheme();
+  const insets = useSafeAreaInsets();
 
   const [selectedType, setSelectedType] = useState(REPAIR_TYPES[0].id);
-  const [address, setAddress] = useState(defaultAddress);
-  const [phone, setPhone] = useState(user?.phone || '');
+  const [contactPhone, setContactPhone] = useState('');
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // Данные — строго из профиля зарегистрированного пользователя (без редактирования).
+  // Телефон НЕ берём из чужого лицевого счёта — только собственный номер профиля.
+  const recipientName = (user?.full_name || '').trim() || 'Получатель не указан';
+  const profileAddress = (user?.address || account?.address || defaultAddress || '').trim();
+  const profilePhone = (user?.phone || '').trim();
+  const needContactPhone = !profilePhone;
+  const effectivePhone = profilePhone || contactPhone.trim();
+
   useEffect(() => {
-    if (defaultAddress && !address) {
-      setAddress(defaultAddress);
+    if (visible) {
+      setSelectedType(REPAIR_TYPES[0].id);
+      setContactPhone('');
+      setComment('');
     }
-    if (user?.phone && !phone) {
-      setPhone(user.phone);
-    }
-  }, [defaultAddress, user]);
+  }, [visible]);
 
   const handleSubmit = async () => {
-    if (!address.trim()) {
-      Alert.alert('Внимание', 'Пожалуйста, укажите адрес (улицу, дом, подъезд и квартиру)');
+    if (!profileAddress) {
+      Alert.alert('Внимание', 'В вашем профиле не указан адрес. Привяжите адрес на главном экране.');
       return;
     }
-    if (!phone.trim()) {
-      Alert.alert('Внимание', 'Укажите контактный номер телефона для мастера');
+    if (!effectivePhone) {
+      Alert.alert('Укажите телефон', 'В профиле нет номера телефона. Введите контактный номер для связи.');
       return;
     }
 
@@ -80,12 +91,10 @@ export const RepairModal: React.FC<RepairModalProps> = ({
 
     setSubmitting(true);
     try {
-      console.log('[Ремонт ТО] Отправка бесплатной заявки мастера из мобильного приложения...');
-      
       const payload = {
-        name: user?.full_name || 'Абонент',
-        phone: phone.trim(),
-        address: address.trim(),
+        name: recipientName,
+        phone: effectivePhone,
+        address: profileAddress,
         message: fullMessage,
         priority: 'medium',
         status: 'pending',
@@ -98,17 +107,8 @@ export const RepairModal: React.FC<RepairModalProps> = ({
 
       Alert.alert(
         'Заявка принята!',
-        `Мастер дежурной службы «Домофондар» уведомлен. Мы свяжемся с вами по телефону ${phone.trim()} для согласования времени визита.`,
-        [
-          {
-            text: 'Понятно',
-            onPress: () => {
-              setComment('');
-              onSuccess();
-              onClose();
-            },
-          },
-        ]
+        `Мастер дежурной службы «Домофондар» уведомлён. Мы свяжемся с вами по телефону ${effectivePhone} для согласования времени визита.`,
+        [{ text: 'Понятно', onPress: () => { onSuccess(); onClose(); } }]
       );
     } catch (err: any) {
       console.error('[Ремонт ТО] Ошибка при отправке заявки:', err);
@@ -119,32 +119,32 @@ export const RepairModal: React.FC<RepairModalProps> = ({
     }
   };
 
-  return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.overlay}
-      >
-        <View style={[styles.sheet, { backgroundColor: isDark ? '#171b26' : '#ffffff', borderColor: colors.border }]}>
-          {/* Шапка модального окна */}
-          <View style={styles.header}>
-            <View style={styles.headerTitleWrap}>
-              <View style={[styles.iconWrap, { backgroundColor: isDark ? '#262a35' : '#e5eeff' }]}>
-                <Ionicons name="construct-outline" size={20} color={colors.primaryContainer} />
-              </View>
-              <View>
-                <Text style={[styles.title, { color: colors.text }]}>Вызов мастера по ТО</Text>
-                <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-                  Бесплатный ремонт в рамках обслуживания
-                </Text>
-              </View>
-            </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Ionicons name="close" size={22} color={colors.textMuted} />
-            </TouchableOpacity>
-          </View>
+  const topPad = Math.max(insets.top, 12) + 4;
+  const botPad = Math.max(insets.bottom, 12);
 
-          <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
+  return (
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose} presentationStyle="fullScreen">
+      <View style={[styles.screen, { backgroundColor: colors.background, paddingTop: topPad }]}>
+        {/* Шапка */}
+        <View style={[styles.header, { borderBottomColor: colors.border }]}>
+          <View style={styles.headerTitleWrap}>
+            <View style={[styles.iconWrap, { backgroundColor: isDark ? '#262a35' : '#e5eeff' }]}>
+              <Ionicons name="construct-outline" size={20} color={colors.primaryContainer} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.title, { color: colors.text }]}>Вызов мастера по ТО</Text>
+              <Text style={[styles.subtitle, { color: colors.textSecondary }]} numberOfLines={1}>
+                Бесплатный ремонт в рамках обслуживания
+              </Text>
+            </View>
+          </View>
+          <TouchableOpacity onPress={onClose} style={styles.closeBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Ionicons name="close" size={24} color={colors.textMuted} />
+          </TouchableOpacity>
+        </View>
+
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+          <ScrollView style={styles.body} contentContainerStyle={{ paddingBottom: 16 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             {/* Выбор характера неисправности */}
             <Text style={[styles.label, { color: colors.textSecondary }]}>Что именно не работает?</Text>
             <View style={styles.typesGrid}>
@@ -157,28 +157,15 @@ export const RepairModal: React.FC<RepairModalProps> = ({
                     style={[
                       styles.typeCard,
                       {
-                        backgroundColor: isSelected
-                          ? (isDark ? '#262a35' : '#e0f2fe')
-                          : (isDark ? '#1c1f2a' : '#f8f9ff'),
+                        backgroundColor: isSelected ? (isDark ? '#262a35' : '#e0f2fe') : (isDark ? '#1c1f2a' : '#f8f9ff'),
                         borderColor: isSelected ? colors.primaryContainer : colors.border,
                       },
                     ]}
                     activeOpacity={0.8}
                   >
                     <View style={styles.typeRow}>
-                      <Ionicons
-                        name={isSelected ? 'radio-button-on' : 'radio-button-off'}
-                        size={18}
-                        color={isSelected ? colors.primaryContainer : colors.textMuted}
-                      />
-                      <Text
-                        style={[
-                          styles.typeTitle,
-                          { color: isSelected ? colors.primaryContainer : colors.text, fontWeight: isSelected ? '700' : '500' },
-                        ]}
-                      >
-                        {t.title}
-                      </Text>
+                      <Ionicons name={isSelected ? 'radio-button-on' : 'radio-button-off'} size={18} color={isSelected ? colors.primaryContainer : colors.textMuted} />
+                      <Text style={[styles.typeTitle, { color: isSelected ? colors.primaryContainer : colors.text, fontWeight: isSelected ? '700' : '500' }]}>{t.title}</Text>
                     </View>
                     <Text style={[styles.typeDesc, { color: colors.textSecondary }]}>{t.desc}</Text>
                   </TouchableOpacity>
@@ -186,68 +173,52 @@ export const RepairModal: React.FC<RepairModalProps> = ({
               })}
             </View>
 
-            {/* Контактные данные */}
-            <Text style={[styles.label, { color: colors.textSecondary, marginTop: 14 }]}>Адрес ремонта:</Text>
-            <TextInput
-              style={[
-                styles.input,
-                {
-                  backgroundColor: isDark ? '#1c1f2a' : '#f8f9ff',
-                  borderColor: colors.border,
-                  color: colors.text,
-                },
-              ]}
-              value={address}
-              onChangeText={setAddress}
-              placeholder="г. Нальчик, ул. Ленина, д. 10, под. 2, кв. 45"
-              placeholderTextColor={colors.textMuted}
-            />
+            {/* Получатель, адрес и телефон — из профиля, без редактирования */}
+            <Text style={[styles.label, { color: colors.textSecondary, marginTop: 16 }]}>Заявитель:</Text>
+            <View style={[styles.readonlyField, { backgroundColor: isDark ? '#15181f' : '#f1f4fb', borderColor: colors.border }]}>
+              <Ionicons name="person-outline" size={16} color={colors.textMuted} style={{ marginRight: 8 }} />
+              <Text style={[styles.readonlyText, { color: colors.text }]} numberOfLines={1}>{recipientName}</Text>
+            </View>
 
-            <Text style={[styles.label, { color: colors.textSecondary, marginTop: 10 }]}>Телефон для связи:</Text>
-            <TextInput
-              style={[
-                styles.input,
-                {
-                  backgroundColor: isDark ? '#1c1f2a' : '#f8f9ff',
-                  borderColor: colors.border,
-                  color: colors.text,
-                },
-              ]}
-              value={phone}
-              onChangeText={setPhone}
-              keyboardType="phone-pad"
-              placeholder="+7 (999) 000-00-00"
-              placeholderTextColor={colors.textMuted}
-            />
+            <Text style={[styles.label, { color: colors.textSecondary, marginTop: 10 }]}>Адрес ремонта (из профиля):</Text>
+            <View style={[styles.readonlyField, { backgroundColor: isDark ? '#15181f' : '#f1f4fb', borderColor: colors.border }]}>
+              <Ionicons name="location-outline" size={16} color={colors.textMuted} style={{ marginRight: 8 }} />
+              <Text style={[styles.readonlyText, { color: profileAddress ? colors.text : colors.error }]} numberOfLines={2}>
+                {profileAddress || 'Адрес не указан — привяжите адрес на главном экране'}
+              </Text>
+            </View>
+
+            {needContactPhone ? (
+              <>
+                <Text style={[styles.label, { color: colors.error, marginTop: 10 }]}>Контактный номер для связи (обязательно):</Text>
+                <TextInput
+                  style={[styles.input, { backgroundColor: isDark ? '#1c1f2a' : '#f8f9ff', borderColor: contactPhone.trim() ? colors.border : colors.error, color: colors.text }]}
+                  value={contactPhone} onChangeText={setContactPhone} keyboardType="phone-pad"
+                  placeholder="+7 (999) 000-00-00" placeholderTextColor={colors.textMuted}
+                />
+              </>
+            ) : (
+              <>
+                <Text style={[styles.label, { color: colors.textSecondary, marginTop: 10 }]}>Телефон для связи (из профиля):</Text>
+                <View style={[styles.readonlyField, { backgroundColor: isDark ? '#15181f' : '#f1f4fb', borderColor: colors.border }]}>
+                  <Ionicons name="call-outline" size={16} color={colors.textMuted} style={{ marginRight: 8 }} />
+                  <Text style={[styles.readonlyText, { color: colors.text }]}>{profilePhone}</Text>
+                </View>
+              </>
+            )}
 
             <Text style={[styles.label, { color: colors.textSecondary, marginTop: 10 }]}>
-              Дополнительный комментарий (необязательно):
+              Сообщите дополнительную информацию или контактный (дополнительный) номер для связи:
             </Text>
             <TextInput
-              style={[
-                styles.input,
-                styles.textArea,
-                {
-                  backgroundColor: isDark ? '#1c1f2a' : '#f8f9ff',
-                  borderColor: colors.border,
-                  color: colors.text,
-                },
-              ]}
-              value={comment}
-              onChangeText={setComment}
-              multiline
-              numberOfLines={3}
-              placeholder="Укажите код домофона, этаж или удобное время для визита мастера"
+              style={[styles.input, styles.textArea, { backgroundColor: isDark ? '#1c1f2a' : '#f8f9ff', borderColor: colors.border, color: colors.text }]}
+              value={comment} onChangeText={setComment} multiline numberOfLines={3}
+              placeholder="код домофона, этаж, удобное время или дополнительный номер — необязательно"
               placeholderTextColor={colors.textMuted}
             />
 
             {/* Информационный бейдж гарантии ТО */}
-            <View
-              style={[
-                styles.infoBadge,
-                { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.1)' : '#ecfdf5', borderColor: 'rgba(16, 185, 129, 0.25)' },
-              ]}
-            >
+            <View style={[styles.infoBadge, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.1)' : '#ecfdf5', borderColor: 'rgba(16, 185, 129, 0.25)' }]}>
               <Ionicons name="shield-checkmark" size={18} color="#10b981" />
               <Text style={styles.infoBadgeText}>
                 Выезд мастера и устранение неполадок включены в договор абонентского обслуживания (0 ₽).
@@ -255,152 +226,50 @@ export const RepairModal: React.FC<RepairModalProps> = ({
             </View>
           </ScrollView>
 
-          {/* Нижняя кнопка отправки */}
-          <View style={[styles.footer, { borderTopColor: colors.border }]}>
-            <TouchableOpacity
-              style={[styles.submitBtn, { backgroundColor: colors.primaryContainer }]}
-              onPress={handleSubmit}
-              disabled={submitting}
-              activeOpacity={0.85}
-            >
-              {submitting ? (
-                <ActivityIndicator color="#ffffff" />
-              ) : (
+          {/* Нижние кнопки: Отменить + Отправить */}
+          <View style={[styles.footer, { borderTopColor: colors.border, paddingBottom: botPad }]}>
+            <TouchableOpacity style={[styles.cancelBtn, { borderColor: colors.border }]} onPress={onClose} activeOpacity={0.8} disabled={submitting}>
+              <Text style={[styles.cancelBtnText, { color: colors.textSecondary }]}>Отменить</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.submitBtn, { backgroundColor: colors.primaryContainer }, submitting && { opacity: 0.6 }]} onPress={handleSubmit} disabled={submitting} activeOpacity={0.85}>
+              {submitting ? <ActivityIndicator color="#ffffff" /> : (
                 <>
                   <Ionicons name="send" size={18} color="#ffffff" style={{ marginRight: 8 }} />
-                  <Text style={styles.submitBtnText}>Отправить заявку мастеру</Text>
+                  <Text style={styles.submitBtnText}>Отправить заявку</Text>
                 </>
               )}
             </TouchableOpacity>
           </View>
-        </View>
-      </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(10, 14, 24, 0.75)',
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    borderTopWidth: 1,
-    maxHeight: '90%',
-    paddingBottom: Platform.OS === 'ios' ? 24 : 12,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 14,
-  },
-  headerTitleWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  iconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 17,
-    fontWeight: '700',
-  },
-  subtitle: {
-    fontSize: 12,
-    marginTop: 1,
-  },
-  closeBtn: {
-    padding: 6,
-  },
-  body: {
-    paddingHorizontal: 20,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '600',
-    marginBottom: 6,
-  },
-  typesGrid: {
-    gap: 8,
-  },
-  typeCard: {
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  typeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
-  },
-  typeTitle: {
-    fontSize: 14,
-  },
-  typeDesc: {
-    fontSize: 12,
-    paddingLeft: 26,
-  },
-  input: {
-    height: 46,
-    borderRadius: 10,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    fontSize: 14,
-  },
-  textArea: {
-    height: 76,
-    paddingTop: 10,
-    textAlignVertical: 'top',
-  },
-  infoBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    marginTop: 14,
-    marginBottom: 10,
-  },
-  infoBadgeText: {
-    flex: 1,
-    fontSize: 12,
-    color: '#10b981',
-    lineHeight: 16,
-  },
-  footer: {
-    paddingHorizontal: 20,
-    paddingTop: 14,
-    borderTopWidth: 1,
-  },
-  submitBtn: {
-    height: 50,
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#0ea5e9',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  submitBtnText: {
-    color: '#ffffff',
-    fontSize: 15,
-    fontWeight: '700',
-  },
+  screen: { flex: 1 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1 },
+  headerTitleWrap: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  iconWrap: { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  title: { fontSize: 17, fontWeight: '700' },
+  subtitle: { fontSize: 12, marginTop: 1 },
+  closeBtn: { padding: 6 },
+  body: { flex: 1, paddingHorizontal: 16, paddingTop: 14 },
+  label: { fontSize: 13, fontWeight: '600', marginBottom: 6 },
+  typesGrid: { gap: 8 },
+  typeCard: { padding: 12, borderRadius: 12, borderWidth: 1 },
+  typeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  typeTitle: { fontSize: 14 },
+  typeDesc: { fontSize: 12, paddingLeft: 26 },
+  input: { minHeight: 48, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, fontSize: 15 },
+  textArea: { height: 84, paddingTop: 12, textAlignVertical: 'top' },
+  readonlyField: { minHeight: 48, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, flexDirection: 'row', alignItems: 'center' },
+  readonlyText: { fontSize: 15, flex: 1 },
+  infoBadge: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 10, borderWidth: 1, marginTop: 16, marginBottom: 10 },
+  infoBadgeText: { flex: 1, fontSize: 12, color: '#10b981', lineHeight: 16 },
+  footer: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingTop: 12, borderTopWidth: 1 },
+  cancelBtn: { flex: 1, height: 50, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  cancelBtnText: { fontSize: 15, fontWeight: '700' },
+  submitBtn: { flex: 2, height: 50, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  submitBtnText: { color: '#ffffff', fontSize: 15, fontWeight: '700' },
 });

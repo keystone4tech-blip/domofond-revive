@@ -41,8 +41,7 @@ export const KeyOrderModal: React.FC<KeyOrderModalProps> = ({
 
   const [quantity, setQuantity] = useState(1);
   const [customQty, setCustomQty] = useState('');
-  const [address, setAddress] = useState(defaultAddress);
-  const [phone, setPhone] = useState(user?.phone || '');
+  const [contactPhone, setContactPhone] = useState(''); // только если в профиле нет телефона
   const [comment, setComment] = useState('');
   const [keyProduct, setKeyProduct] = useState<any>(null);
   const [isInstallation, setIsInstallation] = useState(false);
@@ -50,12 +49,19 @@ export const KeyOrderModal: React.FC<KeyOrderModalProps> = ({
   const [loadingCatalog, setLoadingCatalog] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  // Данные получателя берём ИЗ ПРОФИЛЯ зарегистрированного пользователя (без редактирования).
+  // Телефон НЕ подтягиваем из чужого лицевого счёта — только собственный номер профиля.
+  const recipientName = (user?.full_name || '').trim() || 'Получатель не указан';
+  const profileAddress = (user?.address || account?.address || defaultAddress || '').trim();
+  const profilePhone = (user?.phone || '').trim();
+  const needContactPhone = !profilePhone; // в профиле нет телефона — просим обязательный контактный номер
+  const effectivePhone = profilePhone || contactPhone.trim();
+
   useEffect(() => {
     if (visible) {
-      setAddress(defaultAddress || account?.address || '');
-      setPhone(user?.phone || account?.phone || '');
       setQuantity(1);
       setCustomQty('');
+      setContactPhone('');
       loadCatalogKeys();
     }
   }, [visible, defaultAddress, account, user]);
@@ -107,20 +113,20 @@ export const KeyOrderModal: React.FC<KeyOrderModalProps> = ({
 
   const handlePayment = async () => {
     if (!quantity || quantity < 1) { Alert.alert('Внимание', 'Укажите количество ключей'); return; }
-    if (!address.trim()) { Alert.alert('Внимание', 'Укажите адрес доставки ключей'); return; }
-    if (!phone.trim()) { Alert.alert('Внимание', 'Укажите контактный номер телефона'); return; }
+    if (!profileAddress) { Alert.alert('Внимание', 'В вашем профиле не указан адрес. Привяжите адрес на главном экране.'); return; }
+    if (!effectivePhone) { Alert.alert('Укажите телефон', 'В профиле нет номера телефона. Введите контактный номер для связи.'); return; }
 
     setSubmitting(true);
     try {
-      const messageText = `Заказ электронных ключей: ${quantity} шт. (${tierText})\nАдрес: ${address.trim()}\nТелефон: ${phone.trim()}${comment.trim() ? `\nДоп. информация: ${comment.trim()}` : ''}`;
+      const messageText = `Заказ электронных ключей: ${quantity} шт. (${tierText})\nПолучатель: ${recipientName}\nАдрес: ${profileAddress}\nТелефон: ${effectivePhone}${comment.trim() ? `\nДоп. информация: ${comment.trim()}` : ''}`;
       const orderPayload = {
-        name: user?.full_name || 'Абонент', phone: phone.trim(), address: address.trim(),
+        name: recipientName, phone: effectivePhone, address: profileAddress,
         message: messageText, amount: baseSum, user_id: user?.id, is_mobile: true, source: 'mobile_app',
         items: [{ product_id: keyProduct?.id || null, name: keyProduct?.name || 'Электронный чип-ключ Домофондар', quantity, price: unitPrice }],
       };
       const paymentBody = {
         amount: totalSum, credit_amount: baseSum, fee_amount: feeSum,
-        description: `Заказ ${quantity} ключей домофона, ${address.trim()}`.slice(0, 128),
+        description: `Заказ ${quantity} ключей домофона, ${profileAddress}`.slice(0, 128),
         account_number: account?.account_number || undefined,
         is_order: true, order_data: orderPayload,
         return_url: 'https://домофондар.рф/cabinet?check_payment=1&is_order=1',
@@ -231,20 +237,41 @@ export const KeyOrderModal: React.FC<KeyOrderModalProps> = ({
               placeholderTextColor={colors.textMuted}
             />
 
-            {/* Адрес и контакты */}
-            <Text style={[styles.label, { color: colors.textSecondary, marginTop: 14 }]}>Куда доставить ключи:</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: isDark ? '#1c1f2a' : '#f8f9ff', borderColor: colors.border, color: colors.text }]}
-              value={address} onChangeText={setAddress} placeholder="Адрес (подъезд, квартира)" placeholderTextColor={colors.textMuted}
-            />
+            {/* Получатель, адрес и телефон — строго из профиля, без возможности редактирования */}
+            <Text style={[styles.label, { color: colors.textSecondary, marginTop: 14 }]}>Получатель:</Text>
+            <View style={[styles.readonlyField, { backgroundColor: isDark ? '#15181f' : '#f1f4fb', borderColor: colors.border }]}>
+              <Ionicons name="person-outline" size={16} color={colors.textMuted} style={{ marginRight: 8 }} />
+              <Text style={[styles.readonlyText, { color: colors.text }]} numberOfLines={1}>{recipientName}</Text>
+            </View>
 
-            <Text style={[styles.label, { color: colors.textSecondary, marginTop: 10 }]}>Телефон получателя:</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: isDark ? '#1c1f2a' : '#f8f9ff', borderColor: colors.border, color: colors.text }]}
-              value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="+7 (999) 000-00-00" placeholderTextColor={colors.textMuted}
-            />
+            <Text style={[styles.label, { color: colors.textSecondary, marginTop: 10 }]}>Куда доставить ключи (адрес из профиля):</Text>
+            <View style={[styles.readonlyField, { backgroundColor: isDark ? '#15181f' : '#f1f4fb', borderColor: colors.border }]}>
+              <Ionicons name="location-outline" size={16} color={colors.textMuted} style={{ marginRight: 8 }} />
+              <Text style={[styles.readonlyText, { color: profileAddress ? colors.text : colors.error }]} numberOfLines={2}>
+                {profileAddress || 'Адрес не указан — привяжите адрес на главном экране'}
+              </Text>
+            </View>
 
-            <Text style={[styles.label, { color: colors.textSecondary, marginTop: 10 }]}>Укажите, если есть дополнительная информация:</Text>
+            {needContactPhone ? (
+              <>
+                <Text style={[styles.label, { color: colors.error, marginTop: 10 }]}>Контактный номер для связи (обязательно):</Text>
+                <TextInput
+                  style={[styles.input, { backgroundColor: isDark ? '#1c1f2a' : '#f8f9ff', borderColor: contactPhone.trim() ? colors.border : colors.error, color: colors.text }]}
+                  value={contactPhone} onChangeText={setContactPhone} keyboardType="phone-pad"
+                  placeholder="+7 (999) 000-00-00" placeholderTextColor={colors.textMuted}
+                />
+              </>
+            ) : (
+              <>
+                <Text style={[styles.label, { color: colors.textSecondary, marginTop: 10 }]}>Телефон получателя (из профиля):</Text>
+                <View style={[styles.readonlyField, { backgroundColor: isDark ? '#15181f' : '#f1f4fb', borderColor: colors.border }]}>
+                  <Ionicons name="call-outline" size={16} color={colors.textMuted} style={{ marginRight: 8 }} />
+                  <Text style={[styles.readonlyText, { color: colors.text }]}>{profilePhone}</Text>
+                </View>
+              </>
+            )}
+
+            <Text style={[styles.label, { color: colors.textSecondary, marginTop: 10 }]}>Сообщите дополнительную информацию или дополнительный номер для связи:</Text>
             <TextInput
               style={[styles.input, { backgroundColor: isDark ? '#1c1f2a' : '#f8f9ff', borderColor: colors.border, color: colors.text }]}
               value={comment} onChangeText={setComment} placeholder="необязательно" placeholderTextColor={colors.textMuted}
@@ -303,6 +330,8 @@ const styles = StyleSheet.create({
   qtyCardNum: { fontSize: 15, fontWeight: '700' },
   qtyCardSum: { fontSize: 14, fontWeight: '700', marginTop: 4 },
   input: { height: 48, borderRadius: 12, borderWidth: 1, paddingHorizontal: 16, fontSize: 15 },
+  readonlyField: { minHeight: 48, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, flexDirection: 'row', alignItems: 'center' },
+  readonlyText: { fontSize: 15, flex: 1 },
   summaryBox: { padding: 14, borderRadius: 12, borderWidth: 1, marginTop: 16 },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 3 },
   summaryText: { fontSize: 13 },
