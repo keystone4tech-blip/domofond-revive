@@ -11,6 +11,44 @@
 > 
 > **Пользователь НЕ ДОЛЖЕН ничего вносить вручную.** Вся статистика и история пополняется ИИ автоматически при каждой задаче.
 
+# 2026-10-05 21:00 — Комплексный релиз мобильного приложения v1.2.0 (Build 7): полный паритет с сайтом, мастер адреса, Push и геолокация
+
+## 1. Задачи и бизнес-ценность
+- **Формы заказа (ключи и трубки)**:
+  * Полноэкранные модальные окна без пустот сверху.
+  * Интерактивные карточки выбора количества ключей 1–6 с суммами напрямую из БД (ступенчатые цены, монтаж, обслуживание).
+  * Ручной ввод («Своё количество»), автоматическая подстановка телефона из профиля, нейтральная надпись комиссии банка («Возможна комиссия банка при оплате») и 2 кнопки («Отменить» + «Оплатить»).
+- **Каталог услуг по адресу**:
+  * Подъезд определяется автоматически по адресу профиля жильца (при отсутствии Л/С). Если адрес вне фонда обслуживания компании, выводится предложение обратиться в офис по телефону `+7 (903) 411-83-93` (идентично сайту).
+- **Личный кабинет и профиль**:
+  * Расширенная карточка «Мои данные», редактирование email через модерацию в CRM (применение email диспетчером при одобрении заявки).
+  * Карточка верификации документов с бейджем на главном экране.
+  * Раздел системных разрешений: уведомления, фото, геолокация по GPS/сети (`expo-location`).
+  * Информационные блоки «О нас» (правовые документы) и «Как проехать» (Яндекс.Карты и 2ГИС).
+- **Экран «Заявки» и стабильность**:
+  * Исправлено отображение кнопок, выбор типа обращения (Ремонт / Трубка / Ключи / Звонок).
+  * Защита от разлогинивания при потере сети, глобальный индикатор `OfflineBanner`.
+  * Фоновое обновление данных без перегрузки сервера (`useAutoRefresh`).
+  * Фоновые push-уведомления через Expo Notifications (таблица `expo_push_tokens`, отправка при заявках, оплатах и сменах статуса).
+  * Пошаговый мастер привязки адреса `AddressWizardModal` для новых пользователей.
+- **Версионность**:
+  * Версия повышена до `1.2.0`, `versionCode: 7`.
+
+## 2. Измененные и добавленные файлы
+- [`mobile/app.config.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/app.config.ts) — Версия 1.2.0, код сборки 7, разрешения геопозиции и уведомлений.
+- [`mobile/package.json`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/package.json) — Версия 1.2.0, зависимости expo-device, expo-location, expo-intent-launcher.
+- [`mobile/src/config/constants.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/src/config/constants.ts) — APP_VERSION 1.2.0.
+- [`mobile/src/components/KeyOrderModal.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/src/components/KeyOrderModal.tsx) — Полноэкранный заказ ключей с карточками 1–6 из БД.
+- [`mobile/src/components/HandsetOrderModal.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/src/components/HandsetOrderModal.tsx) — Полноэкранный заказ трубок с услугами подъезда.
+- [`mobile/src/components/AddressWizardModal.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/src/components/AddressWizardModal.tsx) — Пошаговый мастер адреса.
+- [`mobile/src/components/OfflineBanner.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/src/components/OfflineBanner.tsx) — Индикатор отсутствия сети.
+- [`mobile/src/lib/push.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/src/lib/push.ts) — Регистрация push-токена устройства.
+- [`mobile/src/hooks/useAutoRefresh.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/src/hooks/useAutoRefresh.ts) — Легковесный умный поллинг экранов.
+- [`server/index.js`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/server/index.js) — /api/app/version: v1.2.0 (Build 7), /api/user/push-token, /api/user/bind-account, push-триггеры заявок/оплат.
+- [`src/components/fsm/VerificationManager.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/components/fsm/VerificationManager.tsx) — Применение email при одобрении заявки жильца.
+- [`src/data/projectChangelog.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/data/projectChangelog.ts) — Запись в паспорте проекта.
+- [`PROJECT_LOG.md`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/PROJECT_LOG.md) — Обновлен журнал проекта.
+
 # 2026-10-05 20:45 — Компактный аккордеон инструкций CRM и русские названия ролей из базы данных
 
 ## 1. Задачи и бизнес-ценность

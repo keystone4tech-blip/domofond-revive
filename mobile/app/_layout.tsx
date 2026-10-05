@@ -8,9 +8,12 @@ import { ThemeProvider, DarkTheme, DefaultTheme } from '@react-navigation/native
 import { Appearance, View, ActivityIndicator } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import * as Notifications from 'expo-notifications';
 import { useAuthStore } from '@/store/auth.store';
 import { useThemeStore } from '@/store/theme.store';
 import { UpdateCheckerModal } from '@/components/UpdateCheckerModal';
+import { OfflineBanner } from '@/components/OfflineBanner';
+import { registerForPushNotificationsAsync } from '@/lib/push';
 
 // Инициализация клиента кэширования серверных запросов
 const queryClient = new QueryClient({
@@ -80,6 +83,37 @@ export default function RootLayout() {
     }
   }, [isReady, isAuthenticated, segments]);
 
+  // Регистрация push-уведомлений после авторизации (токен уходит на сервер)
+  useEffect(() => {
+    if (isReady && isAuthenticated) {
+      registerForPushNotificationsAsync().catch(() => {});
+    }
+  }, [isReady, isAuthenticated]);
+
+  // Навигация по тапу на push-уведомление (работает и при запуске из закрытого состояния)
+  useEffect(() => {
+    const routeByData = (data: any) => {
+      try {
+        const type = data?.type;
+        if (type === 'payment') router.push('/(tabs)/payments');
+        else if (type === 'request') router.push('/(tabs)/requests');
+        else router.push('/(tabs)/home');
+      } catch { /* no-op */ }
+    };
+
+    // Тап по уведомлению, когда приложение в фоне/открыто
+    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+      routeByData(response?.notification?.request?.content?.data);
+    });
+
+    // Приложение было ЗАКРЫТО и запущено тапом по уведомлению
+    Notifications.getLastNotificationResponseAsync()
+      .then((response) => { if (response) routeByData(response.notification.request.content.data); })
+      .catch(() => {});
+
+    return () => sub.remove();
+  }, [router]);
+
   // Пока идет начальная проверка, показываем фоновый цвет (тёмный сплэш как на сайте)
   if (!isReady) {
     return (
@@ -102,6 +136,8 @@ export default function RootLayout() {
         <StatusBar style={isDark ? 'light' : 'dark'} />
         {/* Глобальное модальное окно автопроверки и установки обновлений приложения */}
         <UpdateCheckerModal />
+        {/* Глобальная плашка об отсутствии связи (не выкидывает из кабинета) */}
+        <OfflineBanner />
       </ThemeProvider>
     </QueryClientProvider>
   );

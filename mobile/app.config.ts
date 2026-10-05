@@ -61,7 +61,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   // === Основные параметры приложения ===
   name: 'Домофондар',                         // Название в меню телефона
   slug: 'domofondar',                          // Уникальный идентификатор проекта
-  version: '1.1.3',                            // Версия приложения
+  version: '1.2.0',                            // Версия приложения
   orientation: 'portrait',                     // Портретная ориентация
   icon: './assets/images/icon.png',            // Иконка приложения (1024x1024)
   scheme: 'domofondar',                        // URL-схема для deep linking (domofondar://)
@@ -78,13 +78,14 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   ios: {
     supportsTablet: true,                      // Поддержка iPad
     bundleIdentifier: 'ru.domofondar.app',     // Уникальный Bundle ID для App Store
-    buildNumber: '6',                          // Номер сборки
+    buildNumber: '3',                          // Номер сборки
     infoPlist: {
       // Описания для запросов разрешений (обязательно для App Store)
       NSCameraUsageDescription: 'Камера нужна для фото заявок и верификации документов',
       NSPhotoLibraryUsageDescription: 'Доступ к фото для загрузки документов и фото к заявкам',
       NSFaceIDUsageDescription: 'Face ID используется для быстрого и безопасного входа в приложение',
       NSMicrophoneUsageDescription: 'Микрофон нужен для записи голосовых сообщений в чате',
+      NSLocationWhenInUseUsageDescription: 'Геопозиция используется для определения адреса и удобства оформления заявок',
     },
     config: {
       usesNonExemptEncryption: false,          // Без экспортного шифрования
@@ -98,7 +99,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       backgroundColor: '#0F172A',                           // Фон адаптивной иконки
     },
     package: 'ru.domofondar.app',              // Уникальный Package Name для Google Play
-    versionCode: 6,                            // Код версии (увеличивать при каждом релизе)
+    versionCode: 7,                            // Код версии (увеличивать при каждом релизе)
     permissions: [
       'CAMERA',                                // Камера для фото
       'READ_MEDIA_IMAGES',                     // Чтение изображений (Android 13+)
@@ -109,6 +110,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       'ACCESS_NETWORK_STATE',                  // Проверка состояния сети
       'VIBRATE',                               // Вибрация для уведомлений
       'POST_NOTIFICATIONS',                    // Push-уведомления (Android 13+)
+      'ACCESS_FINE_LOCATION',                  // Геопозиция по GPS
+      'ACCESS_COARSE_LOCATION',                // Геопозиция по сети/Wi-Fi
     ],
   },
 
@@ -128,6 +131,12 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       'expo-image-picker',
       {
         photosPermission: 'Разрешите доступ к галерее для загрузки фото к заявкам',
+      },
+    ],
+    [
+      'expo-location',
+      {
+        locationWhenInUsePermission: 'Геопозиция используется для определения адреса и удобства оформления заявок',
       },
     ],
     [

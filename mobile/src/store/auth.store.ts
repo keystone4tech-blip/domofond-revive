@@ -22,21 +22,26 @@ interface AuthState {
   user: UserProfile | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  isOffline: boolean;      // нет связи с сервером (но сессия сохраняется)
   token: string | null;
-  
+
   // Действия
   login: (phone: string, password: string) => Promise<void>;
   register: (phone: string, password: string, fullName: string, email?: string) => Promise<void>;
   logout: () => Promise<void>;
   loadProfile: () => Promise<void>;
   setToken: (token: string) => Promise<void>;
+  setOffline: (v: boolean) => void;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   isAuthenticated: false,
   isLoading: false,
+  isOffline: false,
   token: null,
+
+  setOffline: (v: boolean) => set({ isOffline: v }),
 
   // Сохранение токена в стейт и SecureStore
   setToken: async (token: string) => {
@@ -102,7 +107,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   logout: async () => {
     try {
       await SecureStore.deleteItemAsync(STORAGE_KEYS.AUTH_TOKEN);
-      set({ user: null, isAuthenticated: false, token: null });
+      set({ user: null, isAuthenticated: false, token: null, isOffline: false });
       console.log('[AUTH] Выполнен выход из аккаунта');
     } catch (error) {
       console.error('[AUTH ERROR] Ошибка при выходе:', error);
@@ -119,12 +124,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ token, isAuthenticated: true });
 
       const response = await apiClient.get('/api/user/profile');
-      set({ user: response.data.user || response.data });
+      set({ user: response.data.user || response.data, isOffline: false });
       console.log('[AUTH] Профиль успешно загружен');
-    } catch (error) {
-      console.error('[AUTH ERROR] Ошибка загрузки профиля:', error);
-      // Если профиль не загрузился (например, токен протух), разлогиниваем
-      await get().logout();
+    } catch (error: any) {
+      // ВАЖНО: разлогиниваем ТОЛЬКО при реальном 401 (токен недействителен).
+      // При сетевой ошибке (нет интернета / сервер недоступен) сессию сохраняем,
+      // чтобы пользователя не выкидывало из кабинета — просто помечаем оффлайн.
+      const status = error?.response?.status;
+      if (status === 401 || status === 403) {
+        console.warn('[AUTH] Токен недействителен — выход из аккаунта');
+        await get().logout();
+      } else {
+        // Сетевая ошибка или сервер не ответил — остаёмся в кабинете
+        console.warn('[AUTH] Нет связи с сервером — работаем в оффлайн-режиме, сессия сохранена');
+        const token = await SecureStore.getItemAsync(STORAGE_KEYS.AUTH_TOKEN);
+        if (token) set({ token, isAuthenticated: true, isOffline: true });
+      }
     }
   }
 }));

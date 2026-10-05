@@ -16,8 +16,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
 import { useAppTheme } from '@/theme';
 import { apiClient } from '@/api/client';
@@ -40,6 +42,7 @@ export const HandsetOrderModal: React.FC<HandsetOrderModalProps> = ({
   defaultAddress = '',
 }) => {
   const { colors, isDark } = useAppTheme();
+  const insets = useSafeAreaInsets();
 
   const [address, setAddress] = useState(defaultAddress);
   const [phone, setPhone] = useState(user?.phone || '');
@@ -50,6 +53,7 @@ export const HandsetOrderModal: React.FC<HandsetOrderModalProps> = ({
   const [services, setServices] = useState<any[]>([]);
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
   const [zoomImage, setZoomImage] = useState<string | null>(null);
+  const [noEntrance, setNoEntrance] = useState(false);
 
   const [loadingCatalog, setLoadingCatalog] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -57,7 +61,7 @@ export const HandsetOrderModal: React.FC<HandsetOrderModalProps> = ({
   useEffect(() => {
     if (visible) {
       setAddress(defaultAddress || account?.address || '');
-      setPhone(user?.phone || '');
+      setPhone(user?.phone || account?.phone || '');
       loadCatalog();
     }
   }, [visible, defaultAddress, account, user]);
@@ -67,7 +71,7 @@ export const HandsetOrderModal: React.FC<HandsetOrderModalProps> = ({
     try {
       console.log('[Заказ трубки] Загрузка совместимых моделей оборудования...');
       const res = await apiClient.get('/api/catalog/products', {
-        params: { account_number: account?.account_number },
+        params: { account_number: account?.account_number, address: defaultAddress || account?.address || user?.address },
       });
       if (res.data) {
         const hList = res.data.handsets || [];
@@ -78,6 +82,7 @@ export const HandsetOrderModal: React.FC<HandsetOrderModalProps> = ({
         const sList = res.data.services || [];
         setServices(sList);
         if (sList.length > 0) setSelectedServiceId(sList[0].id);
+        setNoEntrance(!!res.data.no_entrance || hList.length === 0);
       }
     } catch (err) {
       console.warn('[Заказ трубки] Ошибка загрузки каталога:', err);
@@ -185,12 +190,12 @@ export const HandsetOrderModal: React.FC<HandsetOrderModalProps> = ({
 
   return (
     <>
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose} presentationStyle="fullScreen">
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.overlay}
+        style={[styles.overlay, { backgroundColor: colors.background }]}
       >
-        <View style={[styles.sheet, { backgroundColor: isDark ? '#171b26' : '#ffffff', borderColor: colors.border }]}>
+        <View style={[styles.sheet, { backgroundColor: colors.background, borderColor: colors.border, paddingTop: Math.max(insets.top, 12) + 4 }]}>
           {/* Заголовок */}
           <View style={styles.header}>
             <View style={styles.headerTitleWrap}>
@@ -210,6 +215,21 @@ export const HandsetOrderModal: React.FC<HandsetOrderModalProps> = ({
           </View>
 
           <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
+            {noEntrance && !loadingCatalog ? (
+              <View style={[styles.officeCard, { backgroundColor: isDark ? '#1c1f2a' : '#f8f9ff', borderColor: colors.border }]}>
+                <Ionicons name="business-outline" size={28} color={colors.primaryContainer} />
+                <Text style={[styles.officeTitle, { color: colors.text }]}>Заказ по вашему адресу — через офис</Text>
+                <Text style={[styles.officeText, { color: colors.textSecondary }]}>
+                  Чтобы заказать или заменить трубку по вашему адресу, обратитесь в офис — менеджер поможет с оформлением.
+                </Text>
+                <TouchableOpacity style={[styles.officeBtn, { backgroundColor: colors.primaryContainer }]} onPress={() => Linking.openURL('tel:+79034118393')} activeOpacity={0.85}>
+                  <Ionicons name="call" size={16} color="#fff" style={{ marginRight: 6 }} />
+                  <Text style={styles.officeBtnText}>+7 (903) 411-83-93</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
+
+            {noEntrance ? null : (<>
             {/* Тип работ — реальные услуги из каталога подъезда (без выдуманных цен) */}
             <Text style={[styles.label, { color: colors.textSecondary }]}>Тип работ:</Text>
             {services.length === 0 ? (
@@ -371,7 +391,7 @@ export const HandsetOrderModal: React.FC<HandsetOrderModalProps> = ({
               placeholderTextColor={colors.textMuted}
             />
 
-            <Text style={[styles.label, { color: colors.textSecondary, marginTop: 10 }]}>Комментарий мастеру:</Text>
+            <Text style={[styles.label, { color: colors.textSecondary, marginTop: 10 }]}>Укажите, если есть дополнительная информация:</Text>
             <TextInput
               style={[
                 styles.input,
@@ -383,7 +403,7 @@ export const HandsetOrderModal: React.FC<HandsetOrderModalProps> = ({
               ]}
               value={comment}
               onChangeText={setComment}
-              placeholder="Удобные дни и часы для монтажа"
+              placeholder="необязательно"
               placeholderTextColor={colors.textMuted}
             />
 
@@ -405,17 +425,21 @@ export const HandsetOrderModal: React.FC<HandsetOrderModalProps> = ({
                 <Text style={[styles.totalValue, { color: colors.primaryContainer }]}>{baseAmount} ₽</Text>
               </View>
               <Text style={[styles.feeNote, { color: colors.textMuted }]}>
-                При оплате картой ЮKassa добавит комиссию эквайринга 5%.
+                Возможна комиссия банка при оплате.
               </Text>
             </View>
+            </>)}
           </ScrollView>
 
-          {/* Кнопка оплаты — показываем базовую сумму, комиссия добавится на ЮKassa */}
-          <View style={[styles.footer, { borderTopColor: colors.border }]}>
+          {/* Кнопки: Отменить + Оплатить (базовая сумма, комиссия добавится на ЮKassa) */}
+          <View style={[styles.footer, { borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, 12) }]}>
+            <TouchableOpacity style={[styles.cancelBtn, { borderColor: colors.border }]} onPress={onClose} disabled={submitting} activeOpacity={0.8}>
+              <Text style={[styles.cancelBtnText, { color: colors.textSecondary }]}>Отменить</Text>
+            </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.submitBtn, { backgroundColor: colors.primaryContainer }, (submitting || !selectedHandset) && { opacity: 0.6 }]}
+              style={[styles.submitBtn, { backgroundColor: colors.primaryContainer }, (submitting || !selectedHandset || noEntrance) && { opacity: 0.6 }]}
               onPress={handlePayment}
-              disabled={submitting || !selectedHandset}
+              disabled={submitting || !selectedHandset || noEntrance}
               activeOpacity={0.85}
             >
               {submitting ? (
@@ -448,15 +472,9 @@ export const HandsetOrderModal: React.FC<HandsetOrderModalProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(10, 14, 24, 0.75)',
-    justifyContent: 'flex-end',
   },
   sheet: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    borderTopWidth: 1,
-    maxHeight: '90%',
-    paddingBottom: Platform.OS === 'ios' ? 24 : 12,
+    flex: 1,
   },
   header: {
     flexDirection: 'row',
@@ -602,6 +620,11 @@ const styles = StyleSheet.create({
     marginTop: 8,
     lineHeight: 15,
   },
+  officeCard: { alignItems: 'center', padding: 20, borderRadius: 14, borderWidth: 1, gap: 8, marginTop: 10 },
+  officeTitle: { fontSize: 16, fontWeight: '700', textAlign: 'center', marginTop: 4 },
+  officeText: { fontSize: 13, lineHeight: 19, textAlign: 'center' },
+  officeBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, paddingHorizontal: 20, borderRadius: 12, marginTop: 6 },
+  officeBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
   zoomBadge: {
     position: 'absolute',
     right: 2,
@@ -668,11 +691,23 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   footer: {
+    flexDirection: 'row',
+    gap: 10,
     paddingHorizontal: 20,
-    paddingTop: 14,
+    paddingTop: 12,
     borderTopWidth: 1,
   },
+  cancelBtn: {
+    flex: 1,
+    height: 50,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelBtnText: { fontSize: 15, fontWeight: '700' },
   submitBtn: {
+    flex: 2,
     height: 50,
     borderRadius: 12,
     flexDirection: 'row',

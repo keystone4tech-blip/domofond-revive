@@ -83,6 +83,83 @@ pool.connect()
   .catch(err => console.error('[Бэкенд: PostgreSQL] Ошибка подключения к базе данных:', err.stack));
 
 // ------------------------------------------------------------------------------
+// МОДУЛЬ PUSH-УВЕДОМЛЕНИЙ ДЛЯ МОБИЛЬНОГО ПРИЛОЖЕНИЯ (Expo Push)
+// Доставляет уведомления на устройство жильца ДАЖЕ когда приложение закрыто.
+// Токены хранятся в таблице expo_push_tokens, отправка идёт через облако Expo
+// (https://exp.host/--/api/v2/push/send), которое само ходит в APNs (iOS) и FCM (Android).
+// Для доставки на Android в проекте Expo/EAS должен быть настроен FCM (см. инструкцию).
+// ------------------------------------------------------------------------------
+async function ensureExpoPushTable() {
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS expo_push_tokens (
+      token TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      platform TEXT,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_expo_push_user ON expo_push_tokens(user_id)`);
+    console.log('[Бэкенд: ExpoPush] Таблица expo_push_tokens готова');
+  } catch (e) {
+    console.warn('[Бэкенд: ExpoPush] Не удалось создать таблицу expo_push_tokens:', e.message);
+  }
+}
+ensureExpoPushTable();
+
+/**
+ * Отправка push-уведомления в мобильное приложение одному или нескольким пользователям.
+ * Никогда не бросает исключение наружу — не должно ломать бизнес-логику заявок/платежей.
+ * @param {string|string[]} userIds - id пользователя(ей)
+ * @param {string} title - заголовок
+ * @param {string} body - текст
+ * @param {object} data - полезная нагрузка (для навигации по тапу)
+ * @returns {Promise<number>} сколько уведомлений успешно отправлено
+ */
+async function sendExpoPush(userIds, title, body, data = {}) {
+  try {
+    const ids = [...new Set((Array.isArray(userIds) ? userIds : [userIds]).filter(Boolean).map(String))];
+    if (ids.length === 0) return 0;
+    const tokRes = await pool.query('SELECT token FROM expo_push_tokens WHERE user_id = ANY($1)', [ids]);
+    const tokens = tokRes.rows
+      .map((r) => r.token)
+      .filter((t) => typeof t === 'string' && t.startsWith('ExponentPushToken'));
+    if (tokens.length === 0) return 0;
+
+    const messages = tokens.map((to) => ({
+      to, sound: 'default', title, body, data, priority: 'high', channelId: 'default',
+    }));
+
+    let delivered = 0;
+    for (let i = 0; i < messages.length; i += 100) {
+      const chunk = messages.slice(i, i + 100);
+      try {
+        const resp = await fetch('https://exp.host/--/api/v2/push/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify(chunk),
+        });
+        const json = await resp.json().catch(() => null);
+        if (json && Array.isArray(json.data)) {
+          json.data.forEach((rec, idx) => {
+            if (rec.status === 'ok') delivered++;
+            else if (rec.status === 'error' && rec.details && rec.details.error === 'DeviceNotRegistered') {
+              // Токен устройства больше не действителен — удаляем
+              pool.query('DELETE FROM expo_push_tokens WHERE token = $1', [chunk[idx].to]).catch(() => {});
+            }
+          });
+        }
+      } catch (chunkErr) {
+        console.warn('[Бэкенд: ExpoPush] Ошибка отправки чанка:', chunkErr.message);
+      }
+    }
+    console.log(`[Бэкенд: ExpoPush] Отправлено ${delivered}/${tokens.length} уведомлений (${title})`);
+    return delivered;
+  } catch (e) {
+    console.warn('[Бэкенд: ExpoPush] Ошибка sendExpoPush:', e.message);
+    return 0;
+  }
+}
+
+// ------------------------------------------------------------------------------
 // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ БЕЗОПАСНОСТИ И ПРАВ ДОСТУПА
 // ------------------------------------------------------------------------------
 
@@ -188,21 +265,23 @@ app.get('/api/app/version', (req, res) => {
   console.log('[Бэкенд: Версия приложения] Запрос проверки обновлений с мобильного клиента');
 
   res.json({
-    latestVersion: '1.1.3',
-    versionCode: 6,
+    latestVersion: '1.2.0',
+    versionCode: 7,
     minSupportedVersion: '1.0.0',
     // Основная ссылка — прямое скачивание через Express API (гарантированный attachment)
     downloadUrl: siteDownloadUrl,
     directMediaUrl: directMediaUrl,
     fallbackDownloadUrl: githubFallbackUrl,
     releaseNotes: [
-      'Реальные услуги из каталога подъезда без фиктивных надбавок и хардкода',
-      'Полноэкранный зум фотографий трубок домофона при нажатии на карточку',
-      'Честный расчет стоимости: чистая сумма в кнопке заказа, эквайринг ЮKassa на шаге оплаты',
-      'Нативное фоновое скачивание обновления APK прямо в приложении с индикатором прогресса'
+      'Полноэкранные формы заказа трубок и ключей с карточками количества 1–6 из базы данных',
+      'Определение подъезда по адресу профиля жильца (если адрес вне фонда — рекомендация обратиться в офис)',
+      'Личный кабинет: расширенный профиль, смена email, верификация документов, блок О нас и Как проехать',
+      'Системные разрешения: уведомления, камера, доступ к файлам и геопозиция по GPS/сети',
+      'Экран заявок с быстрым выбором действия, защита сессии при потере сети и фоновые Push-уведомления',
+      'Мастер пошаговой привязки адреса для новых абонентов'
     ],
     isMandatory: false,
-    publishedAt: '2026-10-04T04:20:00.000Z'
+    publishedAt: new Date().toISOString()
   });
 });
 
@@ -499,17 +578,18 @@ app.put('/api/user/profile', authenticateToken, async (req, res) => {
 // Запрос на изменение данных абонента — ЧЕРЕЗ МОДЕРАЦИЮ диспетчера (как на сайте, ProfileWizard).
 // Живые данные профиля НЕ меняются: сохраняем pending_data_change и создаём заявку data_change_request.
 app.post('/api/user/request-data-change', authenticateToken, async (req, res) => {
-  const { full_name, phone, address, apartment, floor, account_number } = req.body;
+  const { full_name, phone, email, address, apartment, floor, account_number } = req.body;
   const uid = req.user.id;
   try {
     const cur = await pool.query(
-      'SELECT full_name, phone, address, apartment, account_number FROM profiles WHERE id = $1 LIMIT 1',
+      'SELECT full_name, phone, email, address, apartment, account_number FROM profiles WHERE id = $1 LIMIT 1',
       [uid]
     );
     const old = cur.rows[0] || {};
     const pending = {
       full_name: (full_name || '').trim(),
       phone: (phone || '').trim(),
+      email: (email || '').trim(),
       address: (address || '').trim(),
       apartment: (apartment || '').trim(),
       floor: (floor || '').trim(),
@@ -517,7 +597,7 @@ app.post('/api/user/request-data-change', authenticateToken, async (req, res) =>
       submitted_at: new Date().toISOString(),
       source: 'mobile_app',
       old_data: {
-        full_name: old.full_name || '', phone: old.phone || '', address: old.address || '',
+        full_name: old.full_name || '', phone: old.phone || '', email: old.email || '', address: old.address || '',
         apartment: old.apartment || '', account_number: old.account_number || '',
       },
     };
@@ -552,6 +632,76 @@ app.post('/api/user/marketing-consent', authenticateToken, async (req, res) => {
     // Колонки может не быть, если миграция ещё не применена — не критично для регистрации
     console.warn('[Бэкенд: Профиль] Не удалось сохранить согласие на рассылку:', err.message);
     res.json({ ok: false, note: 'not_persisted' });
+  }
+});
+
+// Подача документа на верификацию (подтверждение проживания/собственности) — как на сайте.
+// Принимает { document_base64 }. Ставит статус 'pending' и создаёт заявку диспетчеру.
+app.post('/api/user/submit-verification', authenticateToken, async (req, res) => {
+  const uid = req.user.id;
+  const doc = req.body?.document_base64 || req.body?.document_url || null;
+  if (!doc) return res.status(400).json({ error: 'Не передан документ для верификации' });
+  try {
+    const now = new Date().toISOString();
+    const upd = await pool.query(
+      `UPDATE profiles SET verification_status = 'pending', verification_document_url = $1,
+         verification_document_type = 'residence_document', verification_submitted_at = $2,
+         verification_reject_reason = NULL WHERE id = $3
+       RETURNING full_name, phone, address, apartment`,
+      [doc, now, uid]
+    );
+    const p = upd.rows[0] || {};
+    const fullAddr = `${p.address || ''}${p.apartment ? `, кв. ${p.apartment}` : ''}`;
+    try {
+      await pool.query(
+        `INSERT INTO requests (client_id, name, phone, address, apartment, order_type, message, status, priority, document_url)
+         VALUES ($1, $2, $3, $4, $5, 'verification_request', $6, 'pending', 'medium', $7)`,
+        [uid, p.full_name || 'Жилец', p.phone || '', fullAddr, p.apartment || null,
+         `📱🛡️ [Мобильное приложение] Заявка на подтверждение проживания/собственности по адресу: ${fullAddr}. Жилец: ${p.full_name || 'Не указан'}, телефон: ${p.phone || 'Не указан'}.`,
+         doc]
+      );
+    } catch (reqErr) {
+      console.warn('[Бэкенд: Верификация] Не удалось создать заявку диспетчеру:', reqErr.message);
+    }
+    console.log(`[Бэкенд: Верификация] Документ от ${uid} отправлен на проверку`);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[Бэкенд: Верификация] Ошибка подачи:', err.message);
+    res.status(500).json({ error: 'Не удалось отправить документ на верификацию' });
+  }
+});
+
+// Регистрация push-токена мобильного приложения (Expo). Токен привязывается к пользователю,
+// чтобы отправлять ему уведомления о заявках/оплатах даже при закрытом приложении.
+app.post('/api/user/push-token', authenticateToken, async (req, res) => {
+  try {
+    const { token, platform } = req.body || {};
+    const userId = req.user?.id;
+    if (!userId || !token || !String(token).startsWith('ExponentPushToken')) {
+      return res.status(400).json({ error: 'Некорректный push-токен' });
+    }
+    await pool.query(
+      `INSERT INTO expo_push_tokens (token, user_id, platform, updated_at)
+       VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+       ON CONFLICT (token) DO UPDATE SET user_id = EXCLUDED.user_id, platform = EXCLUDED.platform, updated_at = CURRENT_TIMESTAMP`,
+      [token, String(userId), platform || null]
+    );
+    console.log(`[Бэкенд: ExpoPush] Токен сохранён для пользователя ${userId} (${platform || 'неизвестно'})`);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[Бэкенд: ExpoPush] Ошибка сохранения токена:', err.message);
+    res.status(500).json({ error: 'Не удалось сохранить push-токен' });
+  }
+});
+
+// Удаление push-токена (например, при выходе из аккаунта)
+app.post('/api/user/push-token/remove', authenticateToken, async (req, res) => {
+  try {
+    const { token } = req.body || {};
+    if (token) await pool.query('DELETE FROM expo_push_tokens WHERE token = $1', [token]);
+    res.json({ ok: true });
+  } catch (err) {
+    res.json({ ok: false });
   }
 });
 
@@ -965,6 +1115,58 @@ app.get('/api/user/my-account', authenticateToken, async (req, res) => {
   }
 });
 
+// Привязка лицевого счёта/адреса к профилю (мастер заполнения адреса для нового жильца).
+// Клиент выбирает адрес через /api/lookup/* и присылает сюда account_number (и/или адрес).
+app.post('/api/user/bind-account', authenticateToken, async (req, res) => {
+  const userId = req.user?.id;
+  if (!userId) return res.status(401).json({ error: 'Не авторизован' });
+  try {
+    const { account_number, address, apartment } = req.body || {};
+    let acc = null;
+
+    // Если передан номер счёта — проверяем, что такой счёт реально существует
+    if (account_number) {
+      const digits = String(account_number).replace(/\D/g, '');
+      const padded = digits.padStart(10, '0');
+      const accRes = await pool.query(
+        `SELECT account_number, address, apartment FROM accounts
+         WHERE account_number = $1 OR account_number = $2 ORDER BY (account_number = $1) DESC, period DESC LIMIT 1`,
+        [padded, digits]
+      );
+      acc = accRes.rows[0] || null;
+      if (!acc) return res.status(404).json({ error: 'Лицевой счёт не найден. Проверьте номер или обратитесь в офис.' });
+    }
+
+    const finalAccount = acc?.account_number || null;
+    const finalAddress = address || acc?.address || null;
+    const finalApartment = apartment || acc?.apartment || null;
+
+    await pool.query(
+      `UPDATE profiles SET
+         account_number = COALESCE($1, account_number),
+         address = COALESCE($2, address),
+         apartment = COALESCE($3, apartment)
+       WHERE id = $4`,
+      [finalAccount, finalAddress, finalApartment, userId]
+    );
+
+    console.log(`[Бэкенд: Привязка] Пользователь ${userId} привязал л/с=${finalAccount || '—'}, адрес=${finalAddress || '—'}`);
+
+    // Возвращаем актуальные данные счёта (если привязан)
+    if (finalAccount) {
+      const full = await pool.query(
+        'SELECT account_number, period, debt_amount, address, apartment, phone, full_name, has_handset, payment_type FROM accounts WHERE account_number = $1 LIMIT 1',
+        [finalAccount]
+      );
+      return res.json({ ok: true, account: full.rows[0] || null });
+    }
+    res.json({ ok: true, account: null, address: finalAddress, apartment: finalApartment });
+  } catch (err) {
+    console.error('[Бэкенд: Привязка] Ошибка привязки счёта:', err.message);
+    res.status(500).json({ error: 'Не удалось привязать адрес/счёт' });
+  }
+});
+
 // Получить список заявок (общий список CRM для персонала или с фильтрацией)
 app.get('/api/requests', authenticateToken, async (req, res) => {
   const userRole = req.user?.role;
@@ -1067,8 +1269,8 @@ function catEntranceNum(addr) {
 }
 
 app.get('/api/catalog/products', async (req, res) => {
-  const { account_number, entrance_id } = req.query;
-  console.log(`[Бэкенд: Каталог] Запрос каталога (л/с: ${account_number || 'нет'}, подъезд: ${entrance_id || 'нет'})`);
+  const { account_number, entrance_id, address } = req.query;
+  console.log(`[Бэкенд: Каталог] Запрос каталога (л/с: ${account_number || 'нет'}, подъезд: ${entrance_id || 'нет'}, адрес: ${address || 'нет'})`);
 
   try {
     let targetEntranceId = entrance_id || null;
@@ -1080,31 +1282,38 @@ app.get('/api/catalog/products', async (req, res) => {
         const er = await pool.query('SELECT service_type FROM entrances WHERE id = $1 LIMIT 1', [targetEntranceId]);
         isInstallation = er.rows[0]?.service_type === 'installation';
       } catch (e) { /* не критично */ }
-    } else if (account_number) {
+    } else {
       try {
-        const accRes = await pool.query('SELECT address FROM accounts WHERE account_number = $1 LIMIT 1', [account_number]);
-        if (accRes.rows.length > 0 && accRes.rows[0].address) {
-          const addr = accRes.rows[0].address;
-          const aStreet = catNormStreet(addr), aHouse = catNormHouse(addr), aEnt = catEntranceNum(addr);
-          const entRes = await pool.query('SELECT id, street, house, entrance, service_type FROM entrances');
-          let exact = null, loose = null;
-          for (const ent of entRes.rows) {
-            const es = catNormStreet(ent.street || ''), eh = catNormHouse(ent.house || '');
-            const ee = String(ent.entrance || '').replace(/\D/g, '');
-            if (es && eh && es === aStreet && eh === aHouse) {
-              if (ee && aEnt && ee === aEnt) { exact = ent; break; }
-              if (!loose) loose = ent;
+        // Адрес для сопоставления: по лицевому счёту (1С) либо переданный адрес профиля
+        let resolveAddr = null;
+        if (account_number) {
+          const accRes = await pool.query('SELECT address FROM accounts WHERE account_number = $1 LIMIT 1', [account_number]);
+          if (accRes.rows.length > 0 && accRes.rows[0].address) resolveAddr = accRes.rows[0].address;
+        }
+        if (!resolveAddr && address) resolveAddr = address;
+        if (resolveAddr) {
+          const aStreet = catNormStreet(resolveAddr), aHouse = catNormHouse(resolveAddr), aEnt = catEntranceNum(resolveAddr);
+          if (aStreet && aHouse) {
+            const entRes = await pool.query('SELECT id, street, house, entrance, service_type FROM entrances');
+            let exact = null, loose = null;
+            for (const ent of entRes.rows) {
+              const es = catNormStreet(ent.street || ''), eh = catNormHouse(ent.house || '');
+              const ee = String(ent.entrance || '').replace(/\D/g, '');
+              if (es && eh && es === aStreet && eh === aHouse) {
+                if (ee && aEnt && ee === aEnt) { exact = ent; break; }
+                if (!loose) loose = ent;
+              }
             }
-          }
-          const entranceRow = exact || loose;
-          if (entranceRow) {
-            targetEntranceId = entranceRow.id;
-            isInstallation = entranceRow.service_type === 'installation';
-            console.log(`[Бэкенд: Каталог] Подъезд ${targetEntranceId} (${entranceRow.street} ${entranceRow.house} п.${entranceRow.entrance}), монтаж: ${isInstallation}`);
+            const entranceRow = exact || loose;
+            if (entranceRow) {
+              targetEntranceId = entranceRow.id;
+              isInstallation = entranceRow.service_type === 'installation';
+              console.log(`[Бэкенд: Каталог] Подъезд ${targetEntranceId} (${entranceRow.street} ${entranceRow.house} п.${entranceRow.entrance}), монтаж: ${isInstallation}`);
+            }
           }
         }
       } catch (findErr) {
-        console.warn('[Бэкенд: Каталог] Не удалось сопоставить подъезд по л/с:', findErr.message);
+        console.warn('[Бэкенд: Каталог] Не удалось сопоставить подъезд:', findErr.message);
       }
     }
 
@@ -1140,9 +1349,9 @@ app.get('/api/catalog/products', async (req, res) => {
       }
     }
 
-    // 4. Если есть привязки к подъезду — показываем ТОЛЬКО товары этого подъезда (как на сайте),
-    //    иначе (подъезд не определён) — весь активный каталог как запасной вариант.
-    const sourceProducts = boundIds ? allProducts.filter(p => boundIds.has(p.id)) : allProducts;
+    // 4. Показываем ТОЛЬКО товары, привязанные к подъезду (как на сайте). Если подъезд/привязок
+    //    нет — НЕ показываем весь каталог: приложение предложит обратиться в офис.
+    const sourceProducts = boundIds ? allProducts.filter(p => boundIds.has(p.id)) : [];
 
     const enriched = sourceProducts.map(p => {
       const pricing = customPricing[p.id];
@@ -1174,6 +1383,7 @@ app.get('/api/catalog/products', async (req, res) => {
       entrance_id: targetEntranceId,
       is_installation: isInstallation,
       has_bindings: !!boundIds,
+      no_entrance: !boundIds, // подъезд/привязки не найдены — приложение покажет «обратитесь в офис»
       handsets,
       services,
       keys,
@@ -1206,6 +1416,12 @@ app.post('/api/requests', authenticateToken, async (req, res) => {
       [name, phone, address, message, priority || 'medium', intakeStatus, clientId]
     );
     console.log(`[Бэкенд: Заявки] ✅ Создана заявка #${result.rows[0].id} (статус: ${intakeStatus}, клиент: ${clientId || 'нет'}, моб: ${isFromMobile ? 'ДА' : 'НЕТ'})`);
+    // Push-подтверждение клиенту в мобильное приложение (доставится даже при закрытом приложении)
+    if (clientId) {
+      sendExpoPush(clientId, '✅ Заявка принята',
+        'Ваше обращение зарегистрировано. Мы свяжемся с вами в ближайшее время.',
+        { type: 'request', request_id: result.rows[0].id }).catch(() => {});
+    }
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error('[Бэкенд: Заявки] Ошибка при создании заявки:', err.message);
@@ -1407,6 +1623,26 @@ async function processSuccessfulPayment(yooData, fallbackPayment = null) {
       [creditAmount, accNum]
     );
     console.log(`[Бэкенд: ЮKassa ТО] Баланс лицевого счёта ${accNum} уменьшен на сумму ${creditAmount} ₽`);
+  }
+
+  // Push-уведомление клиенту об успешной оплате (мобильное приложение). Полностью безопасно:
+  // если id клиента определить не удалось — просто пропускаем, бизнес-логика не страдает.
+  try {
+    let clientUserId = combinedMeta?.user_id || paymentRecord?.user_id || null;
+    if (!clientUserId && accNum) {
+      try {
+        const u = await pool.query('SELECT user_id FROM accounts WHERE account_number = $1 LIMIT 1', [accNum]);
+        clientUserId = u.rows[0]?.user_id || null;
+      } catch { /* в таблице accounts может не быть user_id — не критично */ }
+    }
+    if (clientUserId) {
+      const msg = isOrder
+        ? 'Оплата заказа прошла успешно. Заявка принята в работу.'
+        : 'Оплата ТО прошла успешно. Спасибо!';
+      await sendExpoPush(clientUserId, '💳 Оплата получена', msg, { type: 'payment', request_id: reqId || null });
+    }
+  } catch (e) {
+    console.warn('[Бэкенд: ExpoPush] Ошибка уведомления об оплате:', e.message);
   }
 }
 
@@ -2394,7 +2630,34 @@ app.post('/api/notify', async (req, res) => {
 
     console.log(`[Бэкенд: Уведомление] event=${event} -> ${n.title}`);
 
-    // Если push не настроен — просто подтверждаем приём (заявки/верификация не должны падать)
+    // Доп.: push в МОБИЛЬНОЕ приложение клиенту, если событие касается его заявки/профиля.
+    // Работает независимо от web-push для персонала. Best-effort, никогда не ломает основной поток.
+    try {
+      const clientEvents = {
+        request_accepted:    { title: '👷 Заявка в работе',      body: 'Мастер приступил к выполнению вашей заявки.' },
+        request_completed:   { title: '🎉 Заявка выполнена',     body: 'Ваша заявка успешно выполнена.' },
+        request_cancelled:   { title: '❌ Заявка отменена',      body: 'Ваша заявка была отменена. При вопросах звоните диспетчеру.' },
+        verification_approved:{ title: '✅ Верификация одобрена', body: 'Ваш профиль успешно верифицирован!' },
+        data_change_approved: { title: '✅ Данные обновлены',    body: 'Изменения вашего профиля подтверждены.' },
+      };
+      const ce = clientEvents[event];
+      if (ce) {
+        let clientUserId = (data && (data.client_user_id || data.user_id)) || null;
+        if (!clientUserId && data && data.request_id) {
+          try {
+            const r = await pool.query('SELECT client_id FROM requests WHERE id = $1 LIMIT 1', [data.request_id]);
+            clientUserId = r.rows[0]?.client_id || null;
+          } catch { /* no-op */ }
+        }
+        if (clientUserId) {
+          await sendExpoPush(clientUserId, ce.title, ce.body, { type: 'request', event, request_id: (data && data.request_id) || null });
+        }
+      }
+    } catch (e) {
+      console.warn('[Бэкенд: ExpoPush] Ошибка клиентского push в /api/notify:', e.message);
+    }
+
+    // Если web-push (для персонала) не настроен — просто подтверждаем приём (заявки/верификация не должны падать)
     if (!webpush || !VAPID_PRIVATE_KEY) return res.json({ ok: true, delivered: 0, note: 'push_disabled' });
 
     // Определяем список user_id получателей

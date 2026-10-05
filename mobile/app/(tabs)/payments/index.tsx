@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
 import { apiClient } from '@/api/client';
 import { useAppTheme } from '@/theme';
+import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 
 export default function PaymentsScreen() {
   const insets = useSafeAreaInsets();
@@ -61,6 +62,9 @@ export default function PaymentsScreen() {
   useEffect(() => {
     loadPaymentData();
   }, [loadPaymentData]);
+
+  // Обновление баланса/истории «почти в реальном времени» (лёгкий опрос при активном экране)
+  useAutoRefresh(() => { loadPaymentData(); });
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -275,6 +279,11 @@ export default function PaymentsScreen() {
                     <Text style={styles.customPayButtonText}>Оплатить</Text>
                   </TouchableOpacity>
                 </View>
+
+                {/* Уведомление о возможной банковской комиссии (как на сайте) */}
+                <Text style={[styles.feeNote, { color: colors.textMuted }]}>
+                  Возможна комиссия банка при оплате
+                </Text>
               </View>
 
               <Text style={[styles.sectionTitle, { color: colors.text }]}>История операций</Text>
@@ -363,6 +372,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   customPayButtonText: { color: '#ffffff', fontSize: 14, fontWeight: '700' },
+  feeNote: { fontSize: 12, marginTop: 10, textAlign: 'center' },
   sectionTitle: { fontSize: 17, fontWeight: '700', marginBottom: 12 },
   emptyContainer: { alignItems: 'center', paddingVertical: 40 },
   emptyIconCircle: {

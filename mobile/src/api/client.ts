@@ -41,13 +41,17 @@ apiClient.interceptors.response.use(
   (response) => {
     // Логируем успешный ответ
     console.log(`[API RESPONSE] ${response.config.method?.toUpperCase()} ${response.config.url} - Status: ${response.status}`);
+    // Связь есть — снимаем флаг оффлайн (ленивый require во избежание циклического импорта со стором)
+    try { require('@/store/auth.store').useAuthStore.getState().setOffline(false); } catch {}
     return response;
   },
   async (error) => {
     if (error.response) {
       console.error(`[API ERROR] ${error.config?.method?.toUpperCase()} ${error.config?.url} - Status: ${error.response.status}`, error.response.data);
-      
-      // Обработка 401 Unauthorized (ошибка авторизации)
+      // Сервер ответил — связь есть
+      try { require('@/store/auth.store').useAuthStore.getState().setOffline(false); } catch {}
+
+      // Обработка 401 Unauthorized (ошибка авторизации) — токен недействителен
       if (error.response.status === 401) {
         console.log('[API] Получен статус 401. Требуется повторная авторизация.');
         // Очищаем токен из хранилища (в реальном приложении здесь также вызывается logout из zustand)
@@ -55,8 +59,9 @@ apiClient.interceptors.response.use(
         // Редирект на логин обычно обрабатывается на уровне навигации (например, прослушивая состояние авторизации)
       }
     } else if (error.request) {
-      // Сетевая ошибка (нет ответа от сервера)
-      console.error('[API NETWORK ERROR] Нет ответа от сервера:', error.request);
+      // Сетевая ошибка (нет ответа от сервера) — НЕ трогаем токен, помечаем оффлайн
+      console.error('[API NETWORK ERROR] Нет ответа от сервера:', error.message || 'network error');
+      try { require('@/store/auth.store').useAuthStore.getState().setOffline(true); } catch {}
     } else {
       console.error('[API ERROR] Ошибка при настройке запроса:', error.message);
     }

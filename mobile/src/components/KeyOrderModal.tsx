@@ -1,6 +1,6 @@
 // mobile/src/components/KeyOrderModal.tsx
-// Модальное окно заказа электронных ключей (чипов) «Домофондар»
-// Реализует ступенчатый расчет скидок и оплату через ЮKassa со шлюзом СБП/карт
+// Заказ электронных ключей «Домофондар». Полноэкранное окно, карточки выбора количества
+// с суммами из базы (ступени/акции/монтаж), своё количество, авто-телефон, оплата ЮKassa.
 
 import React, { useState, useEffect } from 'react';
 import {
@@ -15,8 +15,10 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
 import { useAppTheme } from '@/theme';
 import { apiClient } from '@/api/client';
@@ -32,29 +34,28 @@ interface KeyOrderModalProps {
 }
 
 export const KeyOrderModal: React.FC<KeyOrderModalProps> = ({
-  visible,
-  onClose,
-  onSuccess,
-  user,
-  account,
-  defaultAddress = '',
+  visible, onClose, onSuccess, user, account, defaultAddress = '',
 }) => {
   const { colors, isDark } = useAppTheme();
+  const insets = useSafeAreaInsets();
 
-  const [quantity, setQuantity] = useState(1); // Количество ключей (минимум 1)
+  const [quantity, setQuantity] = useState(1);
+  const [customQty, setCustomQty] = useState('');
   const [address, setAddress] = useState(defaultAddress);
   const [phone, setPhone] = useState(user?.phone || '');
   const [comment, setComment] = useState('');
   const [keyProduct, setKeyProduct] = useState<any>(null);
   const [isInstallation, setIsInstallation] = useState(false);
+  const [noEntrance, setNoEntrance] = useState(false);
   const [loadingCatalog, setLoadingCatalog] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Загружаем каталог и привязанные ключи для дома жильца
   useEffect(() => {
     if (visible) {
       setAddress(defaultAddress || account?.address || '');
-      setPhone(user?.phone || '');
+      setPhone(user?.phone || account?.phone || '');
+      setQuantity(1);
+      setCustomQty('');
       loadCatalogKeys();
     }
   }, [visible, defaultAddress, account, user]);
@@ -63,12 +64,11 @@ export const KeyOrderModal: React.FC<KeyOrderModalProps> = ({
     setLoadingCatalog(true);
     try {
       const res = await apiClient.get('/api/catalog/products', {
-        params: { account_number: account?.account_number },
+        params: { account_number: account?.account_number, address: defaultAddress || account?.address || user?.address },
       });
-      if (res.data?.keys && res.data.keys.length > 0) {
-        setKeyProduct(res.data.keys[0]);
-      }
+      if (res.data?.keys && res.data.keys.length > 0) setKeyProduct(res.data.keys[0]);
       setIsInstallation(!!res.data?.is_installation);
+      setNoEntrance(!!res.data?.no_entrance || !(res.data?.keys?.length));
     } catch (err) {
       console.warn('[Ключи] Ошибка загрузки каталога ключей:', err);
     } finally {
@@ -76,96 +76,65 @@ export const KeyOrderModal: React.FC<KeyOrderModalProps> = ({
     }
   };
 
-  // Реальные параметры цены из номенклатуры (как на сайте): ступени, акция, льгота монтажа
+  // Реальные параметры цены из номенклатуры (как на сайте)
   const baseKeyPrice = Number(keyProduct?.base_price ?? keyProduct?.price ?? 300);
   const keyTiers = parseTieredPricing(keyProduct?.tiered_pricing);
   const promoEnabled = keyProduct ? !!keyProduct.is_tiered_promo : true;
   const keyInstallPrice = keyProduct?.installation_price != null ? Number(keyProduct.installation_price) : null;
 
-  const calculateKeyPricing = (qty: number) => {
-    const d = calculateKeyPriceDetails(qty, baseKeyPrice, isInstallation, keyInstallPrice, promoEnabled, keyTiers);
-    const baseSum = d.totalPrice;
-    const feeSum = Math.round(baseSum * 0.05 * 100) / 100; // эквайринг 5%, как на сайте
-    const totalSum = Math.round((baseSum + feeSum) * 100) / 100;
-    const tierText = isInstallation
-      ? 'Льготная цена монтажа'
-      : d.isPromoApplied ? `Акция • ${d.unitPrice} ₽/шт` : 'Базовый тариф';
-    return { unitPrice: d.unitPrice, baseSum, feeSum, totalSum, tierText, discountPercent: 0 };
+  const calc = (qty: number) =>
+    calculateKeyPriceDetails(qty, baseKeyPrice, isInstallation, keyInstallPrice, promoEnabled, keyTiers);
+
+  const d = calc(quantity);
+  const baseSum = d.totalPrice;
+  const feeSum = Math.round(baseSum * 0.05 * 100) / 100; // комиссия эквайринга добавляется на ЮKassa
+  const totalSum = Math.round((baseSum + feeSum) * 100) / 100;
+  const unitPrice = d.unitPrice;
+  const tierText = isInstallation
+    ? 'Льготная цена монтажа'
+    : d.isPromoApplied ? `Акция • ${unitPrice} ₽/шт` : 'Базовый тариф';
+
+  const setQty = (n: number) => {
+    setQuantity(n);
+    setCustomQty('');
+  };
+  const onCustomChange = (t: string) => {
+    const digits = t.replace(/\D/g, '');
+    setCustomQty(digits);
+    const n = parseInt(digits, 10);
+    if (!isNaN(n) && n > 0) setQuantity(Math.min(n, 999));
   };
 
-  const pricing = calculateKeyPricing(quantity);
-  // Цена ступени для отображения (из реальной сетки товара)
-  const tierUnit = (minQty: number) =>
-    calculateKeyPriceDetails(minQty, baseKeyPrice, isInstallation, keyInstallPrice, promoEnabled, keyTiers).unitPrice;
-
-  const handleIncrement = () => {
-    if (quantity < 20) setQuantity(quantity + 1);
-  };
-
-  const handleDecrement = () => {
-    if (quantity > 1) setQuantity(quantity - 1);
-  };
-
-  // Оформление заказа и переход в платежный шлюз ЮKassa
   const handlePayment = async () => {
-    if (!address.trim()) {
-      Alert.alert('Внимание', 'Пожалуйста, укажите точный адрес доставки ключей');
-      return;
-    }
-    if (!phone.trim()) {
-      Alert.alert('Внимание', 'Укажите контактный номер телефона');
-      return;
-    }
+    if (!quantity || quantity < 1) { Alert.alert('Внимание', 'Укажите количество ключей'); return; }
+    if (!address.trim()) { Alert.alert('Внимание', 'Укажите адрес доставки ключей'); return; }
+    if (!phone.trim()) { Alert.alert('Внимание', 'Укажите контактный номер телефона'); return; }
 
     setSubmitting(true);
     try {
-      console.log(`[Ключи] Инициализация заказа ${quantity} шт. на сумму ${pricing.totalSum} ₽...`);
-
-      const messageText = `Заказ электронных ключей: ${quantity} шт. (${pricing.tierText})\nАдрес: ${address.trim()}\nТелефон: ${phone.trim()}${comment.trim() ? `\nКомментарий: ${comment.trim()}` : ''}`;
-
+      const messageText = `Заказ электронных ключей: ${quantity} шт. (${tierText})\nАдрес: ${address.trim()}\nТелефон: ${phone.trim()}${comment.trim() ? `\nДоп. информация: ${comment.trim()}` : ''}`;
       const orderPayload = {
-        name: user?.full_name || 'Абонент',
-        phone: phone.trim(),
-        address: address.trim(),
-        message: messageText,
-        amount: pricing.baseSum,
-        user_id: user?.id,
-        is_mobile: true,
-        source: 'mobile_app',
-        items: [
-          {
-            product_id: keyProduct?.id || null,
-            name: keyProduct?.name || 'Электронный чип-ключ Домофондар',
-            quantity: quantity,
-            price: pricing.unitPrice,
-          },
-        ],
+        name: user?.full_name || 'Абонент', phone: phone.trim(), address: address.trim(),
+        message: messageText, amount: baseSum, user_id: user?.id, is_mobile: true, source: 'mobile_app',
+        items: [{ product_id: keyProduct?.id || null, name: keyProduct?.name || 'Электронный чип-ключ Домофондар', quantity, price: unitPrice }],
       };
-
       const paymentBody = {
-        amount: pricing.totalSum,
-        credit_amount: pricing.baseSum,
-        fee_amount: pricing.feeSum,
-        description: `Заказ ${quantity} ключей домофона, ${address.trim()}`,
+        amount: totalSum, credit_amount: baseSum, fee_amount: feeSum,
+        description: `Заказ ${quantity} ключей домофона, ${address.trim()}`.slice(0, 128),
         account_number: account?.account_number || undefined,
-        is_order: true,
-        order_data: orderPayload,
+        is_order: true, order_data: orderPayload,
         return_url: 'https://домофондар.рф/cabinet?check_payment=1&is_order=1',
       };
-
       const res = await apiClient.post('/api/payments/yookassa/create', paymentBody);
       const confirmUrl = res.data?.confirmation_url || res.data?.payment?.confirmation?.confirmation_url;
-
       if (confirmUrl) {
-        console.log('[Ключи] Открытие защищенного окна ЮKassa:', confirmUrl);
         onClose();
         await WebBrowser.openBrowserAsync(confirmUrl);
         onSuccess();
       } else {
-        throw new Error('Платежный шлюз не вернул ссылку подтверждения');
+        throw new Error('Платёжный шлюз не вернул ссылку подтверждения');
       }
     } catch (err: any) {
-      console.error('[Ключи] Ошибка оформления заказа:', err);
       const errMsg = err.response?.data?.error || err.message || 'Не удалось сформировать платёж';
       Alert.alert('Ошибка оплаты', errMsg);
     } finally {
@@ -173,367 +142,182 @@ export const KeyOrderModal: React.FC<KeyOrderModalProps> = ({
     }
   };
 
+  const topPad = Math.max(insets.top, 12) + 4;
+  const botPad = Math.max(insets.bottom, 12);
+
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.overlay}
-      >
-        <View style={[styles.sheet, { backgroundColor: isDark ? '#171b26' : '#ffffff', borderColor: colors.border }]}>
-          {/* Заголовок */}
-          <View style={styles.header}>
-            <View style={styles.headerTitleWrap}>
-              <View style={[styles.iconWrap, { backgroundColor: isDark ? '#262a35' : '#e5eeff' }]}>
-                <Ionicons name="key-outline" size={20} color={colors.primaryContainer} />
-              </View>
-              <View>
-                <Text style={[styles.title, { color: colors.text }]}>Заказ электронных ключей</Text>
-                <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-                  Оригинальные защищенные чипы с кодированием
-                </Text>
-              </View>
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose} presentationStyle="fullScreen">
+      <View style={[styles.screen, { backgroundColor: colors.background, paddingTop: topPad }]}>
+        {/* Шапка */}
+        <View style={[styles.header, { borderBottomColor: colors.border }]}>
+          <View style={styles.headerTitleWrap}>
+            <View style={[styles.iconWrap, { backgroundColor: isDark ? '#262a35' : '#e5eeff' }]}>
+              <Ionicons name="key-outline" size={20} color={colors.primaryContainer} />
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Ionicons name="close" size={22} color={colors.textMuted} />
-            </TouchableOpacity>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.title, { color: colors.text }]}>Заказ электронных ключей</Text>
+              <Text style={[styles.subtitle, { color: colors.textSecondary }]} numberOfLines={1}>Защищённые чипы с кодированием</Text>
+            </View>
           </View>
+          <TouchableOpacity onPress={onClose} style={styles.closeBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Ionicons name="close" size={24} color={colors.textMuted} />
+          </TouchableOpacity>
+        </View>
 
-          <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
-            {/* Блок выбора количества со ступенчатой ценой */}
-            <View style={[styles.counterBox, { backgroundColor: isDark ? '#1c1f2a' : '#f8f9ff', borderColor: colors.border }]}>
-              <View style={styles.counterInfo}>
-                <Text style={[styles.counterLabel, { color: colors.text }]}>Количество ключей</Text>
-                <Text style={[styles.counterDesc, { color: colors.primaryContainer }]}>
-                  {pricing.tierText} • {pricing.unitPrice} ₽/шт
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+          <ScrollView style={styles.body} contentContainerStyle={{ paddingBottom: 16 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            {loadingCatalog ? (
+              <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+                <ActivityIndicator color={colors.primaryContainer} />
+              </View>
+            ) : null}
+
+            {!loadingCatalog && noEntrance ? (
+              <View style={[styles.officeCard, { backgroundColor: isDark ? '#1c1f2a' : '#f8f9ff', borderColor: colors.border }]}>
+                <Ionicons name="business-outline" size={28} color={colors.primaryContainer} />
+                <Text style={[styles.officeTitle, { color: colors.text }]}>Заказ по вашему адресу — через офис</Text>
+                <Text style={[styles.officeText, { color: colors.textSecondary }]}>
+                  Чтобы заказать ключи по вашему адресу, обратитесь в офис — менеджер поможет с оформлением.
                 </Text>
-              </View>
-              <View style={styles.counterControls}>
-                <TouchableOpacity
-                  onPress={handleDecrement}
-                  style={[styles.counterBtn, { backgroundColor: isDark ? '#262a35' : '#e2e8f0' }]}
-                >
-                  <Ionicons name="remove" size={18} color={colors.text} />
-                </TouchableOpacity>
-                <Text style={[styles.counterValue, { color: colors.text }]}>{quantity}</Text>
-                <TouchableOpacity
-                  onPress={handleIncrement}
-                  style={[styles.counterBtn, { backgroundColor: colors.primaryContainer }]}
-                >
-                  <Ionicons name="add" size={18} color="#ffffff" />
+                <TouchableOpacity style={[styles.officeBtn, { backgroundColor: colors.primaryContainer }]} onPress={() => Linking.openURL('tel:+79034118393')} activeOpacity={0.85}>
+                  <Ionicons name="call" size={16} color="#fff" style={{ marginRight: 6 }} />
+                  <Text style={styles.officeBtnText}>+7 (903) 411-83-93</Text>
                 </TouchableOpacity>
               </View>
-            </View>
+            ) : null}
 
+            {!noEntrance ? (<>
             {isInstallation ? (
-              /* Дом на монтаже — действует льготная единая цена, ступенчатая акция не применяется */
               <View style={[styles.installBanner, { backgroundColor: isDark ? 'rgba(16,185,129,0.12)' : '#ecfdf5', borderColor: colors.secondary }]}>
                 <Ionicons name="pricetag" size={16} color={colors.secondary} style={{ marginRight: 6 }} />
-                <Text style={[styles.installBannerText, { color: colors.secondary }]}>
-                  Ваш дом на монтаже — льготная цена {pricing.unitPrice} ₽ за ключ
-                </Text>
+                <Text style={[styles.installBannerText, { color: colors.secondary }]}>Ваш дом на монтаже — льготная цена {unitPrice} ₽ за ключ</Text>
               </View>
-            ) : (
-              /* Ступени цен — реальная сетка из номенклатуры товара */
-              <View style={styles.tiersRow}>
-                {[
-                  { label: '1 шт', q: 1, active: quantity === 1 },
-                  { label: '2 шт', q: 2, active: quantity === 2 },
-                  { label: '3+ шт', q: 3, active: quantity >= 3 },
-                ].map((t) => (
-                  <View
-                    key={t.q}
+            ) : null}
+
+            {/* Карточки выбора количества (суммы из базы) */}
+            <Text style={[styles.label, { color: colors.textSecondary }]}>Выберите количество ключей:</Text>
+            <View style={styles.cardsGrid}>
+              {[1, 2, 3, 4, 5, 6].map((n) => {
+                const total = calc(n).totalPrice;
+                const active = quantity === n;
+                return (
+                  <TouchableOpacity
+                    key={n}
+                    onPress={() => setQty(n)}
+                    activeOpacity={0.85}
                     style={[
-                      styles.tierChip,
+                      styles.qtyCard,
                       {
-                        backgroundColor: t.active ? (isDark ? '#262a35' : '#dbeafe') : (isDark ? '#171b26' : '#f1f5f9'),
-                        borderColor: t.active ? colors.primaryContainer : colors.border,
+                        backgroundColor: active ? colors.primaryContainer : (isDark ? '#1c1f2a' : '#f8f9ff'),
+                        borderColor: active ? colors.primaryContainer : colors.border,
                       },
                     ]}
                   >
-                    <Text style={[styles.tierTitle, { color: colors.text }]}>{t.label}</Text>
-                    <Text style={[styles.tierPrice, { color: colors.textSecondary }]}>{tierUnit(t.q)} ₽</Text>
-                  </View>
-                ))}
-              </View>
-            )}
+                    <Text style={[styles.qtyCardNum, { color: active ? '#fff' : colors.text }]}>{n} шт</Text>
+                    <Text style={[styles.qtyCardSum, { color: active ? '#fff' : colors.primaryContainer }]}>{total} ₽</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Своё количество */}
+            <Text style={[styles.label, { color: colors.textSecondary, marginTop: 14 }]}>Или своё количество:</Text>
+            <TextInput
+              style={[styles.input, { backgroundColor: isDark ? '#1c1f2a' : '#f8f9ff', borderColor: quantity > 6 ? colors.primaryContainer : colors.border, color: colors.text }]}
+              value={customQty}
+              onChangeText={onCustomChange}
+              keyboardType="number-pad"
+              placeholder="например: 10"
+              placeholderTextColor={colors.textMuted}
+            />
 
             {/* Адрес и контакты */}
             <Text style={[styles.label, { color: colors.textSecondary, marginTop: 14 }]}>Куда доставить ключи:</Text>
             <TextInput
-              style={[
-                styles.input,
-                {
-                  backgroundColor: isDark ? '#1c1f2a' : '#f8f9ff',
-                  borderColor: colors.border,
-                  color: colors.text,
-                },
-              ]}
-              value={address}
-              onChangeText={setAddress}
-              placeholder="Адрес (подъезд, квартира)"
-              placeholderTextColor={colors.textMuted}
+              style={[styles.input, { backgroundColor: isDark ? '#1c1f2a' : '#f8f9ff', borderColor: colors.border, color: colors.text }]}
+              value={address} onChangeText={setAddress} placeholder="Адрес (подъезд, квартира)" placeholderTextColor={colors.textMuted}
             />
 
             <Text style={[styles.label, { color: colors.textSecondary, marginTop: 10 }]}>Телефон получателя:</Text>
             <TextInput
-              style={[
-                styles.input,
-                {
-                  backgroundColor: isDark ? '#1c1f2a' : '#f8f9ff',
-                  borderColor: colors.border,
-                  color: colors.text,
-                },
-              ]}
-              value={phone}
-              onChangeText={setPhone}
-              keyboardType="phone-pad"
-              placeholder="+7 (999) 000-00-00"
-              placeholderTextColor={colors.textMuted}
+              style={[styles.input, { backgroundColor: isDark ? '#1c1f2a' : '#f8f9ff', borderColor: colors.border, color: colors.text }]}
+              value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="+7 (999) 000-00-00" placeholderTextColor={colors.textMuted}
             />
 
-            <Text style={[styles.label, { color: colors.textSecondary, marginTop: 10 }]}>Примечание (необязательно):</Text>
+            <Text style={[styles.label, { color: colors.textSecondary, marginTop: 10 }]}>Укажите, если есть дополнительная информация:</Text>
             <TextInput
-              style={[
-                styles.input,
-                {
-                  backgroundColor: isDark ? '#1c1f2a' : '#f8f9ff',
-                  borderColor: colors.border,
-                  color: colors.text,
-                },
-              ]}
-              value={comment}
-              onChangeText={setComment}
-              placeholder="Удобное время передачи ключей"
-              placeholderTextColor={colors.textMuted}
+              style={[styles.input, { backgroundColor: isDark ? '#1c1f2a' : '#f8f9ff', borderColor: colors.border, color: colors.text }]}
+              value={comment} onChangeText={setComment} placeholder="необязательно" placeholderTextColor={colors.textMuted}
             />
 
-            {/* Расчет стоимости (комиссия эквайринга 5% добавляется на стороне ЮKassa при оплате) */}
+            {/* Итог */}
             <View style={[styles.summaryBox, { backgroundColor: isDark ? '#1c1f2a' : '#f8f9ff', borderColor: colors.border }]}>
               <View style={styles.summaryRow}>
-                <Text style={[styles.summaryText, { color: colors.textSecondary }]}>Ключи ({quantity} шт. × {pricing.unitPrice} ₽):</Text>
-                <Text style={[styles.summaryText, { color: colors.text, fontWeight: '600' }]}>{pricing.baseSum} ₽</Text>
+                <Text style={[styles.summaryText, { color: colors.textSecondary }]}>Ключи ({quantity} шт. × {unitPrice} ₽):</Text>
+                <Text style={[styles.summaryText, { color: colors.text, fontWeight: '600' }]}>{baseSum} ₽</Text>
               </View>
               <View style={[styles.divider, { backgroundColor: colors.border }]} />
               <View style={styles.summaryRow}>
                 <Text style={[styles.totalLabel, { color: colors.text }]}>Итого:</Text>
-                <Text style={[styles.totalValue, { color: colors.primaryContainer }]}>{pricing.baseSum} ₽</Text>
+                <Text style={[styles.totalValue, { color: colors.primaryContainer }]}>{baseSum} ₽</Text>
               </View>
-              <Text style={[styles.feeNote, { color: colors.textMuted }]}>
-                При оплате картой ЮKassa добавит комиссию эквайринга 5%.
-              </Text>
+              <Text style={[styles.feeNote, { color: colors.textMuted }]}>Возможна комиссия банка при оплате.</Text>
             </View>
+            </>) : null}
           </ScrollView>
 
-          {/* Кнопка оплаты */}
-          <View style={[styles.footer, { borderTopColor: colors.border }]}>
-            <TouchableOpacity
-              style={[styles.submitBtn, { backgroundColor: colors.primaryContainer }]}
-              onPress={handlePayment}
-              disabled={submitting}
-              activeOpacity={0.85}
-            >
-              {submitting ? (
-                <ActivityIndicator color="#ffffff" />
-              ) : (
+          {/* Нижние кнопки: Отменить + Оплатить */}
+          <View style={[styles.footer, { borderTopColor: colors.border, paddingBottom: botPad }]}>
+            <TouchableOpacity style={[styles.cancelBtn, { borderColor: colors.border }]} onPress={onClose} activeOpacity={0.8} disabled={submitting}>
+              <Text style={[styles.cancelBtnText, { color: colors.textSecondary }]}>Отменить</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.submitBtn, { backgroundColor: colors.primaryContainer }, (submitting || noEntrance) && { opacity: 0.6 }]} onPress={handlePayment} disabled={submitting || noEntrance} activeOpacity={0.85}>
+              {submitting ? <ActivityIndicator color="#fff" /> : (
                 <>
-                  <Ionicons name="card" size={18} color="#ffffff" style={{ marginRight: 8 }} />
-                  <Text style={styles.submitBtnText}>Оплатить {pricing.baseSum} ₽</Text>
+                  <Ionicons name="card" size={18} color="#fff" style={{ marginRight: 8 }} />
+                  <Text style={styles.submitBtnText}>Оплатить {baseSum} ₽</Text>
                 </>
               )}
             </TouchableOpacity>
           </View>
-        </View>
-      </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(10, 14, 24, 0.75)',
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    borderTopWidth: 1,
-    maxHeight: '90%',
-    paddingBottom: Platform.OS === 'ios' ? 24 : 12,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 14,
-  },
-  headerTitleWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  iconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 17,
-    fontWeight: '700',
-  },
-  subtitle: {
-    fontSize: 12,
-    marginTop: 1,
-  },
-  closeBtn: {
-    padding: 6,
-  },
-  body: {
-    paddingHorizontal: 20,
-  },
-  counterBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-    marginBottom: 10,
-  },
-  counterInfo: {
-    flex: 1,
-  },
-  counterLabel: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  counterDesc: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  counterControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  counterBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  counterValue: {
-    fontSize: 18,
-    fontWeight: '700',
-    minWidth: 24,
-    textAlign: 'center',
-  },
-  tiersRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 6,
-  },
-  installBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    marginBottom: 6,
-  },
-  installBannerText: {
-    fontSize: 12.5,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  tierChip: {
-    flex: 1,
-    padding: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    alignItems: 'center',
-  },
-  tierTitle: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  tierPrice: {
-    fontSize: 11,
-    marginTop: 2,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '600',
-    marginBottom: 6,
-  },
-  input: {
-    height: 46,
-    borderRadius: 10,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    fontSize: 14,
-  },
-  summaryBox: {
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginTop: 14,
-    marginBottom: 10,
-  },
-  feeNote: {
-    fontSize: 11,
-    marginTop: 8,
-    lineHeight: 15,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginVertical: 3,
-  },
-  summaryText: {
-    fontSize: 13,
-  },
-  divider: {
-    height: 1,
-    marginVertical: 6,
-  },
-  totalLabel: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  totalValue: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  footer: {
-    paddingHorizontal: 20,
-    paddingTop: 14,
-    borderTopWidth: 1,
-  },
-  submitBtn: {
-    height: 50,
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#0ea5e9',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  submitBtnText: {
-    color: '#ffffff',
-    fontSize: 15,
-    fontWeight: '700',
-  },
+  screen: { flex: 1 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1 },
+  headerTitleWrap: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  iconWrap: { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  title: { fontSize: 17, fontWeight: '700' },
+  subtitle: { fontSize: 12, marginTop: 1 },
+  closeBtn: { padding: 6 },
+  body: { flex: 1, paddingHorizontal: 16, paddingTop: 14 },
+  installBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 10, borderRadius: 10, borderWidth: 1, marginBottom: 12 },
+  installBannerText: { fontSize: 12.5, fontWeight: '700', textAlign: 'center' },
+  label: { fontSize: 13, fontWeight: '600', marginBottom: 8 },
+  cardsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  qtyCard: { width: '31.5%', paddingVertical: 14, borderRadius: 12, borderWidth: 1, alignItems: 'center' },
+  qtyCardNum: { fontSize: 15, fontWeight: '700' },
+  qtyCardSum: { fontSize: 14, fontWeight: '700', marginTop: 4 },
+  input: { height: 48, borderRadius: 12, borderWidth: 1, paddingHorizontal: 16, fontSize: 15 },
+  summaryBox: { padding: 14, borderRadius: 12, borderWidth: 1, marginTop: 16 },
+  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 3 },
+  summaryText: { fontSize: 13 },
+  divider: { height: 1, marginVertical: 6 },
+  totalLabel: { fontSize: 15, fontWeight: '700' },
+  totalValue: { fontSize: 18, fontWeight: '700' },
+  feeNote: { fontSize: 11, marginTop: 8, lineHeight: 15 },
+  officeCard: { alignItems: 'center', padding: 20, borderRadius: 14, borderWidth: 1, gap: 8 },
+  officeTitle: { fontSize: 16, fontWeight: '700', textAlign: 'center', marginTop: 4 },
+  officeText: { fontSize: 13, lineHeight: 19, textAlign: 'center' },
+  officeBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, paddingHorizontal: 20, borderRadius: 12, marginTop: 6 },
+  officeBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  footer: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingTop: 12, borderTopWidth: 1 },
+  cancelBtn: { flex: 1, height: 50, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  cancelBtnText: { fontSize: 15, fontWeight: '700' },
+  submitBtn: { flex: 2, height: 50, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  submitBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 });

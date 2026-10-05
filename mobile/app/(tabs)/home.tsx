@@ -21,9 +21,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/store/auth.store';
 import { useAppTheme } from '@/theme';
 import { apiClient } from '@/api/client';
+import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 import { RepairModal } from '@/components/RepairModal';
 import { KeyOrderModal } from '@/components/KeyOrderModal';
 import { HandsetOrderModal } from '@/components/HandsetOrderModal';
+import { AddressWizardModal } from '@/components/AddressWizardModal';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -46,6 +48,7 @@ export default function HomeScreen() {
   const [isRepairModalOpen, setIsRepairModalOpen] = useState(false);
   const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
   const [isHandsetModalOpen, setIsHandsetModalOpen] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   // Загрузка изолированных персональных данных абонента
   const loadDashboardData = useCallback(async () => {
@@ -91,6 +94,9 @@ export default function HomeScreen() {
   useEffect(() => {
     loadDashboardData();
   }, [loadDashboardData]);
+
+  // Обновление кабинета «почти в реальном времени» (лёгкий опрос при активном экране)
+  useAutoRefresh(() => { loadDashboardData(); });
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -200,6 +206,23 @@ export default function HomeScreen() {
           <Text style={[styles.greetingName, { color: colors.text }]} numberOfLines={1}>
             Здравствуйте, {displayName}!
           </Text>
+          {(() => {
+            const vs = (user as any)?.verification_status || (user?.is_verified ? 'verified' : 'unverified');
+            const b = vs === 'verified'
+              ? { t: 'Аккаунт подтверждён', c: colors.secondary, i: 'shield-checkmark' as const, bg: isDark ? 'rgba(16,185,129,0.15)' : '#ecfdf5' }
+              : vs === 'pending'
+              ? { t: 'Верификация на проверке', c: colors.warning, i: 'time' as const, bg: isDark ? 'rgba(245,158,11,0.15)' : '#fef3c7' }
+              : vs === 'rejected'
+              ? { t: 'Верификация отклонена — повторить', c: colors.error, i: 'close-circle' as const, bg: isDark ? 'rgba(239,68,68,0.15)' : '#fee2e2' }
+              : { t: 'Пройдите верификацию', c: colors.primaryContainer, i: 'shield-outline' as const, bg: isDark ? 'rgba(14,165,233,0.15)' : '#e0f2fe' };
+            return (
+              <TouchableOpacity style={[styles.verifyChip, { backgroundColor: b.bg }]} onPress={() => router.push('/(tabs)/profile')} activeOpacity={0.8}>
+                <Ionicons name={b.i} size={13} color={b.c} style={{ marginRight: 5 }} />
+                <Text style={[styles.verifyChipText, { color: b.c }]}>{b.t}</Text>
+                {vs !== 'verified' && vs !== 'pending' ? <Ionicons name="chevron-forward" size={13} color={b.c} /> : null}
+              </TouchableOpacity>
+            );
+          })()}
         </View>
 
         {/* =================================================================== */}
@@ -298,6 +321,22 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
           </View>
+        )}
+
+        {/* Баннер привязки адреса/лицевого счёта для нового жильца (как мастер на сайте) */}
+        {!loading && !account && (
+          <TouchableOpacity
+            style={[styles.bindBanner, { backgroundColor: isDark ? 'rgba(14,165,233,0.12)' : '#eff4ff', borderColor: colors.primaryContainer }]}
+            onPress={() => setWizardOpen(true)}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="home-outline" size={22} color={colors.primaryContainer} style={{ marginRight: 10 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.bindBannerTitle, { color: colors.text }]}>Привяжите свой адрес</Text>
+              <Text style={[styles.bindBannerSub, { color: colors.textSecondary }]}>Укажите адрес или лицевой счёт, чтобы видеть баланс и услуги по вашему дому</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.primaryContainer} />
+          </TouchableOpacity>
         )}
 
         {/* =================================================================== */}
@@ -534,6 +573,13 @@ export default function HomeScreen() {
         account={account}
         defaultAddress={userAddress}
       />
+
+      {/* Мастер привязки адреса/лицевого счёта (для нового жильца) */}
+      <AddressWizardModal
+        visible={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        onSuccess={() => loadDashboardData()}
+      />
     </View>
   );
 }
@@ -542,6 +588,16 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
+  bindBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 16,
+  },
+  bindBannerTitle: { fontSize: 15, fontWeight: '700' },
+  bindBannerSub: { fontSize: 12, marginTop: 2, lineHeight: 16 },
   container: {
     paddingHorizontal: 16,
   },
@@ -628,6 +684,20 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '700',
     marginTop: 2,
+  },
+  verifyChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    marginTop: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+  },
+  verifyChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+    marginRight: 2,
   },
   accountCard: {
     borderRadius: 16,

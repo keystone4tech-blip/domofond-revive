@@ -204,6 +204,7 @@ const VerificationManager: React.FC = () => {
         .update({
           full_name: change.full_name?.trim() || profile.full_name,
           phone: change.phone?.trim() || profile.phone,
+          email: change.email?.trim() || (profile as any).email,
           address: change.address?.trim() || profile.address,
           apartment: change.apartment !== undefined ? change.apartment?.trim() : profile.apartment,
           floor: change.floor !== undefined ? change.floor?.trim() : profile.floor,
