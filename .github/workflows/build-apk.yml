@@ -69,12 +69,12 @@ jobs:
           cd mobile
           npm install --legacy-peer-deps
 
-      # 6. Синхронизация нативного проекта Expo (без флага --clean, сохраняя настройки Gradle и подписи)
+      # 6. Синхронизация нативного проекта Expo с чистой генерацией Gradle
       - name: ⚙️ Синхронизация нативного Android проекта (Expo Prebuild)
         run: |
           echo "[CI/CD] Запуск Expo Prebuild для генерации ассетов и манифеста..."
           cd mobile
-          npx expo prebuild --platform android --no-install
+          npx expo prebuild --platform android --clean
 
       # 7. Выдача прав на выполнение скрипта сборки Gradle
       - name: 🔑 Выдача прав на gradlew
