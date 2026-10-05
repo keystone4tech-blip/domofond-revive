@@ -32,9 +32,16 @@ import type { ThemeMode } from '@/store/theme.store';
 let Location: any = null;
 try { Location = require('expo-location'); } catch { Location = null; }
 
-// Адрес офиса для построения маршрута
-const OFFICE_ADDRESS = 'Краснодар, проезд им. Репина, 1';
+// Контакты офиса (как на сайте домофондар.рф)
+const OFFICE_ADDRESS = 'г. Краснодар, проезд Репина, 1, 2 этаж, офис 134';
 const OFFICE_PHONE = '+79034118393';
+const OFFICE_EMAIL = 'domofondar@mail.ru';
+const MAP_YANDEX = 'https://yandex.ru/maps/-/CLhNYJYt';
+const MAP_2GIS = 'https://go.2gis.com/Morvu';
+const WHATSAPP_URL = 'https://wa.me/79034118393';
+const TELEGRAM_URL = 'https://t.me/domofondar123';
+const TELEGRAM_BOT_URL = 'https://t.me/Domofondar_bot';
+const SITE_URL = 'https://домофондар.рф';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -53,6 +60,8 @@ export default function ProfileScreen() {
   const [verifying, setVerifying] = useState(false);
   const [legalDocId, setLegalDocId] = useState<string | null>(null);
   const [aboutOpen, setAboutOpen] = useState(false);
+  const [mapsOpen, setMapsOpen] = useState(false);
+  const [docsOpen, setDocsOpen] = useState(false);
   const [notifGranted, setNotifGranted] = useState<boolean | null>(null);
   const [mediaGranted, setMediaGranted] = useState<boolean | null>(null);
   const [geoGranted, setGeoGranted] = useState<boolean | null>(null);
@@ -155,9 +164,12 @@ export default function ProfileScreen() {
   };
 
   const openRoute = (app: 'gis' | 'yandex') => {
-    const q = encodeURIComponent(OFFICE_ADDRESS);
-    const url = app === 'gis' ? `https://2gis.ru/search/${q}` : `https://yandex.ru/maps/?text=${q}`;
+    const url = app === 'gis' ? MAP_2GIS : MAP_YANDEX;
     Linking.openURL(url).catch(() => Alert.alert('Не удалось открыть карты'));
+  };
+
+  const openLink = (url: string) => {
+    Linking.openURL(url).catch(() => Alert.alert('Не удалось открыть ссылку'));
   };
 
   const handleCheckUpdateManual = async () => {
@@ -333,13 +345,23 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Информация</Text>
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Row icon="information-circle-outline" title="О нас и документы" onPress={() => setAboutOpen(true)} />
+            <Row icon="information-circle-outline" title="О нас" onPress={() => setAboutOpen(true)} />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
-            <Row icon="navigate-outline" title="Как проехать в офис" onPress={() => setAboutOpen(true) } value="2ГИС · Яндекс" />
+            <Row icon="navigate-outline" title="Как проехать в офис" onPress={() => setMapsOpen(true)} value="2ГИС · Яндекс" />
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            <Row icon="globe-outline" title="Наш сайт" value="домофондар.рф" onPress={() => openLink(SITE_URL)} />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <Row icon="call-outline" title="Служба поддержки" value="+7 (903) 411-83-93" onPress={() => Linking.openURL(`tel:${OFFICE_PHONE}`)} />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <Row icon="phone-portrait-outline" title="Версия приложения" value={APP_VERSION} onPress={handleCheckUpdateManual} />
+          </View>
+        </View>
+
+        {/* Документы — отдельной кнопкой */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Документы</Text>
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Row icon="document-text-outline" title="Правовые документы" value="4 документа" onPress={() => setDocsOpen(true)} />
           </View>
         </View>
 
@@ -376,7 +398,7 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
-      {/* Модалка «О нас»: документы + маршрут */}
+      {/* Модалка «О нас»: информация о компании, режим работы, мессенджеры (как на сайте) */}
       <Modal visible={aboutOpen} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border }]}>
@@ -385,9 +407,84 @@ export default function ProfileScreen() {
               <TouchableOpacity onPress={() => setAboutOpen(false)}><Ionicons name="close" size={24} color={colors.textMuted} /></TouchableOpacity>
             </View>
             <ScrollView>
-              <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Как проехать в офис</Text>
-              <Text style={[styles.aboutAddr, { color: colors.text }]}>{OFFICE_ADDRESS}</Text>
+              <Text style={[styles.aboutCompany, { color: colors.text }]}>ООО «ДомофонДар»</Text>
+              <Text style={[styles.aboutDesc, { color: colors.textSecondary }]}>
+                Обслуживание, ремонт и монтаж домофонных систем в Краснодаре. Многолетний опыт и поддержка жильцов.
+              </Text>
+
+              <Text style={[styles.inputLabel, { color: colors.textSecondary, marginTop: 16 }]}>Режим работы</Text>
+              <View style={[styles.aboutRow, { borderColor: colors.border }]}>
+                <Ionicons name="time-outline" size={18} color={colors.primaryContainer} style={{ marginRight: 10 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.aboutRowText, { color: colors.text }]}>Пн–Пт: 9:00 – 17:00</Text>
+                  <Text style={[styles.aboutRowSub, { color: colors.textMuted }]}>Сб, Вс — выходной</Text>
+                  <Text style={[styles.aboutRowSub, { color: colors.textMuted }]}>Заявки и заказы в приложении принимаются круглосуточно, обрабатываются в рабочее время.</Text>
+                </View>
+              </View>
+
+              <Text style={[styles.inputLabel, { color: colors.textSecondary, marginTop: 16 }]}>Телефон и почта</Text>
+              <TouchableOpacity style={[styles.aboutRow, { borderColor: colors.border }]} onPress={() => openLink(`tel:${OFFICE_PHONE}`)} activeOpacity={0.7}>
+                <Ionicons name="call-outline" size={18} color={colors.primaryContainer} style={{ marginRight: 10 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.aboutRowText, { color: colors.text }]}>+7 (903) 411-83-93</Text>
+                  <Text style={[styles.aboutRowSub, { color: colors.textMuted }]}>Приём звонков: Пн–Пт 9:00–17:00</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.aboutRow, { borderColor: colors.border }]} onPress={() => openLink(`mailto:${OFFICE_EMAIL}`)} activeOpacity={0.7}>
+                <Ionicons name="mail-outline" size={18} color={colors.primaryContainer} style={{ marginRight: 10 }} />
+                <Text style={[styles.aboutRowText, { color: colors.text, flex: 1 }]}>{OFFICE_EMAIL}</Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+              </TouchableOpacity>
+
+              <Text style={[styles.inputLabel, { color: colors.textSecondary, marginTop: 16 }]}>Мессенджеры</Text>
               <View style={styles.routeRow}>
+                <TouchableOpacity style={[styles.routeBtn, { backgroundColor: isDark ? '#1c1f2a' : '#f8f9ff', borderColor: colors.border }]} onPress={() => openLink(WHATSAPP_URL)} activeOpacity={0.85}>
+                  <Ionicons name="logo-whatsapp" size={18} color="#25D366" style={{ marginRight: 6 }} />
+                  <Text style={[styles.routeBtnText, { color: colors.text }]}>WhatsApp</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.routeBtn, { backgroundColor: isDark ? '#1c1f2a' : '#f8f9ff', borderColor: colors.border }]} onPress={() => openLink(TELEGRAM_URL)} activeOpacity={0.85}>
+                  <Ionicons name="paper-plane-outline" size={18} color="#2AABEE" style={{ marginRight: 6 }} />
+                  <Text style={[styles.routeBtnText, { color: colors.text }]}>Telegram</Text>
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity style={[styles.aboutRow, { borderColor: colors.border, marginTop: 10 }]} onPress={() => openLink(TELEGRAM_BOT_URL)} activeOpacity={0.7}>
+                <Ionicons name="chatbubbles-outline" size={18} color={colors.primaryContainer} style={{ marginRight: 10 }} />
+                <Text style={[styles.aboutRowText, { color: colors.text, flex: 1 }]}>Telegram-бот @Domofondar_bot</Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+              </TouchableOpacity>
+
+              <Text style={[styles.inputLabel, { color: colors.textSecondary, marginTop: 16 }]}>Наш сайт</Text>
+              <TouchableOpacity style={[styles.aboutRow, { borderColor: colors.border }]} onPress={() => openLink(SITE_URL)} activeOpacity={0.7}>
+                <Ionicons name="globe-outline" size={18} color={colors.primaryContainer} style={{ marginRight: 10 }} />
+                <Text style={[styles.aboutRowText, { color: colors.text, flex: 1 }]}>домофондар.рф</Text>
+                <Ionicons name="open-outline" size={16} color={colors.textMuted} />
+              </TouchableOpacity>
+
+              <Text style={[styles.inputLabel, { color: colors.textSecondary, marginTop: 16 }]}>Адрес офиса</Text>
+              <Text style={[styles.aboutAddr, { color: colors.text }]}>{OFFICE_ADDRESS}</Text>
+              <TouchableOpacity style={[styles.saveButton, { backgroundColor: colors.primaryContainer, marginTop: 14 }]} onPress={() => { setAboutOpen(false); setMapsOpen(true); }} activeOpacity={0.85}>
+                <Text style={styles.saveButtonText}>Как проехать</Text>
+              </TouchableOpacity>
+              <View style={{ height: 20 }} />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Модалка «Как проехать»: карты 2ГИС и Яндекс (организация как на сайте) */}
+      <Modal visible={mapsOpen} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Как проехать</Text>
+              <TouchableOpacity onPress={() => setMapsOpen(false)}><Ionicons name="close" size={24} color={colors.textMuted} /></TouchableOpacity>
+            </View>
+            <ScrollView>
+              <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Адрес офиса</Text>
+              <Text style={[styles.aboutAddr, { color: colors.text }]}>{OFFICE_ADDRESS}</Text>
+              <Text style={[styles.aboutRowSub, { color: colors.textMuted, marginTop: 6 }]}>Откройте карточку организации «ДомофонДар» в приложении карт:</Text>
+              <View style={[styles.routeRow, { marginTop: 14 }]}>
                 <TouchableOpacity style={[styles.routeBtn, { backgroundColor: isDark ? '#1c1f2a' : '#f8f9ff', borderColor: colors.border }]} onPress={() => openRoute('gis')} activeOpacity={0.85}>
                   <Ionicons name="map-outline" size={18} color={colors.primaryContainer} style={{ marginRight: 6 }} />
                   <Text style={[styles.routeBtnText, { color: colors.text }]}>2ГИС</Text>
@@ -397,10 +494,23 @@ export default function ProfileScreen() {
                   <Text style={[styles.routeBtnText, { color: colors.text }]}>Яндекс.Карты</Text>
                 </TouchableOpacity>
               </View>
+              <View style={{ height: 20 }} />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
-              <Text style={[styles.inputLabel, { color: colors.textSecondary, marginTop: 18 }]}>Документы</Text>
+      {/* Модалка «Документы»: правовые документы */}
+      <Modal visible={docsOpen} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Документы</Text>
+              <TouchableOpacity onPress={() => setDocsOpen(false)}><Ionicons name="close" size={24} color={colors.textMuted} /></TouchableOpacity>
+            </View>
+            <ScrollView>
               {docs.map((d) => (
-                <TouchableOpacity key={d.id} style={[styles.docRow, { borderColor: colors.border }]} onPress={() => { setAboutOpen(false); setLegalDocId(d.id); }} activeOpacity={0.7}>
+                <TouchableOpacity key={d.id} style={[styles.docRow, { borderColor: colors.border }]} onPress={() => { setDocsOpen(false); setLegalDocId(d.id); }} activeOpacity={0.7}>
                   <Ionicons name="document-text-outline" size={18} color={colors.primaryContainer} style={{ marginRight: 10 }} />
                   <Text style={[styles.docRowText, { color: colors.text }]}>{d.title}</Text>
                   <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
@@ -481,6 +591,11 @@ const styles = StyleSheet.create({
   saveButton: { borderRadius: 12, paddingVertical: 16, alignItems: 'center', marginTop: 14, marginBottom: 20 },
   saveButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
   aboutAddr: { fontSize: 15, fontWeight: '600', marginTop: 4 },
+  aboutCompany: { fontSize: 18, fontWeight: '800', marginTop: 4 },
+  aboutDesc: { fontSize: 13, lineHeight: 19, marginTop: 6 },
+  aboutRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, marginTop: 8 },
+  aboutRowText: { fontSize: 15, fontWeight: '600' },
+  aboutRowSub: { fontSize: 12, marginTop: 2 },
   routeRow: { flexDirection: 'row', gap: 10, marginTop: 10 },
   routeBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: 12, borderWidth: 1 },
   routeBtnText: { fontSize: 14, fontWeight: '700' },

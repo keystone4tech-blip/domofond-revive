@@ -128,14 +128,10 @@ export default function RequestsScreen() {
   return (
     <View style={[styles.safeArea, { backgroundColor: colors.background, paddingTop: safeTop }]}>
       <View style={styles.header}>
-        <View style={{ flex: 1, marginRight: 12 }}>
+        <View style={{ flex: 1 }}>
           <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>Мои заявки</Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]} numberOfLines={1}>История обращений и нарядов</Text>
         </View>
-        <TouchableOpacity style={[styles.createButton, { backgroundColor: colors.primaryContainer }]} onPress={() => setChooserOpen(true)} activeOpacity={0.85}>
-          <Ionicons name="add" size={18} color="#ffffff" />
-          <Text style={styles.createButtonText}>Новая</Text>
-        </TouchableOpacity>
       </View>
 
       {loading ? (
@@ -157,12 +153,23 @@ export default function RequestsScreen() {
       ) : (
         <FlatList
           data={requests}
+          style={{ flex: 1 }}
           keyExtractor={(item) => String(item.id)}
           renderItem={renderItem}
-          contentContainerStyle={[styles.listContainer, { paddingBottom: safeBottom }]}
+          contentContainerStyle={[styles.listContainer, { paddingBottom: 16 }]}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primaryContainer} />}
           showsVerticalScrollIndicator={false}
         />
+      )}
+
+      {/* Нижняя кнопка создания заявки — над баром вкладок, удобно нажимать */}
+      {!loading && requests.length > 0 && (
+        <View style={[styles.bottomBar, { backgroundColor: colors.background, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, 10) }]}>
+          <TouchableOpacity style={[styles.bottomBtn, { backgroundColor: colors.primaryContainer }]} onPress={() => setChooserOpen(true)} activeOpacity={0.85}>
+            <Ionicons name="add-circle-outline" size={20} color="#ffffff" style={{ marginRight: 8 }} />
+            <Text style={styles.bottomBtnText}>Сделать заявку</Text>
+          </TouchableOpacity>
+        </View>
       )}
 
       {/* Выбор действия для новой заявки */}
@@ -200,8 +207,9 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, marginBottom: 16 },
   title: { fontSize: 24, fontWeight: '800' },
   subtitle: { fontSize: 13, marginTop: 2 },
-  createButton: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 9, borderRadius: 10, gap: 4 },
-  createButtonText: { color: '#ffffff', fontWeight: '700', fontSize: 13 },
+  bottomBar: { paddingHorizontal: 16, paddingTop: 10, borderTopWidth: 1 },
+  bottomBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 52, borderRadius: 14 },
+  bottomBtnText: { color: '#ffffff', fontWeight: '800', fontSize: 16 },
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
   loadingText: { marginTop: 12, fontSize: 14 },
   emptyIconCircle: { width: 68, height: 68, borderRadius: 34, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },

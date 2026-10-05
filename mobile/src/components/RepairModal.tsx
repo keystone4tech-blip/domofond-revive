@@ -207,23 +207,17 @@ export const RepairModal: React.FC<RepairModalProps> = ({
               </>
             )}
 
-            <Text style={[styles.label, { color: colors.textSecondary, marginTop: 10 }]}>
-              Сообщите дополнительную информацию или контактный (дополнительный) номер для связи:
-            </Text>
+            <Text style={[styles.label, { color: colors.textSecondary, marginTop: 10 }]}>Сообщите дополнительную информацию или дополнительный номер для связи:</Text>
             <TextInput
-              style={[styles.input, styles.textArea, { backgroundColor: isDark ? '#1c1f2a' : '#f8f9ff', borderColor: colors.border, color: colors.text }]}
-              value={comment} onChangeText={setComment} multiline numberOfLines={3}
-              placeholder="код домофона, этаж, удобное время или дополнительный номер — необязательно"
+              style={[styles.input, { backgroundColor: isDark ? '#1c1f2a' : '#f8f9ff', borderColor: colors.border, color: colors.text }]}
+              value={comment} onChangeText={setComment}
+              placeholder="необязательно"
               placeholderTextColor={colors.textMuted}
             />
 
-            {/* Информационный бейдж гарантии ТО */}
-            <View style={[styles.infoBadge, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.1)' : '#ecfdf5', borderColor: 'rgba(16, 185, 129, 0.25)' }]}>
-              <Ionicons name="shield-checkmark" size={18} color="#10b981" />
-              <Text style={styles.infoBadgeText}>
-                Выезд мастера и устранение неполадок включены в договор абонентского обслуживания (0 ₽).
-              </Text>
-            </View>
+            <Text style={[styles.freeNote, { color: '#10b981' }]}>
+              Выезд мастера включён в абонентское обслуживание (0 ₽).
+            </Text>
           </ScrollView>
 
           {/* Нижние кнопки: Отменить + Отправить */}
@@ -265,6 +259,7 @@ const styles = StyleSheet.create({
   textArea: { height: 84, paddingTop: 12, textAlignVertical: 'top' },
   readonlyField: { minHeight: 48, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, flexDirection: 'row', alignItems: 'center' },
   readonlyText: { fontSize: 15, flex: 1 },
+  freeNote: { fontSize: 12, marginTop: 12, lineHeight: 16 },
   infoBadge: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 10, borderWidth: 1, marginTop: 16, marginBottom: 10 },
   infoBadgeText: { flex: 1, fontSize: 12, color: '#10b981', lineHeight: 16 },
   footer: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingTop: 12, borderTopWidth: 1 },

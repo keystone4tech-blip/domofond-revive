@@ -137,7 +137,7 @@ const Contact = ({ isTabPage = false }: ContactProps) => {
                 <a href="tel:+79034118393" className="text-muted-foreground hover:text-primary transition-colors block">
                   +7 (903) 411-83-93
                 </a>
-                <p className="text-sm text-muted-foreground mt-1">Круглосуточная линия</p>
+                <p className="text-sm text-muted-foreground mt-1">Приём звонков: Пн–Пт 9:00–17:00</p>
                 <div className="flex flex-wrap gap-2 mt-2">
                   <ShinyButton href="tel:+79034118393" className="w-full sm:w-auto py-1.5 px-3 text-xs rounded-xl">
                     <Phone className="h-3.5 w-3.5" />
@@ -222,7 +222,8 @@ const Contact = ({ isTabPage = false }: ContactProps) => {
               <div>
                 <h3 className="font-semibold mb-1">Режим работы</h3>
                 <p className="text-muted-foreground">Пн-Пт: 9:00 - 17:00</p>
-                <p className="text-sm text-muted-foreground mt-1">Аварийная служба: 24/7</p>
+                <p className="text-sm text-muted-foreground mt-1">Сб, Вс — выходной</p>
+                <p className="text-sm text-muted-foreground mt-1">Заявки и заказы на сайте принимаются круглосуточно, обрабатываются в рабочее время.</p>
               </div>
             </div>
           </div>

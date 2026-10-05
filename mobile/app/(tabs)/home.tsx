@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/store/auth.store';
 import { useAppTheme } from '@/theme';
@@ -236,91 +237,53 @@ export default function HomeScreen() {
             </Text>
           </View>
         ) : (
-          <View style={[styles.accountCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            {/* Декоративное высокотехнологичное свечение */}
-            <View
-              style={[
-                styles.glowDeco,
-                { backgroundColor: hasDebt ? 'rgba(239, 68, 68, 0.08)' : 'rgba(14, 165, 233, 0.08)' },
-              ]}
-            />
+          <LinearGradient
+            colors={hasDebt ? ['#f97316', '#ea580c', '#b91c1c'] : ['#0ea5e9', '#0276c4', '#0b3f78']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.heroCard}
+          >
+            {/* Мягкое свечение в углу */}
+            <View style={styles.heroGlow} />
 
             {/* Верхняя строка: номер ЛС и статус */}
-            <View style={styles.accountTopRow}>
+            <View style={styles.heroTopRow}>
               <View style={styles.accountNumberBlock}>
-                <Ionicons name="card-outline" size={16} color={colors.primaryContainer} style={{ marginRight: 6 }} />
-                <Text style={[styles.accountNumberText, { color: colors.textSecondary }]}>
-                  {account ? `Л/С № ${account.account_number}` : 'Л/С не привязан'}
+                <Ionicons name="card-outline" size={15} color="rgba(255,255,255,0.9)" style={{ marginRight: 6 }} />
+                <Text style={styles.heroAccountText}>
+                  {account ? `Лицевой счёт № ${account.account_number}` : 'Л/С не привязан'}
                 </Text>
               </View>
 
-              <View
-                style={[
-                  styles.accountStatusBadge,
-                  {
-                    backgroundColor: hasDebt
-                      ? (isDark ? 'rgba(239, 68, 68, 0.15)' : '#fee2e2')
-                      : (isDark ? 'rgba(16, 185, 129, 0.15)' : '#dcfce7'),
-                    borderColor: hasDebt ? colors.error : colors.secondary,
-                  },
-                ]}
-              >
-                <View
-                  style={[
-                    styles.statusDotSmall,
-                    { backgroundColor: hasDebt ? colors.error : colors.secondary },
-                  ]}
-                />
-                <Text
-                  style={[
-                    styles.accountStatusText,
-                    { color: hasDebt ? colors.error : colors.secondary },
-                  ]}
-                >
-                  {hasDebt ? 'Задолженность' : 'ТО оплачено'}
-                </Text>
+              <View style={styles.heroStatusBadge}>
+                <View style={[styles.statusDotSmall, { backgroundColor: hasDebt ? '#fde68a' : '#4edea3' }]} />
+                <Text style={styles.heroStatusText}>{hasDebt ? 'Задолженность' : 'ТО оплачено'}</Text>
               </View>
             </View>
 
-            {/* Адрес квартиры */}
-            <View style={styles.addressBlock}>
-              <Ionicons name="location-outline" size={16} color={colors.textMuted} style={{ marginRight: 6, marginTop: 1 }} />
-              <Text style={[styles.addressText, { color: colors.text }]} numberOfLines={2}>
-                {userAddress || 'Адрес квартиры не указан (нажмите, чтобы добавить)'}
+            {/* Баланс крупно */}
+            <Text style={styles.heroBalanceLabel}>{hasDebt ? 'Сумма к оплате ТО' : 'Текущий баланс'}</Text>
+            <Text style={styles.heroBalanceValue}>{hasDebt ? `${debt.toFixed(2)} ₽` : '0.00 ₽'}</Text>
+
+            {/* Адрес */}
+            <View style={styles.heroAddrRow}>
+              <Ionicons name="location-outline" size={14} color="rgba(255,255,255,0.85)" style={{ marginRight: 5 }} />
+              <Text style={styles.heroAddrText} numberOfLines={2}>
+                {userAddress || 'Адрес квартиры не указан'}
               </Text>
             </View>
 
-            {/* Блок баланса */}
-            <View style={[styles.balanceBox, { backgroundColor: isDark ? '#171b26' : '#eff4ff', borderColor: colors.border }]}>
-              <View>
-                <Text style={[styles.balanceSub, { color: colors.textSecondary }]}>
-                  {hasDebt ? 'Сумма к оплате ТО:' : 'Текущий баланс:'}
-                </Text>
-                <Text
-                  style={[
-                    styles.balanceMain,
-                    { color: hasDebt ? colors.error : colors.primaryContainer },
-                  ]}
-                >
-                  {hasDebt ? `${debt.toFixed(2)} ₽` : '0.00 ₽'}
-                </Text>
-              </View>
-
-              <TouchableOpacity
-                style={[
-                  styles.payActionBtn,
-                  { backgroundColor: hasDebt ? colors.error : colors.primaryContainer },
-                ]}
-                onPress={() => router.push('/(tabs)/payments')}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="qr-code-outline" size={16} color="#ffffff" style={{ marginRight: 6 }} />
-                <Text style={styles.payActionBtnText}>
-                  {hasDebt ? 'Оплатить ТО' : 'Пополнить'}
-                </Text>
+            {/* Кнопки */}
+            <View style={styles.heroBtnRow}>
+              <TouchableOpacity style={styles.heroBtnMain} onPress={() => router.push('/(tabs)/payments')} activeOpacity={0.85}>
+                <Ionicons name="qr-code-outline" size={16} color="#0276c4" style={{ marginRight: 6 }} />
+                <Text style={styles.heroBtnMainText}>{hasDebt ? 'Оплатить ТО' : 'Пополнить'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.heroBtnGhost} onPress={() => router.push('/(tabs)/payments')} activeOpacity={0.85}>
+                <Text style={styles.heroBtnGhostText}>История</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </LinearGradient>
         )}
 
         {/* Баннер привязки адреса/лицевого счёта для нового жильца (как мастер на сайте) */}
@@ -719,6 +682,109 @@ const styles = StyleSheet.create({
     width: 140,
     height: 140,
     borderRadius: 70,
+  },
+  // ===== Карта-герой (баланс) в стиле банковских приложений =====
+  heroCard: {
+    borderRadius: 26,
+    padding: 20,
+    marginBottom: 20,
+    position: 'relative',
+    overflow: 'hidden',
+    elevation: 10,
+    shadowColor: '#0b3f78',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.4,
+    shadowRadius: 24,
+  },
+  heroGlow: {
+    position: 'absolute',
+    top: -60,
+    right: -40,
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    backgroundColor: 'rgba(78,222,163,0.35)',
+  },
+  heroTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  heroAccountText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.95)',
+    letterSpacing: 0.2,
+  },
+  heroStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  heroStatusText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  heroBalanceLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.82)',
+    marginTop: 18,
+  },
+  heroBalanceValue: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#ffffff',
+    letterSpacing: -0.5,
+    marginTop: 2,
+  },
+  heroAddrRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: 8,
+  },
+  heroAddrText: {
+    flex: 1,
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.85)',
+    lineHeight: 17,
+  },
+  heroBtnRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 16,
+  },
+  heroBtnMain: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+    paddingVertical: 12,
+    borderRadius: 14,
+  },
+  heroBtnMainText: {
+    color: '#0276c4',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  heroBtnGhost: {
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.16)',
+  },
+  heroBtnGhostText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '700',
   },
   loadingText: {
     fontSize: 13,

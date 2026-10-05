@@ -11,6 +11,34 @@
 > 
 > **Пользователь НЕ ДОЛЖЕН ничего вносить вручную.** Вся статистика и история пополняется ИИ автоматически при каждой задаче.
 
+# 2026-10-06 01:10 — Мобильное приложение v1.2.2: Hero-карта баланса с градиентом, нижний бар заявок и актуализация графика диспетчерской
+
+## 1. Задачи и бизнес-ценность
+- **Hero-карта баланса в стиле нео-банкинга (`home.tsx`)**:
+  * На главном экране мобильного приложения карточка баланса и лицевого счёта оформлена как статусная банковская карта с использованием `LinearGradient`.
+  * Интерактивное разделение: крупная сумма к оплате или текущий баланс, статусный чип «ТО оплачено» / «Задолженность», быстрые кнопки «Оплатить ТО / Пополнить» и «История».
+  * Адрес и номер лицевого счета гармонично интегрированы в карту с сапфировыми тенями.
+- **Эргономика оформления заявок (`requests/index.tsx`)**:
+  * Кнопка «Сделать заявку» вынесена в фиксированную нижнюю плашку над таббаром. Теперь жильцу удобно нажимать кнопку большим пальцем одной руки без необходимости тянуться вверх.
+- **Структурирование профиля жильца (`profile/index.tsx`)**:
+  * Разделены модальные окна «О компании», «Как проехать» (с быстрым выбором навигатора — 2ГИС или Яндекс.Карты) и «Документы».
+  * Форма ремонта домофона (`RepairModal.tsx`): выезд мастера зафиксирован как «0 ₽», формулировки стали более емкими.
+- **Актуализация графика работы на сайте (`Contact.tsx`)**:
+  * Уточнен режим работы диспетчерской службы: Пн–Пт с 9:00 до 17:00, выходные — суббота и воскресенье.
+  * Добавлено пояснение: «Заявки и заказы на сайте принимаются круглосуточно, обрабатываются в рабочее время».
+
+## 2. Измененные файлы
+- [`src/components/Contact.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/components/Contact.tsx) — Актуализирован график работы и прием звонков.
+- [`mobile/app/(tabs)/home.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/app/(tabs)/home.tsx) — Hero-градиент баланса и ЛС.
+- [`mobile/app/(tabs)/requests/index.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/app/(tabs)/requests/index.tsx) — Нижний закрепленный бар создания заявки.
+- [`mobile/app/(tabs)/profile/index.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/app/(tabs)/profile/index.tsx) — Раздельные модалки навигации и документов.
+- [`mobile/app/(tabs)/payments/index.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/app/(tabs)/payments/index.tsx) — Доработки интерфейса оплаты.
+- [`mobile/app/(tabs)/_layout.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/app/(tabs)/_layout.tsx) — Стили таббара.
+- [`mobile/package.json`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/package.json) — Версия 1.2.2 и зависимость expo-linear-gradient.
+- [`mobile/src/components/RepairModal.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/src/components/RepairModal.tsx) — Выезд мастера 0 ₽, компактный текст.
+- [`server/index.js`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/server/index.js) — Актуальные releaseNotes для версии 1.2.2.
+- [`src/data/projectChangelog.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/data/projectChangelog.ts) — Внесение записи в паспорт проекта.
+
 # 2026-10-05 23:30 — Мобильное приложение v1.2.2 (Build 9): Редизайн темы «Frosted Arctic Glass» и матовые карточки
 
 ## 1. Задачи и бизнес-ценность

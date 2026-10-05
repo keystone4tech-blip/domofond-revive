@@ -81,10 +81,17 @@ export default function PaymentsScreen() {
     setPaying(true);
     try {
       const accNum = account?.account_number || '';
-      console.log(`[Payments CyberShield] Инициализация оплаты ${amountToPay} ₽ (л/с: ${accNum})...`);
+      // Комиссия эквайринга 5% добавляется к сумме при переходе на ЮKassa (как на сайте):
+      // клиент платит base + 5%, а в счёт ТО зачисляется именно base (credit_amount).
+      const base = Math.round(amountToPay * 100) / 100;
+      const fee = Math.round(base * 0.05 * 100) / 100;
+      const total = Math.round((base + fee) * 100) / 100;
+      console.log(`[Payments CyberShield] Оплата ${base} ₽ + 5% (${fee} ₽) = ${total} ₽ (л/с: ${accNum})...`);
 
       const payload = {
-        amount: amountToPay,
+        amount: total,
+        credit_amount: base,
+        fee_amount: fee,
         account_number: accNum,
         description: `Оплата ТО домофона, л/с ${accNum || 'не указан'}`,
         return_url: 'https://домофондар.рф/cabinet?check_payment=1',
