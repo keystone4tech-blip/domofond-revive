@@ -9,11 +9,10 @@ export default function TabsLayout() {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useAppTheme();
 
-  // Плавающий таб-бар из матового стекла, приподнятый над нижним краем
-  const bottomInset = insets.bottom > 0 ? insets.bottom : (Platform.OS === 'android' ? 10 : 8);
-  const barHeight = 62;
-  const sideMargin = 14;
-  const liftFromBottom = bottomInset + 8;
+  // Закреплённый внизу компактный таб-бар с матовым стеклом (не плавающий,
+  // чтобы кнопки на экранах не оказывались под ним).
+  const bottomInset = insets.bottom > 0 ? insets.bottom : (Platform.OS === 'android' ? 8 : 6);
+  const barHeight = 52 + bottomInset;
 
   return (
     <Tabs
@@ -22,44 +21,44 @@ export default function TabsLayout() {
         tabBarActiveTintColor: colors.primaryContainer,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarLabelStyle: {
-          fontSize: 10.5,
+          fontSize: 10,
           fontWeight: '700',
-          marginBottom: 8,
+          marginBottom: 2,
         },
         tabBarItemStyle: {
-          paddingTop: 8,
+          paddingTop: 5,
         },
-        // Прозрачный контейнер + размытая матовая подложка под ним (frosted glass)
+        // Матовое стекло на всю ширину бара
         tabBarBackground: () => (
           <BlurView
-            intensity={isDark ? 40 : 60}
+            intensity={isDark ? 40 : 55}
             tint={isDark ? 'dark' : 'light'}
             style={{
               position: 'absolute',
               top: 0, left: 0, right: 0, bottom: 0,
-              borderRadius: 26,
+              backgroundColor: isDark ? 'rgba(18,24,38,0.80)' : 'rgba(255,255,255,0.86)',
+              borderTopWidth: 1,
+              borderTopColor: colors.border,
+              borderTopLeftRadius: 20,
+              borderTopRightRadius: 20,
               overflow: 'hidden',
-              backgroundColor: isDark ? 'rgba(18,24,38,0.62)' : 'rgba(255,255,255,0.72)',
-              borderWidth: 1,
-              borderColor: colors.border,
             }}
           />
         ),
         tabBarStyle: {
           position: 'absolute',
-          left: sideMargin,
-          right: sideMargin,
-          bottom: liftFromBottom,
+          left: 0,
+          right: 0,
+          bottom: 0,
           height: barHeight,
-          borderRadius: 26,
           borderTopWidth: 0,
           backgroundColor: 'transparent',
-          elevation: 18,
+          elevation: 12,
           shadowColor: isDark ? '#000000' : '#1e3a8a',
-          shadowOffset: { width: 0, height: 12 },
-          shadowOpacity: isDark ? 0.5 : 0.18,
-          shadowRadius: 20,
-          paddingHorizontal: 6,
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: isDark ? 0.4 : 0.1,
+          shadowRadius: 12,
+          paddingBottom: bottomInset,
         },
       }}
     >
@@ -67,14 +66,14 @@ export default function TabsLayout() {
         name="home"
         options={{
           title: 'Главная',
-          tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'home' : 'home-outline'} size={23} color={color} />,
+          tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'home' : 'home-outline'} size={21} color={color} />,
         }}
       />
       <Tabs.Screen
         name="requests/index"
         options={{
           title: 'Заявки',
-          tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'clipboard' : 'clipboard-outline'} size={23} color={color} />,
+          tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'clipboard' : 'clipboard-outline'} size={21} color={color} />,
         }}
       />
       <Tabs.Screen
@@ -85,21 +84,21 @@ export default function TabsLayout() {
         name="payments/index"
         options={{
           title: 'Платежи',
-          tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'card' : 'card-outline'} size={23} color={color} />,
+          tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'card' : 'card-outline'} size={21} color={color} />,
         }}
       />
       <Tabs.Screen
         name="chat/index"
         options={{
           title: 'Чат',
-          tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={23} color={color} />,
+          tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={21} color={color} />,
         }}
       />
       <Tabs.Screen
         name="profile/index"
         options={{
           title: 'Профиль',
-          tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'person' : 'person-outline'} size={23} color={color} />,
+          tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'person' : 'person-outline'} size={21} color={color} />,
         }}
       />
     </Tabs>

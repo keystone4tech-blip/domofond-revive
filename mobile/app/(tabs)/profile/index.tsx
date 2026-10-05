@@ -310,11 +310,6 @@ export default function ProfileScreen() {
               <Text style={[styles.permStatus, { color: notifGranted ? colors.secondary : colors.textMuted }]}>{notifGranted == null ? '…' : notifGranted ? 'Разрешены' : 'Включить'}</Text>
             </TouchableOpacity>
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
-            <TouchableOpacity style={styles.menuItem} onPress={requestMedia} activeOpacity={0.7}>
-              <View style={styles.menuItemLeft}><Ionicons name="images-outline" size={22} color={colors.textMuted} /><Text style={[styles.menuItemTitle, { color: colors.text }]}>Доступ к фото и файлам</Text></View>
-              <Text style={[styles.permStatus, { color: mediaGranted ? colors.secondary : colors.textMuted }]}>{mediaGranted == null ? '…' : mediaGranted ? 'Разрешён' : 'Включить'}</Text>
-            </TouchableOpacity>
-            <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <TouchableOpacity style={styles.menuItem} onPress={requestGeo} activeOpacity={0.7}>
               <View style={styles.menuItemLeft}><Ionicons name="location-outline" size={22} color={colors.textMuted} /><Text style={[styles.menuItemTitle, { color: colors.text }]}>Геопозиция</Text></View>
               <Text style={[styles.permStatus, { color: geoGranted ? colors.secondary : colors.textMuted }]}>{geoGranted == null ? '…' : geoGranted ? 'Разрешена' : 'Включить'}</Text>
@@ -347,11 +342,11 @@ export default function ProfileScreen() {
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Row icon="information-circle-outline" title="О нас" onPress={() => setAboutOpen(true)} />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
-            <Row icon="navigate-outline" title="Как проехать в офис" onPress={() => setMapsOpen(true)} value="2ГИС · Яндекс" />
+            <Row icon="navigate-outline" title="Как проехать в офис" onPress={() => setMapsOpen(true)} />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
-            <Row icon="globe-outline" title="Наш сайт" value="домофондар.рф" onPress={() => openLink(SITE_URL)} />
+            <Row icon="globe-outline" title="Наш сайт" onPress={() => openLink(SITE_URL)} />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
-            <Row icon="call-outline" title="Служба поддержки" value="+7 (903) 411-83-93" onPress={() => Linking.openURL(`tel:${OFFICE_PHONE}`)} />
+            <Row icon="call-outline" title="Служба поддержки" onPress={() => Linking.openURL(`tel:${OFFICE_PHONE}`)} />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <Row icon="phone-portrait-outline" title="Версия приложения" value={APP_VERSION} onPress={handleCheckUpdateManual} />
           </View>
@@ -373,7 +368,7 @@ export default function ProfileScreen() {
       {/* Модалка редактирования данных */}
       <Modal visible={isEditModalOpen} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border }]}>
+          <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border, paddingTop: Math.max(insets.top, 12) + 8 }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>Мои данные</Text>
               <TouchableOpacity onPress={() => setIsEditModalOpen(false)}><Ionicons name="close" size={24} color={colors.textMuted} /></TouchableOpacity>
@@ -401,12 +396,12 @@ export default function ProfileScreen() {
       {/* Модалка «О нас»: информация о компании, режим работы, мессенджеры (как на сайте) */}
       <Modal visible={aboutOpen} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border }]}>
+          <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border, paddingTop: Math.max(insets.top, 12) + 8 }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>О нас</Text>
               <TouchableOpacity onPress={() => setAboutOpen(false)}><Ionicons name="close" size={24} color={colors.textMuted} /></TouchableOpacity>
             </View>
-            <ScrollView>
+            <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 12) + 24 }} showsVerticalScrollIndicator={false}>
               <Text style={[styles.aboutCompany, { color: colors.text }]}>ООО «ДомофонДар»</Text>
               <Text style={[styles.aboutDesc, { color: colors.textSecondary }]}>
                 Обслуживание, ремонт и монтаж домофонных систем в Краснодаре. Многолетний опыт и поддержка жильцов.
@@ -475,12 +470,12 @@ export default function ProfileScreen() {
       {/* Модалка «Как проехать»: карты 2ГИС и Яндекс (организация как на сайте) */}
       <Modal visible={mapsOpen} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border }]}>
+          <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border, paddingTop: Math.max(insets.top, 12) + 8 }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>Как проехать</Text>
               <TouchableOpacity onPress={() => setMapsOpen(false)}><Ionicons name="close" size={24} color={colors.textMuted} /></TouchableOpacity>
             </View>
-            <ScrollView>
+            <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 12) + 24 }} showsVerticalScrollIndicator={false}>
               <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Адрес офиса</Text>
               <Text style={[styles.aboutAddr, { color: colors.text }]}>{OFFICE_ADDRESS}</Text>
               <Text style={[styles.aboutRowSub, { color: colors.textMuted, marginTop: 6 }]}>Откройте карточку организации «ДомофонДар» в приложении карт:</Text>
@@ -503,12 +498,12 @@ export default function ProfileScreen() {
       {/* Модалка «Документы»: правовые документы */}
       <Modal visible={docsOpen} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border }]}>
+          <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border, paddingTop: Math.max(insets.top, 12) + 8 }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>Документы</Text>
               <TouchableOpacity onPress={() => setDocsOpen(false)}><Ionicons name="close" size={24} color={colors.textMuted} /></TouchableOpacity>
             </View>
-            <ScrollView>
+            <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 12) + 24 }} showsVerticalScrollIndicator={false}>
               {docs.map((d) => (
                 <TouchableOpacity key={d.id} style={[styles.docRow, { borderColor: colors.border }]} onPress={() => { setDocsOpen(false); setLegalDocId(d.id); }} activeOpacity={0.7}>
                   <Ionicons name="document-text-outline" size={18} color={colors.primaryContainer} style={{ marginRight: 10 }} />
@@ -582,7 +577,7 @@ const styles = StyleSheet.create({
   segment: { flexDirection: 'row', borderRadius: 12, borderWidth: 1, padding: 4, gap: 4 },
   segmentBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 9, borderRadius: 9 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.7)', justifyContent: 'flex-end' },
-  modalContent: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '88%', borderWidth: 1 },
+  modalContent: { flex: 1, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 4, borderWidth: 0 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   modalTitle: { fontSize: 20, fontWeight: 'bold' },
   inputLabel: { fontSize: 13, fontWeight: '600', marginBottom: 6, marginTop: 12 },

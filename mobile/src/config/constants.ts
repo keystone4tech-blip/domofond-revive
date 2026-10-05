@@ -10,7 +10,7 @@ export const API_URL = 'https://xn--80aha5afebav9a.xn--p1ai/backend-api';
 export const WS_URL = 'wss://xn--80aha5afebav9a.xn--p1ai/ws';
 
 // Текущая версия приложения
-export const APP_VERSION = '1.2.3';
+export const APP_VERSION = '1.2.4';
 
 // Прямая ссылка для скачивания последней версии APK с официального сервера компании
 // Используется бэкенд-эндпоинт с заголовками attachment для предотвращения перехвата Service Worker браузера

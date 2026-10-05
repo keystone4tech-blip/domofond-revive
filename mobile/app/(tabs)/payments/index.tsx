@@ -14,6 +14,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
 import { apiClient } from '@/api/client';
@@ -210,88 +211,75 @@ export default function PaymentsScreen() {
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
             <>
-              {/* Карточка баланса в стиле CyberShield */}
-              <View style={[styles.balanceCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <View style={styles.balanceTopRow}>
-                  <View>
-                    <Text style={[styles.accountTitle, { color: colors.textSecondary }]}>Номер лицевого счёта</Text>
-                    <Text style={[styles.accountNumber, { color: colors.text }]}>
+              {/* Карта-герой счёта (в стиле главного экрана) */}
+              <LinearGradient
+                colors={debt > 0
+                  ? ['#f97316', '#ea580c', '#b91c1c']
+                  : debt < 0
+                  ? ['#10b981', '#059669', '#047857']
+                  : ['#0ea5e9', '#0276c4', '#0b3f78']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.heroCard}
+              >
+                <View style={styles.heroGlow} />
+
+                <View style={styles.heroTopRow}>
+                  <View style={styles.heroAcctBlock}>
+                    <Text style={styles.heroAcctLabel}>Лицевой счёт</Text>
+                    <Text style={styles.heroAcctNum} numberOfLines={1}>
                       {account ? `№ ${account.account_number}` : 'Не привязан'}
                     </Text>
                   </View>
-                  <View style={[styles.sbpBadge, { backgroundColor: isDark ? '#262a35' : '#eff4ff', borderColor: colors.border }]}>
-                    <Ionicons name="card" size={14} color={colors.primaryContainer} style={{ marginRight: 4 }} />
-                    <Text style={[styles.sbpBadgeText, { color: colors.primaryContainer }]}>СБП • Мир</Text>
+                  <View style={styles.heroSbp}>
+                    <Ionicons name="card" size={13} color="#fff" style={{ marginRight: 4 }} />
+                    <Text style={styles.heroSbpText}>СБП • Мир</Text>
                   </View>
                 </View>
 
-                {account?.address && (
-                  <Text style={[styles.accountAddress, { color: colors.textMuted }]} numberOfLines={1}>
-                    📍 {account.address}
-                  </Text>
-                )}
+                {account?.address ? (
+                  <View style={styles.heroAddrRow}>
+                    <Ionicons name="location-outline" size={13} color="rgba(255,255,255,0.85)" style={{ marginRight: 5 }} />
+                    <Text style={styles.heroAddrText} numberOfLines={1}>{account.address}</Text>
+                  </View>
+                ) : null}
 
-                <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-                <Text style={[styles.balanceText, { color: colors.textSecondary }]}>
-                  {hasDebt ? 'Текущая задолженность по ТО:' : 'Состояние счета:'}
+                <Text style={styles.heroBalLabel}>
+                  {hasDebt ? 'Задолженность по ТО' : debt < 0 ? 'Баланс (переплата)' : 'Состояние счёта'}
                 </Text>
-                <Text
-                  style={[
-                    styles.balanceAmount,
-                    { color: hasDebt ? colors.error : colors.primaryContainer },
-                  ]}
-                >
-                  {hasDebt ? `${debt.toFixed(2)} ₽` : 'Задолженности нет • 0.00 ₽'}
+                <Text style={styles.heroBalValue}>
+                  {hasDebt ? `${debt.toFixed(2)} ₽` : debt < 0 ? `+${Math.abs(debt).toFixed(2)} ₽` : 'Задолженности нет'}
                 </Text>
 
                 {/* Быстрая кнопка погашения долга */}
                 {hasDebt && (
-                  <TouchableOpacity
-                    style={[styles.payButton, { backgroundColor: colors.error }]}
-                    onPress={() => handlePay(debt)}
-                    disabled={paying}
-                    activeOpacity={0.85}
-                  >
-                    {paying ? (
-                      <ActivityIndicator color="#ffffff" />
-                    ) : (
+                  <TouchableOpacity style={styles.heroPayDebt} onPress={() => handlePay(debt)} disabled={paying} activeOpacity={0.85}>
+                    {paying ? <ActivityIndicator color="#b91c1c" /> : (
                       <>
-                        <Ionicons name="flash" size={18} color="#ffffff" style={{ marginRight: 8 }} />
-                        <Text style={styles.payButtonText}>Погасить долг ({debt.toFixed(2)} ₽)</Text>
+                        <Ionicons name="flash" size={17} color="#b91c1c" style={{ marginRight: 8 }} />
+                        <Text style={styles.heroPayDebtText}>Погасить долг ({debt.toFixed(2)} ₽)</Text>
                       </>
                     )}
                   </TouchableOpacity>
                 )}
 
                 {/* Оплата произвольной суммы */}
-                <View style={styles.customPayRow}>
+                <View style={styles.heroPayRow}>
                   <TextInput
-                    style={[
-                      styles.customInput,
-                      { backgroundColor: isDark ? '#171b26' : '#f8f9ff', borderColor: colors.border, color: colors.text },
-                    ]}
+                    style={styles.heroInput}
                     placeholder="Сумма, ₽"
-                    placeholderTextColor={colors.textMuted}
+                    placeholderTextColor="rgba(255,255,255,0.7)"
                     keyboardType="numeric"
                     value={customAmount}
                     onChangeText={setCustomAmount}
                   />
-                  <TouchableOpacity
-                    style={[styles.customPayButton, { backgroundColor: colors.primaryContainer }]}
-                    onPress={() => handlePay(parseFloat(customAmount))}
-                    disabled={paying}
-                    activeOpacity={0.85}
-                  >
-                    <Text style={styles.customPayButtonText}>Оплатить</Text>
+                  <TouchableOpacity style={styles.heroPayBtn} onPress={() => handlePay(parseFloat(customAmount))} disabled={paying} activeOpacity={0.85}>
+                    <Text style={styles.heroPayBtnText}>Оплатить</Text>
                   </TouchableOpacity>
                 </View>
 
-                {/* Уведомление о возможной банковской комиссии (как на сайте) */}
-                <Text style={[styles.feeNote, { color: colors.textMuted }]}>
-                  Возможна комиссия банка при оплате
-                </Text>
-              </View>
+                <Text style={styles.heroFeeNote}>Возможна комиссия банка при оплате</Text>
+              </LinearGradient>
 
               <Text style={[styles.sectionTitle, { color: colors.text }]}>История операций</Text>
             </>
@@ -320,6 +308,53 @@ const styles = StyleSheet.create({
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
   loadingText: { marginTop: 12, fontSize: 14 },
   container: { paddingHorizontal: 16 },
+  // ===== Карта-герой счёта =====
+  heroCard: {
+    borderRadius: 26,
+    padding: 20,
+    marginBottom: 20,
+    position: 'relative',
+    overflow: 'hidden',
+    elevation: 10,
+    shadowColor: '#0b3f78',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.4,
+    shadowRadius: 24,
+  },
+  heroGlow: {
+    position: 'absolute', top: -60, right: -40, width: 180, height: 180,
+    borderRadius: 90, backgroundColor: 'rgba(78,222,163,0.35)',
+  },
+  heroTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  heroAcctBlock: { flexShrink: 1, minWidth: 0 },
+  heroAcctLabel: { fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.82)' },
+  heroAcctNum: { fontSize: 17, fontWeight: '800', color: '#fff', marginTop: 2 },
+  heroSbp: {
+    flexShrink: 0, flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 9, paddingVertical: 5, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  heroSbpText: { fontSize: 10.5, fontWeight: '700', color: '#fff' },
+  heroAddrRow: { flexDirection: 'row', alignItems: 'center', marginTop: 10 },
+  heroAddrText: { flexShrink: 1, fontSize: 12, color: 'rgba(255,255,255,0.85)' },
+  heroBalLabel: { fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.82)', marginTop: 16 },
+  heroBalValue: { fontSize: 28, fontWeight: '800', color: '#fff', letterSpacing: -0.5, marginTop: 2 },
+  heroPayDebt: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#fff', paddingVertical: 13, borderRadius: 14, marginTop: 16,
+  },
+  heroPayDebtText: { color: '#b91c1c', fontSize: 14, fontWeight: '800' },
+  heroPayRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
+  heroInput: {
+    flex: 1, height: 46, borderRadius: 12, paddingHorizontal: 14, fontSize: 15, fontWeight: '600',
+    color: '#fff', backgroundColor: 'rgba(255,255,255,0.18)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',
+  },
+  heroPayBtn: {
+    paddingHorizontal: 20, height: 46, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#fff',
+  },
+  heroPayBtnText: { color: '#0276c4', fontSize: 14, fontWeight: '800' },
+  heroFeeNote: { fontSize: 11, color: 'rgba(255,255,255,0.8)', textAlign: 'center', marginTop: 12 },
   balanceCard: {
     borderRadius: 18,
     borderWidth: 1,

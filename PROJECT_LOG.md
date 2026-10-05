@@ -11,6 +11,35 @@
 > 
 > **Пользователь НЕ ДОЛЖЕН ничего вносить вручную.** Вся статистика и история пополняется ИИ автоматически при каждой задаче.
 
+# 2026-10-06 02:15 — Мобильное приложение v1.2.4 (Build 11): Закреплённый таб-бар, Hero-карта платежей и полноэкранные модалки
+
+## 1. Задачи и бизнес-ценность
+- **Закреплённый компактный таб-бар (`_layout.tsx`)**:
+  * Таб-бар переведён из плавающего с боковыми отступами в закреплённый на всю ширину с матовым стеклом `BlurView`.
+  * Верхние углы аккуратно скруглены (`borderTopLeftRadius: 20`, `borderTopRightRadius: 20`).
+  * Полностью исключено перекрытие контента и кнопок в нижней части экранов (например, кнопки заявок и оплат).
+- **Hero-карта счёта на экране «Платежи» (`payments/index.tsx`)**:
+  * Оформление лицевого счёта и баланса в едином стиле с главным экраном через `LinearGradient`.
+  * Бейдж «СБП • Мир», крупная сумма задолженности или переплаты (`+... ₽`), мгновенная оплата долга и поле произвольной суммы с кнопкой «Оплатить».
+- **Полноэкранные модальные окна (`profile/index.tsx`, `LegalModal.tsx`)**:
+  * Окна «Мои данные», «О нас», «Как проехать» и «Документы» переведены в полноэкранный режим с поддержкой безопасных зон (`insets.top`, `insets.bottom`).
+  * Компонент юридических регламентов `LegalModal` оформлен во весь экран с закреплённой шапкой и удобной кнопкой «Понятно».
+- **Версионирование**:
+  * Версия приложения повышена до **v1.2.4** (`versionCode: 11`, `buildNumber: 11`).
+  * Эндпоинт `/api/app/version` на сервере обновлён для отдачи `1.2.4 (Build 11)`.
+
+## 2. Измененные файлы
+- [`mobile/app/(tabs)/_layout.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/app/(tabs)/_layout.tsx) — Закреплённый таб-бар на всю ширину с BlurView.
+- [`mobile/app/(tabs)/payments/index.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/app/(tabs)/payments/index.tsx) — Hero-карта платежей с градиентом и СБП.
+- [`mobile/app/(tabs)/profile/index.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/app/(tabs)/profile/index.tsx) — Полноэкранные модалки информации и навигации.
+- [`mobile/src/components/LegalModal.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/src/components/LegalModal.tsx) — Полноэкранный просмотр документов.
+- [`mobile/app.config.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/app.config.ts) — Повышение версии до 1.2.4 (versionCode: 11).
+- [`mobile/package.json`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/package.json) — Версия 1.2.4.
+- [`mobile/src/config/constants.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/src/config/constants.ts) — APP_VERSION = '1.2.4'.
+- [`server/index.js`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/server/index.js) — latestVersion: '1.2.4', versionCode: 11.
+- [`src/data/projectChangelog.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/data/projectChangelog.ts) — Внесение записи в паспорт проекта.
+- [`PROJECT_LOG.md`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/PROJECT_LOG.md) — Обновление журнала проекта.
+
 # 2026-10-06 01:25 — Мобильное приложение v1.2.3 (Build 10): Повышение версии для срабатывания OTA-обновления
 
 ## 1. Задачи и бизнес-ценность
