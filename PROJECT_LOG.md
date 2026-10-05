@@ -11,6 +11,33 @@
 > 
 > **Пользователь НЕ ДОЛЖЕН ничего вносить вручную.** Вся статистика и история пополняется ИИ автоматически при каждой задаче.
 
+# 2026-10-05 23:15 — Глобальный рефакторинг и стандартизация: миграция с устаревшего наименования FSM на CRM
+
+## 1. Задачи и бизнес-ценность
+- **Унификация терминологии**:
+  * Исключена путаница в названии диспетчерской/сервисной подсистемы компании. Все ссылки, компоненты и страницы переведены на единый отраслевой стандарт **CRM** (Customer Relationship Management).
+- **Безопасность и отказоустойчивость**:
+  * Создан полный снапшот базы данных PostgreSQL на боевом сервере (`db_backup_pre_crm_20261005_230103.sql.gz`).
+  * Зафиксирован Git-тег точки восстановления `backup-pre-crm-migration`.
+  * Локальные копии сохранены в `backups/pre_crm_migration/`.
+- **100% обратная совместимость**:
+  * Маршрут `/fsm` сохранен и прозрачно отображает `/crm` — мобильные устройства мастеров и закладки сотрудников продолжают работать без сбоев.
+  * Созданы прозрачные реэкспорты старых компонентов в `src/components/fsm/` для предотвращения поломок зависимостей.
+
+## 2. Измененные и созданные файлы
+- [`src/pages/CRM.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/pages/CRM.tsx) — Основная страница CRM системы.
+- [`src/pages/FSM.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/pages/FSM.tsx) — Бесшовный реэкспорт страницы для старых ссылок.
+- `src/components/crm/*` — Выделенный каталог из 17 модулей управления CRM (заявки, наряды, номенклатура, мастера, графики, отчёты).
+- [`src/App.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/App.tsx) — Регистрация роутов `/crm` и `/fsm`.
+- [`src/components/Header.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/components/Header.tsx), [`src/components/MobileBottomNav.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/components/MobileBottomNav.tsx), [`src/pages/Admin.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/pages/Admin.tsx), [`src/pages/Cabinet.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/pages/Cabinet.tsx) — Обновление ссылок навигации и проверок ролей (`isCRMUser`).
+- [`src/types/crmRoles.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/types/crmRoles.ts), [`src/hooks/useUserRole.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/hooks/useUserRole.tsx) — CRM-типизация с алиасами.
+
+## 3. Статус выкатки
+- Проект успешно собран локально (Vite, 4227 модулей, 0 ошибок).
+- Код запушен в `main` (`commit e2147e7`).
+- Контейнер `domofondar_frontend` успешно пересобран и запущен на боевом сервере `45.8.99.238`. Роуты `/crm` и `/fsm` отдают `HTTP 200 OK`.
+
+
 # 2026-10-05 22:45 — Панель Супер-Администратора (SuperAdminControl): скрытые роли, персональные права и режим Инкогнито
 
 ## 1. Задачи и бизнес-ценность
