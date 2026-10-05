@@ -186,6 +186,12 @@ export const useUserRole = (): UseUserRoleResult => {
     if (assignedRoles.includes("director") || assignedRoles.includes("superadmin")) {
       return true;
     }
+    // Раздел базы знаний «Инструкция» доступен любому авторизованному сотруднику CRM по умолчанию,
+    // если только он явно не отключен в индивидуальном списке разрешений роли
+    if (tabId === "instructions") {
+      // Если в permissions явно есть instructions, или если permissions не пустой (сотрудник FSM)
+      return permissions.includes("instructions") || permissions.length > 0;
+    }
     // Проверяем наличие вкладки в списке прав
     return permissions.includes(tabId);
   }, [roles, assignedRoles, permissions]);

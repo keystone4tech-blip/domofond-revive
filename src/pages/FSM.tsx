@@ -37,6 +37,7 @@ import { AccountsManager } from "@/components/admin/AccountsManager";
 import IntercomLoginsManager from "@/components/fsm/IntercomLoginsManager";
 import InstallerSheetManager from "@/components/fsm/InstallerSheetManager";
 import VerificationManager from "@/components/fsm/VerificationManager";
+import InstructionsManager from "@/components/fsm/InstructionsManager";
 import FSMBottomNav from "@/components/fsm/FSMBottomNav";
 import { FSMSidebar } from "@/components/fsm/FSMSidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -394,6 +395,13 @@ const FSM = () => {
             {hasPermission("verification") && (
               <TabsContent value="verification" className="mt-0 outline-none">
                 <VerificationManager />
+              </TabsContent>
+            )}
+
+            {/* 14. База знаний и инструкции для сотрудников */}
+            {hasPermission("instructions") && (
+              <TabsContent value="instructions" className="mt-0 outline-none">
+                <InstructionsManager onNavigateTab={(tab) => handleTabChange(tab)} />
               </TabsContent>
             )}
           </Tabs>

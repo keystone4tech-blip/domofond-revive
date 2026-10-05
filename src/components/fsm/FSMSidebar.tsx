@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { 
   LayoutDashboard, ClipboardList, FileText, Package, 
   Users, Building2, MapPin, BarChart3, ShieldCheck, 
-  Home, LogOut, Shield, User, FileSpreadsheet, DoorClosed, KeyRound, ClipboardCheck, Wrench, Construction
+  Home, LogOut, Shield, User, FileSpreadsheet, DoorClosed, KeyRound, ClipboardCheck, Wrench, Construction, BookOpen
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -117,6 +117,12 @@ export const FSMSidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }: FSMSi
       label: "Верификация", 
       icon: ShieldCheck, 
       badge: counts?.pendingVerifications || 0 
+    },
+    // База знаний и регламенты для сотрудников (в самом низу меню)
+    {
+      id: "instructions",
+      label: "Инструкция",
+      icon: BookOpen,
     },
   ];
 

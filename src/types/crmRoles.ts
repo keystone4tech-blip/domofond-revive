@@ -124,4 +124,10 @@ export const FSM_TABS: FSMTabDefinition[] = [
     description: "Проверка документов абонентов и заявок на смену персональных данных",
     category: "management"
   },
+  { 
+    id: "instructions", 
+    label: "Инструкция", 
+    description: "База знаний, производственные регламенты и пошаговые инструкции для сотрудников",
+    category: "management"
+  },
 ];
