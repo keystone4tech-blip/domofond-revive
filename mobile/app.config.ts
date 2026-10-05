@@ -4,13 +4,27 @@
 import { ExpoConfig, ConfigContext } from 'expo/config';
 import { withAndroidManifest, withAppBuildGradle, withGradleProperties, ConfigPlugin } from '@expo/config-plugins';
 
-// Плагин для гарантированного разрешения HTTP-трафика (порт 80) к боевому серверу 45.8.99.238
-const withCleartextTraffic: ConfigPlugin = (config) => {
+// Плагин для гарантированного разрешения HTTP-трафика и установки APK обновлений
+const withAppCustomManifest: ConfigPlugin = (config) => {
   return withAndroidManifest(config, async (manifestConfig) => {
     const androidManifest = manifestConfig.modResults.manifest;
     if (androidManifest.application && androidManifest.application[0]) {
       androidManifest.application[0].$['android:usesCleartextTraffic'] = 'true';
     }
+
+    // Добавляем системное разрешение REQUEST_INSTALL_PACKAGES для нативного PackageInstaller
+    if (!androidManifest['uses-permission']) {
+      androidManifest['uses-permission'] = [];
+    }
+    const hasInstallPermission = androidManifest['uses-permission'].some(
+      (p: any) => p.$?.['android:name'] === 'android.permission.REQUEST_INSTALL_PACKAGES'
+    );
+    if (!hasInstallPermission) {
+      androidManifest['uses-permission'].push({
+        $: { 'android:name': 'android.permission.REQUEST_INSTALL_PACKAGES' }
+      } as any);
+    }
+
     return manifestConfig;
   });
 };
@@ -112,6 +126,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       'POST_NOTIFICATIONS',                    // Push-уведомления (Android 13+)
       'ACCESS_FINE_LOCATION',                  // Геопозиция по GPS
       'ACCESS_COARSE_LOCATION',                // Геопозиция по сети/Wi-Fi
+      'REQUEST_INSTALL_PACKAGES',              // Разрешение на установку APK обновлений
     ],
   },
 
@@ -170,5 +185,5 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   },
   };
 
-  return withCustomGradleProperties(withReleaseSigning(withCleartextTraffic(baseConfig)));
+  return withCustomGradleProperties(withReleaseSigning(withAppCustomManifest(baseConfig)));
 };

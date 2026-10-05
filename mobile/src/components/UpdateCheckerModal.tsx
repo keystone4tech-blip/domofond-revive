@@ -190,11 +190,13 @@ export function UpdateCheckerModal() {
         const contentUri = await FileSystem.getContentUriAsync(fileUri);
         console.log('[UpdateChecker] Сформирован Android Content URI:', contentUri);
 
-        // Запуск системного интента ACTION_VIEW для установки пакета приложения
-        // Флаг 1 (FLAG_GRANT_READ_URI_PERMISSION) дает установщику права на чтение файла APK
+        // Флаги:
+        // FLAG_GRANT_READ_URI_PERMISSION = 1 (чтение URI установщиком)
+        // FLAG_ACTIVITY_NEW_TASK = 268435456 (0x10000000) (запуск в новом стеке задач поверх текущего экрана)
+        // Сумма = 268435457
         await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
           data: contentUri,
-          flags: 1,
+          flags: 268435457,
           type: 'application/vnd.android.package-archive',
         });
         console.log('[UpdateChecker] Системный установщик пакетов Android успешно запущен');
@@ -213,25 +215,37 @@ export function UpdateCheckerModal() {
     } catch (openErr: any) {
       console.warn('[UpdateChecker] Не удалось напрямую вызвать PackageInstaller:', openErr);
       Alert.alert(
-        'Файл загружен',
-        'Обновление успешно загружено. Нажмите «Установить» для открытия файла установщиком.',
+        'Установка обновления',
+        'Файл обновления успешно загружен на устройство. Если система запросила «Разрешить установку из этого источника» — включите тумблер и нажмите «Установить».',
         [
           {
-            text: 'Установить',
+            text: 'Запустить установку',
             onPress: async () => {
               try {
                 const cUri = await FileSystem.getContentUriAsync(fileUri);
                 await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
                   data: cUri,
-                  flags: 1,
+                  flags: 268435457,
                   type: 'application/vnd.android.package-archive',
                 });
               } catch (e) {
-                handleFallbackBrowserDownload();
+                // Если система заблокировала прямой вызов, открываем диалог системного шаринга/открытия файла
+                try {
+                  const shareAvail = await Sharing.isAvailableAsync();
+                  if (shareAvail) {
+                    await Sharing.shareAsync(fileUri, {
+                      mimeType: 'application/vnd.android.package-archive',
+                    });
+                  } else {
+                    handleFallbackBrowserDownload();
+                  }
+                } catch {
+                  handleFallbackBrowserDownload();
+                }
               }
             }
           },
-          { text: 'Открыть ссылку', onPress: handleFallbackBrowserDownload },
+          { text: 'Скачать через браузер', onPress: handleFallbackBrowserDownload },
           { text: 'Отмена', style: 'cancel' }
         ]
       );
