@@ -74,7 +74,7 @@ const MobileBottomNav = () => {
   }, [location.pathname]);
 
   // Проверка прав доступа сотрудника CRM
-  const isFSMUser = userRoles.some((r) => 
+  const isCRMUser = userRoles.some((r) => 
     ["admin", "director", "dispatcher", "master", "engineer", "manager", "superadmin"].includes(r)
   );
 
@@ -86,9 +86,9 @@ const MobileBottomNav = () => {
   // Доступ к Инженерному паспорту строго закрыт для всех и открыт ИСКЛЮЧИТЕЛЬНО суперадмину
   const isSuperAdmin = ((user?.email || "").toLowerCase().trim() === "viruscorp4@gmail.com") || userRoles.includes("superadmin");
 
-  // На страницах админки (/admin) и CRM (/fsm) глобальную нижнюю панель скрываем,
+  // На страницах админки (/admin) и CRM (/crm, /fsm) глобальную нижнюю панель скрываем,
   // так как там используются свои специализированные мобильные тулбары
-  if (location.pathname.startsWith("/fsm") || location.pathname.startsWith("/admin")) {
+  if (location.pathname.startsWith("/crm") || location.pathname.startsWith("/fsm") || location.pathname.startsWith("/admin")) {
     return null;
   }
 
@@ -328,16 +328,16 @@ const MobileBottomNav = () => {
           </div>
 
           {/* Служебный блок для сотрудников и администратора */}
-          {(isFSMUser || isAdmin) && (
+          {(isCRMUser || isAdmin) && (
             <div className="mt-4 pt-3 border-t border-border/60 space-y-2">
               <div className="text-[10px] font-extrabold text-muted-foreground uppercase tracking-wider px-1">
                 Служебный доступ персонала
               </div>
 
-              {/* FSM CRM для сотрудников */}
-              {isFSMUser && (
+              {/* CRM для сотрудников */}
+              {isCRMUser && (
                 <button
-                  onClick={() => handleNavigate("/fsm")}
+                  onClick={() => handleNavigate("/crm")}
                   className="w-full flex items-center justify-between p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 font-semibold text-xs border border-blue-500/20 active:scale-95 transition-transform"
                 >
                   <div className="flex items-center gap-2.5">

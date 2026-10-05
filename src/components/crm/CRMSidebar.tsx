@@ -1,0 +1,239 @@
+import React, { useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Link, useNavigate } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { 
+  LayoutDashboard, ClipboardList, FileText, Package, 
+  Users, Building2, MapPin, BarChart3, ShieldCheck, 
+  Home, LogOut, Shield, User, FileSpreadsheet, DoorClosed, KeyRound, ClipboardCheck, Wrench, Construction, BookOpen
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useUserRole } from "@/hooks/useUserRole";
+
+// Пропсы для боковой панели CRM
+export interface CRMSidebarProps {
+  activeTab: string;
+  setActiveTab: (tab: string, filter?: string) => void;
+  isManager: boolean;
+  isOpen?: boolean; // Для мобильной шторки
+  setIsOpen?: (open: boolean) => void;
+}
+
+export type FSMSidebarProps = CRMSidebarProps;
+
+export const CRMSidebar = ({ activeTab, setActiveTab, isManager, isOpen, setIsOpen }: CRMSidebarProps) => {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { isAdmin, hasPermission } = useUserRole();
+
+  // Получение количества активных задач, заявок и верификаций для бейджей (онлайн опрос каждые 5 сек)
+  const { data: counts } = useQuery({
+    queryKey: ["fsm-sidebar-counts"],
+    queryFn: async () => {
+      console.log("[FSMSidebar] Онлайн-запрос счетчиков для бейджей (задачи, заявки, верификации)...");
+      const [tasksRes, requestsRes, profilesRes] = await Promise.all([
+        supabase.from("tasks").select("status"),
+        supabase.from("requests").select("status"),
+        supabase.from("profiles").select("id, is_verified, verification_status, verification_document_url, full_name, pending_data_change"),
+      ]);
+      
+      const tasks = tasksRes.data || [];
+      const requests = requestsRes.data || [];
+      const profiles = profilesRes.data || [];
+      
+      // Подсчет количества поступивших заявок на первичную верификацию
+      const pendingVerifications = profiles.filter((p: any) => {
+        if (p.is_verified) return false;
+        if (p.verification_status === "rejected") return false;
+        if (p.verification_status === "pending") return true;
+        if (p.verification_document_url) return true;
+        return false;
+      }).length;
+
+      // Подсчет поступивших заявок на изменение персональных данных абонентов
+      const pendingDataChanges = profiles.filter((p: any) => 
+        p.pending_data_change && typeof p.pending_data_change === "object"
+      ).length;
+
+      return {
+        pendingTasks: tasks.filter((t) => t.status === "pending" || t.status === "assigned" || t.status === "in_progress").length,
+        pendingRequests: requests.filter((r) => r.status === "pending" || r.status === "in_progress").length,
+        pendingVerifications: pendingVerifications + pendingDataChanges,
+      };
+    },
+    refetchInterval: 5000, // Онлайн-обновление каждые 5 секунд
+  });
+
+  // Мгновенная синхронизация через локальные события при отправке верификации в ЛК
+  useEffect(() => {
+    const handleSync = () => {
+      console.log("[FSMSidebar] Получен сигнал обновления верификации, синхронизируем счётчики...");
+      queryClient.invalidateQueries({ queryKey: ["fsm-sidebar-counts"] });
+    };
+
+    window.addEventListener("storage", handleSync);
+    window.addEventListener("verification_submitted", handleSync);
+    return () => {
+      window.removeEventListener("storage", handleSync);
+      window.removeEventListener("verification_submitted", handleSync);
+    };
+  }, [queryClient]);
+
+  // Полный перечень всех 13 вкладок FSM навигации с иконками и бейджами
+  const allMenuItems = [
+    { id: "dashboard", label: "Панель управления", icon: LayoutDashboard },
+    { 
+      id: "tasks", 
+      label: "Задачи", 
+      icon: ClipboardList, 
+      badge: counts?.pendingTasks || 0 
+    },
+    {
+      id: "requests",
+      label: "Заявки",
+      icon: FileText,
+      badge: counts?.pendingRequests || 0
+    },
+    // Объекты на монтаже: заявки, контроль оборудования, история подъездов
+    { id: "new-buildings", label: "Новые дома", icon: Construction },
+    // Раздел поквартирной ведомости оборудования по домам для монтажников
+    { id: "installer-sheet", label: "Лист монтажника", icon: ClipboardCheck },
+    { id: "products", label: "Товары и услуги", icon: Package },
+    // Настройка подбора оборудования по анкете (сценарии → услуги → оборудование)
+    { id: "equipment-matching", label: "Подбор оборудования", icon: Wrench },
+    // Раздел управления адресами и привязкой оборудования к подъездам
+    { id: "addresses", label: "Адреса и подъезды", icon: DoorClosed },
+    // Раздел управления и загрузки лицевых счетов для сотрудников
+    { id: "accounts", label: "Лицевые счета", icon: FileSpreadsheet },
+    // Раздел управления логопасами умного домофона (учетными данными приложения)
+    { id: "logins", label: "Логопасы", icon: KeyRound },
+    // Раздел кадрового состава и прав доступа
+    { id: "employees", label: "Сотрудники и роли", icon: Users },
+    { id: "clients", label: "Клиенты / Объекты", icon: Building2 },
+    // Личные кабинеты зарегистрированных пользователей (поиск, фильтры, удаление)
+    { id: "cabinets", label: "Личные кабинеты", icon: User },
+    { id: "map", label: "Карта мастеров", icon: MapPin },
+    { id: "reports", label: "Финансовые отчеты", icon: BarChart3 },
+    { 
+      id: "verification", 
+      label: "Верификация", 
+      icon: ShieldCheck, 
+      badge: counts?.pendingVerifications || 0 
+    },
+    // База знаний и регламенты для сотрудников (в самом низу меню)
+    {
+      id: "instructions",
+      label: "Инструкция",
+      icon: BookOpen,
+    },
+  ];
+
+  // Динамически фильтруем отображаемые вкладки на основе назначенных прав роли текущего пользователя
+  const visibleItems = allMenuItems.filter((item) => hasPermission(item.id));
+
+  // Обработчик выбора вкладки
+  const handleTabClick = (tabId: string) => {
+    console.log(`[FSMSidebar] Переключение вкладки на: ${tabId}`);
+    setActiveTab(tabId);
+    if (setIsOpen) setIsOpen(false); // Закрываем мобильное меню при наличии шторки
+  };
+
+  // Выход из сессии
+  const handleLogout = async () => {
+    console.log("[FSMSidebar] Выход из системы...");
+    await supabase.auth.signOut();
+    navigate("/auth");
+  };
+
+  return (
+    <aside className={cn(
+      "w-64 h-screen flex flex-col justify-between transition-all duration-300",
+      "bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-r border-slate-200/50 dark:border-slate-800/50",
+      "fixed top-0 left-0 z-50",
+      // Мобильное скрытие сайдбара
+      isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+    )}>
+      {/* Верхний блок: Логотип и Название */}
+      <div>
+        <div className="h-16 flex items-center gap-3 px-6 border-b border-slate-100 dark:border-slate-800/80">
+          <Shield className="h-6 w-6 text-primary animate-pulse" />
+          <div className="flex flex-col text-left">
+            <span className="font-logo font-extrabold text-sm tracking-wide text-foreground uppercase">CRM Домофондар</span>
+            <span className="text-[10px] text-muted-foreground font-semibold">Панель управления</span>
+          </div>
+        </div>
+
+        {/* Список разделов навигации согласно правам роли */}
+        <nav className="p-4 space-y-1 max-h-[calc(100vh-14rem)] overflow-y-auto custom-scrollbar">
+          {visibleItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => handleTabClick(item.id)}
+                className={cn(
+                  "w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 text-left",
+                  isActive 
+                    ? "bg-primary text-primary-foreground shadow-md shadow-primary/20 scale-[1.02]"
+                    : "text-muted-foreground hover:bg-slate-100/70 dark:hover:bg-slate-800/50 hover:text-foreground"
+                )}
+              >
+                <div className="flex items-center gap-3 truncate">
+                  <Icon className={cn("h-4 w-4 shrink-0", isActive ? "text-white" : "text-muted-foreground/80")} />
+                  <span className="truncate">{item.label}</span>
+                </div>
+                {/* Бейдж с количеством активных элементов */}
+                {'badge' in item && item.badge > 0 && (
+                  <span className={cn(
+                    "min-w-[18px] h-[18px] text-[10px] font-bold rounded-full flex items-center justify-center px-1.5",
+                    isActive ? "bg-white text-primary" : "bg-destructive text-white animate-pulse"
+                  )}>
+                    {item.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+      </div>
+
+      {/* Нижний блок: Навигация в Админку, на сайт, в ЛК и Выход */}
+      <div className="p-4 border-t border-slate-100 dark:border-slate-800/80 space-y-1 bg-white/40 dark:bg-slate-900/40">
+        {isAdmin && (
+          <Link 
+            to="/admin" 
+            className="flex items-center gap-3 px-4 py-2 rounded-xl text-sm font-semibold text-purple-600 dark:text-purple-400 hover:bg-purple-50/70 dark:hover:bg-purple-950/30 hover:text-purple-700 transition-all duration-200"
+          >
+            <Shield className="h-4 w-4 shrink-0" />
+            <span>Панель управления</span>
+          </Link>
+        )}
+        <Link 
+          to="/cabinet" 
+          className="flex items-center gap-3 px-4 py-2 rounded-xl text-sm font-semibold text-muted-foreground hover:bg-slate-100/70 dark:hover:bg-slate-800/50 hover:text-foreground transition-all duration-200"
+        >
+          <User className="h-4 w-4 shrink-0" />
+          <span>Личный кабинет</span>
+        </Link>
+        <Link 
+          to="/" 
+          className="flex items-center gap-3 px-4 py-2 rounded-xl text-sm font-semibold text-muted-foreground hover:bg-slate-100/70 dark:hover:bg-slate-800/50 hover:text-foreground transition-all duration-200"
+        >
+          <Home className="h-4 w-4 shrink-0" />
+          <span>На сайт</span>
+        </Link>
+        <button 
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-4 py-2 rounded-xl text-sm font-semibold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 transition-all duration-200 text-left"
+        >
+          <LogOut className="h-4 w-4 shrink-0" />
+          <span>Выйти</span>
+        </button>
+      </div>
+    </aside>
+  );
+};
+
+export const FSMSidebar = CRMSidebar;
+export default CRMSidebar;

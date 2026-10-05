@@ -11,15 +11,16 @@ interface UseUserRoleResult {
   user: User | null;                          // Авторизованный пользователь Supabase
   roles: AppRole[];                           // Системные роли пользователя (из user_roles)
   assignedRoles: string[];                    // Все назначенные роли (включая кастомные роли из employees)
-  permissions: string[];                      // Массив идентификаторов доступных вкладок FSM
+  permissions: string[];                      // Массив идентификаторов доступных вкладок CRM
   crmRoles: CRMRole[];                        // Справочник всех ролей CRM из базы данных
   isLoading: boolean;                         // Флаг загрузки
   isManager: boolean;                         // Является ли менеджером или выше
-  isFSMUser: boolean;                         // Имеет ли доступ к CRM системе
+  isCRMUser: boolean;                         // Имеет ли доступ к CRM системе
+  isFSMUser: boolean;                         // Алиас для обратной совместимости
   isAdmin: boolean;                           // Администратор или директор
   isSuperAdmin: boolean;                      // Супер-администратор
   hasRole: (role: AppRole) => boolean;        // Проверка наличия системной роли
-  hasPermission: (tabId: string) => boolean;  // Проверка права доступа к конкретной вкладке FSM
+  hasPermission: (tabId: string) => boolean;  // Проверка права доступа к конкретной вкладке CRM
   refetchPermissions: () => Promise<void>;    // Функция для ручного обновления прав
   getRoleDisplayName: () => string;           // Получение понятного русского названия роли из БД
 }
@@ -203,10 +204,13 @@ export const useUserRole = (): UseUserRoleResult => {
   // Менеджер или выше (позволяет видеть разделы управления)
   const isManager = isAdmin || roles.includes("manager") || assignedRoles.includes("manager");
   
-  // Пользователь FSM (любой сотрудник с доступом к CRM)
-  const isFSMUser = isAdmin || isManager || roles.some((r) => 
+  // Пользователь CRM (любой сотрудник с доступом к CRM-системе)
+  const isCRMUser = isAdmin || isManager || roles.some((r) => 
     ["dispatcher", "master", "engineer"].includes(r)
   ) || permissions.length > 0;
+  
+  // Алиас для обратной совместимости
+  const isFSMUser = isCRMUser;
 
   return {
     user,
@@ -216,6 +220,7 @@ export const useUserRole = (): UseUserRoleResult => {
     crmRoles,
     isLoading,
     isManager,
+    isCRMUser,
     isFSMUser,
     isAdmin,
     isSuperAdmin,

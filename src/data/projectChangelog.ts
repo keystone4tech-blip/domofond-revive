@@ -258,6 +258,16 @@ export const KIND_META: Record<Kind, { label: string; badgeCls: string }> = {
  */
 export const PROJECT_CHANGELOG: ProjectEntry[] = [
   {
+    id: "stage-2026-10-05-2300",
+    datetime: "2026-10-05 23:00",
+    title: "Глобальная унификация нейминга: полный перевод платформы с FSM на CRM с резервным копированием",
+    description: "Проведена комплексная миграция архитектуры проекта с устаревшего термина FSM на единый стандарт CRM: 1) Созданы полные резервные копии: Git-тэг backup-pre-crm-migration, сжатый дамп всей базы данных PostgreSQL на сервере и локальный архив исходных файлов. 2) Официальный маршрут переведен на /crm с сохранением мостика и редиректа с /fsm. 3) Создана страница src/pages/CRM.tsx и модули в src/components/crm/ (CRMDashboard, CRMBottomNav, CRMSidebar, CRMReports, crmInstructionsData) с прозрачными реэкспортами из устаревших путей fsm для 100% обратной совместимости. 4) Хук useUserRole расширен флагом isCRMUser, обновлен реестр CRM_TABS. 5) Все визуальные элементы в шапке (Header), нижней навигации (MobileBottomNav), админке (AdminSidebar) и личном кабинете переименованы в «CRM Панель». Сборка Vite успешно проверена без единой ошибки.",
+    module: "crm_fsm",
+    kind: "improvement",
+    hours: 6,
+    difficulty: "Средняя",
+  },
+  {
     id: "stage-2026-10-05-2245",
     datetime: "2026-10-05 22:45",
     title: "Панель Супер-Администратора (SuperAdminControl): скрытые роли, персональные права и режим Инкогнито",

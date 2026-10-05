@@ -148,9 +148,9 @@ export const AdminSidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }: Adm
           </Link>
         )}
 
-        {/* Переход в CRM FSM */}
+        {/* Переход в CRM Панель */}
         <Link 
-          to="/fsm" 
+          to="/crm" 
           onClick={() => setIsOpen && setIsOpen(false)}
           className="flex items-center gap-3 px-3.5 py-2 rounded-xl text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50/80 dark:hover:bg-blue-950/30 transition-all"
         >

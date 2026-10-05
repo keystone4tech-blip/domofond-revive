@@ -1,5 +1,5 @@
 // ============================================================================
-// Описание типов и структуры прав доступа для CRM-системы (FSM)
+// Описание типов и структуры прав доступа для CRM-системы «Домофондар»
 // ============================================================================
 
 // Интерфейс роли CRM из таблицы crm_roles
@@ -7,22 +7,25 @@ export interface CRMRole {
   id: string;                   // Уникальный строковый идентификатор роли (например: director, master, manager)
   name: string;                 // Понятное отображаемое название (например: "Директор", "Мастер")
   description: string | null;   // Описание обязанностей и сферы ответственности роли
-  permissions: string[];        // Массив идентификаторов вкладок FSM, к которым разрешен доступ
+  permissions: string[];        // Массив идентификаторов вкладок CRM, к которым разрешен доступ
   is_system: boolean;           // Флаг системной роли (системные роли нельзя удалить)
   created_at?: string;          // Дата создания
   updated_at?: string;          // Дата последнего обновления
 }
 
 // Описание вкладки CRM для конструктора прав
-export interface FSMTabDefinition {
-  id: string;                   // Идентификатор вкладки (совпадает с activeTab в FSM.tsx)
+export interface CRMTabDefinition {
+  id: string;                   // Идентификатор вкладки (совпадает с activeTab в CRM.tsx)
   label: string;                // Название вкладки на русском языке
   description: string;          // Краткое пояснение назначения вкладки
   category: "operations" | "catalog" | "management"; // Категория для группировки в UI
 }
 
-// Полный реестр всех 13 вкладок FSM CRM-системы
-export const FSM_TABS: FSMTabDefinition[] = [
+// Алиас для обратной совместимости
+export type FSMTabDefinition = CRMTabDefinition;
+
+// Полный реестр всех 17 вкладок CRM-системы «Домофондар»
+export const CRM_TABS: CRMTabDefinition[] = [
   // Операционный блок
   { 
     id: "dashboard", 
@@ -131,3 +134,7 @@ export const FSM_TABS: FSMTabDefinition[] = [
     category: "management"
   },
 ];
+
+// Экспорт алиаса для обратной совместимости
+export const FSM_TABS = CRM_TABS;
+

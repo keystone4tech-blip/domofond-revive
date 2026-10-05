@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Cabinet from "./pages/Cabinet";
 import Admin from "./pages/Admin";
+import CRM from "./pages/CRM";
 import FSM from "./pages/FSM";
 import Domofony from "./pages/Domofony";
 import Videonablyudenie from "./pages/Videonablyudenie";
@@ -70,7 +71,8 @@ const App = () => (
                     <Route path="/auth" element={<Auth />} />
                     <Route path="/cabinet" element={<Cabinet />} />
                     <Route path="/admin" element={<Admin />} />
-                    <Route path="/fsm" element={<FSM />} />
+                    <Route path="/crm" element={<CRM />} />
+                    <Route path="/fsm" element={<CRM />} />
                     <Route path="/domofony" element={<Domofony />} />
                     <Route path="/videonablyudenie" element={<Videonablyudenie />} />
                     <Route path="/nashi-raboty" element={<NashiRaboty />} />

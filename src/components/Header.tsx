@@ -39,7 +39,7 @@ const Header = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const isFSMUser = userRoles.some((r) => 
+  const isCRMUser = userRoles.some((r) => 
     ["admin", "director", "dispatcher", "master", "engineer", "manager", "superadmin"].includes(r)
   );
 
@@ -179,9 +179,9 @@ const Header = () => {
                   <span>Админ</span>
                 </ShinyButton>
               )}
-              {isFSMUser && (
+              {isCRMUser && (
                 <ShinyButton
-                  onClick={() => navigate("/fsm")}
+                  onClick={() => navigate("/crm")}
                   className="hidden sm:inline-flex py-1 px-2 text-xs rounded-xl shrink-0"
                 >
                   <LayoutDashboard className="h-3.5 w-3.5 sm:mr-1" />

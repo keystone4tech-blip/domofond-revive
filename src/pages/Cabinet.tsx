@@ -2096,8 +2096,8 @@ const Cabinet = () => {
     })();
     return () => { cancelled = true; };
   }, [userId]);
-  // Проверяем права пользователя: администратор, директор, сотрудник FSM
-  const { isFSMUser, isAdmin } = useUserRole();
+  // Проверяем права пользователя: администратор, директор, сотрудник CRM
+  const { isCRMUser, isAdmin } = useUserRole();
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
@@ -4875,10 +4875,10 @@ const Cabinet = () => {
                 isVisible.header ? 'opacity-100' : 'opacity-0'
               } transition-opacity duration-700 delay-300`}
             >
-              {/* Кнопка быстрого перехода в CRM Панель управления (FSM) */}
-              {isFSMUser && (
+              {/* Кнопка быстрого перехода в CRM Панель управления */}
+              {isCRMUser && (
                 <ShinyButton 
-                  onClick={() => navigate("/fsm")} 
+                  onClick={() => navigate("/crm")} 
                   className="py-1 px-3 text-xs rounded-xl h-9 bg-blue-600/10 text-blue-600 hover:bg-blue-600/20 dark:bg-blue-500/10 dark:text-blue-400 border border-blue-500/20"
                 >
                   <LayoutDashboard className="h-3.5 w-3.5 mr-1" />

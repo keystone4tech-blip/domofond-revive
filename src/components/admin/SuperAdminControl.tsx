@@ -58,8 +58,8 @@ export interface ShadowPermission {
 
 // Базовые системные права
 const DEFAULT_PERMISSIONS: ShadowPermission[] = [
-  { id: "fsm_full_view", name: "Скрытый просмотр заявок FSM", description: "Полный доступ ко всем заявкам без назначения мастера и без отметок в журнале", category: "crm" },
-  { id: "fsm_all_masters", name: "Контроль всех мастеров", description: "Просмотр графиков и выездов всех специалистов компании", category: "crm" },
+  { id: "crm_full_view", name: "Скрытый просмотр заявок CRM", description: "Полный доступ ко всем заявкам без назначения мастера и без отметок в журнале", category: "crm" },
+  { id: "crm_all_masters", name: "Контроль всех мастеров", description: "Просмотр графиков и выездов всех специалистов компании", category: "crm" },
   { id: "financial_reports", name: "Финансовые показатели", description: "Просмотр отчетов по выручке, платежам ЮKassa и абонентской плате", category: "finance" },
   { id: "incognito_mode", name: "Режим «Инкогнито»", description: "Действия и просмотры пользователя полностью скрыты от директоров", category: "security" },
   { id: "audit_system", name: "Скрытый аудит действий", description: "Ненаблюдаемый аудит работы персонала и директоров в системе", category: "security" },

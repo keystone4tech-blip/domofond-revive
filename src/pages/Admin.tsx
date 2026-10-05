@@ -193,9 +193,9 @@ const Admin = () => {
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {/* Быстрый переход в CRM */}
             <Link
-              to="/fsm"
+              to="/crm"
               className="px-2.5 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200/50 dark:border-blue-900/40 text-xs font-bold flex items-center gap-1 hover:bg-blue-100 transition-colors"
-              title="Перейти в CRM FSM"
+              title="Перейти в CRM Панель"
             >
               <LayoutDashboard className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">CRM</span>
@@ -342,13 +342,13 @@ const Admin = () => {
             <span className="text-[10px] font-medium">Счета</span>
           </button>
 
-          {/* 4. CRM FSM */}
+          {/* 4. CRM Панель */}
           <Link
-            to="/fsm"
+            to="/crm"
             className="flex flex-col items-center justify-center flex-1 h-full gap-0.5 text-blue-600 dark:text-blue-400 hover:text-blue-700 active:scale-95 transition-all"
           >
             <LayoutDashboard className="h-5 w-5" />
-            <span className="text-[10px] font-semibold">CRM FSM</span>
+            <span className="text-[10px] font-semibold">CRM Панель</span>
           </Link>
 
           {/* 5. Личный кабинет */}
