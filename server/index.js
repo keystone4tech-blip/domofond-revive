@@ -265,8 +265,8 @@ app.get('/api/app/version', (req, res) => {
   console.log('[Бэкенд: Версия приложения] Запрос проверки обновлений с мобильного клиента');
 
   res.json({
-    latestVersion: '1.2.1',
-    versionCode: 8,
+    latestVersion: '1.2.2',
+    versionCode: 9,
     minSupportedVersion: '1.0.0',
     // Основная ссылка — прямое скачивание через Express API (гарантированный attachment)
     downloadUrl: siteDownloadUrl,

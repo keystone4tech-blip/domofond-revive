@@ -11,6 +11,36 @@
 > 
 > **Пользователь НЕ ДОЛЖЕН ничего вносить вручную.** Вся статистика и история пополняется ИИ автоматически при каждой задаче.
 
+# 2026-10-05 23:30 — Мобильное приложение v1.2.2 (Build 9): Редизайн темы «Frosted Arctic Glass» и матовые карточки
+
+## 1. Задачи и бизнес-ценность
+- **Комфорт для зрения и устранение слепящей белизны**:
+  * В светлой теме приложения заменён плоский белый фон на приятный пастельный нежно-голубой оттенок `#EDF4FB` с деликатной подложкой `#E2EEFA`.
+  * Экран больше не слепит глаза и создаёт мягкий контраст между поверхностями.
+- **Матовый эффект стекла (Frosted Glass)**:
+  * Карточки лицевого счёта, баланса, 4 плиток быстрого вызова мастера/заказа ключей, списков заявок и платежей оформлены в виде парящих матовых пластин.
+  * Тонкая элегантная фаска `#CADDF4` имитирует обработанный край стекла.
+  * Внедрены глубокие мягкие сапфирово-синие тени (`elevation: 4`, `shadowColor: '#1e3a8a'`, `shadowRadius: 14`), разделяющие слои интерфейса.
+- **Премиальная тёмная тема (Deep Nebula Glass)**:
+  * Обновлена ночная палитра: глубокий сапфирово-обсидиановый фон `#0B0F17`, матовые карточки `#161C28` с деликатным неоновым свечением.
+- **Нижняя навигация (Tabs)**:
+  * Нижняя панель переведена в полупрозрачное матовое стекло `rgba(255, 255, 255, 0.94)` / `rgba(17, 23, 34, 0.94)` с рассеянными тенями.
+- **Версионирование**:
+  * Версия приложения повышена до **v1.2.2 (Build 9)** в `mobile/app.config.ts` и `mobile/src/config/constants.ts`.
+  * Эндпоинт `/api/app/version` на сервере обновлён для отдачи `1.2.2 (Build 9)`.
+
+## 2. Измененные файлы
+- [`mobile/src/theme/colors.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/src/theme/colors.ts) — Новые токены палитры Frosted Arctic Glass и Deep Nebula Glass.
+- [`mobile/app/(tabs)/home.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/app/(tabs)/home.tsx) — Парящие карточки ЛС, баланса, плиток действий и заявок.
+- [`mobile/app/(tabs)/payments/index.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/app/(tabs)/payments/index.tsx) — Карточки оплаты и истории платежей.
+- [`mobile/app/(tabs)/requests/index.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/app/(tabs)/requests/index.tsx) — Список заявок и модальное меню выбора действий.
+- [`mobile/app/(tabs)/profile/index.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/app/(tabs)/profile/index.tsx) — Карточка профиля и скругленные блоки настроек.
+- [`mobile/app/(tabs)/_layout.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/app/(tabs)/_layout.tsx) — Матовая стеклянная нижняя панель навигации.
+- [`mobile/app.config.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/app.config.ts) — Повышение версии до 1.2.2 (Build 9).
+- [`mobile/src/config/constants.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/src/config/constants.ts) — Константа APP_VERSION: '1.2.2'.
+- [`server/index.js`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/server/index.js) — Ответ API проверки версий.
+
+
 # 2026-10-05 23:15 — Глобальный рефакторинг и стандартизация: миграция с устаревшего наименования FSM на CRM
 
 ## 1. Задачи и бизнес-ценность
