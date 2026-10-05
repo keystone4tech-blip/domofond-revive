@@ -11,6 +11,24 @@
 > 
 > **Пользователь НЕ ДОЛЖЕН ничего вносить вручную.** Вся статистика и история пополняется ИИ автоматически при каждой задаче.
 
+# 2026-10-06 01:25 — Мобильное приложение v1.2.3 (Build 10): Повышение версии для срабатывания OTA-обновления
+
+## 1. Задачи и бизнес-ценность
+- **Гарантированное срабатывание встроенного обновления**:
+  * Версия приложения повышена до **v1.2.3** (`versionCode: 10`, `buildNumber: 10`).
+  * Теперь у всех пользователей с установленными версиями v1.2.2 и ниже при запуске приложения гарантированно всплывает модальное окно «Доступно обновление 1.2.3».
+  * Нажатие на кнопку обновления запускает нативное скачивание и бесшовную установку через системный установщик Android.
+- **Синхронизация бэкенда**:
+  * В `server/index.js` эндпоинт `/api/app/version` обновлен до `latestVersion: '1.2.3'`, `versionCode: 10`.
+
+## 2. Измененные файлы
+- [`mobile/app.config.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/app.config.ts) — Повышение версии до 1.2.3 (versionCode: 10, buildNumber: 10).
+- [`mobile/package.json`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/package.json) — Версия 1.2.3.
+- [`mobile/src/config/constants.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/src/config/constants.ts) — APP_VERSION = '1.2.3'.
+- [`server/index.js`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/server/index.js) — latestVersion: '1.2.3', versionCode: 10.
+- [`src/data/projectChangelog.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/data/projectChangelog.ts) — Внесение записи в паспорт проекта.
+- [`PROJECT_LOG.md`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/PROJECT_LOG.md) — Обновление журнала проекта.
+
 # 2026-10-06 01:10 — Мобильное приложение v1.2.2: Hero-карта баланса с градиентом, нижний бар заявок и актуализация графика диспетчерской
 
 ## 1. Задачи и бизнес-ценность

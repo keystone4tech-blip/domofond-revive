@@ -258,6 +258,16 @@ export const KIND_META: Record<Kind, { label: string; badgeCls: string }> = {
  */
 export const PROJECT_CHANGELOG: ProjectEntry[] = [
   {
+    id: "stage-2026-10-06-0125",
+    datetime: "2026-10-06 01:25",
+    title: "Релиз мобильного приложения v1.2.3 (Build 10): синхронизация автообновления и сборка APK",
+    description: "Повышена версия мобильного приложения до v1.2.3 (versionCode 10) для гарантированного срабатывания механизма OTA/APK автообновления на смартфонах всех жильцов. Синхронизированы конфигурации mobile/app.config.ts, mobile/package.json, constants.ts и эндпоинт проверки обновлений Express API server/index.js. Запущена пересборка подписанного пакета на GitHub Actions CI/CD.",
+    module: "infra_mobile",
+    kind: "improvement",
+    hours: 2,
+    difficulty: "Средняя",
+  },
+  {
     id: "stage-2026-10-06-0110",
     datetime: "2026-10-06 01:10",
     title: "Мобильное приложение v1.2.2: Hero-карта баланса с градиентом, нижний бар заявок и актуализация графика диспетчерской",

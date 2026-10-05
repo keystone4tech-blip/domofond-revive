@@ -1,6 +1,8 @@
 import paramiko
 import sys
 
+sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+
 HOST = "45.8.99.238"
 USER = "root"
 PASS = "j2Pz7,PPqzEte."
