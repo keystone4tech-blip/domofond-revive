@@ -21,6 +21,7 @@ interface UseUserRoleResult {
   hasRole: (role: AppRole) => boolean;        // Проверка наличия системной роли
   hasPermission: (tabId: string) => boolean;  // Проверка права доступа к конкретной вкладке FSM
   refetchPermissions: () => Promise<void>;    // Функция для ручного обновления прав
+  getRoleDisplayName: () => string;           // Получение понятного русского названия роли из БД
 }
 
 export const useUserRole = (): UseUserRoleResult => {
@@ -221,5 +222,32 @@ export const useUserRole = (): UseUserRoleResult => {
     hasRole,
     hasPermission,
     refetchPermissions,
+    // Вспомогательная функция для получения читаемого русского названия роли
+    getRoleDisplayName: (): string => {
+      // 1. Если есть кастомная или системная роль в crmRoles, возвращаем ее название (name)
+      for (const roleId of assignedRoles) {
+        const found = crmRoles.find(
+          (r) => r.id.toLowerCase() === roleId.toLowerCase() || r.name.toLowerCase() === roleId.toLowerCase()
+        );
+        if (found && found.name) return found.name;
+      }
+      for (const roleId of roles) {
+        const found = crmRoles.find(
+          (r) => r.id.toLowerCase() === roleId.toLowerCase() || r.name.toLowerCase() === roleId.toLowerCase()
+        );
+        if (found && found.name) return found.name;
+      }
+
+      // 2. Стандартные человекочитаемые подписи на русском языке
+      if (roles.includes("superadmin") || assignedRoles.includes("superadmin")) return "Суперадминистратор";
+      if (roles.includes("director") || assignedRoles.includes("director")) return "Директор";
+      if (roles.includes("admin") || assignedRoles.includes("admin")) return "Администратор";
+      if (roles.includes("manager") || assignedRoles.includes("manager")) return "Менеджер";
+      if (roles.includes("dispatcher") || assignedRoles.includes("dispatcher")) return "Диспетчер";
+      if (roles.includes("master") || assignedRoles.includes("master")) return "Мастер";
+      if (roles.includes("engineer") || assignedRoles.includes("engineer")) return "Инженер";
+
+      return "Сотрудник";
+    },
   };
 };

@@ -68,7 +68,7 @@ const FSM = () => {
 
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user, isFSMUser, isManager, isLoading, roles, permissions, hasPermission } = useUserRole();
+  const { user, isFSMUser, isManager, isLoading, roles, permissions, hasPermission, getRoleDisplayName } = useUserRole();
 
   // Анимация плавного появления интерфейса
   useEffect(() => {
@@ -197,14 +197,7 @@ const FSM = () => {
   }
 
   const getRoleLabel = () => {
-    if (roles.includes("superadmin")) return "Суперадмин";
-    if (roles.includes("admin")) return "Администратор";
-    if (roles.includes("director")) return "Директор";
-    if (roles.includes("manager")) return "Менеджер";
-    if (roles.includes("dispatcher")) return "Диспетчер";
-    if (roles.includes("master")) return "Мастер";
-    if (roles.includes("engineer")) return "Инженер";
-    return "Сотрудник";
+    return getRoleDisplayName();
   };
 
   const getTabTitle = () => {
