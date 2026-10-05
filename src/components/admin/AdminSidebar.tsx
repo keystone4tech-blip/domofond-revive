@@ -95,6 +95,22 @@ export const AdminSidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen }: Adm
 
         {/* Список вкладок (Скроллируемый контейнер с оптимизированным скроллбаром) */}
         <nav className="p-3 space-y-1 max-h-[calc(100vh-17rem)] overflow-y-auto custom-scrollbar">
+          {/* Секретный пункт: Панель Супер-Администратора (доступен СТРОГО суперадмину) */}
+          {isSuperAdmin && (
+            <button
+              onClick={() => handleTabClick("superadmin")}
+              className={cn(
+                "w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 text-left mb-2",
+                activeTab === "superadmin"
+                  ? "bg-gradient-to-r from-amber-500 to-purple-600 text-white shadow-lg shadow-amber-500/25 scale-[1.01]"
+                  : "text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30"
+              )}
+            >
+              <Crown className="h-4 w-4 shrink-0 text-amber-400" />
+              <span className="truncate">👑 Панель Супер-Админа</span>
+            </button>
+          )}
+
           {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;

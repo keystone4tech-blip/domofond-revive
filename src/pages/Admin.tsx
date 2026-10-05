@@ -20,7 +20,8 @@ import { VotingManager } from "@/components/admin/VotingManager";
 import { BackupsManager } from "@/components/admin/BackupsManager";
 import { PortfolioManager } from "@/components/admin/PortfolioManager";
 import { DeletedItemsManager } from "@/components/admin/DeletedItemsManager";
-import { Loader2, Shield, Menu, ChevronRight, LayoutDashboard, User, Home, CreditCard, Calculator, X } from "lucide-react";
+import { SuperAdminControl } from "@/components/admin/SuperAdminControl";
+import { Loader2, Shield, Menu, ChevronRight, LayoutDashboard, User, Home, CreditCard, Calculator, X, Crown } from "lucide-react";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -137,6 +138,7 @@ const Admin = () => {
       case "chatwidget": return "AI-ассистент чата";
       case "chathistory": return "История диалогов чата";
       case "deleted": return "Корзина удалённых";
+      case "superadmin": return "👑 Панель Супер-Администратора";
       default: return "Администрирование";
     }
   };
@@ -294,6 +296,10 @@ const Admin = () => {
 
             <TabsContent value="deleted" className="mt-0 outline-none">
               <DeletedItemsManager />
+            </TabsContent>
+
+            <TabsContent value="superadmin" className="mt-0 outline-none">
+              <SuperAdminControl />
             </TabsContent>
           </Tabs>
         </main>
