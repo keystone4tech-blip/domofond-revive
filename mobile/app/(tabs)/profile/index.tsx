@@ -25,7 +25,7 @@ import { useAuthStore } from '@/store/auth.store';
 import { useAppTheme } from '@/theme';
 import { apiClient } from '@/api/client';
 import { APP_VERSION, APP_DOWNLOAD_URL } from '@/config/constants';
-import { LegalModal } from '@/components/LegalModal';
+import { ALL_LEGAL_DOCUMENTS } from '@/data/legalDocuments';
 import type { ThemeMode } from '@/store/theme.store';
 
 // expo-location подключаем безопасно: если модуль ещё не установлен, приложение не падает.
@@ -58,7 +58,7 @@ export default function ProfileScreen() {
   const [isSaving, setIsSaving] = useState(false);
 
   const [verifying, setVerifying] = useState(false);
-  const [legalDocId, setLegalDocId] = useState<string | null>(null);
+  const [docReaderId, setDocReaderId] = useState<string | null>(null);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [mapsOpen, setMapsOpen] = useState(false);
   const [docsOpen, setDocsOpen] = useState(false);
@@ -361,7 +361,7 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Документы</Text>
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Row icon="document-text-outline" title="Правовые документы" onPress={() => setDocsOpen(true)} />
+            <Row icon="document-text-outline" title="Правовые документы" onPress={() => { setDocReaderId(null); setDocsOpen(true); }} />
           </View>
         </View>
 
@@ -509,32 +509,67 @@ export default function ProfileScreen() {
       </Modal>
 
       {/* Модалка «Документы»: правовые документы */}
-      <Modal visible={docsOpen} animationType="slide" transparent>
+      <Modal visible={docsOpen} animationType="slide" transparent onRequestClose={() => { if (docReaderId) setDocReaderId(null); else setDocsOpen(false); }}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border, paddingTop: Math.max(insets.top, 12) + 8 }]}>
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Документы</Text>
-              <TouchableOpacity onPress={() => setDocsOpen(false)}><Ionicons name="close" size={24} color={colors.textMuted} /></TouchableOpacity>
-            </View>
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 20 }} showsVerticalScrollIndicator>
-              {docs.map((d) => (
-                <TouchableOpacity key={d.id} style={[styles.docRow, { borderColor: colors.border }]} onPress={() => { setDocsOpen(false); setTimeout(() => setLegalDocId(d.id), 320); }} activeOpacity={0.7}>
-                  <Ionicons name="document-text-outline" size={18} color={colors.primaryContainer} style={{ marginRight: 10 }} />
-                  <Text style={[styles.docRowText, { color: colors.text }]}>{d.title}</Text>
-                  <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            <View style={[styles.modalFooter, { borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, 12) }]}>
-              <TouchableOpacity style={[styles.modalCloseBtn, { borderColor: colors.border }]} onPress={() => setDocsOpen(false)} activeOpacity={0.85}>
-                <Text style={[styles.modalCloseText, { color: colors.textSecondary }]}>Закрыть</Text>
-              </TouchableOpacity>
-            </View>
+            {docReaderId ? (() => {
+              // Чтение документа ВНУТРИ этого же окна (без второго модального окна — иначе на Android ломается скролл)
+              const doc = ALL_LEGAL_DOCUMENTS.find((d) => d.id === docReaderId) || null;
+              return (
+                <>
+                  <View style={styles.modalHeader}>
+                    <TouchableOpacity onPress={() => setDocReaderId(null)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={{ marginRight: 10 }}>
+                      <Ionicons name="arrow-back" size={24} color={colors.text} />
+                    </TouchableOpacity>
+                    <Text style={[styles.modalTitle, { color: colors.text, flex: 1 }]} numberOfLines={1}>{doc?.shortTitle || doc?.title || 'Документ'}</Text>
+                    <TouchableOpacity onPress={() => { setDocReaderId(null); setDocsOpen(false); }}><Ionicons name="close" size={24} color={colors.textMuted} /></TouchableOpacity>
+                  </View>
+                  <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 24 }} showsVerticalScrollIndicator>
+                    <Text style={[styles.docTitleFull, { color: colors.text }]}>{doc?.title}</Text>
+                    {doc?.updatedAt ? <Text style={[styles.aboutRowSub, { color: colors.textMuted, marginBottom: 6 }]}>Редакция от {doc.updatedAt}</Text> : null}
+                    {doc?.description ? <Text style={[styles.docParagraph, { color: colors.textSecondary }]}>{doc.description}</Text> : null}
+                    {doc?.sections.map((sec, i) => (
+                      <View key={i} style={{ marginTop: 16 }}>
+                        <Text style={[styles.docSectionTitle, { color: colors.text }]}>{sec.title}</Text>
+                        {sec.content.map((p, j) => (
+                          <Text key={j} style={[styles.docParagraph, { color: colors.textSecondary }]}>{p}</Text>
+                        ))}
+                      </View>
+                    ))}
+                    {!doc ? <Text style={[styles.docParagraph, { color: colors.textSecondary }]}>Документ не найден.</Text> : null}
+                  </ScrollView>
+                  <View style={[styles.modalFooter, { borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, 12) }]}>
+                    <TouchableOpacity style={[styles.modalCloseBtn, { borderColor: colors.border }]} onPress={() => setDocReaderId(null)} activeOpacity={0.85}>
+                      <Text style={[styles.modalCloseText, { color: colors.textSecondary }]}>Назад к списку</Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              );
+            })() : (
+              <>
+                <View style={styles.modalHeader}>
+                  <Text style={[styles.modalTitle, { color: colors.text }]}>Документы</Text>
+                  <TouchableOpacity onPress={() => setDocsOpen(false)}><Ionicons name="close" size={24} color={colors.textMuted} /></TouchableOpacity>
+                </View>
+                <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 20 }} showsVerticalScrollIndicator>
+                  {docs.map((d) => (
+                    <TouchableOpacity key={d.id} style={[styles.docRow, { borderColor: colors.border }]} onPress={() => setDocReaderId(d.id)} activeOpacity={0.7}>
+                      <Ionicons name="document-text-outline" size={18} color={colors.primaryContainer} style={{ marginRight: 10 }} />
+                      <Text style={[styles.docRowText, { color: colors.text }]}>{d.title}</Text>
+                      <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <View style={[styles.modalFooter, { borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, 12) }]}>
+                  <TouchableOpacity style={[styles.modalCloseBtn, { borderColor: colors.border }]} onPress={() => setDocsOpen(false)} activeOpacity={0.85}>
+                    <Text style={[styles.modalCloseText, { color: colors.textSecondary }]}>Закрыть</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
           </View>
         </View>
       </Modal>
-
-      <LegalModal visible={!!legalDocId} docId={legalDocId} onClose={() => setLegalDocId(null)} />
     </View>
   );
 }
@@ -616,4 +651,7 @@ const styles = StyleSheet.create({
   routeBtnText: { fontSize: 14, fontWeight: '700' },
   docRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1 },
   docRowText: { flex: 1, fontSize: 13.5 },
+  docTitleFull: { fontSize: 16, fontWeight: '800', marginTop: 6, marginBottom: 2, lineHeight: 22 },
+  docSectionTitle: { fontSize: 14, fontWeight: '700', marginBottom: 6 },
+  docParagraph: { fontSize: 13, lineHeight: 20, marginBottom: 8 },
 });

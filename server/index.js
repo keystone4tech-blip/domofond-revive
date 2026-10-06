@@ -634,6 +634,65 @@ app.post('/api/user/marketing-consent', authenticateToken, async (req, res) => {
   }
 });
 
+// ==============================================================================
+// АВТОПЛАТЕЖИ / РЕКУРРЕНТНЫЕ СПИСАНИЯ ТО (ЮKASSA)
+// ==============================================================================
+
+// Получение статуса автоплатежа для текущего пользователя / лицевого счёта
+app.get('/api/user/autopay/status', authenticateToken, async (req, res) => {
+  const uid = req.user.id;
+  const accountNumber = req.query.account_number || req.query.accountNumber;
+  try {
+    let query = 'SELECT * FROM autopay_subscriptions WHERE (user_id = $1 OR account_number = $2) AND is_active = true ORDER BY id DESC LIMIT 1';
+    let params = [uid, accountNumber || ''];
+    if (!accountNumber) {
+      query = 'SELECT * FROM autopay_subscriptions WHERE user_id = $1 AND is_active = true ORDER BY id DESC LIMIT 1';
+      params = [uid];
+    }
+    const result = await pool.query(query, params);
+    if (result.rows.length === 0) {
+      return res.json({
+        enabled: false,
+        card_last4: null,
+        card_type: null,
+        account_number: accountNumber || null
+      });
+    }
+
+    const row = result.rows[0];
+    res.json({
+      enabled: true,
+      card_last4: row.card_last4 || '••••',
+      card_type: row.card_type || 'bank_card',
+      account_number: row.account_number,
+      created_at: row.created_at
+    });
+  } catch (err) {
+    console.error('[Бэкенд: Автоплатеж] Ошибка получения статуса:', err.message);
+    res.status(500).json({ error: 'Не удалось получить статус автоплатежа' });
+  }
+});
+
+// Отключение автоплатежа абонентом
+app.post('/api/user/autopay/disable', authenticateToken, async (req, res) => {
+  const uid = req.user.id;
+  const accountNumber = req.body.account_number || req.body.accountNumber;
+  try {
+    let query = 'UPDATE autopay_subscriptions SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE user_id = $1';
+    let params = [uid];
+    if (accountNumber) {
+      query = 'UPDATE autopay_subscriptions SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE user_id = $1 OR account_number = $2';
+      params = [uid, accountNumber];
+    }
+    await pool.query(query, params);
+    console.log(`[Бэкенд: Автоплатеж] Автоплатеж отключен пользователем ${uid} (л/с ${accountNumber || 'все'})`);
+    res.json({ ok: true, enabled: false });
+  } catch (err) {
+    console.error('[Бэкенд: Автоплатеж] Ошибка отключения автоплатежа:', err.message);
+    res.status(500).json({ error: 'Не удалось отключить автоплатеж' });
+  }
+});
+
 // Подача документа на верификацию (подтверждение проживания/собственности) — как на сайте.
 // Принимает { document_base64 }. Ставит статус 'pending' и создаёт заявку диспетчеру.
 app.post('/api/user/submit-verification', authenticateToken, async (req, res) => {
@@ -1475,6 +1534,45 @@ async function processSuccessfulPayment(yooData, fallbackPayment = null) {
   );
   console.log(`[Бэкенд: ЮKassa Успех] Платёж ${paymentId} на сумму ${paidAmount} ₽ успешно подтверждён (метод: ${paymentMethod})`);
 
+  // 1.1. Сохранение токена банковской карты для автоплатежа (если был запрошен save_payment_method или сохранен метод)
+  try {
+    const yooMethod = yooData.payment_method;
+    const isSaved = yooMethod?.saved === true;
+    const accNumber = combinedMeta?.account_number || paymentRecord?.account_number;
+    const payUserId = combinedMeta?.user_id || paymentRecord?.user_id || null;
+    const saveRequested = combinedMeta?.save_payment_method === 'true' || combinedMeta?.save_payment_method === true;
+
+    if (accNumber && (isSaved || saveRequested) && yooMethod?.id) {
+      const cardInfo = yooMethod.card || {};
+      const cardLast4 = cardInfo.last4 || null;
+      const cardFirst6 = cardInfo.first6 || null;
+      const cardType = cardInfo.card_type || yooMethod.type || 'bank_card';
+      const expYear = cardInfo.expiry_year || null;
+      const expMonth = cardInfo.expiry_month || null;
+
+      await pool.query(
+        `INSERT INTO autopay_subscriptions (
+           user_id, account_number, payment_method_id, card_first6, card_last4, card_type,
+           card_expiry_year, card_expiry_month, is_active, updated_at
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, CURRENT_TIMESTAMP)
+         ON CONFLICT (account_number) 
+         DO UPDATE SET 
+           payment_method_id = EXCLUDED.payment_method_id,
+           card_first6 = EXCLUDED.card_first6,
+           card_last4 = EXCLUDED.card_last4,
+           card_type = EXCLUDED.card_type,
+           card_expiry_year = EXCLUDED.card_expiry_year,
+           card_expiry_month = EXCLUDED.card_expiry_month,
+           is_active = true,
+           updated_at = CURRENT_TIMESTAMP`,
+        [payUserId, accNumber, yooMethod.id, cardFirst6, cardLast4, cardType, expYear, expMonth]
+      );
+      console.log(`[Бэкенд: Автоплатеж] ✅ Карта •••• ${cardLast4 || 'N/A'} успешно привязана к л/с ${accNumber} для автоплатежей!`);
+    }
+  } catch (autoErr) {
+    console.warn('[Бэкенд: Автоплатеж] Не удалось привязать карту для автоплатежа:', autoErr.message);
+  }
+
   let reqId = combinedMeta?.request_id || paymentRecord?.request_id;
   const isOrder = combinedMeta?.is_order === 'true' || combinedMeta?.is_order === true || !!combinedMeta?.order_data;
 
@@ -1762,6 +1860,8 @@ app.post('/api/payments/yookassa/create', async (req, res) => {
       ]
     };
 
+    const save_payment_method = req.body.save_payment_method === true || req.body.save_payment_method === 'true' || req.body.savePaymentMethod === true;
+
     // Метаданные для внешнего шлюза ЮKassa (компактные поля)
     const yooMetadata = {
       account_number: account_number || '',
@@ -1770,6 +1870,7 @@ app.post('/api/payments/yookassa/create', async (req, res) => {
       credit_amount: credit_amount ? String(credit_amount) : '',
       fee_amount: fee_amount ? String(fee_amount) : '',
       is_order: is_order ? 'true' : 'false',
+      save_payment_method: save_payment_method ? 'true' : 'false',
     };
 
     const payload = {
@@ -1786,6 +1887,10 @@ app.post('/api/payments/yookassa/create', async (req, res) => {
       receipt: receiptObj,
       metadata: yooMetadata,
     };
+
+    if (save_payment_method) {
+      payload.save_payment_method = true;
+    }
 
     console.log(`[Бэкенд: ЮKassa] Запрос создания платежа на ${formattedAmount} ₽ (заказ: ${is_order ? 'ДА' : 'НЕТ'}, чек для: ${customerObj.phone || customerObj.email})...`);
 
