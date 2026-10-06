@@ -518,7 +518,7 @@ export default function ProfileScreen() {
             </View>
             <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 20 }} showsVerticalScrollIndicator>
               {docs.map((d) => (
-                <TouchableOpacity key={d.id} style={[styles.docRow, { borderColor: colors.border }]} onPress={() => { setDocsOpen(false); setLegalDocId(d.id); }} activeOpacity={0.7}>
+                <TouchableOpacity key={d.id} style={[styles.docRow, { borderColor: colors.border }]} onPress={() => { setDocsOpen(false); setTimeout(() => setLegalDocId(d.id), 320); }} activeOpacity={0.7}>
                   <Ionicons name="document-text-outline" size={18} color={colors.primaryContainer} style={{ marginRight: 10 }} />
                   <Text style={[styles.docRowText, { color: colors.text }]}>{d.title}</Text>
                   <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
