@@ -118,6 +118,10 @@ export const HandsetOrderModal: React.FC<HandsetOrderModalProps> = ({
   const feeAmount = Math.round(baseAmount * 0.05 * 100) / 100;
   const totalAmount = Math.round((baseAmount + feeAmount) * 100) / 100;
 
+  // Оформить заказ можно ТОЛЬКО если реально выбрана трубка с ненулевой ценой и сумма > 0.
+  // Это исключает «нулевые наряды» (когда для подъезда нет трубок в каталоге).
+  const canOrder = !noEntrance && handsets.length > 0 && !!selectedHandset?.id && handsetPrice > 0 && baseAmount > 0;
+
   // Оформление заказа и переход к оплате через ЮKassa
   const handlePayment = async () => {
     if (!profileAddress) {
@@ -126,6 +130,15 @@ export const HandsetOrderModal: React.FC<HandsetOrderModalProps> = ({
     }
     if (!effectivePhone) {
       Alert.alert('Укажите телефон', 'В профиле нет номера телефона. Введите контактный номер для связи.');
+      return;
+    }
+    // Обязательно должна быть выбрана трубка с реальной ценой — и для замены, и для установки
+    if (!selectedHandset?.id) {
+      Alert.alert('Выберите трубку', 'Пожалуйста, выберите модель аудиотрубки из списка.');
+      return;
+    }
+    if (handsetPrice <= 0 || baseAmount <= 0) {
+      Alert.alert('Оформление недоступно', 'Для вашего подъезда стоимость оборудования не задана. Обратитесь в офис: +7 (903) 411-83-93.');
       return;
     }
 
@@ -281,24 +294,20 @@ export const HandsetOrderModal: React.FC<HandsetOrderModalProps> = ({
                 </Text>
               </View>
             ) : handsets.length === 0 ? (
-              <View
-                style={[
-                  styles.handsetCard,
-                  { backgroundColor: isDark ? '#1c1f2a' : '#f8f9ff', borderColor: colors.primaryContainer },
-                ]}
-              >
+              <View style={[styles.handsetCard, { backgroundColor: isDark ? '#1c1f2a' : '#f8f9ff', borderColor: colors.border }]}>
                 <View style={styles.handsetRow}>
-                  <Ionicons name="call" size={24} color={colors.primaryContainer} />
+                  <Ionicons name="business-outline" size={22} color={colors.primaryContainer} style={{ marginRight: 10 }} />
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.handsetName, { color: colors.text }]}>
-                      Универсальная координатная трубка ТКП
-                    </Text>
+                    <Text style={[styles.handsetName, { color: colors.text }]}>Подбор трубки — через офис</Text>
                     <Text style={[styles.handsetDesc, { color: colors.textSecondary }]}>
-                      Совместима со всеми вызывными панелями Домофондар
+                      Для вашего адреса модели пока не настроены. Менеджер подберёт трубку и назовёт точную цену.
                     </Text>
                   </View>
-                  <Text style={[styles.handsetPrice, { color: colors.primaryContainer }]}>1 200 ₽</Text>
                 </View>
+                <TouchableOpacity style={[styles.officeBtn, { backgroundColor: colors.primaryContainer, marginTop: 10 }]} onPress={() => Linking.openURL('tel:+79034118393')} activeOpacity={0.85}>
+                  <Ionicons name="call" size={16} color="#fff" style={{ marginRight: 6 }} />
+                  <Text style={styles.officeBtnText}>+7 (903) 411-83-93</Text>
+                </TouchableOpacity>
               </View>
             ) : (
               <View style={{ gap: 8 }}>
@@ -442,9 +451,9 @@ export const HandsetOrderModal: React.FC<HandsetOrderModalProps> = ({
               <Text style={[styles.cancelBtnText, { color: colors.textSecondary }]}>Отменить</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.submitBtn, { backgroundColor: colors.primaryContainer }, (submitting || !selectedHandset || noEntrance) && { opacity: 0.6 }]}
+              style={[styles.submitBtn, { backgroundColor: colors.primaryContainer }, (submitting || !canOrder) && { opacity: 0.6 }]}
               onPress={handlePayment}
-              disabled={submitting || !selectedHandset || noEntrance}
+              disabled={submitting || !canOrder}
               activeOpacity={0.85}
             >
               {submitting ? (
