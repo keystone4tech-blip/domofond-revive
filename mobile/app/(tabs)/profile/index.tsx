@@ -89,10 +89,13 @@ export default function ProfileScreen() {
     setIsSaving(true);
     try {
       const isExisting = !!(user?.is_verified || (user as any)?.address || (user as any)?.account_number);
-      if (isExisting) {
         await apiClient.post('/api/user/request-data-change', {
-          full_name: fullName.trim(), phone: phone.trim(), email: email.trim(),
-          address: address.trim(), apartment: apartment.trim(),
+          full_name: fullName.trim(),
+          phone: phone.trim(),
+          email: email.trim(),
+          address: address.trim(),
+          apartment: apartment.trim(),
+          account_number: (user as any)?.account_number || undefined,
         });
         setIsEditModalOpen(false);
         Alert.alert('Отправлено на проверку', 'Заявка на изменение данных направлена диспетчеру. Новые данные вступят в силу после подтверждения.');
@@ -195,9 +198,11 @@ export default function ProfileScreen() {
   };
 
   const displayName = user?.full_name || (user as any)?.email || 'Абонент';
-  const displayPhone = user?.phone || 'Телефон не указан';
-  const displayAddress = (user as any)?.address
-    ? `${(user as any).address}${(user as any)?.apartment ? `, кв. ${(user as any).apartment}` : ''}`
+  const rawAddr = (user as any)?.address || '';
+  const apt = (user as any)?.apartment ? String((user as any).apartment).trim() : '';
+  const hasAptInAddr = rawAddr && (/кв\.?\s*\d+/i.test(rawAddr) || /квартира\s*\d+/i.test(rawAddr));
+  const displayAddress = rawAddr
+    ? (hasAptInAddr || !apt ? rawAddr : `${rawAddr}, кв. ${apt}`)
     : 'Адрес не заполнен';
   const initials = displayName.split(' ').filter(Boolean).slice(0, 2).map((w: string) => w[0].toUpperCase()).join('') || 'ДД';
 

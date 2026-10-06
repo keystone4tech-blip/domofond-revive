@@ -11,6 +11,33 @@
 > 
 > **Пользователь НЕ ДОЛЖЕН ничего вносить вручную.** Вся статистика и история пополняется ИИ автоматически при каждой задаче.
 
+# 2026-10-06 22:15 — Ликвидация слёта настроек личного кабинета и устранение дублирования номеров квартир
+
+## 1. Задачи и расследование первопричины
+- **Скриншот «кабинет.jpg»**:
+  * Обнаружено визуальное дублирование: `Адрес: Краснодар, Куликова Поля (ул), д. 16, п. 4, кв. 128, кв. 128`.
+  * Причина: поле `address` в БД уже содержало строку с номером квартиры `, кв. 128`, а интерфейс клиентского приложения безусловно дописывал `${address}, кв. ${apartment}`.
+- **Первопричина полного слёта настроек личного кабинета**:
+  * В модальном окне редактирования профиля `mobile/app/(tabs)/profile/index.tsx` при отправке запроса `/api/user/request-data-change` поле `account_number` не передавалось.
+  * Бэкенд `server/index.js` записывал в `pending_data_change` объект с `account_number: null`.
+  * При подтверждении оператором в CRM (`VerificationManager.tsx`) код выполнял: `account_number: change.account_number !== undefined ? (change.account_number || null) : profile.account_number`. Поскольку поле `change.account_number` равнялось `null`, существующий лицевой счёт жильца **стирался в базе данных (`account_number = NULL`)**.
+  * После этого эндпоинт `/api/user/my-account` не находил лицевой счёт абонента, личный кабинет обнулялся и на сайте, и в мобильном приложении.
+- **Инженерные исправления**:
+  * В `server/index.js` (`/api/user/request-data-change`): если `account_number` не указан явно, он берётся из текущего профиля абонента (`old.account_number`).
+  * В `server/index.js` (`/api/user/my-account`): добавлен интеллектуальный fallback-поиск по связке подтверждённого адреса и квартиры, если номер телефона абонента отличается от архивного в договоре.
+  * В `src/components/crm/VerificationManager.tsx` и `src/components/fsm/VerificationManager.tsx`: защита от зануления (`change.account_number ? change.account_number.trim() : profile.account_number`), а также исключение дублирования квартиры в тексте уведомления.
+  * В `mobile/app/(tabs)/profile/index.tsx`: интеллектуальная сборка `displayAddress` с регулярным выражением (`/кв\.?\s*\d+/i`), передача текущего `account_number` при смене данных.
+  * В БД на боевом сервере (`45.8.99.238`): восстановлен лицевой счёт `0000000654` для Владимира Сергеевича, очищен текст уведомления от дубликата.
+  * Обновлённый бэкенд развернут и перезапущен в Docker на сервере `45.8.99.238`.
+
+## 2. Измененные файлы
+- [`server/index.js`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/server/index.js) — Сохранение `account_number` в `request-data-change`, поиск по адресу/квартире в `my-account`.
+- [`src/components/crm/VerificationManager.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/components/crm/VerificationManager.tsx) — Защита от зануления счёта и дублирования квартиры при одобрении.
+- [`src/components/fsm/VerificationManager.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/components/fsm/VerificationManager.tsx) — Защита от зануления счёта и дублирования квартиры в FSM.
+- [`mobile/app/(tabs)/profile/index.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/app/(tabs)/profile/index.tsx) — Регулярное выражение против дублей `кв.`, передача `account_number`.
+- [`src/data/projectChangelog.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/data/projectChangelog.ts) — Запись в паспорте проекта.
+- [`PROJECT_LOG.md`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/PROJECT_LOG.md) — Обновление журнала проекта.
+
 # 2026-10-06 19:45 — Мобильное приложение v1.2.6 (Build 13): Полноэкранные модалки документов, отступ кнопки заявок, брендовый аватар и онлайн-статус
 
 ## 1. Задачи и бизнес-ценность

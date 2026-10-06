@@ -590,8 +590,11 @@ app.post('/api/user/request-data-change', authenticateToken, async (req, res) =>
       email: (email || '').trim(),
       address: (address || '').trim(),
       apartment: (apartment || '').trim(),
-      floor: (floor || '').trim(),
-      account_number: account_number || null,
+      // Важно: если лицевой счёт не указан в теле запроса (например, менялся только телефон),
+      // сохраняем текущий account_number из профиля, чтобы он не занулялся при модерации!
+      account_number: (account_number !== undefined && account_number !== null && String(account_number).trim() !== '')
+        ? String(account_number).trim()
+        : (old.account_number || null),
       submitted_at: new Date().toISOString(),
       source: 'mobile_app',
       old_data: {
@@ -1164,7 +1167,24 @@ app.get('/api/user/my-account', authenticateToken, async (req, res) => {
       }
     }
 
-    // В. Лицевой счёт не привязан — возвращаем null (строго исключаем чужие счета!)
+    // В. Если номер не найден по телефону, но есть подтвержденный адрес и квартира абонента
+    if (profile.address && profile.apartment) {
+      // Ищем точное совпадение по номеру квартиры и включению адреса
+      const aptClean = String(profile.apartment).trim();
+      if (aptClean) {
+        const accAddrRes = await pool.query(
+          "SELECT account_number, period, debt_amount, address, apartment, phone, full_name, has_handset, payment_type FROM accounts WHERE apartment = $1 AND ($2 ILIKE '%' || address || '%' OR address ILIKE '%' || $2 || '%') LIMIT 1",
+          [aptClean, profile.address.trim()]
+        );
+        if (accAddrRes.rows.length > 0) {
+          console.log(`[Бэкенд: Мой счёт] Автоматически привязан лицевой счёт ${accAddrRes.rows[0].account_number} по адресу/квартире ${aptClean} для ${userId}`);
+          await pool.query('UPDATE profiles SET account_number = $1 WHERE id = $2', [accAddrRes.rows[0].account_number, userId]);
+          return res.json(accAddrRes.rows[0]);
+        }
+      }
+    }
+
+    // Г. Лицевой счёт не привязан — возвращаем null (строго исключаем чужие счета!)
     res.json(null);
   } catch (err) {
     console.error('[Бэкенд: Мой счёт] Ошибка поиска лицевого счета:', err.message);
