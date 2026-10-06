@@ -251,8 +251,8 @@ export default function ProfileScreen() {
       <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 90 + insets.bottom }]}>
         {/* Карточка пользователя */}
         <View style={[styles.profileHeader, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={[styles.avatar, { backgroundColor: isDark ? 'rgba(16,185,129,0.2)' : '#dcfce7', borderColor: colors.secondary }]}>
-            <Text style={[styles.avatarText, { color: colors.secondary }]}>{initials}</Text>
+          <View style={[styles.avatar, { backgroundColor: isDark ? '#1c1f2a' : '#e0f2fe', borderColor: colors.primaryContainer }]}>
+            <Ionicons name="shield-checkmark" size={30} color={colors.primaryContainer} />
           </View>
           <View style={styles.profileInfo}>
             <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>{displayName}</Text>
@@ -310,6 +310,11 @@ export default function ProfileScreen() {
               <Text style={[styles.permStatus, { color: notifGranted ? colors.secondary : colors.textMuted }]}>{notifGranted == null ? '…' : notifGranted ? 'Разрешены' : 'Включить'}</Text>
             </TouchableOpacity>
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            <TouchableOpacity style={styles.menuItem} onPress={requestMedia} activeOpacity={0.7}>
+              <View style={styles.menuItemLeft}><Ionicons name="images-outline" size={22} color={colors.textMuted} /><Text style={[styles.menuItemTitle, { color: colors.text }]}>Доступ к фото и файлам</Text></View>
+              <Text style={[styles.permStatus, { color: mediaGranted ? colors.secondary : colors.textMuted }]}>{mediaGranted == null ? '…' : mediaGranted ? 'Разрешён' : 'Включить'}</Text>
+            </TouchableOpacity>
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <TouchableOpacity style={styles.menuItem} onPress={requestGeo} activeOpacity={0.7}>
               <View style={styles.menuItemLeft}><Ionicons name="location-outline" size={22} color={colors.textMuted} /><Text style={[styles.menuItemTitle, { color: colors.text }]}>Геопозиция</Text></View>
               <Text style={[styles.permStatus, { color: geoGranted ? colors.secondary : colors.textMuted }]}>{geoGranted == null ? '…' : geoGranted ? 'Разрешена' : 'Включить'}</Text>
@@ -356,7 +361,7 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Документы</Text>
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Row icon="document-text-outline" title="Правовые документы" value="4 документа" onPress={() => setDocsOpen(true)} />
+            <Row icon="document-text-outline" title="Правовые документы" onPress={() => setDocsOpen(true)} />
           </View>
         </View>
 
@@ -401,7 +406,7 @@ export default function ProfileScreen() {
               <Text style={[styles.modalTitle, { color: colors.text }]}>О нас</Text>
               <TouchableOpacity onPress={() => setAboutOpen(false)}><Ionicons name="close" size={24} color={colors.textMuted} /></TouchableOpacity>
             </View>
-            <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 12) + 24 }} showsVerticalScrollIndicator={false}>
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 20 }} showsVerticalScrollIndicator>
               <Text style={[styles.aboutCompany, { color: colors.text }]}>ООО «ДомофонДар»</Text>
               <Text style={[styles.aboutDesc, { color: colors.textSecondary }]}>
                 Обслуживание, ремонт и монтаж домофонных систем в Краснодаре. Многолетний опыт и поддержка жильцов.
@@ -461,8 +466,12 @@ export default function ProfileScreen() {
               <TouchableOpacity style={[styles.saveButton, { backgroundColor: colors.primaryContainer, marginTop: 14 }]} onPress={() => { setAboutOpen(false); setMapsOpen(true); }} activeOpacity={0.85}>
                 <Text style={styles.saveButtonText}>Как проехать</Text>
               </TouchableOpacity>
-              <View style={{ height: 20 }} />
             </ScrollView>
+            <View style={[styles.modalFooter, { borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, 12) }]}>
+              <TouchableOpacity style={[styles.modalCloseBtn, { borderColor: colors.border }]} onPress={() => setAboutOpen(false)} activeOpacity={0.85}>
+                <Text style={[styles.modalCloseText, { color: colors.textSecondary }]}>Закрыть</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -475,7 +484,7 @@ export default function ProfileScreen() {
               <Text style={[styles.modalTitle, { color: colors.text }]}>Как проехать</Text>
               <TouchableOpacity onPress={() => setMapsOpen(false)}><Ionicons name="close" size={24} color={colors.textMuted} /></TouchableOpacity>
             </View>
-            <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 12) + 24 }} showsVerticalScrollIndicator={false}>
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 20 }} showsVerticalScrollIndicator>
               <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Адрес офиса</Text>
               <Text style={[styles.aboutAddr, { color: colors.text }]}>{OFFICE_ADDRESS}</Text>
               <Text style={[styles.aboutRowSub, { color: colors.textMuted, marginTop: 6 }]}>Откройте карточку организации «ДомофонДар» в приложении карт:</Text>
@@ -489,8 +498,12 @@ export default function ProfileScreen() {
                   <Text style={[styles.routeBtnText, { color: colors.text }]}>Яндекс.Карты</Text>
                 </TouchableOpacity>
               </View>
-              <View style={{ height: 20 }} />
             </ScrollView>
+            <View style={[styles.modalFooter, { borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, 12) }]}>
+              <TouchableOpacity style={[styles.modalCloseBtn, { borderColor: colors.border }]} onPress={() => setMapsOpen(false)} activeOpacity={0.85}>
+                <Text style={[styles.modalCloseText, { color: colors.textSecondary }]}>Закрыть</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -503,7 +516,7 @@ export default function ProfileScreen() {
               <Text style={[styles.modalTitle, { color: colors.text }]}>Документы</Text>
               <TouchableOpacity onPress={() => setDocsOpen(false)}><Ionicons name="close" size={24} color={colors.textMuted} /></TouchableOpacity>
             </View>
-            <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 12) + 24 }} showsVerticalScrollIndicator={false}>
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 20 }} showsVerticalScrollIndicator>
               {docs.map((d) => (
                 <TouchableOpacity key={d.id} style={[styles.docRow, { borderColor: colors.border }]} onPress={() => { setDocsOpen(false); setLegalDocId(d.id); }} activeOpacity={0.7}>
                   <Ionicons name="document-text-outline" size={18} color={colors.primaryContainer} style={{ marginRight: 10 }} />
@@ -511,8 +524,12 @@ export default function ProfileScreen() {
                   <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
                 </TouchableOpacity>
               ))}
-              <View style={{ height: 20 }} />
             </ScrollView>
+            <View style={[styles.modalFooter, { borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, 12) }]}>
+              <TouchableOpacity style={[styles.modalCloseBtn, { borderColor: colors.border }]} onPress={() => setDocsOpen(false)} activeOpacity={0.85}>
+                <Text style={[styles.modalCloseText, { color: colors.textSecondary }]}>Закрыть</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -577,7 +594,10 @@ const styles = StyleSheet.create({
   segment: { flexDirection: 'row', borderRadius: 12, borderWidth: 1, padding: 4, gap: 4 },
   segmentBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 9, borderRadius: 9 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.7)', justifyContent: 'flex-end' },
-  modalContent: { flex: 1, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 4, borderWidth: 0 },
+  modalContent: { flex: 1, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 0, borderWidth: 0 },
+  modalFooter: { paddingTop: 10, borderTopWidth: 1 },
+  modalCloseBtn: { height: 48, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  modalCloseText: { fontSize: 15, fontWeight: '700' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   modalTitle: { fontSize: 20, fontWeight: 'bold' },
   inputLabel: { fontSize: 13, fontWeight: '600', marginBottom: 6, marginTop: 12 },

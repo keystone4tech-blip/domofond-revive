@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { apiClient } from '@/api/client';
 import { useAppTheme } from '@/theme';
 import { useAuthStore } from '@/store/auth.store';
@@ -27,6 +28,7 @@ const DISPATCHER_PHONE = '+79034118393';
 
 export default function RequestsScreen() {
   const insets = useSafeAreaInsets();
+  const tabBarHeight = useBottomTabBarHeight();
   const { colors, isDark } = useAppTheme();
   const { user } = useAuthStore();
 
@@ -156,15 +158,15 @@ export default function RequestsScreen() {
           style={{ flex: 1 }}
           keyExtractor={(item) => String(item.id)}
           renderItem={renderItem}
-          contentContainerStyle={[styles.listContainer, { paddingBottom: 16 }]}
+          contentContainerStyle={[styles.listContainer, { paddingBottom: tabBarHeight + 80 }]}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primaryContainer} />}
           showsVerticalScrollIndicator={false}
         />
       )}
 
-      {/* Нижняя кнопка создания заявки — над баром вкладок, удобно нажимать */}
+      {/* Нижняя кнопка создания заявки — закреплена прямо над баром вкладок */}
       {!loading && requests.length > 0 && (
-        <View style={[styles.bottomBar, { backgroundColor: colors.background, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, 10) }]}>
+        <View style={[styles.bottomBar, { backgroundColor: colors.background, borderTopColor: colors.border, paddingBottom: 10, marginBottom: tabBarHeight }]}>
           <TouchableOpacity style={[styles.bottomBtn, { backgroundColor: colors.primaryContainer }]} onPress={() => setChooserOpen(true)} activeOpacity={0.85}>
             <Ionicons name="add-circle-outline" size={20} color="#ffffff" style={{ marginRight: 8 }} />
             <Text style={styles.bottomBtnText}>Сделать заявку</Text>

@@ -14,30 +14,18 @@ export function OfflineBanner() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const setOffline = useAuthStore((s) => s.setOffline);
 
-  // Слушаем состояние сети устройства — мгновенно реагируем на потерю/восстановление связи
+  // Слушаем состояние сети устройства и обновляем флаг онлайн/оффлайн,
+  // который показывается в шапке главного экрана. Всплывающую плашку больше не рисуем.
   useEffect(() => {
     const unsub = NetInfo.addEventListener((state) => {
       const online = !!state.isConnected && state.isInternetReachable !== false;
-      if (!online) {
-        setOffline(true);
-      }
-      // Восстановление связи подтверждаем успешным ответом API (в client.ts),
-      // поэтому здесь при online флаг НЕ снимаем принудительно.
+      setOffline(!online);
     });
     return () => unsub();
   }, [setOffline]);
 
-  // Плашку показываем только авторизованному пользователю в оффлайне
-  if (!isAuthenticated || !isOffline) return null;
-
-  return (
-    <View style={[styles.wrap, { paddingTop: Math.max(insets.top, 8) }]} pointerEvents="none">
-      <View style={styles.banner}>
-        <Text style={styles.icon}>⚠️</Text>
-        <Text style={styles.text}>Нет подключения к интернету — данные могут быть неактуальны</Text>
-      </View>
-    </View>
-  );
+  void insets; void isOffline; void isAuthenticated;
+  return null;
 }
 
 const styles = StyleSheet.create({

@@ -32,6 +32,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user, loadProfile } = useAuthStore();
+  const isOffline = useAuthStore((s) => s.isOffline);
   const { colors, isDark, toggleTheme } = useAppTheme();
 
   // Состояния данных
@@ -155,76 +156,50 @@ export default function HomeScreen() {
         {/* 1. ШАПКА В СТИЛЕ CYBERSHIELD */}
         {/* =================================================================== */}
         <View style={styles.cyberHeader}>
-          {/* Бренд и пульсирующий индикатор безопасности */}
-          <View style={styles.brandContainer}>
-            <View style={styles.brandRow}>
-              <View style={[styles.logoBadge, { backgroundColor: isDark ? '#1c1f2a' : '#e0f2fe', borderColor: colors.border }]}>
-                <Ionicons name="shield-checkmark" size={18} color={colors.primaryContainer} />
-              </View>
-              <View>
-                <Text style={[styles.brandTitle, { color: colors.text }]}>ДОМОФОНДАР</Text>
-                <View style={styles.statusIndicatorRow}>
-                  <View style={styles.statusPulseWrapper}>
-                    <View style={styles.statusDotPulse} />
-                    <View style={styles.statusDotMain} />
-                  </View>
-                  <Text style={[styles.statusIndicatorText, { color: colors.secondary }]}>
-                    СИСТЕМА АКТИВНА // В НОРМЕ
-                  </Text>
-                </View>
+          {/* Логотип, название и статус подключения */}
+          <View style={styles.brandRow}>
+            <View style={[styles.logoBadge, { backgroundColor: isDark ? '#1c1f2a' : '#e0f2fe', borderColor: colors.border }]}>
+              <Ionicons name="shield-checkmark" size={18} color={colors.primaryContainer} />
+            </View>
+            <View style={{ flexShrink: 1 }}>
+              <Text style={[styles.brandTitle, { color: colors.text }]} numberOfLines={1}>ДОМОФОНДАР</Text>
+              <View style={styles.statusLine}>
+                <View style={[styles.statusDot, { backgroundColor: isOffline ? colors.warning : colors.secondary }]} />
+                <Text style={[styles.statusLineText, { color: isOffline ? colors.warning : colors.secondary }]} numberOfLines={1}>
+                  {isOffline ? 'Нет связи с сервером' : 'Онлайн'}
+                </Text>
               </View>
             </View>
           </View>
 
-          {/* Кнопки переключения темы и перехода в профиль */}
-          <View style={styles.headerActions}>
-            <TouchableOpacity
-              style={[styles.headerIconBtn, { backgroundColor: isDark ? '#1c1f2a' : '#ffffff', borderColor: colors.border }]}
-              onPress={toggleTheme}
-              activeOpacity={0.8}
-              accessibilityLabel="Переключить тему"
-            >
-              <Ionicons
-                name={isDark ? 'sunny-outline' : 'moon-outline'}
-                size={20}
-                color={isDark ? '#fbbf24' : '#0284c7'}
-              />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.headerIconBtn, { backgroundColor: isDark ? '#1c1f2a' : '#ffffff', borderColor: colors.border }]}
-              onPress={() => router.push('/(tabs)/profile')}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="person-outline" size={19} color={colors.primaryContainer} />
-            </TouchableOpacity>
-          </View>
+          {/* Одна кнопка — переключение темы */}
+          <TouchableOpacity
+            style={[styles.headerIconBtn, { backgroundColor: isDark ? '#1c1f2a' : '#ffffff', borderColor: colors.border }]}
+            onPress={toggleTheme}
+            activeOpacity={0.8}
+            accessibilityLabel="Переключить тему"
+          >
+            <Ionicons name={isDark ? 'sunny-outline' : 'moon-outline'} size={20} color={isDark ? '#fbbf24' : '#0284c7'} />
+          </TouchableOpacity>
         </View>
 
-        {/* Приветствие абонента */}
-        <View style={styles.greetingSection}>
-          <Text style={[styles.greetingLabel, { color: colors.textSecondary }]}>Личный кабинет жильца</Text>
-          <Text style={[styles.greetingName, { color: colors.text }]} numberOfLines={1}>
-            Здравствуйте, {displayName}!
-          </Text>
-          {(() => {
-            const vs = (user as any)?.verification_status || (user?.is_verified ? 'verified' : 'unverified');
-            const b = vs === 'verified'
-              ? { t: 'Аккаунт подтверждён', c: colors.secondary, i: 'shield-checkmark' as const, bg: isDark ? 'rgba(16,185,129,0.15)' : '#ecfdf5' }
-              : vs === 'pending'
-              ? { t: 'Верификация на проверке', c: colors.warning, i: 'time' as const, bg: isDark ? 'rgba(245,158,11,0.15)' : '#fef3c7' }
-              : vs === 'rejected'
-              ? { t: 'Верификация отклонена — повторить', c: colors.error, i: 'close-circle' as const, bg: isDark ? 'rgba(239,68,68,0.15)' : '#fee2e2' }
-              : { t: 'Пройдите верификацию', c: colors.primaryContainer, i: 'shield-outline' as const, bg: isDark ? 'rgba(14,165,233,0.15)' : '#e0f2fe' };
-            return (
-              <TouchableOpacity style={[styles.verifyChip, { backgroundColor: b.bg }]} onPress={() => router.push('/(tabs)/profile')} activeOpacity={0.8}>
-                <Ionicons name={b.i} size={13} color={b.c} style={{ marginRight: 5 }} />
-                <Text style={[styles.verifyChipText, { color: b.c }]}>{b.t}</Text>
-                {vs !== 'verified' && vs !== 'pending' ? <Ionicons name="chevron-forward" size={13} color={b.c} /> : null}
-              </TouchableOpacity>
-            );
-          })()}
-        </View>
+        {/* Кнопка верификации на всю ширину — только если НЕ подтверждён */}
+        {(() => {
+          const vs = (user as any)?.verification_status || (user?.is_verified ? 'verified' : 'unverified');
+          if (vs === 'verified') return null;
+          const b = vs === 'pending'
+            ? { t: 'Верификация на проверке', c: colors.warning, i: 'time' as const, bg: isDark ? 'rgba(245,158,11,0.15)' : '#fef3c7' }
+            : vs === 'rejected'
+            ? { t: 'Верификация отклонена — повторить', c: colors.error, i: 'close-circle' as const, bg: isDark ? 'rgba(239,68,68,0.15)' : '#fee2e2' }
+            : { t: 'Пройдите верификацию аккаунта', c: colors.primaryContainer, i: 'shield-outline' as const, bg: isDark ? 'rgba(14,165,233,0.15)' : '#e0f2fe' };
+          return (
+            <TouchableOpacity style={[styles.verifyBtn, { backgroundColor: b.bg, borderColor: b.c }]} onPress={() => router.push('/(tabs)/profile')} activeOpacity={0.85}>
+              <Ionicons name={b.i} size={16} color={b.c} style={{ marginRight: 8 }} />
+              <Text style={[styles.verifyBtnText, { color: b.c }]}>{b.t}</Text>
+              <Ionicons name="chevron-forward" size={15} color={b.c} style={{ marginLeft: 'auto' }} />
+            </TouchableOpacity>
+          );
+        })()}
 
         {/* =================================================================== */}
         {/* 2. КАРТОЧКА ЛИЦЕВОГО СЧЕТА И БАЛАНСА */}
@@ -238,7 +213,11 @@ export default function HomeScreen() {
           </View>
         ) : (
           <LinearGradient
-            colors={hasDebt ? ['#f97316', '#ea580c', '#b91c1c'] : ['#0ea5e9', '#0276c4', '#0b3f78']}
+            colors={debt > 0
+              ? ['#f97316', '#ea580c', '#b91c1c']
+              : debt < 0
+              ? ['#10b981', '#059669', '#047857']
+              : ['#0ea5e9', '#0276c4', '#0b3f78']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.heroCard}
@@ -248,22 +227,28 @@ export default function HomeScreen() {
 
             {/* Верхняя строка: номер ЛС и статус */}
             <View style={styles.heroTopRow}>
-              <View style={styles.accountNumberBlock}>
+              <View style={[styles.accountNumberBlock, { flexShrink: 1, minWidth: 0 }]}>
                 <Ionicons name="card-outline" size={15} color="rgba(255,255,255,0.9)" style={{ marginRight: 6 }} />
-                <Text style={styles.heroAccountText}>
-                  {account ? `Лицевой счёт № ${account.account_number}` : 'Л/С не привязан'}
+                <Text style={[styles.heroAccountText, { flexShrink: 1 }]} numberOfLines={1}>
+                  {account ? `Л/С № ${account.account_number}` : 'Л/С не привязан'}
                 </Text>
               </View>
 
-              <View style={styles.heroStatusBadge}>
-                <View style={[styles.statusDotSmall, { backgroundColor: hasDebt ? '#fde68a' : '#4edea3' }]} />
-                <Text style={styles.heroStatusText}>{hasDebt ? 'Задолженность' : 'ТО оплачено'}</Text>
+              <View style={[styles.heroStatusBadge, { flexShrink: 0 }]}>
+                <View style={[styles.statusDotSmall, { backgroundColor: debt > 0 ? '#fde68a' : '#d1fae5' }]} />
+                <Text style={styles.heroStatusText} numberOfLines={1}>
+                  {debt > 0 ? 'Задолженность' : debt < 0 ? 'Переплата' : 'ТО оплачено'}
+                </Text>
               </View>
             </View>
 
             {/* Баланс крупно */}
-            <Text style={styles.heroBalanceLabel}>{hasDebt ? 'Сумма к оплате ТО' : 'Текущий баланс'}</Text>
-            <Text style={styles.heroBalanceValue}>{hasDebt ? `${debt.toFixed(2)} ₽` : '0.00 ₽'}</Text>
+            <Text style={styles.heroBalanceLabel}>
+              {debt > 0 ? 'Сумма к оплате ТО' : debt < 0 ? 'Баланс (переплата)' : 'Текущий баланс'}
+            </Text>
+            <Text style={styles.heroBalanceValue}>
+              {debt > 0 ? `${debt.toFixed(2)} ₽` : debt < 0 ? `+${Math.abs(debt).toFixed(2)} ₽` : '0.00 ₽'}
+            </Text>
 
             {/* Адрес */}
             <View style={styles.heroAddrRow}>
@@ -590,6 +575,35 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
     letterSpacing: 0.5,
+  },
+  statusLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 3,
+  },
+  statusDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+  },
+  statusLineText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+  },
+  verifyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  verifyBtnText: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    flexShrink: 1,
   },
   statusIndicatorRow: {
     flexDirection: 'row',

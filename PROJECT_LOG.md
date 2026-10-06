@@ -11,6 +11,39 @@
 > 
 > **Пользователь НЕ ДОЛЖЕН ничего вносить вручную.** Вся статистика и история пополняется ИИ автоматически при каждой задаче.
 
+# 2026-10-06 19:45 — Мобильное приложение v1.2.6 (Build 13): Полноэкранные модалки документов, отступ кнопки заявок, брендовый аватар и онлайн-статус
+
+## 1. Задачи и бизнес-ценность
+- **Полноэкранные информационные модалки в профиле (`profile/index.tsx`)**:
+  * Окна «О нас», «Как проехать» и «Документы» переведены в полноценный полноэкранный режим с поддержкой безопасных зон (`insets.top`, `insets.bottom`).
+  * Обеспечен плавный вертикальный скролл (`ScrollView flex: 1`), все разделы и внешние ссылки («Наш сайт», карты и документы) легко доступны и видны пользователю.
+  * Добавлены нижние фиксированные кнопки «Закрыть» для комфортного закрытия окна одной рукой.
+  * С кнопки правовых документов убрана некорректная надпись «4 документа».
+- **Исправление наложения кнопки «Сделать заявку» (`requests/index.tsx`)**:
+  * Использован хук `useBottomTabBarHeight()` для гарантированного расчета динамического клиренса над таб-баром (`marginBottom: tabBarHeight`).
+  * Для списка заявок добавлен отступ `paddingBottom: tabBarHeight + 80`, исключающий перекрытие последнего элемента кнопкой.
+- **Брендовый аватар профиля компании (`profile/index.tsx`)**:
+  * Заменена безликая серая иконка пользователя на официальный логотип компании «Домофондар».
+  * Сохранена возможность выбора собственного фото из галереи или съёмки с камеры.
+- **Эргономика главного экрана (`home.tsx`, `OfflineBanner.tsx`)**:
+  * Удалена дублирующая кнопка перехода в профиль из правого верхнего угла шапки.
+  * Блокирующий баннер отсутствия сети заменен на лаконичный индикатор статуса (🟢 Онлайн / 🔴 Нет сети) прямо под логотипом компании.
+- **Версионирование**:
+  * Версия приложения повышена до **v1.2.6** (`versionCode: 13`, `buildNumber: 13`).
+  * Эндпоинт `/api/app/version` обновлён на выдачу `1.2.6 (Build 13)`.
+
+## 2. Измененные файлы
+- [`mobile/app/(tabs)/home.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/app/(tabs)/home.tsx) — Удаление лишней кнопки профиля, индикатор онлайн-статуса сети.
+- [`mobile/app/(tabs)/profile/index.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/app/(tabs)/profile/index.tsx) — Полноэкранные модалки, брендовый аватар, убрана надпись «4 документа», кнопки «Закрыть».
+- [`mobile/app/(tabs)/requests/index.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/app/(tabs)/requests/index.tsx) — Отступ кнопки над закреплённым таб-баром через `useBottomTabBarHeight`.
+- [`mobile/src/components/OfflineBanner.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/src/components/OfflineBanner.tsx) — Отключение блокирующей оффлайн-плашки в пользу статуса в шапке.
+- [`mobile/app.config.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/app.config.ts) — Версия 1.2.6 (versionCode: 13, buildNumber: 13).
+- [`mobile/package.json`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/package.json) — Версия 1.2.6.
+- [`mobile/src/config/constants.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/src/config/constants.ts) — APP_VERSION = '1.2.6'.
+- [`server/index.js`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/server/index.js) — latestVersion: '1.2.6', versionCode: 13, примечания релиза.
+- [`src/data/projectChangelog.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/data/projectChangelog.ts) — Запись о релизе v1.2.6 в паспорте проекта.
+- [`PROJECT_LOG.md`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/PROJECT_LOG.md) — Обновление журнала проекта.
+
 # 2026-10-06 19:15 — Мобильное приложение v1.2.5 (Build 12): Строгий контроль заказа аудиотрубки и ликвидация «нулевых нарядов»
 
 ## 1. Задачи и бизнес-ценность
