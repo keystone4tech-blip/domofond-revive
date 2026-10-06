@@ -240,7 +240,7 @@ export default function PaymentsScreen() {
                 {account?.address ? (
                   <View style={styles.heroAddrRow}>
                     <Ionicons name="location-outline" size={13} color="rgba(255,255,255,0.85)" style={{ marginRight: 5 }} />
-                    <Text style={styles.heroAddrText} numberOfLines={1}>{account.address}</Text>
+                    <Text style={styles.heroAddrText} numberOfLines={2}>{account.address}</Text>
                   </View>
                 ) : null}
 
@@ -262,6 +262,11 @@ export default function PaymentsScreen() {
                     )}
                   </TouchableOpacity>
                 )}
+
+                {/* Пояснение про оплату сверх суммы */}
+                <Text style={styles.heroHint}>
+                  Можно оплатить больше — переплата зачислится на баланс и автоматически спишется в счёт следующего ТО.
+                </Text>
 
                 {/* Оплата произвольной суммы */}
                 <View style={styles.heroPayRow}>
@@ -343,6 +348,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff', paddingVertical: 13, borderRadius: 14, marginTop: 16,
   },
   heroPayDebtText: { color: '#b91c1c', fontSize: 14, fontWeight: '800' },
+  heroHint: { color: 'rgba(255,255,255,0.85)', fontSize: 11.5, lineHeight: 16, marginTop: 10 },
   heroPayRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
   heroInput: {
     flex: 1, height: 46, borderRadius: 12, paddingHorizontal: 14, fontSize: 15, fontWeight: '600',
