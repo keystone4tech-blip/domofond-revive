@@ -108,3 +108,18 @@ export const matchAccount = (profile: AddrLike, accounts: AccountLike[]): string
   }
   return null;
 };
+
+/**
+ * Единая утилита форматирования полного адреса без дублирования номеров квартир.
+ * Если в строке адреса уже присутствует номер квартиры (кв. 128, квартира 128),
+ * повторно `, кв. ${apt}` не прибавляется!
+ */
+export const formatFullAddress = (address?: string | null, apartment?: string | null): string => {
+  const addr = (address || "").trim();
+  const apt = (apartment || "").toString().trim();
+  if (!addr) return apt ? `кв. ${apt}` : "";
+  if (!apt) return addr;
+  const hasApt = /кв\.?\s*\d+/i.test(addr) || /квартира\s*\d+/i.test(addr);
+  if (hasApt) return addr;
+  return `${addr}, кв. ${apt}`;
+};

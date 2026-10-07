@@ -47,6 +47,7 @@ import {
   Sparkles
 } from "lucide-react";
 import { format, startOfMonth, endOfMonth, subMonths, startOfYear, startOfDay } from "date-fns";
+import { formatFullAddress } from "@/lib/addressMatch";
 
 // --- Интерфейсы типизации данных отчётов ---
 
@@ -1354,8 +1355,8 @@ export const CRMReports: React.FC = () => {
                           <TableCell className="font-mono">
                             {p.phone || "—"}
                           </TableCell>
-                          <TableCell className="max-w-[220px] truncate" title={p.address || ""}>
-                            {p.address || "Адрес не указан"}
+                          <TableCell className="max-w-[220px] truncate" title={formatFullAddress(p.address, p.apartment)}>
+                            {formatFullAddress(p.address, p.apartment) || "Адрес не указан"}
                           </TableCell>
                           <TableCell className="font-mono font-bold">
                             {p.apartment ? `кв. ${p.apartment}` : "—"}

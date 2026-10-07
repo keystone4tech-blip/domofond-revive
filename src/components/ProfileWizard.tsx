@@ -329,12 +329,17 @@ export const ProfileWizard: React.FC<Props> = ({ userId, phone, initialFullName,
           }).eq("id", userId);
         } catch { /* не критично */ }
         try {
+          const cleanApt = apartment.trim();
+          const hasAptInFinal = /кв\.?\s*\d+/i.test(finalAddress) || /квартира\s*\d+/i.test(finalAddress);
+          const fullAddr = finalAddress
+            ? (hasAptInFinal || !cleanApt ? finalAddress : `${finalAddress}, кв. ${cleanApt}`)
+            : (cleanApt ? `кв. ${cleanApt}` : "");
           await supabase.from("requests").insert({
             client_id: userId, name: fullName.trim(), phone,
-            address: `${finalAddress}${apartment ? `, кв. ${apartment}` : ""}`,
-            apartment: apartment.trim() || null, street: street || null, house: house || null, entrance: entrance || null,
+            address: fullAddr,
+            apartment: cleanApt || null, street: street || null, house: house || null, entrance: entrance || null,
             order_type: "data_change_request", status: "pending", priority: "medium",
-            message: `📝 Заявка на изменение данных.\nНовый адрес: ${finalAddress}, кв. ${apartment || "-"}\nЛицевой счёт: ${accountNumber || "-"}`,
+            message: `📝 Заявка на изменение данных.\nНовый адрес: ${fullAddr}\nЛицевой счёт: ${accountNumber || "-"}`,
             notes: JSON.stringify(pending),
           });
         } catch { /* заявка не критична для UX */ }

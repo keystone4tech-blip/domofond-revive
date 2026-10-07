@@ -16,7 +16,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { Search, Users, Trash2, ShieldCheck, ShieldAlert, Phone, Mail, Hash, RefreshCw, Pencil, Loader2, Link2 } from "lucide-react";
-import { streetQuery, aptDigits, matchAccount } from "@/lib/addressMatch";
+import { streetQuery, aptDigits, matchAccount, formatFullAddress } from "@/lib/addressMatch";
 
 // Личные кабинеты: все зарегистрированные пользователи с полной информацией, поиском,
 // фильтрами и мягким удалением (с подтверждением и записью «кто удалил»).
@@ -264,7 +264,7 @@ export const UsersManager: React.FC = () => {
                       {u.email && !String(u.email).startsWith("phone_") && <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{u.email}</span>}
                       {u.created_at && <span>рег. {new Date(u.created_at).toLocaleDateString("ru-RU")}</span>}
                     </div>
-                    {u.address && <div className="text-[11px] text-muted-foreground mt-0.5 truncate max-w-[520px]">{u.address}{u.apartment ? `, кв. ${u.apartment}` : ""}</div>}
+                    {u.address && <div className="text-[11px] text-muted-foreground mt-0.5 truncate max-w-[520px]">{formatFullAddress(u.address, u.apartment)}</div>}
                   </div>
 
                   <div className="flex items-center gap-1 shrink-0">
@@ -371,7 +371,7 @@ export const UsersManager: React.FC = () => {
                   <div key={m.id} className="p-2 text-xs flex items-center justify-between gap-2">
                     <div className="min-w-0">
                       <div className="font-medium truncate">{m.name}</div>
-                      <div className="text-muted-foreground truncate">{m.address}{m.apartment ? `, кв. ${m.apartment}` : ""}</div>
+                      <div className="text-muted-foreground truncate">{formatFullAddress(m.address, m.apartment)}</div>
                     </div>
                     <Badge variant="outline" className="font-mono gap-1 shrink-0"><Hash className="h-3 w-3" />{m.account_number}</Badge>
                   </div>

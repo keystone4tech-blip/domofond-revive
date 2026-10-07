@@ -11,6 +11,42 @@
 > 
 > **Пользователь НЕ ДОЛЖЕН ничего вносить вручную.** Вся статистика и история пополняется ИИ автоматически при каждой задаче.
 
+# 2026-10-07 18:15 — Тотальная ликвидация дублирования номеров квартир («кв. X, кв. X») во всех нарядах, заявках, CRM и кабинете
+
+## 1. Задачи и сквозная ревизия
+- **Поиск всех мест появления дубликатов («кв. X, кв. X»)**:
+  * Просканирована вся кодовая база фронтенда (`src/`), мобильного приложения (`mobile/`), серверных обработчиков (`server/index.js`) и таблицы PostgreSQL на боевом сервере (`requests`, `profiles`, `work_orders`, `acts`).
+  * Найдена первопричина: при формировании заявок (`requests`) адрес часто собирался шаблоном `${address}${apartment ? `, кв. ${apartment}` : ''}`. Если в `address` жилец уже выбрал или ввёл улицу вместе с квартирой (или адрес подтянулся из справочника/профиля уже с квартирой), добавление `, кв. ${apartment}` приводило к записи дубликата прямо в базу данных нарядов и заявок.
+- **Инженерные решения**:
+  * В [`src/lib/addressMatch.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/lib/addressMatch.ts) реализована централизованная утилита `formatFullAddress(address, apartment)` с регулярной проверкой `/кв\.?\s*\d+/i` и `/квартира\s*\d+/i`.
+  * В [`server/index.js`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/server/index.js):
+    - В `/api/user/request-data-change`: при формировании сообщения заявки и адреса наряда исключено повторное прибавление квартиры.
+    - В `/api/user/submit-verification`: в `fullAddr` заявки на подтверждение собственности также внедрена проверка на уже имеющуюся квартиру.
+  * В компонентах сайта и личного кабинета:
+    - [`src/pages/Cabinet.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/pages/Cabinet.tsx) и [`src/pages/Cabinet-1.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/pages/Cabinet-1.tsx): чистый вывод в карточке счёта, модалке неисправности, диалоге уточнения счёта и заявке на смену данных.
+    - [`src/components/ProfileWizard.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/components/ProfileWizard.tsx): устранено дублирование при сохранении заявки.
+    - [`src/components/VerificationUploadDialog.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/components/VerificationUploadDialog.tsx): исключено дублирование при отправке выписки/паспорта.
+  * В панелях CRM и FSM:
+    - [`VerificationManager.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/components/crm/VerificationManager.tsx) и [`fsm/VerificationManager.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/components/fsm/VerificationManager.tsx): очищено отображение во всех списках карточек и модальном окне проверки.
+    - [`UsersManager.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/components/crm/UsersManager.tsx) и [`fsm/UsersManager.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/components/fsm/UsersManager.tsx): чистый вывод адресов в списке абонентов и модалке привязки.
+    - [`CRMReports.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/components/crm/CRMReports.tsx): чистый вывод в таблице абонентов.
+  * Бэкенд задеплоен на сервер `45.8.99.238`, фронтенд успешно собран без ошибок (`npm run build`).
+
+## 2. Измененные файлы
+- [`src/lib/addressMatch.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/lib/addressMatch.ts) — Централизованная утилита `formatFullAddress`.
+- [`server/index.js`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/server/index.js) — Защита от дублей в `request-data-change` и `submit-verification`.
+- [`src/pages/Cabinet.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/pages/Cabinet.tsx) — Безопасное отображение и создание нарядов.
+- [`src/pages/Cabinet-1.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/pages/Cabinet-1.tsx) — Безопасное отображение и создание нарядов.
+- [`src/components/ProfileWizard.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/components/ProfileWizard.tsx) — Защита от повторного указания квартиры в заявке.
+- [`src/components/VerificationUploadDialog.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/components/VerificationUploadDialog.tsx) — Исключение дублей при подаче документов.
+- [`src/components/crm/VerificationManager.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/components/crm/VerificationManager.tsx) — Использование `formatFullAddress` в карточках и диалоге.
+- [`src/components/fsm/VerificationManager.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/components/fsm/VerificationManager.tsx) — Использование `formatFullAddress` в FSM.
+- [`src/components/crm/UsersManager.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/components/crm/UsersManager.tsx) — Чистые адреса в CRM.
+- [`src/components/fsm/UsersManager.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/components/fsm/UsersManager.tsx) — Чистые адреса в FSM.
+- [`src/components/crm/CRMReports.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/components/crm/CRMReports.tsx) — Чистые адреса в отчётах.
+- [`src/data/projectChangelog.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/data/projectChangelog.ts) — Запись в паспорте проекта.
+- [`PROJECT_LOG.md`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/PROJECT_LOG.md) — Обновление журнала проекта.
+
 # 2026-10-06 22:15 — Ликвидация слёта настроек личного кабинета и устранение дублирования номеров квартир
 
 ## 1. Задачи и расследование первопричины

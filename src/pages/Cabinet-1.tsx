@@ -4384,21 +4384,25 @@ const Cabinet = () => {
 
         // Создаем карточку наряда в таблице requests для CRM
         try {
-          const fullAddr = `${currentAddress}${apartment.trim() ? `, кв. ${apartment.trim()}` : ""}`;
+          const cleanApt = premiseType === "private" ? "" : apartment.trim();
+          const hasAptInCurrent = /кв\.?\s*\d+/i.test(currentAddress) || /квартира\s*\d+/i.test(currentAddress);
+          const fullAddr = currentAddress
+            ? (hasAptInCurrent || !cleanApt ? currentAddress : `${currentAddress}, кв. ${cleanApt}`)
+            : (cleanApt ? `кв. ${cleanApt}` : "");
           await supabase.from("requests").insert({
             client_id: session.user.id,
             name: fullName.trim(),
             phone: phone.trim(),
             address: fullAddr,
-            apartment: premiseType === "private" ? "" : apartment.trim(),
+            apartment: cleanApt || null,
             street: displayStreet?.trim() || null,
             house: displayHouse?.trim() || null,
             entrance: entrance?.trim() || null,
             floor: floor?.trim() || null,
             order_type: "data_change_request",
             message: `📝 Заявка на изменение данных абонента.
-Старый адрес: ${profile.address || "Не указан"}, кв. ${profile.apartment || "-"}
-Новый адрес: ${currentAddress}, кв. ${apartment.trim() || "-"}
+Старый адрес: ${profile.address || "Не указан"}${profile.apartment && !(/кв\.?\s*\d+/i.test(profile.address || "")) ? `, кв. ${profile.apartment}` : ""}
+Новый адрес: ${fullAddr}
 Старое ФИО: ${profile.full_name || "-"} ➔ Новое ФИО: ${fullName.trim()}
 Лицевой счет: ${accountSearchInput?.trim() || userAccount?.account_number || "-"}`,
             notes: JSON.stringify(pendingChange),

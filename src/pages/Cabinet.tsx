@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo, useRef, Component, ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { streetQuery, aptDigits, matchAccount } from "@/lib/addressMatch";
+import { streetQuery, aptDigits, matchAccount, formatFullAddress } from "@/lib/addressMatch";
 import { notify } from "@/lib/notify";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -759,7 +759,7 @@ const DebtCard = ({
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Адрес:</span>
-                    <span className="font-medium text-foreground text-right truncate max-w-[240px]">{address}{apartment ? `, кв. ${apartment}` : ""}</span>
+                    <span className="font-medium text-foreground text-right truncate max-w-[240px]">{formatFullAddress(address, apartment)}</span>
                   </div>
                   <div className="flex justify-between pt-1 border-t">
                     <span className="text-muted-foreground">{isDebt ? "Текущий долг:" : "Баланс:"}</span>
@@ -1171,7 +1171,7 @@ const DebtCard = ({
               <div className="text-sm text-muted-foreground space-y-1">
                 <div>👤 {fullName}</div>
                 <div>📞 {phone}</div>
-                <div>📍 {address}{apartment ? `, кв. ${apartment}` : ""}</div>
+                <div>📍 {formatFullAddress(address, apartment)}</div>
               </div>
               <Textarea
                 placeholder="Например: не находит мой лицевой счёт по квартире 45..."
@@ -4486,21 +4486,25 @@ const Cabinet = () => {
 
         // Создаем карточку наряда в таблице requests для CRM
         try {
-          const fullAddr = `${currentAddress}${apartment.trim() ? `, кв. ${apartment.trim()}` : ""}`;
+          const cleanApt = premiseType === "private" ? "" : apartment.trim();
+          const hasAptInCurrent = /кв\.?\s*\d+/i.test(currentAddress) || /квартира\s*\d+/i.test(currentAddress);
+          const fullAddr = currentAddress
+            ? (hasAptInCurrent || !cleanApt ? currentAddress : `${currentAddress}, кв. ${cleanApt}`)
+            : (cleanApt ? `кв. ${cleanApt}` : "");
           await supabase.from("requests").insert({
             client_id: session.user.id,
             name: fullName.trim(),
             phone: phone.trim(),
             address: fullAddr,
-            apartment: premiseType === "private" ? "" : apartment.trim(),
+            apartment: cleanApt || null,
             street: displayStreet?.trim() || null,
             house: displayHouse?.trim() || null,
             entrance: entrance?.trim() || null,
             floor: floor?.trim() || null,
             order_type: "data_change_request",
             message: `📝 Заявка на изменение данных абонента.
-Старый адрес: ${profile.address || "Не указан"}, кв. ${profile.apartment || "-"}
-Новый адрес: ${currentAddress}, кв. ${apartment.trim() || "-"}
+Старый адрес: ${profile.address || "Не указан"}${profile.apartment && !(/кв\.?\s*\d+/i.test(profile.address || "")) ? `, кв. ${profile.apartment}` : ""}
+Новый адрес: ${fullAddr}
 Старое ФИО: ${profile.full_name || "-"} ➔ Новое ФИО: ${fullName.trim()}
 Лицевой счет: ${accountSearchInput?.trim() || userAccount?.account_number || "-"}`,
             notes: JSON.stringify(pendingChange),
@@ -6479,7 +6483,7 @@ const Cabinet = () => {
                     Создание новой заявки
                   </DialogTitle>
                   <DialogDescription className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    Абонент: <span className="font-semibold text-foreground">{fullName || profile?.full_name}</span> | Адрес: <span className="font-semibold text-foreground">{address}{apartment ? `, кв. ${apartment}` : ""}</span>
+                    Абонент: <span className="font-semibold text-foreground">{fullName || profile?.full_name}</span> | Адрес: <span className="font-semibold text-foreground">{formatFullAddress(address, apartment)}</span>
                   </DialogDescription>
                 </DialogHeader>
 

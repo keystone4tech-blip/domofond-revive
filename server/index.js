@@ -603,8 +603,13 @@ app.post('/api/user/request-data-change', authenticateToken, async (req, res) =>
       },
     };
     await pool.query('UPDATE profiles SET pending_data_change = $1 WHERE id = $2', [JSON.stringify(pending), uid]);
+    const hasAptInAddr = (pending.address && (/кв\.?\s*\d+/i.test(pending.address) || /квартира\s*\d+/i.test(pending.address)));
+    const formattedAddr = pending.address
+      ? (hasAptInAddr || !pending.apartment ? pending.address : `${pending.address}, кв. ${pending.apartment}`)
+      : '-';
+
     const msg = `📱 [Мобильное приложение Домофондар]\n📝 Заявка на изменение данных абонента.\n` +
-      `Новый адрес: ${pending.address || '-'}, кв. ${pending.apartment || '-'}\n` +
+      `Новый адрес: ${formattedAddr}\n` +
       `ФИО: ${pending.full_name || '-'}\nТелефон: ${pending.phone || '-'}\nЛицевой счёт: ${pending.account_number || '-'}`;
     await pool.query(
       `INSERT INTO requests (name, phone, address, apartment, message, status, priority, order_type, client_id, notes)
@@ -711,7 +716,10 @@ app.post('/api/user/submit-verification', authenticateToken, async (req, res) =>
       [doc, now, uid]
     );
     const p = upd.rows[0] || {};
-    const fullAddr = `${p.address || ''}${p.apartment ? `, кв. ${p.apartment}` : ''}`;
+    const hasApt = p.address && (/кв\.?\s*\d+/i.test(p.address) || /квартира\s*\d+/i.test(p.address));
+    const fullAddr = p.address
+      ? (hasApt || !p.apartment ? p.address : `${p.address}, кв. ${p.apartment}`)
+      : (p.apartment ? `кв. ${p.apartment}` : '');
     try {
       await pool.query(
         `INSERT INTO requests (client_id, name, phone, address, apartment, order_type, message, status, priority, document_url)

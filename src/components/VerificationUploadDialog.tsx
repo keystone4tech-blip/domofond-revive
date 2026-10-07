@@ -279,7 +279,11 @@ export const VerificationUploadDialog: React.FC<VerificationUploadDialogProps> =
 
       // 2. Создаем карточку наряда в журнале requests для диспетчера
       try {
-        const fullAddr = `${profile.address}${profile.apartment ? `, кв. ${profile.apartment}` : ""}`;
+        const apt = (profile.apartment || "").trim();
+        const hasApt = profile.address && (/кв\.?\s*\d+/i.test(profile.address) || /квартира\s*\d+/i.test(profile.address));
+        const fullAddr = profile.address
+          ? (hasApt || !apt ? profile.address : `${profile.address}, кв. ${apt}`)
+          : (apt ? `кв. ${apt}` : "");
         await supabase.from("requests").insert({
           client_id: profile.id,
           name: profile.full_name || "Жилец",

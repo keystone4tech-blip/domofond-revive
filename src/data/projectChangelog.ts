@@ -258,6 +258,16 @@ export const KIND_META: Record<Kind, { label: string; badgeCls: string }> = {
  */
 export const PROJECT_CHANGELOG: ProjectEntry[] = [
   {
+    id: "stage-2026-10-07-1815",
+    datetime: "2026-10-07 18:15",
+    title: "Тотальная ликвидация дублирования номеров квартир («кв. X, кв. X») во всех нарядах, заявках, CRM и кабинете",
+    description: "Проведена глубокая ревизия и очистка сквозной цепочки формирования адресов по всей системе: 1) Создана единая универсальная утилита formatFullAddress(address, apartment), гарантирующая отсутствие повторов «кв. X, кв. X» при отображении и сохранении адресов. 2) В server/index.js внедрена защита в эндпоинтах подачи заявок (/api/user/request-data-change) и подтверждения верификации (/api/user/submit-verification) — при наличии номера квартиры в исходной строке адреса исключено прибавление второго суффикса «, кв.». 3) На сайте и в личном кабинете жильца (Cabinet.tsx, Cabinet-1.tsx, ProfileWizard.tsx, VerificationUploadDialog.tsx) обновлены все блоки генерации заявок и карточки счетов. 4) В панелях CRM и FSM (VerificationManager.tsx, UsersManager.tsx, CRMReports.tsx) обновлен рендеринг адресов абонентов. 5) В базе данных на сервере 45.8.99.238 очищены исторические заявки от накопленных дублей.",
+    module: "cabinet",
+    kind: "fix",
+    hours: 2.5,
+    difficulty: "Средняя",
+  },
+  {
     id: "stage-2026-10-06-2215",
     datetime: "2026-10-06 22:15",
     title: "Ликвидация слёта настроек личного кабинета и устранение дублирования номеров квартир",

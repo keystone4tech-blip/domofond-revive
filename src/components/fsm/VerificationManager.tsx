@@ -42,6 +42,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatFullAddress } from "@/lib/addressMatch";
 
 // Интерфейс расширенного профиля пользователя
 interface Profile {
@@ -669,7 +670,7 @@ const VerificationManager: React.FC = () => {
                       <div className="text-xs space-y-1 pt-1 border-t border-slate-100 dark:border-slate-800">
                         <p className="text-foreground font-semibold flex items-center gap-1.5">
                           <MapPin className="h-3.5 w-3.5 text-primary shrink-0" />
-                          <span>{profile.address || "Адрес не указан"}{profile.apartment ? `, кв. ${profile.apartment}` : ""}</span>
+                          <span>{formatFullAddress(profile.address, profile.apartment) || "Адрес не указан"}</span>
                         </p>
                         <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-0.5">
                           {getDocumentTypeBadge(profile.verification_document_type) || <span>Тип: Не указан</span>}
@@ -723,7 +724,7 @@ const VerificationManager: React.FC = () => {
                     <div className="text-xs text-muted-foreground pt-1 border-t border-slate-100 dark:border-slate-800">
                       <p className="text-foreground font-medium flex items-center gap-1.5">
                         <MapPin className="h-3.5 w-3.5 text-primary shrink-0" />
-                        <span>{profile.address || "—"}{profile.apartment ? `, кв. ${profile.apartment}` : ""}</span>
+                        <span>{formatFullAddress(profile.address, profile.apartment) || "—"}</span>
                       </p>
                     </div>
                   </CardContent>
@@ -770,7 +771,7 @@ const VerificationManager: React.FC = () => {
                     <div className="text-xs text-muted-foreground pt-1 border-t border-red-100 dark:border-red-900/30 space-y-1">
                       <p className="text-foreground font-medium flex items-center gap-1.5">
                         <MapPin className="h-3.5 w-3.5 text-primary shrink-0" />
-                        <span>{profile.address || "—"}{profile.apartment ? `, кв. ${profile.apartment}` : ""}</span>
+                        <span>{formatFullAddress(profile.address, profile.apartment) || "—"}</span>
                       </p>
                       {profile.verification_reject_reason && (
                         <p className="text-red-600 dark:text-red-400 font-medium">
@@ -950,8 +951,7 @@ const VerificationManager: React.FC = () => {
                 <div className="sm:col-span-2">
                   <span className="text-muted-foreground uppercase text-[10px] font-semibold block">Адрес и квартира</span>
                   <p className="font-bold text-sm text-foreground">
-                    {selectedProfile.address || "—"}
-                    {selectedProfile.apartment ? `, кв. ${selectedProfile.apartment}` : ""}
+                    {formatFullAddress(selectedProfile.address, selectedProfile.apartment) || "—"}
                   </p>
                 </div>
                 {selectedProfile.verification_reject_reason && (
