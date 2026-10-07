@@ -233,6 +233,55 @@ const DebtCard = ({
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  // --- Автоплатёж (рекуррентные платежи ЮKassa) — ТОЛЬКО абонентская плата (ТО) ---
+  const [autopay, setAutopay] = useState<{ enabled: boolean; card_last4: string | null; card_type: string | null }>({ enabled: false, card_last4: null, card_type: null });
+  const [saveCardForAuto, setSaveCardForAuto] = useState(false);
+  const [autopayBusy, setAutopayBusy] = useState(false);
+
+  // Загрузка статуса автоплатежа по лицевому счёту абонента
+  useEffect(() => {
+    const acc = account?.account_number;
+    if (!acc || !userId) {
+      setAutopay({ enabled: false, card_last4: null, card_type: null });
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch(`/backend-api/api/user/autopay/status?account_number=${encodeURIComponent(acc)}`);
+        const d = await r.json().catch(() => ({}));
+        if (!cancelled && r.ok) {
+          setAutopay({ enabled: !!d.enabled, card_last4: d.card_last4 ?? null, card_type: d.card_type ?? null });
+        }
+      } catch (e) {
+        /* статус автоплатежа не критичен для отображения */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [account?.account_number, userId]);
+
+  // Отключение автоплатежа
+  const disableAutopay = async () => {
+    if (!account) return;
+    setAutopayBusy(true);
+    try {
+      const r = await fetch("/backend-api/api/user/autopay/disable", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ account_number: account.account_number }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || "Не удалось отключить автоплатёж");
+      setAutopay({ enabled: false, card_last4: null, card_type: null });
+      setSaveCardForAuto(false);
+      toast({ title: "Автоплатёж отключён", description: "Абонентская плата больше не будет списываться автоматически." });
+    } catch (e: any) {
+      toast({ title: "Ошибка", description: e.message || "Не удалось отключить автоплатёж", variant: "destructive" });
+    } finally {
+      setAutopayBusy(false);
+    }
+  };
+
   useEffect(() => {
     const loadDebt = async () => {
       setLoading(true);
@@ -530,6 +579,9 @@ const DebtCard = ({
           customerPhone: phone || undefined,
           return_url: `${window.location.origin}/cabinet?check_payment=1&account=${account.account_number}`,
           returnUrl: `${window.location.origin}/cabinet?check_payment=1&account=${account.account_number}`,
+          // Подключение автоплатежа: сохраняем карту ТОЛЬКО при оплате абонентской платы (ТО)
+          save_payment_method: saveCardForAuto || undefined,
+          savePaymentMethod: saveCardForAuto || undefined,
         }),
       });
 
@@ -665,16 +717,18 @@ const DebtCard = ({
             <span className="text-sm font-medium">{formatPeriod(account.period)}</span>
           </div>
 
-          <div className={`flex items-center justify-between p-4 rounded-lg border ${
+          <div className={`flex items-center justify-between p-4 rounded-xl border transition-all duration-500 animate-in fade-in ${
             isDebt
-              ? "bg-destructive/10 border-destructive/20"
-              : "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800"
+              ? "bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-950/30 dark:to-rose-950/20 border-destructive/30"
+              : isOverpayment
+              ? "bg-gradient-to-br from-emerald-50 to-green-50 dark:from-emerald-950/30 dark:to-green-950/20 border-emerald-300 dark:border-emerald-800"
+              : "bg-gradient-to-br from-sky-50 to-indigo-50 dark:from-sky-950/30 dark:to-indigo-950/20 border-sky-300 dark:border-sky-800"
           }`}>
             <span className="font-medium">
               {isDebt ? "Задолженность" : isOverpayment ? "Переплата" : "Баланс"}
             </span>
-            <span className={`text-xl font-bold ${
-              isDebt ? "text-destructive" : "text-green-600"
+            <span className={`text-xl font-extrabold tabular-nums transition-colors ${
+              isDebt ? "text-destructive" : isOverpayment ? "text-emerald-600 dark:text-emerald-400" : "text-sky-600 dark:text-sky-400"
             }`}>
               {isDebt ? "−" : isOverpayment ? "+" : ""}{absAmount.toFixed(2)} ₽
             </span>
@@ -718,6 +772,63 @@ const DebtCard = ({
                   <span>Быстрая онлайн-оплата картой через <strong>ЮKassa</strong> станет доступна после подтверждения адреса (верификации).</span>
                 </div>
               </div>
+            )}
+
+            {/* Автоплатёж (рекуррентные платежи) — ТОЛЬКО абонентская плата (ТО). Доступен после верификации. */}
+            {isVerified && !account.contract_terminated && account.status !== "terminated" && (
+              autopay.enabled ? (
+                <div className="rounded-xl border border-emerald-500/30 bg-emerald-50/70 dark:bg-emerald-950/20 p-3 flex items-center justify-between gap-3 animate-in fade-in">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="h-9 w-9 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                      <ShieldCheck className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold text-emerald-800 dark:text-emerald-300">Автоплатёж включён</div>
+                      <div className="text-[11px] text-emerald-700/80 dark:text-emerald-400/70 truncate">
+                        Карта •••• {autopay.card_last4 || "••••"} · списание 4-го числа
+                        {account.tariff_price != null ? ` · ${Number(account.tariff_price)} ₽/мес` : ""}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={disableAutopay}
+                    disabled={autopayBusy}
+                    className="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg border border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10 transition-colors disabled:opacity-50"
+                  >
+                    {autopayBusy ? "…" : "Отключить"}
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const cd = Number(account.debt_amount) || 0;
+                    setPayAmount(account.tariff_price != null ? Number(account.tariff_price).toFixed(2) : cd > 0 ? cd.toFixed(2) : "300");
+                    setSaveCardForAuto(true);
+                    setIsYooKassaOpen(true);
+                  }}
+                  className="group w-full text-left rounded-xl border border-sky-500/30 bg-gradient-to-br from-sky-50 to-indigo-50 dark:from-sky-950/30 dark:to-indigo-950/20 p-3.5 transition-all duration-300 hover:shadow-md hover:border-sky-500/50 animate-in fade-in"
+                >
+                  <div className="flex items-start gap-2.5">
+                    <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-500 text-white flex items-center justify-center shrink-0 shadow-sm shadow-sky-500/30 group-hover:scale-105 transition-transform">
+                      <Sparkles className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-extrabold text-slate-800 dark:text-slate-100 leading-snug">
+                        Подключите автоплатёж — и забудьте о квитанциях в ящике
+                      </div>
+                      <div className="text-[11.5px] text-slate-600 dark:text-slate-300 mt-1 leading-snug">
+                        Абонентская плата{account.tariff_price != null ? ` ${Number(account.tariff_price)} ₽/мес` : ""} спишется сама 4-го числа каждого месяца. Без очередей, напоминаний и риска просрочки. Отключить можно в один тап в любой момент.
+                      </div>
+                      <div className="inline-flex items-center gap-1.5 mt-2 text-xs font-bold text-sky-700 dark:text-sky-300">
+                        <Zap className="h-3.5 w-3.5 fill-current" />
+                        Включить автоплатёж
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              )
             )}
 
             {/* Кнопка «Оставить заявку» во всю ширину под блоком оплаты в едином фирменном стиле ShinyButton */}
@@ -857,6 +968,21 @@ const DebtCard = ({
                   </div>
                   <p>Оплата зачисляется мгновенно. После завершения платежа вы вернётесь в личный кабинет.</p>
                 </div>
+
+                {/* Подключение автоплатежа при оплате абонентской платы */}
+                {!autopay.enabled && (
+                  <label className="flex items-start gap-2.5 p-3 rounded-xl border border-sky-500/30 bg-sky-50/60 dark:bg-sky-950/20 cursor-pointer select-none transition-colors hover:bg-sky-50 dark:hover:bg-sky-950/30">
+                    <input
+                      type="checkbox"
+                      checked={saveCardForAuto}
+                      onChange={(e) => setSaveCardForAuto(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 accent-sky-600 shrink-0"
+                    />
+                    <span className="text-[11.5px] leading-snug text-slate-700 dark:text-slate-300">
+                      <span className="font-bold text-slate-800 dark:text-slate-100">Подключить автоплатёж</span> — сохранить карту и списывать абонентскую плату автоматически 4-го числа каждого месяца. Только за ТО домофона. Отключить можно в любой момент.
+                    </span>
+                  </label>
+                )}
               </div>
 
               <DialogFooter className="flex-col sm:flex-row gap-2">
@@ -1123,16 +1249,22 @@ const DebtCard = ({
       </>
     );
 
+    const statusBorder = isDebt
+      ? "border-destructive/30"
+      : isOverpayment
+      ? "border-emerald-500/30"
+      : "border-sky-500/30";
+
     if (embedded) {
       return (
-        <div className={`p-4 rounded-lg border ${isDebt ? "border-destructive/30" : "border-green-500/30"} bg-card`}>
+        <div className={`p-4 rounded-xl border ${statusBorder} bg-card transition-all duration-500 animate-in fade-in slide-in-from-bottom-2`}>
           {inner}
         </div>
       );
     }
 
     return (
-      <Card className={isDebt ? "border-destructive/30" : "border-green-500/30"}>
+      <Card className={`${statusBorder} transition-all duration-500 animate-in fade-in`}>
         <CardContent className="pt-6">{inner}</CardContent>
       </Card>
     );
@@ -2181,6 +2313,8 @@ const Cabinet = () => {
   const [showApartmentSuggestions, setShowApartmentSuggestions] = useState(false); // Показ подсказок квартиры
   const [loadingAddressCache, setLoadingAddressCache] = useState(false); // Процесс загрузки кэша адресов
   const [editing, setEditing] = useState(false);
+  // Активный раздел компактного кабинета (Вариант B: карта-герой + плитки)
+  const [section, setSection] = useState<"home" | "profile" | "domofon" | "history">("home");
 
   // --- СТЕЙТЫ ДЛЯ ПОИСКА ПО ЛИЦЕВОМУ СЧЁТУ ---
   const [accountSearchInput, setAccountSearchInput] = useState(""); // Введённый пользователем лицевой счёт
@@ -4946,6 +5080,64 @@ const Cabinet = () => {
           </div>
 
           <div className="grid gap-6">
+            {/* ===== КАРТА АБОНЕНТА (герой) — всегда сверху, цвет по статусу + анимация ===== */}
+            {profile?.address && (
+              <div className="animate-in fade-in slide-in-from-top-2 duration-500">
+                <div className="flex items-center justify-between mb-2.5">
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <CreditCard className="h-4 w-4 text-emerald-600" />
+                    Лицевой счёт и оплата
+                  </span>
+                  {userAccount?.account_number && (
+                    <Badge variant="outline" className="font-mono text-xs border-emerald-500/30 text-emerald-700 dark:text-emerald-300 font-bold">
+                      л/с {userAccount.account_number}
+                    </Badge>
+                  )}
+                </div>
+                <DebtCard
+                  address={profile.address}
+                  apartment={profile.apartment || ""}
+                  fullName={profile.full_name || fullName}
+                  phone={profile.phone || phone}
+                  embedded
+                  setParentAccount={setUserAccount}
+                  isVerified={profile?.is_verified === true || profile?.verification_status === "verified"}
+                  userId={userId}
+                  accountNumber={profile?.account_number}
+                  onOpenOrderDialog={(type) => {
+                    setOrderType(type || "repair");
+                    setIsOrderDialogOpen(true);
+                  }}
+                />
+              </div>
+            )}
+
+            {/* ===== ПЛИТКИ НАВИГАЦИИ (Вариант B) ===== */}
+            {profile?.address && (
+              <div className="grid grid-cols-4 gap-2.5 animate-in fade-in duration-500">
+                {([
+                  { key: "home", label: "Главное", Icon: Home },
+                  { key: "profile", label: "Профиль", Icon: User },
+                  { key: "domofon", label: "Домофон", Icon: DoorOpen },
+                  { key: "history", label: "История", Icon: History },
+                ] as const).map(({ key, label, Icon }) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setSection(key)}
+                    className={`flex flex-col items-center justify-center gap-1.5 rounded-2xl border p-3 transition-all duration-200 ${
+                      section === key
+                        ? "border-primary/40 bg-primary/10 text-primary shadow-sm scale-[1.02]"
+                        : "border-slate-200/70 dark:border-slate-800/70 bg-card hover:bg-muted/50 text-slate-600 dark:text-slate-300"
+                    }`}
+                  >
+                    <Icon className="h-5 w-5" />
+                    <span className="text-[11px] font-semibold">{label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
             {/* Мои заявки - показываем если есть задачи */}
             {myTasks && myTasks.length > 0 && (
               <Card>
@@ -4993,7 +5185,7 @@ const Cabinet = () => {
 
 
 
-            <Card className="glass-premium rounded-[24px] border-none shadow-xl">
+            <Card className={`glass-premium rounded-[24px] border-none shadow-xl ${(section === "profile" || !profile?.address) ? "animate-in fade-in duration-300" : "hidden"}`}>
               <CardHeader className="pb-4 border-b border-slate-100 dark:border-slate-800">
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div className="space-y-1.5">
@@ -5148,37 +5340,7 @@ const Cabinet = () => {
                   </div>
                 )}
 
-                {/* RULE 2: Состояние лицевого счёта и оплата ТО (в самом верху личной информации) */}
-                {profile?.address ? (
-                  <div className="space-y-2.5 pb-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                        <CreditCard className="h-4 w-4 text-emerald-600" />
-                        Лицевой счёт и оплата ТО
-                      </span>
-                      {userAccount?.account_number && (
-                        <Badge variant="outline" className="font-mono text-xs border-emerald-500/30 text-emerald-700 dark:text-emerald-300 font-bold">
-                          л/с {userAccount.account_number}
-                        </Badge>
-                      )}
-                    </div>
-                    <DebtCard 
-                      address={profile.address} 
-                      apartment={profile.apartment || ""} 
-                      fullName={profile.full_name || fullName} 
-                      phone={profile.phone || phone} 
-                      embedded
-                      setParentAccount={setUserAccount}
-                      isVerified={profile?.is_verified === true || profile?.verification_status === "verified"}
-                      userId={userId}
-                      accountNumber={profile?.account_number}
-                      onOpenOrderDialog={(type) => {
-                        setOrderType(type || "repair");
-                        setIsOrderDialogOpen(true);
-                      }}
-                    />
-                  </div>
-                ) : null}
+                {/* Карта абонента (л/с, баланс, оплата, автоплатёж) перенесена наверх кабинета как герой — см. начало grid gap-6. */}
 
                 {/* Пошаговый мастер заполнения (первичное заполнение или редактирование через диспетчера) */}
                 {!isLocked ? (
@@ -5854,7 +6016,7 @@ const Cabinet = () => {
             </Card>
 
             {/* Доступ к системе: только информация и оплата по умному домофону (больше НЕ исчезает при редактировании!) */}
-            <Card className="glass-premium rounded-[24px] border-none shadow-lg">
+            <Card className={`glass-premium rounded-[24px] border-none shadow-lg ${section === "domofon" ? "animate-in fade-in duration-300" : "hidden"}`}>
               <CardHeader className="pb-4 border-b border-slate-100 dark:border-slate-800">
                 <CardTitle className="flex items-center gap-2 font-display text-lg font-bold text-slate-800 dark:text-slate-100">
                   <Shield className="h-5 w-5 text-amber-500 animate-pulse" />
@@ -5926,8 +6088,8 @@ const Cabinet = () => {
               )}
             </Card>
 
-            {/* --- РАЗДЕЛ: ИСТОРИЯ ВАШИХ ОБРАЩЕНИЙ И ОПЛАТ (в самом низу страницы) --- */}
-            {(() => {
+            {/* --- РАЗДЕЛ: ИСТОРИЯ ВАШИХ ОБРАЩЕНИЙ И ОПЛАТ (раздел «История») --- */}
+            {section === "history" && (() => {
               // Фильтруем заявки на 2 категории:
               // 1. Обычные заявки (ремонт, диагностика, бесплатные)
               const regularRequests = (userRequests || []).filter((r: any) => 
