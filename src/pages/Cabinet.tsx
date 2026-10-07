@@ -5080,7 +5080,7 @@ const Cabinet = () => {
 
           <div className="grid gap-6">
             {/* ===== КАРТА АБОНЕНТА (герой) — всегда сверху, цвет по статусу + анимация ===== */}
-            {profile?.address && (
+            {profile?.address ? (
               <div className="animate-in fade-in slide-in-from-top-2 duration-500">
                 <div className="flex items-center justify-between mb-2.5">
                   <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
@@ -5109,33 +5109,52 @@ const Cabinet = () => {
                   }}
                 />
               </div>
-            )}
+            ) : section === "home" ? (
+              <div className="rounded-2xl border border-sky-500/30 bg-gradient-to-br from-sky-50 via-white to-blue-50/50 dark:from-sky-950/30 dark:via-background dark:to-blue-950/20 p-5 text-center space-y-3 animate-in fade-in shadow-xs">
+                <div className="h-12 w-12 rounded-2xl bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center mx-auto shadow-xs">
+                  <CreditCard className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-slate-800 dark:text-slate-100">Лицевой счёт не привязан</h3>
+                  <p className="text-xs text-muted-foreground max-w-md mx-auto mt-1 leading-relaxed">
+                    Укажите ваш адрес в профиле или найдите ваш лицевой счёт, чтобы видеть состояние счёта, баланс, квитанции и подключить удобный автоплатёж.
+                  </p>
+                </div>
+                <div className="flex flex-wrap justify-center gap-2 pt-1">
+                  <ShinyButton 
+                    onClick={() => setSection("profile")} 
+                    className="py-2 px-4 rounded-xl text-xs font-semibold"
+                  >
+                    <User className="h-3.5 w-3.5 mr-1.5" />
+                    Заполнить адрес в профиле
+                  </ShinyButton>
+                </div>
+              </div>
+            ) : null}
 
             {/* ===== ПЛИТКИ НАВИГАЦИИ (Вариант B) ===== */}
-            {profile?.address && (
-              <div className="grid grid-cols-4 gap-2.5 animate-in fade-in duration-500">
-                {([
-                  { key: "home", label: "Главное", Icon: Home },
-                  { key: "profile", label: "Профиль", Icon: User },
-                  { key: "domofon", label: "Домофон", Icon: DoorOpen },
-                  { key: "history", label: "История", Icon: History },
-                ] as const).map(({ key, label, Icon }) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setSection(key)}
-                    className={`flex flex-col items-center justify-center gap-1.5 rounded-2xl border p-3 transition-all duration-200 ${
-                      section === key
-                        ? "border-primary/40 bg-primary/10 text-primary shadow-sm scale-[1.02]"
-                        : "border-slate-200/70 dark:border-slate-800/70 bg-card hover:bg-muted/50 text-slate-600 dark:text-slate-300"
-                    }`}
-                  >
-                    <Icon className="h-5 w-5" />
-                    <span className="text-[11px] font-semibold">{label}</span>
-                  </button>
-                ))}
-              </div>
-            )}
+            <div className="grid grid-cols-4 gap-2.5 animate-in fade-in duration-500">
+              {([
+                { key: "home", label: "Главное", Icon: Home },
+                { key: "profile", label: "Профиль", Icon: User },
+                { key: "domofon", label: "Домофон", Icon: DoorOpen },
+                { key: "history", label: "История", Icon: History },
+              ] as const).map(({ key, label, Icon }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setSection(key)}
+                  className={`flex flex-col items-center justify-center gap-1.5 rounded-2xl border p-3 transition-all duration-200 ${
+                    section === key
+                      ? "border-primary/40 bg-primary/10 text-primary shadow-sm scale-[1.02]"
+                      : "border-slate-200/70 dark:border-slate-800/70 bg-card hover:bg-muted/50 text-slate-600 dark:text-slate-300"
+                  }`}
+                >
+                  <Icon className="h-5 w-5" />
+                  <span className="text-[11px] font-semibold">{label}</span>
+                </button>
+              ))}
+            </div>
 
             {/* Мои заявки - показываем если есть задачи */}
             {myTasks && myTasks.length > 0 && (
@@ -5184,7 +5203,7 @@ const Cabinet = () => {
 
 
 
-            <Card className={`glass-premium rounded-[24px] border-none shadow-xl ${(section === "profile" || !profile?.address) ? "animate-in fade-in duration-300" : "hidden"}`}>
+            <Card className={`glass-premium rounded-[24px] border-none shadow-xl ${section === "profile" ? "animate-in fade-in duration-300" : "hidden"}`}>
               <CardHeader className="pb-4 border-b border-slate-100 dark:border-slate-800">
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div className="space-y-1.5">
