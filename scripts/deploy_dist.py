@@ -22,27 +22,34 @@ ssh = paramiko.SSHClient()
 ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 ssh.connect("45.8.99.238", 22, "root", "j2Pz7,PPqzEte.", timeout=30)
 
-print("[3/4] Загрузка архива на сервер...")
-sftp = ssh.open_sftp()
-sftp.put(archive_path, "/var/www/domofondar/dist.tar.gz")
-sftp.close()
+try:
+    print("[3/4] Загрузка архива на сервер...")
+    sftp = ssh.open_sftp()
+    sftp.put(archive_path, "/var/www/domofondar/dist.tar.gz")
+    sftp.close()
 
-# Распаковка и очистка
-print("[4/4] Распаковка dist в /var/www/domofondar/dist...")
-cmd = """
-cd /var/www/domofondar && \
-rm -rf dist/* && \
-tar -xzf dist.tar.gz -C dist/ && \
-rm dist.tar.gz && \
-docker exec domofondar_frontend nginx -s reload && \
-ls -la dist/
-"""
-stdin, stdout, stderr = ssh.exec_command(cmd)
-print("STDOUT:", stdout.read().decode("utf-8"))
-err = stderr.read().decode("utf-8")
-if err:
-    print("STDERR:", err)
+    # Распаковка и очистка
+    print("[4/4] Распаковка dist в /var/www/domofondar/dist...")
+    cmd = """
+    cd /var/www/domofondar && \
+    mkdir -p dist && \
+    rm -rf dist/* && \
+    tar -xzf dist.tar.gz -C dist/ && \
+    rm -f dist.tar.gz && \
+    docker exec domofondar_frontend nginx -s reload && \
+    ls -la dist/
+    """
+    stdin, stdout, stderr = ssh.exec_command(cmd)
+    print("STDOUT:", stdout.read().decode("utf-8"))
+    err = stderr.read().decode("utf-8")
+    if err:
+        print("STDERR:", err)
+finally:
+    ssh.close()
+    if os.path.exists(archive_path):
+        try:
+            os.remove(archive_path)
+        except Exception as e:
+            print("Ошибка при удалении локального архива:", e)
 
-ssh.close()
-os.remove(archive_path)
 print("=== ДЕПЛОЙ ФРОНТЕНДА УСПЕШНО ЗАВЕРШЕН ===")

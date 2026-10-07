@@ -668,136 +668,146 @@ const DebtCard = ({
     const isDebt = debt > 0;
     const absAmount = Math.abs(debt);
 
+    const heroBg = isDebt
+      ? "bg-gradient-to-br from-[#f97316] via-[#ea580c] to-[#b91c1c] shadow-2xl shadow-rose-950/20"
+      : isOverpayment
+      ? "bg-gradient-to-br from-[#10b981] via-[#059669] to-[#047857] shadow-2xl shadow-emerald-950/20"
+      : "bg-gradient-to-br from-[#0ea5e9] via-[#0284c7] to-[#0b3f78] shadow-2xl shadow-sky-950/25";
+
     const inner = (
       <>
-        <div className="flex items-center gap-2 mb-1">
-          <Wallet className="h-5 w-5 text-primary" />
-          <span className="font-semibold">Состояние лицевого счёта</span>
-        </div>
-        <p className="text-xs text-muted-foreground mb-3">
-          Лицевой счёт: <span className="font-mono font-medium text-foreground">{account.account_number}</span>
-        </p>
+        {/* ===== БАНКОВСКАЯ КАРТА АБОНЕНТА (ГЕРОЙ ИЗ РЕДИЗАЙНА CLAUDE) ===== */}
+        <div className={`relative overflow-hidden rounded-[26px] p-5 sm:p-6 text-white ${heroBg} transition-all duration-500`}>
+          {/* Световые анимированные агломерации (Glow) */}
+          <div className="absolute -top-16 -right-12 w-56 h-56 rounded-full bg-white/20 blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-10 -left-10 w-44 h-44 rounded-full bg-emerald-400/20 blur-2xl pointer-events-none" />
 
-        {/* Договор расторгнут — показываем предупреждение вместо активной информации */}
-        {account.contract_terminated || account.status === "terminated" ? (
-          <div className="mb-3 p-3 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 text-sm text-amber-800 dark:text-amber-200">
-            Договор по этому адресу расторгнут. Если это ошибка — свяжитесь с диспетчером.
-          </div>
-        ) : null}
+          {/* Верхняя строка: номер лицевого счета и чип статуса */}
+          <div className="relative z-10 flex items-start justify-between gap-3">
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-wider text-white/80">Лицевой счёт</div>
+              <div className="text-lg sm:text-xl font-extrabold text-white font-mono tracking-wider mt-0.5">
+                № {account.account_number}
+              </div>
+            </div>
 
-        {/* Обслуживание — компактно, в одну строку. Название тарифа (внутреннее) скрыто, показываем только ₽/мес. */}
-        {(account.tariff_price != null || account.has_handset != null || account.is_smart_home != null) && (
-          <div className="mb-3 p-2.5 rounded-lg border bg-muted/20">
-            <div className="text-[11px] font-semibold text-muted-foreground mb-1.5">Ваше обслуживание</div>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-              {account.tariff_price != null && (
-                <span><span className="text-muted-foreground">Тариф: </span><span className="font-bold text-primary">{Number(account.tariff_price)} ₽/мес</span></span>
-              )}
+            <div className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full bg-white/20 backdrop-blur-md text-white border border-white/25 shadow-xs">
+              <span className={`w-2 h-2 rounded-full ${isDebt ? "bg-rose-300 animate-pulse" : "bg-emerald-300"}`} />
               <span>
-                <span className="text-muted-foreground">Трубка: </span>
-                <span className={`font-medium ${account.has_handset ? "text-green-600" : "text-muted-foreground"}`}>{account.has_handset ? "Есть" : "Нет"}</span>
+                {isDebt ? `Долг: ${absAmount.toFixed(2)} ₽` : isOverpayment ? `Переплата: ${absAmount.toFixed(2)} ₽` : "ТО оплачено"}
               </span>
-              <span>
-                <span className="text-muted-foreground">Умный домофон: </span>
-                <span className={`font-medium ${account.is_smart_home ? "text-indigo-600" : "text-muted-foreground"}`}>{account.is_smart_home ? "Да" : "Нет"}</span>
-              </span>
-              {account.is_smart_home && (
-                <span>
-                  <span className="text-muted-foreground">ЛК: </span>
-                  <span className={`font-medium ${account.has_lk ? "text-green-600" : "text-amber-600"}`}>{account.has_lk ? "Подключён" : "Не подключён"}</span>
-                </span>
-              )}
             </div>
           </div>
-        )}
 
-        <div className="space-y-3">
-          <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
-            <span className="text-sm text-muted-foreground">Период начисления</span>
-            <span className="text-sm font-medium">{formatPeriod(account.period)}</span>
+          {/* Адрес абонента */}
+          <div className="relative z-10 text-xs sm:text-sm text-white/95 mt-3 font-medium flex items-center gap-1.5 truncate">
+            <MapPin className="h-4 w-4 shrink-0 text-white/75" />
+            <span className="truncate">{formatFullAddress(address, apartment)}</span>
           </div>
 
-          <div className={`flex items-center justify-between p-4 rounded-xl border transition-all duration-500 animate-in fade-in ${
-            isDebt
-              ? "bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-950/30 dark:to-rose-950/20 border-destructive/30"
-              : isOverpayment
-              ? "bg-gradient-to-br from-emerald-50 to-green-50 dark:from-emerald-950/30 dark:to-green-950/20 border-emerald-300 dark:border-emerald-800"
-              : "bg-gradient-to-br from-sky-50 to-indigo-50 dark:from-sky-950/30 dark:to-indigo-950/20 border-sky-300 dark:border-sky-800"
-          }`}>
-            <span className="font-medium">
-              {isDebt ? "Задолженность" : isOverpayment ? "Переплата" : "Баланс"}
-            </span>
-            <span className={`text-xl font-extrabold tabular-nums transition-colors ${
-              isDebt ? "text-destructive" : isOverpayment ? "text-emerald-600 dark:text-emerald-400" : "text-sky-600 dark:text-sky-400"
-            }`}>
+          {/* Предупреждение о расторжении договора */}
+          {account.contract_terminated || account.status === "terminated" ? (
+            <div className="relative z-10 mt-3 p-2.5 rounded-xl bg-black/30 backdrop-blur-md border border-amber-300/40 text-xs text-amber-200">
+              Договор по этому адресу расторгнут. Если это ошибка — свяжитесь с диспетчером.
+            </div>
+          ) : null}
+
+          {/* Информация об обслуживании на карте */}
+          {(account.tariff_price != null || account.has_handset != null || account.is_smart_home != null) && (
+            <div className="relative z-10 mt-3 py-1.5 px-3 rounded-xl bg-black/20 backdrop-blur-md border border-white/10 text-[11px] text-white/90 flex flex-wrap items-center gap-x-3.5 gap-y-1">
+              {account.tariff_price != null && (
+                <span>Тариф: <strong className="text-white font-bold">{Number(account.tariff_price)} ₽/мес</strong></span>
+              )}
+              <span>Трубка: <strong className="text-white">{account.has_handset ? "Есть" : "Нет"}</strong></span>
+              <span>Умный домофон: <strong className="text-white">{account.is_smart_home ? "Да" : "Нет"}</strong></span>
+              {account.is_smart_home && (
+                <span>ЛК: <strong className="text-white">{account.has_lk ? "Подключён" : "Не подключён"}</strong></span>
+              )}
+            </div>
+          )}
+
+          {/* Текущий баланс */}
+          <div className="relative z-10 mt-4">
+            <div className="text-xs font-semibold text-white/80">
+              {isDebt ? "Задолженность к оплате" : "Текущий баланс"}
+            </div>
+            <div className="text-3xl sm:text-4xl font-black text-white tracking-tight mt-0.5 tabular-nums">
               {isDebt ? "−" : isOverpayment ? "+" : ""}{absAmount.toFixed(2)} ₽
-            </span>
+            </div>
           </div>
 
-          {/* Блок кнопок оплаты:
-              - Если абонент верифицирован: доступна Быстрая оплата картой/СБП через ЮKassa и кнопка Банка «Кубань Кредит».
-              - Если не верифицирован: кнопка Банка «Кубань Кредит» + подсказка о доступности ЮKassa после подтверждения адреса. */}
-          <div className="space-y-2.5">
+          {/* Кнопки оплаты внутри карты */}
+          <div className="relative z-10 mt-4 flex flex-wrap sm:flex-nowrap gap-2">
             {isVerified ? (
-              <div className="flex flex-col sm:flex-row gap-2">
+              <>
                 <Button
-                  className="flex-1 justify-center rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white font-bold shadow-md shadow-amber-500/20 hover:shadow-amber-500/30 transition-all gap-2"
+                  className="flex-1 bg-white hover:bg-white/95 text-slate-900 font-extrabold rounded-xl py-3 text-xs sm:text-sm shadow-lg shadow-black/15 transition-transform active:scale-[0.98] gap-1.5"
                   onClick={() => {
                     const currentDebt = Number(account.debt_amount) || 0;
-                    setPayAmount(currentDebt > 0 ? currentDebt.toFixed(2) : "300");
+                    setPayAmount(currentDebt > 0 ? currentDebt.toFixed(2) : (account.tariff_price ? String(account.tariff_price) : "300"));
                     setIsYooKassaOpen(true);
                   }}
                 >
-                  <Zap className="h-4 w-4 fill-current" />
+                  <Zap className="h-4 w-4 text-amber-500 fill-amber-500" />
                   <span>Быстрая оплата ЮKassa</span>
                 </Button>
+
                 <Button
-                  variant="outline"
-                  className="rounded-xl text-xs flex items-center justify-center gap-1.5 border-slate-300 dark:border-slate-700"
+                  variant="ghost"
+                  className="bg-white/20 hover:bg-white/30 backdrop-blur-md text-white font-bold rounded-xl py-3 border border-white/25 text-xs transition-transform active:scale-[0.98]"
                   onClick={() => navigate("/payment")}
-                  title="Оплата через платёжный терминал Банка «Кубань Кредит»"
+                  title="Оплата через Банк «Кубань Кредит»"
                 >
-                  <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
+                  <CreditCard className="h-4 w-4 mr-1.5" />
                   <span>Банк «Кубань Кредит»</span>
                 </Button>
-              </div>
+              </>
             ) : (
-              <div className="space-y-2">
-                <ShinyButton className="w-full justify-center rounded-xl" onClick={() => navigate("/payment")}>
-                  <CreditCard className="mr-2 h-4 w-4" />
-                  Оплатить (Банк «Кубань Кредит»)
-                </ShinyButton>
-                <div className="p-2.5 rounded-xl border border-amber-500/20 bg-amber-500/5 flex items-center gap-2 text-[11px] text-amber-800 dark:text-amber-300">
-                  <Zap className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                  <span>Быстрая онлайн-оплата картой через <strong>ЮKassa</strong> станет доступна после подтверждения адреса (верификации).</span>
-                </div>
-              </div>
+              <Button
+                className="flex-1 bg-white hover:bg-white/95 text-slate-900 font-extrabold rounded-xl py-3 text-xs sm:text-sm shadow-md"
+                onClick={() => navigate("/payment")}
+              >
+                <CreditCard className="h-4 w-4 mr-1.5 text-slate-700" />
+                <span>Оплатить (Банк «Кубань Кредит»)</span>
+              </Button>
             )}
 
-            {/* Автоплатёж (рекуррентные платежи) — ТОЛЬКО абонентская плата (ТО). Доступен после верификации. */}
-            {isVerified && !account.contract_terminated && account.status !== "terminated" && (
-              autopay.enabled ? (
-                <div className="rounded-xl border border-emerald-500/30 bg-emerald-50/70 dark:bg-emerald-950/20 p-3 flex items-center justify-between gap-3 animate-in fade-in">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="h-9 w-9 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-                      <ShieldCheck className="h-5 w-5" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-xs font-bold text-emerald-800 dark:text-emerald-300">Автоплатёж включён</div>
-                      <div className="text-[11px] text-emerald-700/80 dark:text-emerald-400/70 truncate">
-                        Карта •••• {autopay.card_last4 || "••••"} · списание всего остатка 4-го числа
-                      </div>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={disableAutopay}
-                    disabled={autopayBusy}
-                    className="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg border border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10 transition-colors disabled:opacity-50"
-                  >
-                    {autopayBusy ? "…" : "Отключить"}
-                  </button>
+            <Button
+              variant="ghost"
+              className="bg-white/15 hover:bg-white/25 backdrop-blur-md text-white font-bold rounded-xl py-3 border border-white/20 text-xs px-3 transition-transform active:scale-[0.98]"
+              onClick={() => setIsHistoryOpen(true)}
+              title="История оплат и электронные чеки"
+            >
+              <Receipt className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {/* Блок автоплатежа внутри карты со стильным тумблером */}
+          {isVerified && !account.contract_terminated && account.status !== "terminated" && (
+            <div className="relative z-10 mt-3.5 rounded-xl bg-white/15 backdrop-blur-md border border-white/20 p-3 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="h-8 w-8 rounded-lg bg-white/20 flex items-center justify-center shrink-0 text-white shadow-xs">
+                  <Sparkles className="h-4 w-4" />
                 </div>
+                <div className="min-w-0">
+                  <div className="text-xs font-bold text-white truncate">
+                    {autopay.enabled ? `Автоплатёж включён (•••• ${autopay.card_last4 || "карта"})` : "Автоплатёж — списание 4-го числа"}
+                  </div>
+                  <div className="text-[10.5px] text-white/80 truncate">
+                    {autopay.enabled ? "Ежемесячно списывается остаток лицевого счёта" : "Погашение остатка без очередей и напоминаний (+5% эквайринг)"}
+                  </div>
+                </div>
+              </div>
+
+              {autopay.enabled ? (
+                <button
+                  type="button"
+                  onClick={disableAutopay}
+                  disabled={autopayBusy}
+                  className="shrink-0 text-xs font-bold px-3 py-1.5 rounded-lg bg-white/20 hover:bg-white/30 text-white transition-colors border border-white/30 disabled:opacity-50 active:scale-[0.98]"
+                >
+                  {autopayBusy ? "…" : "Отключить"}
+                </button>
               ) : (
                 <button
                   type="button"
@@ -807,43 +817,29 @@ const DebtCard = ({
                     setSaveCardForAuto(true);
                     setIsYooKassaOpen(true);
                   }}
-                  className="group w-full text-left rounded-xl border border-sky-500/30 bg-gradient-to-br from-sky-50 to-indigo-50 dark:from-sky-950/30 dark:to-indigo-950/20 p-3.5 transition-all duration-300 hover:shadow-md hover:border-sky-500/50 animate-in fade-in"
+                  className="shrink-0 text-xs font-extrabold px-3 py-1.5 rounded-lg bg-white text-slate-900 hover:bg-white/95 transition-all shadow-sm flex items-center gap-1 active:scale-[0.98]"
                 >
-                  <div className="flex items-start gap-2.5">
-                    <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-500 text-white flex items-center justify-center shrink-0 shadow-sm shadow-sky-500/30 group-hover:scale-105 transition-transform">
-                      <Sparkles className="h-5 w-5" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-extrabold text-slate-800 dark:text-slate-100 leading-snug">
-                        Подключите автоплатёж — и забудьте о квитанциях в ящике
-                      </div>
-                      <div className="text-[11.5px] text-slate-600 dark:text-slate-300 mt-1 leading-snug">
-                        4-го числа каждого месяца автоматически спишется весь остаток лицевого счёта — абонентская плата и задолженность, если она есть, плюс 5% комиссии эквайринга. Без очередей, напоминаний и риска просрочки. Отключить можно в один тап в любой момент.
-                      </div>
-                      <div className="inline-flex items-center gap-1.5 mt-2 text-xs font-bold text-sky-700 dark:text-sky-300">
-                        <Zap className="h-3.5 w-3.5 fill-current" />
-                        Включить автоплатёж
-                      </div>
-                    </div>
-                  </div>
+                  <Zap className="h-3 w-3 fill-current text-amber-500" />
+                  Включить
                 </button>
-              )
-            )}
+              )}
+            </div>
+          )}
+        </div>
 
-            {/* Кнопка «Оставить заявку» во всю ширину под блоком оплаты в едином фирменном стиле ShinyButton */}
-            {onOpenOrderDialog && (
-              <ShinyButton
-                onClick={() => {
-                  console.log("[DebtCard] Нажата кнопка 'Оставить заявку' во всю ширину под кнопкой оплаты");
-                  onOpenOrderDialog("repair");
-                }}
-                className="w-full justify-center rounded-xl h-10 text-xs sm:text-sm font-semibold flex items-center gap-2 mt-1 shadow-sm"
-              >
-                <Wrench className="h-4 w-4 text-amber-500 shrink-0" />
-                <span>Оставить заявку</span>
-              </ShinyButton>
-            )}
-          </div>
+        {/* Кнопка «Оставить заявку» под картой во всю ширину */}
+        {onOpenOrderDialog && (
+          <ShinyButton
+            onClick={() => {
+              onOpenOrderDialog("repair");
+            }}
+            className="w-full justify-center rounded-xl h-10 text-xs sm:text-sm font-semibold flex items-center gap-2 mt-2.5 shadow-sm"
+          >
+            <Wrench className="h-4 w-4 text-amber-500 shrink-0" />
+            <span>Оставить заявку</span>
+          </ShinyButton>
+        )}
+
 
           {/* Диалог быстрой оплаты через платёжный шлюз ЮKassa */}
           <Dialog open={isYooKassaOpen} onOpenChange={setIsYooKassaOpen}>
@@ -1244,19 +1240,12 @@ const DebtCard = ({
               </DialogFooter>
             </DialogContent>
           </Dialog>
-        </div>
       </>
     );
 
-    const statusBorder = isDebt
-      ? "border-destructive/30"
-      : isOverpayment
-      ? "border-emerald-500/30"
-      : "border-sky-500/30";
-
     if (embedded) {
       return (
-        <div className={`p-4 rounded-xl border ${statusBorder} bg-card transition-all duration-500 animate-in fade-in slide-in-from-bottom-2`}>
+        <div className="transition-all duration-500 animate-in fade-in slide-in-from-bottom-2">
           {inner}
         </div>
       );
@@ -5132,28 +5121,131 @@ const Cabinet = () => {
               </div>
             ) : null}
 
-            {/* ===== ПЛИТКИ НАВИГАЦИИ (Вариант B) ===== */}
-            <div className="grid grid-cols-4 gap-2.5 animate-in fade-in duration-500">
-              {([
-                { key: "home", label: "Главное", Icon: Home },
-                { key: "profile", label: "Профиль", Icon: User },
-                { key: "domofon", label: "Домофон", Icon: DoorOpen },
-                { key: "history", label: "История", Icon: History },
-              ] as const).map(({ key, label, Icon }) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setSection(key)}
-                  className={`flex flex-col items-center justify-center gap-1.5 rounded-2xl border p-3 transition-all duration-200 ${
-                    section === key
-                      ? "border-primary/40 bg-primary/10 text-primary shadow-sm scale-[1.02]"
-                      : "border-slate-200/70 dark:border-slate-800/70 bg-card hover:bg-muted/50 text-slate-600 dark:text-slate-300"
-                  }`}
-                >
-                  <Icon className="h-5 w-5" />
-                  <span className="text-[11px] font-semibold">{label}</span>
-                </button>
-              ))}
+            {/* ===== ЦВЕТНЫЕ ПЛИТКИ БЫСТРЫХ ДЕЙСТВИЙ (ВАРИАНТ B ИЗ МАКЕТА CLAUDE) ===== */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 animate-in fade-in duration-500">
+              {/* 1. Платежи */}
+              <button
+                type="button"
+                onClick={() => setSection("history")}
+                className={`p-3.5 rounded-2xl border text-left transition-all duration-200 flex flex-col gap-2 shadow-xs ${
+                  section === "history"
+                    ? "border-sky-500/60 bg-sky-500/10 shadow-sm scale-[1.02] ring-1 ring-sky-500/30"
+                    : "border-slate-200/80 dark:border-slate-800/80 bg-card hover:bg-muted/50 hover:border-slate-300 dark:hover:border-slate-700 active:scale-[0.98]"
+                }`}
+              >
+                <div className="w-10 h-10 rounded-xl bg-sky-500/15 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0">
+                  <CreditCard className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="text-xs sm:text-sm font-bold text-foreground">Платежи</div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5 leading-tight">История и чеки</div>
+                </div>
+              </button>
+
+              {/* 2. Заявки */}
+              <button
+                type="button"
+                onClick={() => {
+                  setOrderType("repair");
+                  setIsOrderDialogOpen(true);
+                }}
+                className="p-3.5 rounded-2xl border text-left transition-all duration-200 flex flex-col gap-2 border-slate-200/80 dark:border-slate-800/80 bg-card hover:bg-muted/50 hover:border-slate-300 dark:hover:border-slate-700 shadow-xs active:scale-[0.98]"
+              >
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                  <Wrench className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="text-xs sm:text-sm font-bold text-foreground">Заявки</div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5 leading-tight">Ремонт, ключи, трубка</div>
+                </div>
+              </button>
+
+              {/* 3. Домофон */}
+              <button
+                type="button"
+                onClick={() => setSection("domofon")}
+                className={`p-3.5 rounded-2xl border text-left transition-all duration-200 flex flex-col gap-2 shadow-xs ${
+                  section === "domofon"
+                    ? "border-amber-500/60 bg-amber-500/10 shadow-sm scale-[1.02] ring-1 ring-amber-500/30"
+                    : "border-slate-200/80 dark:border-slate-800/80 bg-card hover:bg-muted/50 hover:border-slate-300 dark:hover:border-slate-700 active:scale-[0.98]"
+                }`}
+              >
+                <div className="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                  <DoorOpen className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="text-xs sm:text-sm font-bold text-foreground">Домофон</div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5 leading-tight">Доступ и камеры</div>
+                </div>
+              </button>
+
+              {/* 4. Профиль */}
+              <button
+                type="button"
+                onClick={() => setSection("profile")}
+                className={`p-3.5 rounded-2xl border text-left transition-all duration-200 flex flex-col gap-2 shadow-xs ${
+                  section === "profile"
+                    ? "border-purple-500/60 bg-purple-500/10 shadow-sm scale-[1.02] ring-1 ring-purple-500/30"
+                    : "border-slate-200/80 dark:border-slate-800/80 bg-card hover:bg-muted/50 hover:border-slate-300 dark:hover:border-slate-700 active:scale-[0.98]"
+                }`}
+              >
+                <div className="w-10 h-10 rounded-xl bg-purple-500/15 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
+                  <User className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="text-xs sm:text-sm font-bold text-foreground">Профиль</div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5 leading-tight">Данные и верификация</div>
+                </div>
+              </button>
+            </div>
+
+            {/* Аккордеон-строки быстрого перехода (из макета Claude) */}
+            <div className="space-y-2 animate-in fade-in duration-500">
+              <button
+                type="button"
+                onClick={() => setSection(section === "profile" ? "home" : "profile")}
+                className="w-full p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-card hover:bg-muted/40 transition-all flex items-center justify-between text-left shadow-xs"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300">
+                    <User className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <span className="text-xs sm:text-sm font-bold text-foreground">Мои данные и адрес</span>
+                    <span className="text-[11px] text-muted-foreground block truncate max-w-[260px] sm:max-w-md">
+                      {profile?.address ? `${formatFullAddress(profile.address, profile.apartment || "")}` : "Адрес не указан"}
+                    </span>
+                  </div>
+                </div>
+                <span className="text-xs font-bold text-primary px-2 py-1 rounded-lg bg-primary/10">
+                  {section === "profile" ? "Скрыть ▲" : "Открыть ›"}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSection("profile")}
+                className="w-full p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-card hover:bg-muted/40 transition-all flex items-center justify-between text-left shadow-xs"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-600">
+                    <ShieldCheck className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <span className="text-xs sm:text-sm font-bold text-foreground">Верификация жильца</span>
+                    <span className="text-[11px] text-muted-foreground block">
+                      {profile?.is_verified ? "Подтверждённый абонент компании" : "Загрузите документ для подтверждения"}
+                    </span>
+                  </div>
+                </div>
+                <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${
+                  profile?.is_verified 
+                    ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20" 
+                    : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20"
+                }`}>
+                  {profile?.is_verified ? "Подтверждена ✓" : "Требуется проверка ›"}
+                </span>
+              </button>
             </div>
 
             {/* Мои заявки - показываем если есть задачи */}
