@@ -736,50 +736,65 @@ const DebtCard = ({
             </div>
           </div>
 
-          {/* Кнопки оплаты внутри карты */}
-          <div className="relative z-10 mt-4 flex flex-wrap sm:flex-nowrap gap-2">
+          {/* Кнопки оплаты внутри карты: на мобильных экранах в столбик во всю ширину, на планшетах/ПК в ряд */}
+          <div className="relative z-10 mt-4 flex flex-col sm:flex-row gap-2.5">
             {isVerified ? (
               <>
                 <Button
-                  className="flex-1 bg-white hover:bg-white/95 text-slate-900 font-extrabold rounded-xl py-3 text-xs sm:text-sm shadow-lg shadow-black/15 transition-transform active:scale-[0.98] gap-1.5"
+                  className="w-full sm:flex-1 h-12 bg-white hover:bg-white/95 text-slate-900 font-extrabold rounded-xl text-sm sm:text-base shadow-lg shadow-black/15 transition-transform active:scale-[0.98] flex items-center justify-center gap-2"
                   onClick={() => {
                     const currentDebt = Number(account.debt_amount) || 0;
                     setPayAmount(currentDebt > 0 ? currentDebt.toFixed(2) : (account.tariff_price ? String(account.tariff_price) : "300"));
                     setIsYooKassaOpen(true);
                   }}
                 >
-                  <Zap className="h-4 w-4 text-amber-500 fill-amber-500" />
+                  <Zap className="h-5 w-5 text-amber-500 fill-amber-500 shrink-0" />
                   <span>Быстрая оплата ЮKassa</span>
+                </Button>
+
+                <div className="flex gap-2 w-full sm:w-auto">
+                  <Button
+                    variant="ghost"
+                    className="flex-1 sm:flex-none h-12 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white font-bold rounded-xl border border-white/25 text-xs sm:text-sm px-4 transition-transform active:scale-[0.98] flex items-center justify-center"
+                    onClick={() => navigate("/payment")}
+                    title="Оплата через Банк «Кубань Кредит»"
+                  >
+                    <CreditCard className="h-4 w-4 mr-2 shrink-0" />
+                    <span>Банк «Кубань Кредит»</span>
+                  </Button>
+
+                  <Button
+                    variant="ghost"
+                    className="h-12 w-12 bg-white/15 hover:bg-white/25 backdrop-blur-md text-white font-bold rounded-xl border border-white/20 px-0 transition-transform active:scale-[0.98] shrink-0 flex items-center justify-center"
+                    onClick={() => setIsHistoryOpen(true)}
+                    title="История оплат и электронные чеки"
+                    aria-label="История платежей"
+                  >
+                    <Receipt className="h-5 w-5" />
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <div className="flex gap-2 w-full">
+                <Button
+                  className="flex-1 h-12 bg-white hover:bg-white/95 text-slate-900 font-extrabold rounded-xl text-sm sm:text-base shadow-md flex items-center justify-center"
+                  onClick={() => navigate("/payment")}
+                >
+                  <CreditCard className="h-5 w-5 mr-2 text-slate-700 shrink-0" />
+                  <span>Оплатить (Банк «Кубань Кредит»)</span>
                 </Button>
 
                 <Button
                   variant="ghost"
-                  className="bg-white/20 hover:bg-white/30 backdrop-blur-md text-white font-bold rounded-xl py-3 border border-white/25 text-xs transition-transform active:scale-[0.98]"
-                  onClick={() => navigate("/payment")}
-                  title="Оплата через Банк «Кубань Кредит»"
+                  className="h-12 w-12 bg-white/15 hover:bg-white/25 backdrop-blur-md text-white font-bold rounded-xl border border-white/20 px-0 transition-transform active:scale-[0.98] shrink-0 flex items-center justify-center"
+                  onClick={() => setIsHistoryOpen(true)}
+                  title="История оплат и электронные чеки"
+                  aria-label="История платежей"
                 >
-                  <CreditCard className="h-4 w-4 mr-1.5" />
-                  <span>Банк «Кубань Кредит»</span>
+                  <Receipt className="h-5 w-5" />
                 </Button>
-              </>
-            ) : (
-              <Button
-                className="flex-1 bg-white hover:bg-white/95 text-slate-900 font-extrabold rounded-xl py-3 text-xs sm:text-sm shadow-md"
-                onClick={() => navigate("/payment")}
-              >
-                <CreditCard className="h-4 w-4 mr-1.5 text-slate-700" />
-                <span>Оплатить (Банк «Кубань Кредит»)</span>
-              </Button>
+              </div>
             )}
-
-            <Button
-              variant="ghost"
-              className="bg-white/15 hover:bg-white/25 backdrop-blur-md text-white font-bold rounded-xl py-3 border border-white/20 text-xs px-3 transition-transform active:scale-[0.98]"
-              onClick={() => setIsHistoryOpen(true)}
-              title="История оплат и электронные чеки"
-            >
-              <Receipt className="h-4 w-4" />
-            </Button>
           </div>
 
           {/* Блок автоплатежа внутри карты со стильным тумблером */}
@@ -980,28 +995,28 @@ const DebtCard = ({
                 )}
               </div>
 
-              <DialogFooter className="flex-col sm:flex-row gap-2">
+              <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2.5 pt-2">
                 <Button
                   variant="outline"
                   onClick={() => setIsYooKassaOpen(false)}
                   disabled={isPayingYooKassa}
-                  className="rounded-xl"
+                  className="w-full sm:w-auto h-11 rounded-xl text-sm font-semibold"
                 >
                   Отмена
                 </Button>
                 <Button
                   onClick={handleYooKassaPay}
                   disabled={isPayingYooKassa || !payAmount || parseFloat(payAmount) <= 0}
-                  className="rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white font-bold gap-2"
+                  className="w-full sm:flex-1 h-12 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white font-extrabold text-sm sm:text-base gap-2 shadow-md transition-transform active:scale-[0.98]"
                 >
                   {isPayingYooKassa ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span>Подготовка...</span>
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      <span>Подготовка платежа...</span>
                     </>
                   ) : (
                     <>
-                      <Zap className="h-4 w-4 fill-current" />
+                      <Zap className="h-5 w-5 fill-current" />
                       <span>
                         Оплатить {(() => {
                           const base = parseFloat(payAmount) || 0;

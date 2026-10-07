@@ -1,14 +1,15 @@
 import { useState, useEffect } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import { ShieldCheck, CreditCard, Building2, Loader2, Sparkles } from "lucide-react";
-import { Link } from "react-router-dom";
+import { ShieldCheck, CreditCard, Building2, Loader2, Sparkles, ArrowLeft } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 
 /**
  * Страница онлайн-оплаты технического обслуживания домофона.
  * Доступна без регистрации и верификации через защищенный платёжный шлюз Банка «Кубань Кредит».
  */
 const Payment = () => {
+  const navigate = useNavigate();
   // Состояние отображения индикатора загрузки платежного фрейма
   const [iframeLoaded, setIframeLoaded] = useState(false);
 
@@ -37,9 +38,20 @@ const Payment = () => {
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950">
       <Header />
-      <main className="flex-1 py-8 sm:py-12">
+      <main className="flex-1 py-6 sm:py-10">
         <div className="container max-w-4xl mx-auto px-4">
           
+          {/* Кнопка быстрого возврата в личный кабинет */}
+          <div className="mb-4">
+            <button
+              onClick={() => navigate("/cabinet")}
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shadow-xs"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span>Вернуться в личный кабинет</span>
+            </button>
+          </div>
+
           {/* Информационный заголовок и статус банка */}
           <div className="text-center mb-8 space-y-3">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
