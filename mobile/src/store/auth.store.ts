@@ -74,12 +74,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   register: async (phone: string, password: string, full_name: string, userEmail?: string) => {
     set({ isLoading: true });
     try {
-      const cleanDigits = phone.replace(/\D/g, '');
       const email = userEmail && userEmail.trim().length > 0
         ? userEmail.trim().toLowerCase()
-        : `${cleanDigits || 'resident_' + Date.now()}@domofondar.ru`;
+        : undefined;
 
-      console.log(`[AUTH] Регистрация нового жильца: email=${email}, phone=${phone}`);
+      console.log(`[AUTH] Регистрация нового жильца: email=${email || 'НЕТ'}, phone=${phone}`);
       const response = await apiClient.post('/api/auth/register', {
         email,
         password,

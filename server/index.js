@@ -265,18 +265,19 @@ app.get('/api/app/version', (req, res) => {
   console.log('[Бэкенд: Версия приложения] Запрос проверки обновлений с мобильного клиента');
 
   res.json({
-    latestVersion: '1.2.8',
-    versionCode: 15,
+    latestVersion: '1.2.7',
+    versionCode: 14,
     minSupportedVersion: '1.0.0',
     // Основная ссылка — прямое скачивание через Express API (гарантированный attachment)
     downloadUrl: siteDownloadUrl,
     directMediaUrl: directMediaUrl,
     fallbackDownloadUrl: githubFallbackUrl,
     releaseNotes: [
-      'Полная переработка читалки документов: переключение списка и текста внутри одного модального окна без вложенных окон, гарантированный плавный вертикальный скролл',
-      'Отображение полного адреса квартиры в 2 строки на экране «Платежи»',
-      'Пояснение о зачислении переплаты на баланс в счёт будущих начислений ТО',
-      'Бэкенд-поддержка автоплатежей по сохранённым картам ЮKassa'
+      'Плавное открытие и гарантированный вертикальный скролл полноэкранного просмотрщика документов с анимационной задержкой',
+      'Полноэкранные информационные разделы профиля («О нас», «Как проехать», «Документы») с кнопками закрытия',
+      'Защита от наложения кнопки «Сделать заявку» на закреплённый таб-бар с учётом безопасного отступа экрана',
+      'Брендовый логотип-аватар профиля компании взамен пустой серой заглушки с полным сохранением смены фото из камеры и галереи',
+      'Индикатор онлайн-статуса сети (🟢 Онлайн / 🔴 Нет сети) в шапке главного экрана вместо блокирующей оффлайн-плашки'
     ],
     isMandatory: false,
     publishedAt: new Date().toISOString()
@@ -318,6 +319,21 @@ app.get('/api/app/download', (req, res) => {
   return res.redirect(githubFallbackUrl);
 });
 
+// Вспомогательная функция: извлечение последних 10 цифр номера телефона для унифицированного поиска и сравнения
+// Например: +7 (909) 453-62-41 -> 9094536241; 89094536241 -> 9094536241
+function extractLast10Digits(input) {
+  if (!input) return null;
+  const digits = String(input).replace(/\D/g, '');
+  if (digits.length < 10) return null;
+  return digits.slice(-10);
+}
+
+// Вспомогательная функция: форматирование 10 цифр в канонический вид +7 (XXX) XXX-XX-XX
+function formatRussianPhone(digits10) {
+  if (!digits10 || digits10.length !== 10) return digits10;
+  return `+7 (${digits10.slice(0, 3)}) ${digits10.slice(3, 6)}-${digits10.slice(6, 8)}-${digits10.slice(8, 10)}`;
+}
+
 // ------------------------------------------------------------------------------
 // МАРШРУТЫ АВТОРИЗАЦИИ И РЕГИСТРАЦИИ
 // ------------------------------------------------------------------------------
@@ -325,96 +341,104 @@ app.get('/api/app/download', (req, res) => {
 // Регистрация нового жильца (поддерживает как Email, так и Номер телефона)
 app.post('/api/auth/register', async (req, res) => {
   const { email, phone, login, password, full_name } = req.body;
-  const rawInput = (email || phone || login || '').trim();
+  
+  // Определяем переданные поля логина
+  const rawLogin = (login || '').trim();
+  const rawEmail = (email || '').trim();
+  const rawPhone = (phone || '').trim();
 
-  if (!rawInput || !password) {
-    console.warn('[Бэкенд: Регистрация] Попытка регистрации с пустым логином или паролем');
-    return res.status(400).json({ error: 'Почта или номер телефона и пароль обязательны для заполнения' });
-  }
+  let targetEmail = null;
+  let targetPhoneClean10 = null;
 
-  // Определяем, что ввёл пользователь: email или номер телефона
-  const isEmail = rawInput.includes('@');
-  const digitsOnly = rawInput.replace(/\D/g, '');
-
-  let cleanEmail = null;
-  let cleanPhone = null;
-
-  if (isEmail) {
-    // RULE 2: Строгая очистка Email от абсолютно любых пробелов (в т.ч. случайных автозамен на смартфонах)
-    cleanEmail = rawInput.toLowerCase().replace(/\s+/g, '');
-    
-    // Проверка корректности формата Email
+  // 1. Проверяем email, если он был передан явно или через login
+  const candidateEmail = rawEmail || (rawLogin.includes('@') ? rawLogin : '');
+  if (candidateEmail) {
+    // Очищаем email от пробелов и приводим к нижнему регистру
+    const cleanEmailCandidate = candidateEmail.toLowerCase().replace(/\s+/g, '');
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(cleanEmail)) {
-      console.warn(`[Бэкенд: Регистрация] Некорректный формат email: "${cleanEmail}"`);
+    if (!emailRegex.test(cleanEmailCandidate)) {
+      console.warn(`[Бэкенд: Регистрация] Некорректный формат email: "${cleanEmailCandidate}"`);
       return res.status(400).json({ error: 'Пожалуйста, введите корректный адрес электронной почты (например, name@mail.ru).' });
     }
-
-    if (phone) {
-      cleanPhone = String(phone).trim();
+    // Исключаем автоматические системные email phone_... при регистрации
+    if (!cleanEmailCandidate.startsWith('phone_') && !cleanEmailCandidate.endsWith('@domofondar.ru')) {
+      targetEmail = cleanEmailCandidate;
     }
-    console.log(`[Бэкенд: Регистрация] Регистрация по Email: "${cleanEmail}"`);
-  } else {
-    // Ввод распознан как номер телефона
-    if (digitsOnly.length < 10) {
-      return res.status(400).json({ error: 'Пожалуйста, введите корректный номер телефона (не менее 10 цифр) или адрес электронной почты.' });
-    }
-    const last10 = digitsOnly.slice(-10);
-    // Приводим телефон к стандартному презентабельному виду
-    cleanPhone = `+7 (${last10.slice(0, 3)}) ${last10.slice(3, 6)}-${last10.slice(6, 8)}-${last10.slice(8, 10)}`;
-    // Для системной совместимости с полем users.email (NOT NULL) формируем системный email
-    cleanEmail = `phone_${last10}@domofondar.ru`;
-    console.log(`[Бэкенд: Регистрация] Регистрация по номеру телефона: "${cleanPhone}" (системный email: "${cleanEmail}")`);
   }
 
+  // 2. Проверяем телефон, если он был передан явно или через login
+  const candidatePhone = rawPhone || (!rawLogin.includes('@') ? rawLogin : '');
+  if (candidatePhone) {
+    const last10 = extractLast10Digits(candidatePhone);
+    if (last10) {
+      targetPhoneClean10 = last10;
+    }
+  }
+
+  // Для регистрации обязателен хотя бы один валидный контакт (телефон или email) и пароль
+  if (!targetEmail && !targetPhoneClean10) {
+    return res.status(400).json({ error: 'Укажите номер телефона или адрес электронной почты для регистрации.' });
+  }
+
+  if (!password || String(password).length < 6) {
+    return res.status(400).json({ error: 'Пароль обязателен и должен содержать не менее 6 символов.' });
+  }
+
+  const formattedPhone = targetPhoneClean10 ? formatRussianPhone(targetPhoneClean10) : null;
+  console.log(`[Бэкенд: Регистрация] Попытка регистрации: email="${targetEmail || 'НЕТ'}", phone="${formattedPhone || 'НЕТ'}" (10 цифр: ${targetPhoneClean10 || 'НЕТ'})`);
+
   try {
-    // 1. Комплексная проверка дубликатов в users и profiles
-    if (isEmail) {
+    // 3. СТРОГИЙ ЗАПРЕТ ДУБЛИКАТОВ ПО EMAIL
+    if (targetEmail) {
       const emailDupCheck = await pool.query(
         `SELECT u.id FROM users u 
          LEFT JOIN profiles p ON p.id = u.id 
-         WHERE LOWER(u.email) = LOWER($1) OR LOWER(COALESCE(p.email, '')) = LOWER($1)
+         WHERE LOWER(COALESCE(u.email, '')) = LOWER($1) 
+            OR LOWER(COALESCE(p.email, '')) = LOWER($1)
          LIMIT 1`,
-        [cleanEmail]
+        [targetEmail]
       );
       if (emailDupCheck.rows.length > 0) {
-        console.warn(`[Бэкенд: Регистрация] Отклонено: пользователь с Email "${cleanEmail}" уже существует`);
+        console.warn(`[Бэкенд: Регистрация] Отклонено: пользователь с Email "${targetEmail}" уже существует`);
         return res.status(400).json({ 
-          error: 'Пользователь с такой электронной почтой уже зарегистрирован. Пожалуйста, перейдите на вкладку «Вход».' 
-        });
-      }
-    } else {
-      const last10 = digitsOnly.slice(-10);
-      const phoneDupCheck = await pool.query(
-        `SELECT u.id FROM users u 
-         LEFT JOIN profiles p ON p.id = u.id 
-         WHERE u.email = $1 
-            OR REGEXP_REPLACE(COALESCE(p.phone, ''), '[^0-9]', '', 'g') LIKE '%' || $2
-         LIMIT 1`,
-        [`phone_${last10}@domofondar.ru`, last10]
-      );
-      if (phoneDupCheck.rows.length > 0) {
-        console.warn(`[Бэкенд: Регистрация] Отклонено: номер телефона "${last10}" уже зарегистрирован`);
-        return res.status(400).json({ 
-          error: 'Пользователь с таким номером телефона уже зарегистрирован. Пожалуйста, перейдите на вкладку «Вход».' 
+          error: 'Пользователь с такой электронной почтой уже зарегистрирован. Пожалуйста, войдите в личный кабинет.' 
         });
       }
     }
 
-    // 2. Хэшируем пароль пользователя с солью 10 раундов
+    // 4. СТРОГИЙ ЗАПРЕТ ДУБЛИКАТОВ ПО НОМЕРУ ТЕЛЕФОНА (проверяем profiles И employees)
+    if (targetPhoneClean10) {
+      const phoneDupCheck = await pool.query(
+        `SELECT p.id FROM profiles p 
+         WHERE p.phone_clean LIKE '%' || $1
+         UNION 
+         SELECT e.user_id as id FROM employees e 
+         WHERE REGEXP_REPLACE(COALESCE(e.phone, ''), '[^0-9]', '', 'g') LIKE '%' || $1
+         LIMIT 1`,
+        [targetPhoneClean10]
+      );
+      if (phoneDupCheck.rows.length > 0) {
+        console.warn(`[Бэкенд: Регистрация] Отклонено: номер телефона "${targetPhoneClean10}" уже зарегистрирован`);
+        return res.status(400).json({ 
+          error: 'Пользователь с таким номером телефона уже зарегистрирован. Пожалуйста, войдите в личный кабинет.' 
+        });
+      }
+    }
+
+    // 5. Хэшируем пароль пользователя с солью 10 раундов
     const salt = await bcrypt.genSalt(10);
     const password_hash = await bcrypt.hash(password, salt);
 
-    // 3. Вставляем запись нового пользователя в таблицу users
+    // 6. Вставляем запись нового пользователя в таблицу users (email строго null, если не указан!)
     const newUser = await pool.query(
       'INSERT INTO users (email, password_hash, role) VALUES ($1, $2, $3) RETURNING id, email, role',
-      [cleanEmail, password_hash, 'user']
+      [targetEmail, password_hash, 'user']
     );
 
     const user = newUser.rows[0];
     console.log(`[Бэкенд: Регистрация] Создана запись в users для ID: ${user.id}`);
 
-    // 4. Создаем профиль пользователя с сохранением телефона и email
+    // 7. Создаем профиль пользователя с сохранением телефона и email
     await pool.query(
       `INSERT INTO profiles (id, full_name, phone, email, email_verified) 
        VALUES ($1, $2, $3, $4, true) 
@@ -423,23 +447,23 @@ app.post('/api/auth/register', async (req, res) => {
          phone = COALESCE(NULLIF(EXCLUDED.phone, ''), profiles.phone), 
          email = COALESCE(NULLIF(EXCLUDED.email, ''), profiles.email), 
          email_verified = true`,
-      [user.id, full_name || '', cleanPhone, isEmail ? cleanEmail : null]
+      [user.id, full_name || '', formattedPhone, targetEmail]
     );
 
-    // 5. Назначаем базовую роль 'user' в user_roles
+    // 8. Назначаем базовую роль 'user' в user_roles
     await pool.query(
       'INSERT INTO user_roles (user_id, role) VALUES ($1, $2) ON CONFLICT DO NOTHING',
       [user.id, 'user']
     );
 
-    // 6. Генерируем JWT-токен сессии на 7 дней
+    // 9. Генерируем JWT-токен сессии на 7 дней
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: 'authenticated', sub: user.id },
+      { id: user.id, email: user.email, role: 'authenticated', userRole: 'user', sub: user.id },
       ACTIVE_JWT_SECRET,
       { expiresIn: '7d' }
     );
 
-    console.log(`[Бэкенд: Регистрация] Успешно завершена для ID: "${user.id}" (логин: "${cleanEmail}")`);
+    console.log(`[Бэкенд: Регистрация] Успешно завершена для ID: "${user.id}"`);
     res.status(201).json({ user, token, session: { access_token: token, user } });
   } catch (err) {
     console.error('[Бэкенд: Регистрация] Критическая ошибка во время регистрации:', err);
@@ -461,33 +485,36 @@ app.post('/api/auth/login', async (req, res) => {
   }
 
   const cleanInput = String(loginInput).trim();
-  // Удаляем все пробелы, если это email
   const cleanEmail = cleanInput.toLowerCase().replace(/\s+/g, '');
-  const digitsOnly = cleanInput.replace(/\D/g, ''); // Извлекаем только цифры для проверки телефона
-  console.log(`[Бэкенд: Вход] Попытка входа для: "${cleanInput}" (очищенный email: "${cleanEmail}", цифры: "${digitsOnly}")`);
+  const digits10 = extractLast10Digits(cleanInput);
+
+  console.log(`[Бэкенд: Вход] Попытка входа для: "${cleanInput}" (email: "${cleanEmail}", телефон 10 цифр: "${digits10 || 'НЕТ'}")`);
 
   try {
-    // 1. Ищем пользователя в таблице users по Email либо по номеру телефона в profiles
+    // Ищем пользователя:
+    // 1. По email (в users или profiles)
+    // 2. По номеру телефона (в profiles или employees)
     let result;
-    if (digitsOnly.length >= 10) {
-      // Если ввод похож на номер телефона (10+ цифр), ищем по профилю и по email
-      const last10Digits = digitsOnly.slice(-10);
+    if (digits10) {
       result = await pool.query(
         `SELECT u.* FROM users u 
          LEFT JOIN profiles p ON p.id = u.id 
-         WHERE LOWER(u.email) = LOWER($1) 
-            OR u.email = $2
-            OR REGEXP_REPLACE(COALESCE(p.phone, ''), '[^0-9]', '', 'g') LIKE '%' || $3
+         LEFT JOIN employees e ON e.user_id = u.id 
+         WHERE LOWER(COALESCE(u.email, '')) = LOWER($1) 
             OR LOWER(COALESCE(p.email, '')) = LOWER($1)
+            OR p.phone_clean LIKE '%' || $2
+            OR REGEXP_REPLACE(COALESCE(e.phone, ''), '[^0-9]', '', 'g') LIKE '%' || $2
+         ORDER BY (CASE WHEN u.role IN ('director', 'superadmin', 'admin') THEN 0 ELSE 1 END) ASC
          LIMIT 1`,
-        [cleanEmail, `phone_${last10Digits}@domofondar.ru`, last10Digits]
+        [cleanEmail, digits10]
       );
     } else {
-      // Ищем по Email (в users и в profiles)
       result = await pool.query(
         `SELECT u.* FROM users u 
          LEFT JOIN profiles p ON p.id = u.id 
-         WHERE LOWER(u.email) = LOWER($1) OR LOWER(COALESCE(p.email, '')) = LOWER($1)
+         WHERE LOWER(COALESCE(u.email, '')) = LOWER($1) 
+            OR LOWER(COALESCE(p.email, '')) = LOWER($1)
+         ORDER BY (CASE WHEN u.role IN ('director', 'superadmin', 'admin') THEN 0 ELSE 1 END) ASC
          LIMIT 1`,
         [cleanEmail]
       );
@@ -500,12 +527,12 @@ app.post('/api/auth/login', async (req, res) => {
 
     const user = result.rows[0];
 
-    // 2. Проверяем пароль через bcrypt
+    // Проверяем пароль через bcrypt
     let isMatch = false;
     if (password === user.password_hash) {
       // Миграция открытого пароля в bcrypt хеш при первом входе
       isMatch = true;
-      console.log(`[Бэкенд: Вход] Обнаружен plain-text пароль для "${cleanEmail}". Хэшируем...`);
+      console.log(`[Бэкенд: Вход] Обнаружен plain-text пароль для ID ${user.id}. Хэшируем...`);
       const salt = await bcrypt.genSalt(10);
       const newHash = await bcrypt.hash(password, salt);
       await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [newHash, user.id]);
@@ -514,21 +541,21 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     if (!isMatch) {
-      console.warn(`[Бэкенд: Вход] Отклонено: неверный пароль для "${cleanEmail}"`);
-      return res.status(401).json({ error: 'Неверный адрес электронной почты или пароль' });
+      console.warn(`[Бэкенд: Вход] Отклонено: неверный пароль для логина "${cleanInput}"`);
+      return res.status(401).json({ error: 'Неверный логин (Email/телефон) или пароль' });
     }
 
-    // 3. Определяем актуальную роль
+    // Определяем актуальную роль
     const userRole = await getUserRole(user.id);
 
-    // 4. Генерируем JWT-токен на 7 дней
+    // Генерируем JWT-токен на 7 дней
     const token = jwt.sign(
       { id: user.id, email: user.email, role: 'authenticated', userRole: userRole, sub: user.id },
       ACTIVE_JWT_SECRET,
       { expiresIn: '7d' }
     );
 
-    console.log(`[Бэкенд: Вход] Успешная авторизация для Email: "${cleanEmail}", роль: ${userRole}`);
+    console.log(`[Бэкенд: Вход] Успешная авторизация для ID: "${user.id}" (логин: "${cleanInput}"), роль: ${userRole}`);
     res.json({
       user: { id: user.id, email: user.email, role: userRole },
       token,
@@ -590,11 +617,8 @@ app.post('/api/user/request-data-change', authenticateToken, async (req, res) =>
       email: (email || '').trim(),
       address: (address || '').trim(),
       apartment: (apartment || '').trim(),
-      // Важно: если лицевой счёт не указан в теле запроса (например, менялся только телефон),
-      // сохраняем текущий account_number из профиля, чтобы он не занулялся при модерации!
-      account_number: (account_number !== undefined && account_number !== null && String(account_number).trim() !== '')
-        ? String(account_number).trim()
-        : (old.account_number || null),
+      floor: (floor || '').trim(),
+      account_number: account_number || null,
       submitted_at: new Date().toISOString(),
       source: 'mobile_app',
       old_data: {
@@ -603,13 +627,8 @@ app.post('/api/user/request-data-change', authenticateToken, async (req, res) =>
       },
     };
     await pool.query('UPDATE profiles SET pending_data_change = $1 WHERE id = $2', [JSON.stringify(pending), uid]);
-    const hasAptInAddr = (pending.address && (/кв\.?\s*\d+/i.test(pending.address) || /квартира\s*\d+/i.test(pending.address)));
-    const formattedAddr = pending.address
-      ? (hasAptInAddr || !pending.apartment ? pending.address : `${pending.address}, кв. ${pending.apartment}`)
-      : '-';
-
     const msg = `📱 [Мобильное приложение Домофондар]\n📝 Заявка на изменение данных абонента.\n` +
-      `Новый адрес: ${formattedAddr}\n` +
+      `Новый адрес: ${pending.address || '-'}, кв. ${pending.apartment || '-'}\n` +
       `ФИО: ${pending.full_name || '-'}\nТелефон: ${pending.phone || '-'}\nЛицевой счёт: ${pending.account_number || '-'}`;
     await pool.query(
       `INSERT INTO requests (name, phone, address, apartment, message, status, priority, order_type, client_id, notes)
@@ -650,7 +669,9 @@ app.get('/api/user/autopay/status', authenticateToken, async (req, res) => {
   const uid = req.user.id;
   const accountNumber = req.query.account_number || req.query.accountNumber;
   try {
-    let query = 'SELECT * FROM autopay_subscriptions WHERE (user_id = $1 OR account_number = $2) AND is_active = true ORDER BY id DESC LIMIT 1';
+    // Если передан счёт — ищем строго по этому счёту И пользователю (иначе вернулся бы автоплатёж
+    // другого счёта этого пользователя). Без счёта — по пользователю.
+    let query = 'SELECT * FROM autopay_subscriptions WHERE account_number = $2 AND user_id = $1 AND is_active = true ORDER BY id DESC LIMIT 1';
     let params = [uid, accountNumber || ''];
     if (!accountNumber) {
       query = 'SELECT * FROM autopay_subscriptions WHERE user_id = $1 AND is_active = true ORDER BY id DESC LIMIT 1';
@@ -688,7 +709,8 @@ app.post('/api/user/autopay/disable', authenticateToken, async (req, res) => {
     let query = 'UPDATE autopay_subscriptions SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE user_id = $1';
     let params = [uid];
     if (accountNumber) {
-      query = 'UPDATE autopay_subscriptions SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE user_id = $1 OR account_number = $2';
+      // Строго этот счёт этого пользователя (не затрагиваем чужие строки и другие счета).
+      query = 'UPDATE autopay_subscriptions SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE user_id = $1 AND account_number = $2';
       params = [uid, accountNumber];
     }
     await pool.query(query, params);
@@ -716,10 +738,7 @@ app.post('/api/user/submit-verification', authenticateToken, async (req, res) =>
       [doc, now, uid]
     );
     const p = upd.rows[0] || {};
-    const hasApt = p.address && (/кв\.?\s*\d+/i.test(p.address) || /квартира\s*\d+/i.test(p.address));
-    const fullAddr = p.address
-      ? (hasApt || !p.apartment ? p.address : `${p.address}, кв. ${p.apartment}`)
-      : (p.apartment ? `кв. ${p.apartment}` : '');
+    const fullAddr = `${p.address || ''}${p.apartment ? `, кв. ${p.apartment}` : ''}`;
     try {
       await pool.query(
         `INSERT INTO requests (client_id, name, phone, address, apartment, order_type, message, status, priority, document_url)
@@ -1175,24 +1194,7 @@ app.get('/api/user/my-account', authenticateToken, async (req, res) => {
       }
     }
 
-    // В. Если номер не найден по телефону, но есть подтвержденный адрес и квартира абонента
-    if (profile.address && profile.apartment) {
-      // Ищем точное совпадение по номеру квартиры и включению адреса
-      const aptClean = String(profile.apartment).trim();
-      if (aptClean) {
-        const accAddrRes = await pool.query(
-          "SELECT account_number, period, debt_amount, address, apartment, phone, full_name, has_handset, payment_type FROM accounts WHERE apartment = $1 AND ($2 ILIKE '%' || address || '%' OR address ILIKE '%' || $2 || '%') LIMIT 1",
-          [aptClean, profile.address.trim()]
-        );
-        if (accAddrRes.rows.length > 0) {
-          console.log(`[Бэкенд: Мой счёт] Автоматически привязан лицевой счёт ${accAddrRes.rows[0].account_number} по адресу/квартире ${aptClean} для ${userId}`);
-          await pool.query('UPDATE profiles SET account_number = $1 WHERE id = $2', [accAddrRes.rows[0].account_number, userId]);
-          return res.json(accAddrRes.rows[0]);
-        }
-      }
-    }
-
-    // Г. Лицевой счёт не привязан — возвращаем null (строго исключаем чужие счета!)
+    // В. Лицевой счёт не привязан — возвращаем null (строго исключаем чужие счета!)
     res.json(null);
   } catch (err) {
     console.error('[Бэкенд: Мой счёт] Ошибка поиска лицевого счета:', err.message);
@@ -1577,23 +1579,31 @@ async function processSuccessfulPayment(yooData, fallbackPayment = null) {
       const expYear = cardInfo.expiry_year || null;
       const expMonth = cardInfo.expiry_month || null;
 
-      await pool.query(
-        `INSERT INTO autopay_subscriptions (
-           user_id, account_number, payment_method_id, card_first6, card_last4, card_type,
-           card_expiry_year, card_expiry_month, is_active, updated_at
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, CURRENT_TIMESTAMP)
-         ON CONFLICT (account_number) 
-         DO UPDATE SET 
-           payment_method_id = EXCLUDED.payment_method_id,
-           card_first6 = EXCLUDED.card_first6,
-           card_last4 = EXCLUDED.card_last4,
-           card_type = EXCLUDED.card_type,
-           card_expiry_year = EXCLUDED.card_expiry_year,
-           card_expiry_month = EXCLUDED.card_expiry_month,
+      // Надёжный upsert без зависимости от UNIQUE-констрейнта (ON CONFLICT падал,
+      // если на account_number нет уникального индекса): сначала UPDATE, если 0 строк — INSERT.
+      const updAuto = await pool.query(
+        `UPDATE autopay_subscriptions SET
+           user_id = $1,
+           payment_method_id = $3,
+           card_first6 = $4,
+           card_last4 = $5,
+           card_type = $6,
+           card_expiry_year = $7,
+           card_expiry_month = $8,
            is_active = true,
-           updated_at = CURRENT_TIMESTAMP`,
+           updated_at = CURRENT_TIMESTAMP
+         WHERE account_number = $2`,
         [payUserId, accNumber, yooMethod.id, cardFirst6, cardLast4, cardType, expYear, expMonth]
       );
+      if (updAuto.rowCount === 0) {
+        await pool.query(
+          `INSERT INTO autopay_subscriptions (
+             user_id, account_number, payment_method_id, card_first6, card_last4, card_type,
+             card_expiry_year, card_expiry_month, is_active, updated_at
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, CURRENT_TIMESTAMP)`,
+          [payUserId, accNumber, yooMethod.id, cardFirst6, cardLast4, cardType, expYear, expMonth]
+        );
+      }
       console.log(`[Бэкенд: Автоплатеж] ✅ Карта •••• ${cardLast4 || 'N/A'} успешно привязана к л/с ${accNumber} для автоплатежей!`);
     }
   } catch (autoErr) {

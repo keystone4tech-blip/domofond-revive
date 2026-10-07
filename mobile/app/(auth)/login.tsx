@@ -28,6 +28,31 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
+  // Умное форматирование телефона: если пользователь вводит цифры (начиная с 8 или 7),
+  // автоматически форматируем в +7 (XXX) XXX-XX-XX. Если вводится email — сохраняем email без пробелов.
+  const handleIdentifierChange = (text: string) => {
+    if (text.includes('@') || /[a-zA-Z]/.test(text)) {
+      setIdentifier(text.replace(/\s+/g, ''));
+      return;
+    }
+    const digits = text.replace(/\D/g, '');
+    if (digits.length === 0) {
+      setIdentifier('');
+      return;
+    }
+    let d = digits;
+    if (d.startsWith('8')) d = '7' + d.slice(1);
+    if (!d.startsWith('7')) d = '7' + d;
+    d = d.slice(0, 11);
+
+    let formatted = '+7';
+    if (d.length > 1) formatted += ` (${d.slice(1, 4)}`;
+    if (d.length >= 4) formatted += `) ${d.slice(4, 7)}`;
+    if (d.length >= 7) formatted += `-${d.slice(7, 9)}`;
+    if (d.length >= 9) formatted += `-${d.slice(9, 11)}`;
+    setIdentifier(formatted);
+  };
+
   const { login, isLoading } = useAuthStore();
 
   const handleLogin = async () => {
@@ -68,7 +93,7 @@ export default function LoginScreen() {
             placeholder="+7 (999) 123-45-67 или mail@example.ru"
             placeholderTextColor={colors.textMuted}
             value={identifier}
-            onChangeText={setIdentifier}
+            onChangeText={handleIdentifierChange}
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="email-address"

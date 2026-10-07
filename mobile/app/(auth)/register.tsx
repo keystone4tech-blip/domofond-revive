@@ -34,6 +34,27 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
+  // Форматирование телефона: если пользователь начинает вводить 8 или 7 —
+  // автоматически нормализуем к +7 (XXX) XXX-XX-XX
+  const handlePhoneChange = (text: string) => {
+    const digits = text.replace(/\D/g, '');
+    if (digits.length === 0) {
+      setPhone('');
+      return;
+    }
+    let d = digits;
+    if (d.startsWith('8')) d = '7' + d.slice(1);
+    if (!d.startsWith('7')) d = '7' + d;
+    d = d.slice(0, 11);
+
+    let formatted = '+7';
+    if (d.length > 1) formatted += ` (${d.slice(1, 4)}`;
+    if (d.length >= 4) formatted += `) ${d.slice(4, 7)}`;
+    if (d.length >= 7) formatted += `-${d.slice(7, 9)}`;
+    if (d.length >= 9) formatted += `-${d.slice(9, 11)}`;
+    setPhone(formatted);
+  };
+
   // Согласия: обработка ПД + оферта (обязательно), рекламная рассылка (необязательно)
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [marketingConsent, setMarketingConsent] = useState(false);
@@ -87,7 +108,7 @@ export default function RegisterScreen() {
           <TextInput style={inputStyle} placeholder="Иванов Иван Иванович" placeholderTextColor={colors.textMuted} value={fullName} onChangeText={setFullName} />
 
           <Text style={[styles.label, { color: colors.textSecondary, marginTop: 12 }]}>Номер телефона</Text>
-          <TextInput style={inputStyle} placeholder="+7 (999) 123-45-67" placeholderTextColor={colors.textMuted} value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
+          <TextInput style={inputStyle} placeholder="+7 (999) 123-45-67" placeholderTextColor={colors.textMuted} value={phone} onChangeText={handlePhoneChange} keyboardType="phone-pad" />
 
           <Text style={[styles.label, { color: colors.textSecondary, marginTop: 12 }]}>Электронная почта (необязательно)</Text>
           <TextInput style={inputStyle} placeholder="example@mail.ru" placeholderTextColor={colors.textMuted} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} />

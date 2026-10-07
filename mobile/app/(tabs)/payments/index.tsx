@@ -12,6 +12,7 @@ import {
   Alert,
   ActivityIndicator,
   RefreshControl,
+  Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -19,11 +20,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
 import { apiClient } from '@/api/client';
 import { useAppTheme } from '@/theme';
+import { useAuthStore } from '@/store/auth.store';
 import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 
 export default function PaymentsScreen() {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useAppTheme();
+  const { user } = useAuthStore();
 
   const [account, setAccount] = useState<any>(null);
   const [payments, setPayments] = useState<any[]>([]);
@@ -31,6 +34,8 @@ export default function PaymentsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [paying, setPaying] = useState(false);
+  const [saveCardForAuto, setSaveCardForAuto] = useState(false); // чекбокс «подключить автоплатёж» при оплате
+  const [autopay, setAutopay] = useState<{ enabled: boolean; card_last4: string | null }>({ enabled: false, card_last4: null });
 
   // Загрузка персонального лицевого счета и истории платежей текущего жильца
   const loadPaymentData = useCallback(async () => {
@@ -49,6 +54,12 @@ export default function PaymentsScreen() {
         } catch (histErr) {
           console.warn('[Payments CyberShield] История платежей пока пуста');
         }
+
+        // Статус автоплатежа по этому счёту
+        try {
+          const apRes = await apiClient.get('/api/user/autopay/status', { params: { account_number: primaryAcc.account_number } });
+          setAutopay({ enabled: !!apRes.data?.enabled, card_last4: apRes.data?.card_last4 || null });
+        } catch { setAutopay({ enabled: false, card_last4: null }); }
       } else {
         setAccount(null);
       }
@@ -89,15 +100,20 @@ export default function PaymentsScreen() {
       const total = Math.round((base + fee) * 100) / 100;
       console.log(`[Payments CyberShield] Оплата ${base} ₽ + 5% (${fee} ₽) = ${total} ₽ (л/с: ${accNum})...`);
 
-      const payload = {
+      const payload: any = {
         amount: total,
         credit_amount: base,
         fee_amount: fee,
         account_number: accNum,
+        user_id: user?.id,
         description: `Оплата ТО домофона, л/с ${accNum || 'не указан'}`,
         return_url: 'https://домофондар.рф/cabinet?check_payment=1',
         is_order: false,
       };
+      // Подключение автоплатежа: сохранить карту при этой оплате
+      if (saveCardForAuto) {
+        payload.save_payment_method = true;
+      }
 
       const res = await apiClient.post('/api/payments/yookassa/create', payload);
       const confirmationUrl = res.data?.confirmation_url || res.data?.payment?.confirmation?.confirmation_url;
@@ -115,6 +131,26 @@ export default function PaymentsScreen() {
       Alert.alert('Ошибка оплаты', msg);
     } finally {
       setPaying(false);
+    }
+  };
+
+  // Отключение автоплатежа
+  const disableAutopay = async () => {
+    try {
+      await apiClient.post('/api/user/autopay/disable', { account_number: account?.account_number });
+      setAutopay({ enabled: false, card_last4: null });
+      Alert.alert('Автоплатёж отключён', 'Ежемесячное списание больше не выполняется.');
+    } catch {
+      Alert.alert('Ошибка', 'Не удалось отключить автоплатёж. Попробуйте позже.');
+    }
+  };
+
+  const onToggleAutopay = (val: boolean) => {
+    if (!val) {
+      Alert.alert('Отключить автоплатёж?', 'Ежемесячное автосписание будет остановлено.', [
+        { text: 'Отмена', style: 'cancel' },
+        { text: 'Отключить', style: 'destructive', onPress: disableAutopay },
+      ]);
     }
   };
 
@@ -283,8 +319,44 @@ export default function PaymentsScreen() {
                   </TouchableOpacity>
                 </View>
 
+                {/* Подключение автоплатежа при оплате — показываем, если ещё не подключён */}
+                {!autopay.enabled && (
+                  <TouchableOpacity style={styles.heroAutoRow} activeOpacity={0.8} onPress={() => setSaveCardForAuto((v) => !v)}>
+                    <Ionicons name={saveCardForAuto ? 'checkbox' : 'square-outline'} size={20} color="#ffffff" style={{ marginRight: 8 }} />
+                    <Text style={styles.heroAutoText}>Подключить автоплатёж — сохранить карту для ежемесячного списания ТО</Text>
+                  </TouchableOpacity>
+                )}
+
                 <Text style={styles.heroFeeNote}>Возможна комиссия банка при оплате</Text>
               </LinearGradient>
+
+              {/* Карточка статуса автоплатежа */}
+              {autopay.enabled ? (
+                <View style={[styles.autopayCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <View style={[styles.autopayIcon, { backgroundColor: isDark ? 'rgba(16,185,129,0.15)' : '#ecfdf5' }]}>
+                    <Ionicons name="repeat" size={20} color={colors.secondary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.autopayTitle, { color: colors.text }]}>Автоплатёж включён</Text>
+                    <Text style={[styles.autopaySub, { color: colors.textSecondary }]}>
+                      Карта •••• {autopay.card_last4 || '····'} · ежемесячное списание ТО
+                    </Text>
+                  </View>
+                  <Switch
+                    value={true}
+                    onValueChange={onToggleAutopay}
+                    trackColor={{ true: colors.secondary, false: colors.border }}
+                    thumbColor="#ffffff"
+                  />
+                </View>
+              ) : (
+                saveCardForAuto ? (
+                  <Text style={[styles.autopayConsent, { color: colors.textMuted }]}>
+                    Отметив «Подключить автоплатёж», вы соглашаетесь на ежемесячное автосписание суммы ТО с сохранённой карты.
+                    Отключить автоплатёж можно в любой момент здесь же.
+                  </Text>
+                ) : null
+              )}
 
               <Text style={[styles.sectionTitle, { color: colors.text }]}>История операций</Text>
             </>
@@ -361,6 +433,13 @@ const styles = StyleSheet.create({
   },
   heroPayBtnText: { color: '#0276c4', fontSize: 14, fontWeight: '800' },
   heroFeeNote: { fontSize: 11, color: 'rgba(255,255,255,0.8)', textAlign: 'center', marginTop: 12 },
+  heroAutoRow: { flexDirection: 'row', alignItems: 'center', marginTop: 14, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 12, padding: 12 },
+  heroAutoText: { flex: 1, color: '#ffffff', fontSize: 12, lineHeight: 16, fontWeight: '600' },
+  autopayCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 16, borderWidth: 1, marginBottom: 20 },
+  autopayIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  autopayTitle: { fontSize: 14, fontWeight: '700' },
+  autopaySub: { fontSize: 12, marginTop: 2 },
+  autopayConsent: { fontSize: 11.5, lineHeight: 16, marginBottom: 18, paddingHorizontal: 4 },
   balanceCard: {
     borderRadius: 18,
     borderWidth: 1,

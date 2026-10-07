@@ -89,6 +89,7 @@ export default function ProfileScreen() {
     setIsSaving(true);
     try {
       const isExisting = !!(user?.is_verified || (user as any)?.address || (user as any)?.account_number);
+      if (isExisting) {
         await apiClient.post('/api/user/request-data-change', {
           full_name: fullName.trim(),
           phone: phone.trim(),
@@ -404,9 +405,9 @@ export default function ProfileScreen() {
       </Modal>
 
       {/* Модалка «О нас»: информация о компании, режим работы, мессенджеры (как на сайте) */}
-      <Modal visible={aboutOpen} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border, paddingTop: Math.max(insets.top, 12) + 8 }]}>
+      <Modal visible={aboutOpen} animationType="slide" presentationStyle="fullScreen" onRequestClose={() => setAboutOpen(false)}>
+        <View style={[styles.modalFull, { backgroundColor: colors.background, paddingTop: Math.max(insets.top, 12) + 8 }]}>
+          <View style={[styles.modalContentFull, { backgroundColor: colors.background }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>О нас</Text>
               <TouchableOpacity onPress={() => setAboutOpen(false)}><Ionicons name="close" size={24} color={colors.textMuted} /></TouchableOpacity>
@@ -482,9 +483,9 @@ export default function ProfileScreen() {
       </Modal>
 
       {/* Модалка «Как проехать»: карты 2ГИС и Яндекс (организация как на сайте) */}
-      <Modal visible={mapsOpen} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border, paddingTop: Math.max(insets.top, 12) + 8 }]}>
+      <Modal visible={mapsOpen} animationType="slide" presentationStyle="fullScreen" onRequestClose={() => setMapsOpen(false)}>
+        <View style={[styles.modalFull, { backgroundColor: colors.background, paddingTop: Math.max(insets.top, 12) + 8 }]}>
+          <View style={[styles.modalContentFull, { backgroundColor: colors.background }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>Как проехать</Text>
               <TouchableOpacity onPress={() => setMapsOpen(false)}><Ionicons name="close" size={24} color={colors.textMuted} /></TouchableOpacity>
@@ -635,6 +636,8 @@ const styles = StyleSheet.create({
   segmentBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 9, borderRadius: 9 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.7)', justifyContent: 'flex-end' },
   modalContent: { flex: 1, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 0, borderWidth: 0 },
+  modalFull: { flex: 1, paddingHorizontal: 20 },
+  modalContentFull: { flex: 1 },
   modalFooter: { paddingTop: 10, borderTopWidth: 1 },
   modalCloseBtn: { height: 48, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   modalCloseText: { fontSize: 15, fontWeight: '700' },
