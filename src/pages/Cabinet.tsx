@@ -790,11 +790,11 @@ const DebtCard = ({
                   <Sparkles className="h-4 w-4" />
                 </div>
                 <div className="min-w-0">
-                  <div className="text-xs font-bold text-white truncate">
-                    {autopay.enabled ? `Автоплатёж включён (•••• ${autopay.card_last4 || "карта"})` : "Автоплатёж — списание 4-го числа"}
+                  <div className={`text-[13px] font-extrabold text-white ${autopay.enabled ? "truncate" : "leading-snug"}`}>
+                    {autopay.enabled ? `Автоплатёж включён (•••• ${autopay.card_last4 || "карта"})` : "Подключите автоплатёж — и забудьте о квитанциях в ящике"}
                   </div>
-                  <div className="text-[10.5px] text-white/80 truncate">
-                    {autopay.enabled ? "Ежемесячно списывается остаток лицевого счёта" : "Погашение остатка без очередей и напоминаний (+5% эквайринг)"}
+                  <div className={`text-[11px] text-white/85 ${autopay.enabled ? "truncate" : "leading-snug mt-0.5"}`}>
+                    {autopay.enabled ? "Ежемесячно списывается остаток лицевого счёта" : "Остаток лицевого счёта спишется сам 4-го числа — без очередей, бумажных квитанций и риска просрочки. Комиссия эквайринга 5%. Отключить можно в один тап в любой момент."}
                   </div>
                 </div>
               </div>
