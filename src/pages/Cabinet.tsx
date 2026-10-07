@@ -785,8 +785,7 @@ const DebtCard = ({
                     <div className="min-w-0">
                       <div className="text-xs font-bold text-emerald-800 dark:text-emerald-300">Автоплатёж включён</div>
                       <div className="text-[11px] text-emerald-700/80 dark:text-emerald-400/70 truncate">
-                        Карта •••• {autopay.card_last4 || "••••"} · списание 4-го числа
-                        {account.tariff_price != null ? ` · ${Number(account.tariff_price)} ₽/мес` : ""}
+                        Карта •••• {autopay.card_last4 || "••••"} · списание всего остатка 4-го числа
                       </div>
                     </div>
                   </div>
@@ -819,7 +818,7 @@ const DebtCard = ({
                         Подключите автоплатёж — и забудьте о квитанциях в ящике
                       </div>
                       <div className="text-[11.5px] text-slate-600 dark:text-slate-300 mt-1 leading-snug">
-                        Абонентская плата{account.tariff_price != null ? ` ${Number(account.tariff_price)} ₽/мес` : ""} спишется сама 4-го числа каждого месяца. Без очередей, напоминаний и риска просрочки. Отключить можно в один тап в любой момент.
+                        4-го числа каждого месяца автоматически спишется весь остаток лицевого счёта — абонентская плата и задолженность, если она есть, плюс 5% комиссии эквайринга. Без очередей, напоминаний и риска просрочки. Отключить можно в один тап в любой момент.
                       </div>
                       <div className="inline-flex items-center gap-1.5 mt-2 text-xs font-bold text-sky-700 dark:text-sky-300">
                         <Zap className="h-3.5 w-3.5 fill-current" />
@@ -979,7 +978,7 @@ const DebtCard = ({
                       className="mt-0.5 h-4 w-4 accent-sky-600 shrink-0"
                     />
                     <span className="text-[11.5px] leading-snug text-slate-700 dark:text-slate-300">
-                      <span className="font-bold text-slate-800 dark:text-slate-100">Подключить автоплатёж</span> — сохранить карту и списывать абонентскую плату автоматически 4-го числа каждого месяца. Только за ТО домофона. Отключить можно в любой момент.
+                      <span className="font-bold text-slate-800 dark:text-slate-100">Подключить автоплатёж</span> — сохранить карту и 4-го числа каждого месяца автоматически гасить весь остаток лицевого счёта (абонентская плата и задолженность) с комиссией эквайринга 5%. Только за ТО домофона. Отключить можно в любой момент.
                     </span>
                   </label>
                 )}

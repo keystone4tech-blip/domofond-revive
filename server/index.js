@@ -1570,8 +1570,10 @@ async function processSuccessfulPayment(yooData, fallbackPayment = null) {
     const accNumber = combinedMeta?.account_number || paymentRecord?.account_number;
     const payUserId = combinedMeta?.user_id || paymentRecord?.user_id || null;
     const saveRequested = combinedMeta?.save_payment_method === 'true' || combinedMeta?.save_payment_method === true;
+    // ВАЖНО: автоплатёж — ТОЛЬКО для абонентской платы (ТО). Карта НЕ сохраняется при оплате заказов/оборудования.
+    const isOrderPayment = combinedMeta?.is_order === 'true' || combinedMeta?.is_order === true || !!combinedMeta?.order_data || combinedMeta?.order_type === 'equipment_order';
 
-    if (accNumber && (isSaved || saveRequested) && yooMethod?.id) {
+    if (accNumber && (isSaved || saveRequested) && !isOrderPayment && yooMethod?.id) {
       const cardInfo = yooMethod.card || {};
       const cardLast4 = cardInfo.last4 || null;
       const cardFirst6 = cardInfo.first6 || null;
@@ -3000,10 +3002,164 @@ app.get('/api/lookup/by-phone', requireAuthLite, async (req, res) => {
   }
 });
 
+// ============================================================================
+//  АВТОСПИСАНИЕ АБОНЕНТСКОЙ ПЛАТЫ (рекуррентные платежи ЮKassa) — 4-го числа
+//  Списывается ТОЛЬКО абонентская плата (тариф). Заказы/оборудование — никогда.
+//  Планировщик без внешних зависимостей + идемпотентность через autopay_charges.
+// ============================================================================
+
+async function ensureAutopayChargesTable() {
+  await pool.query(`CREATE TABLE IF NOT EXISTS autopay_charges (
+    id SERIAL PRIMARY KEY,
+    account_number TEXT NOT NULL,
+    period TEXT NOT NULL,
+    amount NUMERIC,
+    status TEXT,
+    yookassa_payment_id TEXT,
+    detail TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (account_number, period)
+  )`);
+}
+
+// Текущее «настенное» время по МСК (UTC+3) без внешних TZ-библиотек.
+function mskNow() { return new Date(Date.now() + 3 * 3600 * 1000); }
+function currentPeriodMSK() {
+  const d = mskNow();
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+let autopayRunning = false;
+async function runAutopayCharges(trigger = 'scheduler') {
+  if (autopayRunning) { console.log('[Автосписание] Уже выполняется — пропуск.'); return; }
+  autopayRunning = true;
+  const period = currentPeriodMSK();
+  try {
+    await ensureAutopayChargesTable();
+    const subs = await pool.query(
+      `SELECT * FROM autopay_subscriptions WHERE is_active = true AND payment_method_id IS NOT NULL`
+    );
+    if (subs.rows.length === 0) { console.log(`[Автосписание] (${trigger}) Активных подписок нет.`); return; }
+    console.log(`[Автосписание] Старт (${trigger}), период ${period}, подписок: ${subs.rows.length}`);
+    const authHeader = 'Basic ' + Buffer.from(`${YOOKASSA_SHOP_ID}:${YOOKASSA_SECRET_KEY}`).toString('base64');
+
+    for (const sub of subs.rows) {
+      const acc = sub.account_number;
+      try {
+        // Тариф (абонентская плата) и текущий долг — из последнего начисления по счёту.
+        const accRow = await pool.query(
+          `SELECT debt_amount, status, contract_terminated FROM accounts WHERE account_number = $1 ORDER BY period DESC LIMIT 1`,
+          [acc]
+        );
+        const arow = accRow.rows[0] || {};
+        const debt = Number(arow.debt_amount) || 0;
+
+        // Не списываем по расторгнутым договорам — исключаем спорные списания и возвраты.
+        if (arow.contract_terminated === true || arow.status === 'terminated') {
+          console.log(`[Автосписание] л/с ${acc}: договор расторгнут — пропуск.`);
+          continue;
+        }
+        if (debt <= 0) { console.log(`[Автосписание] л/с ${acc}: долга нет (предоплата) — пропуск.`); continue; }
+        // База зачисляется на счёт и гасит весь остаток (абонплата + задолженность); 5% эквайринга — сверху, как при ручной оплате.
+        const base = Math.round(debt * 100) / 100;
+        const fee = Math.round(base * 0.05 * 100) / 100;
+        const amount = Math.round((base + fee) * 100) / 100;
+        if (base < 10) { console.log(`[Автосписание] л/с ${acc}: сумма ${base} ₽ ниже минимума ЮKassa — пропуск.`); continue; }
+
+        // Идемпотентность периода: занимаем (account_number, period).
+        const claim = await pool.query(
+          `INSERT INTO autopay_charges (account_number, period, amount, status)
+           VALUES ($1, $2, $3, 'processing')
+           ON CONFLICT (account_number, period) DO NOTHING RETURNING id`,
+          [acc, period, amount]
+        );
+        if (claim.rowCount === 0) { console.log(`[Автосписание] л/с ${acc}: период ${period} уже обработан — пропуск.`); continue; }
+
+        const idempotenceKey = `autopay-${acc}-${period}`;
+        const yooRes = await fetch('https://api.yookassa.ru/v3/payments', {
+          method: 'POST',
+          headers: {
+            'Authorization': authHeader,
+            'Idempotence-Key': idempotenceKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            amount: { value: amount.toFixed(2), currency: 'RUB' },
+            capture: true,
+            payment_method_id: sub.payment_method_id,
+            description: `Автосписание абонентской платы ТО домофона, л/с ${acc}`,
+            metadata: {
+              account_number: acc,
+              user_id: sub.user_id || '',
+              autopay: 'true',
+              period,
+              credit_amount: base.toFixed(2),
+              fee_amount: fee.toFixed(2),
+            },
+          }),
+        });
+        const data = await yooRes.json().catch(() => ({}));
+        const status = data.status || (yooRes.ok ? 'pending' : 'error');
+        const reason = data?.cancellation_details?.reason || null;
+        await pool.query(
+          `UPDATE autopay_charges SET status = $3, yookassa_payment_id = $4, detail = $5 WHERE account_number = $1 AND period = $2`,
+          [acc, period, status, data.id || null, reason || (yooRes.ok ? null : JSON.stringify(data).slice(0, 300))]
+        );
+        console.log(`[Автосписание] л/с ${acc}: ${amount.toFixed(2)} ₽ → статус ${status}${reason ? ' (' + reason + ')' : ''}`);
+
+        if (status === 'canceled' && ['permission_revoked', 'card_expired', 'general_decline', 'fraud_suspected'].includes(reason)) {
+          await pool.query(`UPDATE autopay_subscriptions SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE account_number = $1`, [acc]);
+          console.log(`[Автосписание] л/с ${acc}: подписка деактивирована (${reason}).`);
+        }
+      } catch (chargeErr) {
+        try {
+          await pool.query(
+            `UPDATE autopay_charges SET status = 'error', detail = $3 WHERE account_number = $1 AND period = $2`,
+            [acc, period, String(chargeErr.message || chargeErr).slice(0, 300)]
+          );
+        } catch (_) { /* журналирование не критично */ }
+        console.warn(`[Автосписание] л/с ${acc}: ошибка списания:`, chargeErr.message);
+      }
+    }
+    console.log(`[Автосписание] Завершено, период ${period}.`);
+  } catch (err) {
+    console.error('[Автосписание] Критическая ошибка:', err.message);
+  } finally {
+    autopayRunning = false;
+  }
+}
+
+// Планировщик: проверка раз в час; запуск 4-го числа (по МСК). Идемпотентность — на уровне периода.
+// Аварийный выключатель: переменная окружения AUTOPAY_CRON_DISABLED=1.
+function startAutopayScheduler() {
+  if (process.env.AUTOPAY_CRON_DISABLED === '1') {
+    console.log('[Автосписание] Планировщик ОТКЛЮЧЁН (AUTOPAY_CRON_DISABLED=1).');
+    return;
+  }
+  const check = () => {
+    try {
+      const d = mskNow();
+      if (d.getUTCDate() === 4) runAutopayCharges('scheduler-4th');
+    } catch (e) { console.warn('[Автосписание] Ошибка планировщика:', e.message); }
+  };
+  setInterval(check, 60 * 60 * 1000); // каждый час
+  setTimeout(check, 30 * 1000);       // первичная проверка вскоре после старта
+  console.log('[Автосписание] Планировщик запущен (списание 4-го числа каждого месяца, МСК).');
+}
+
+// Ручной запуск автосписания — ТОЛЬКО для суперадмина/админа (тест в тестовом магазине).
+app.post('/api/admin/autopay/run', authenticateToken, async (req, res) => {
+  if (!req.isSuperAdmin && !req.isAdmin) return res.status(403).json({ error: 'Недостаточно прав' });
+  console.log(`[Автосписание] Ручной запуск от ${req.user.email || req.user.id}`);
+  runAutopayCharges('manual:' + (req.user.email || req.user.id)).catch(() => {});
+  res.json({ ok: true, started: true, period: currentPeriodMSK() });
+});
+
 // Запуск сервера
 app.listen(port, () => {
   console.log(`[Бэкенд: Domofondar] Сервер успешно запущен на порту ${port}`);
   console.log(`[Бэкенд: Domofondar] Директория бэкапов: ${BACKUP_DIR}`);
   console.log(`[Бэкенд: Domofondar] Платежный шлюз ЮKassa: подключен (ShopId: ${YOOKASSA_SHOP_ID})`);
+  startAutopayScheduler();
 });
 
