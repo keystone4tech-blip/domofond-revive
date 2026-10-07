@@ -165,7 +165,7 @@ const Project: React.FC = () => {
   .ddr .barrow { display:flex; align-items:center; gap:10px; }
   .ddr .barrow .tag { width:56px; font-size:10.5px; color:var(--muted); font-weight:600; flex:none; text-transform:uppercase; letter-spacing:.04em; }
   .ddr .track { flex:1; height:16px; background:var(--surface-2); border-radius:6px; overflow:hidden; min-width:0; }
-  .ddr .fill { height:100%; border-radius:6px; }
+  .ddr .fill { display:block; height:100%; border-radius:6px; }
   .ddr .fill.mine { background:var(--mine); } .ddr .fill.studio { background:var(--studio); }
   .ddr .barrow .amt { width:92px; text-align:right; font-family:var(--display); font-weight:700; font-size:12.5px; font-variant-numeric:tabular-nums; flex:none; }
   .ddr .amt.mine { color:var(--brand); } .ddr .amt.studio { color:var(--accent); }
@@ -181,7 +181,7 @@ const Project: React.FC = () => {
   .ddr .catrow { display:flex; align-items:center; gap:10px; padding:5px 0; }
   .ddr .catrow .cl { width:150px; font-size:12px; color:var(--ink-2); flex:none; }
   .ddr .catrow .ct { flex:1; height:14px; background:var(--surface-2); border-radius:5px; overflow:hidden; min-width:0; }
-  .ddr .catrow .cf { height:100%; background:var(--brand); border-radius:5px; }
+  .ddr .catrow .cf { display:block; height:100%; background:var(--brand); border-radius:5px; }
   .ddr .catrow .cv { width:52px; text-align:right; font-family:var(--display); font-weight:700; font-size:12px; font-variant-numeric:tabular-nums; flex:none; color:var(--ink-2); }
   .ddr table.exp { width:100%; border-collapse:collapse; font-size:13.5px; }
   .ddr table.exp td { padding:9px 0; border-bottom:1px solid var(--border); color:var(--ink-2); }
