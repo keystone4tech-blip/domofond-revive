@@ -31,7 +31,7 @@ import EquipmentMatchingManager from "@/components/fsm/EquipmentMatchingManager"
 import AddressesManager from "@/components/fsm/AddressesManager";
 import { AccountsManager } from "@/components/admin/AccountsManager";
 import IntercomLoginsManager from "@/components/fsm/IntercomLoginsManager";
-import InstallerSheetManager from "@/components/fsm/InstallerSheetManager";
+import InstallerSheetManager from "@/components/crm/InstallerSheetManager";
 import VerificationManager from "@/components/fsm/VerificationManager";
 import FSMBottomNav from "@/components/fsm/FSMBottomNav";
 import { FSMSidebar } from "@/components/fsm/FSMSidebar";

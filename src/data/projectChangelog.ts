@@ -258,6 +258,16 @@ export const KIND_META: Record<Kind, { label: string; badgeCls: string }> = {
  */
 export const PROJECT_CHANGELOG: ProjectEntry[] = [
   {
+    id: "stage-2026-10-08-2120",
+    datetime: "2026-10-08 21:20",
+    title: "Лист монтажника: полная унификация экспорта в Excel и устранение устаревшего дубликата в FSM-1",
+    description: "Обнаружен и устранен устаревший дубликат компонента InstallerSheetManager в директории fsm, который вызывался на странице FSM-1 и экспортировал старую версию Excel-ведомости. Компонент src/components/fsm/InstallerSheetManager.tsx переведен на сквозной реэкспорт единого актуального источника правды src/components/crm/InstallerSheetManager.tsx. Теперь при любом сценарии входа (через CRM, FSM или FSM-1) строго гарантирован единый эталонный порядок колонок в XLSX: № п/п → Квартира → ФИО Абонента → Контактный телефон → Монтаж / Замена → Трубка → Ключи (шт.) → Личный кабинет → Подпись собственника.",
+    module: "montage",
+    kind: "fix",
+    hours: 1,
+    difficulty: "Средняя",
+  },
+  {
     id: "stage-2026-10-08-2110",
     datetime: "2026-10-08 21:10",
     title: "Лист монтажника: перенос колонки «Монтаж / Замена» перед трубками и улучшение читаемости таблицы",

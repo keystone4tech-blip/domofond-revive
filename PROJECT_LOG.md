@@ -11,6 +11,23 @@
 > 
 > **Пользователь НЕ ДОЛЖЕН ничего вносить вручную.** Вся статистика и история пополняется ИИ автоматически при каждой задаче.
 
+# 2026-10-08 21:20 — Лист монтажника: полная унификация Excel-экспорта и устранение дубликата в FSM-1
+
+## 1. Задачи и выполненные работы
+- **Устранение старого дубликата `InstallerSheetManager` в `src/components/fsm/`**:
+  * В проекте сохранялся старый монолитный файл `src/components/fsm/InstallerSheetManager.tsx`, использовавшийся на странице `src/pages/FSM-1.tsx`. При открытии раздела через FSM-1 скачивался старый Excel-лист с устаревшим порядком колонок, суммами и без подписи.
+  * Файл `src/components/fsm/InstallerSheetManager.tsx` заменен на чистый сквозной реэкспорт единого актуального компонента из `src/components/crm/InstallerSheetManager.tsx`.
+  * В `src/pages/FSM-1.tsx` импорт переведен напрямую на `@/components/crm/InstallerSheetManager`.
+- **Строгий порядок колонок во всех точках входа**:
+  * № п/п → Квартира → ФИО Абонента → Контактный телефон → **Монтаж / Замена** → **Трубка** → Ключи (шт.) → Личный кабинет → Подпись собственника.
+
+## 2. Измененные файлы
+- [`src/components/fsm/InstallerSheetManager.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/components/fsm/InstallerSheetManager.tsx) — реэкспорт единого компонента.
+- [`src/pages/FSM-1.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/pages/FSM-1.tsx) — прямой импорт из crm.
+- [`AGENT_SYNC.md`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/AGENT_SYNC.md) — фиксация и снятие claim.
+- [`PROJECT_LOG.md`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/PROJECT_LOG.md) — актуализация паспорта проекта.
+- [`src/data/projectChangelog.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/data/projectChangelog.ts) — фиксация этапа разработки в реестре.
+
 # 2026-10-08 21:10 — Лист монтажника: перенос колонки «Монтаж / Замена» перед трубками и устранение обрезания текста
 
 ## 1. Задачи и выполненные работы
