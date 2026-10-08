@@ -166,15 +166,27 @@ const getAccountEntrance = (acc: { entrance?: string | null; address?: string | 
   return "";
 };
 
+// Синглтон-кэш в оперативной памяти клиента для мгновенного (0 мс) открытия реестра счетов
+let cachedAccountsData: {
+  accounts: Account[];
+  lastRegistry: RegistryUpload | null;
+  autopayMap: Record<string, { is_active: boolean; card_last4: string; card_type: string; created_at: string }>;
+  loadedAt: number;
+} | null = null;
+
 export const AccountsManager: React.FC = () => {
   const { toast } = useToast();
 
-  // --- Состояния данных ---
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [lastRegistry, setLastRegistry] = useState<RegistryUpload | null>(null);
-  const [loading, setLoading] = useState(true);
+  // --- Состояния данных с поддержкой кэша ---
+  const [accounts, setAccounts] = useState<Account[]>(() => cachedAccountsData?.accounts || []);
+  const [lastRegistry, setLastRegistry] = useState<RegistryUpload | null>(() => cachedAccountsData?.lastRegistry || null);
+  const [loading, setLoading] = useState(() => !cachedAccountsData || cachedAccountsData.accounts.length === 0);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<"all" | "debt" | "overpayment" | "zero">("all");
+
+  // --- Пагинация списка счетов (50 строк на страницу для мгновенного рендера DOM) ---
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 50;
 
   // --- Выбранный узел дерева ---
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
@@ -214,11 +226,16 @@ export const AccountsManager: React.FC = () => {
   const [loadingHistory, setLoadingHistory] = useState(false);
 
   // --- Автоплатежи (рекуррентные платежи ЮKassa) ---
-  const [autopayMap, setAutopayMap] = useState<Record<string, { is_active: boolean; card_last4: string; card_type: string; created_at: string }>>({});
+  const [autopayMap, setAutopayMap] = useState<Record<string, { is_active: boolean; card_last4: string; card_type: string; created_at: string }>>(() => cachedAccountsData?.autopayMap || {});
   const [filterAutopayOnly, setFilterAutopayOnly] = useState(false);
   const [selectedAutopayAccount, setSelectedAutopayAccount] = useState<string | null>(null);
   const [subscriberAutopayData, setSubscriberAutopayData] = useState<{ subscription: any; charges: any[]; account: any } | null>(null);
   const [loadingAutopayData, setLoadingAutopayData] = useState(false);
+
+  // Сброс страницы пагинации на первую при изменении любых поисковых критериев
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedCity, selectedHouse, selectedEntrance, searchQuery, filterType, filterAutopayOnly]);
 
   // Загрузка карты автоплатежей с бэкенда для моментального отображения статусов
   const loadAutopayMap = async () => {
@@ -232,8 +249,12 @@ export const AccountsManager: React.FC = () => {
       });
       if (res.ok) {
         const d = await res.json();
-        setAutopayMap(d.map || {});
-        console.log(`[AccountsManager] Загружена карта автоплатежей: ${Object.keys(d.map || {}).length} счетов`);
+        const map = d.map || {};
+        setAutopayMap(map);
+        if (cachedAccountsData) {
+          cachedAccountsData.autopayMap = map;
+        }
+        console.log(`[AccountsManager] Загружена карта автоплатежей: ${Object.keys(map).length} счетов`);
       }
     } catch (e) {
       console.warn("[AccountsManager] Не удалось загрузить карту автоплатежей:", e);
@@ -264,9 +285,11 @@ export const AccountsManager: React.FC = () => {
   };
 
   // --- Загрузка счетов и последнего реестра из Supabase ---
-  const loadData = async () => {
+  const loadData = async (forceSpinner = false) => {
     try {
-      setLoading(true);
+      if (forceSpinner || !cachedAccountsData || cachedAccountsData.accounts.length === 0) {
+        setLoading(true);
+      }
       console.log("[AccountsManager] Загрузка счетов и истории реестров...");
 
       // 1. Получаем информацию о последнем загруженном реестре
@@ -291,11 +314,20 @@ export const AccountsManager: React.FC = () => {
       if (error) throw error;
 
       console.log(`[AccountsManager] Успешно загружено счетов: ${data?.length || 0}`);
-      setAccounts(data || []);
+      const freshAccounts = (data || []) as Account[];
+      setAccounts(freshAccounts);
+
+      // Сохраняем в синглтон-кэш для 0 мс повторного открытия
+      cachedAccountsData = {
+        accounts: freshAccounts,
+        lastRegistry: regData?.[0] || null,
+        autopayMap: autopayMap || {},
+        loadedAt: Date.now()
+      };
 
       // Автоматически раскрываем первый город
-      if (data && data.length > 0) {
-        const { city } = extractAddressParts(data[0].address);
+      if (freshAccounts.length > 0) {
+        const { city } = extractAddressParts(freshAccounts[0].address);
         setExpandedCities(prev => ({ ...prev, [city]: true }));
         if (!selectedCity) setSelectedCity(city);
       }
@@ -315,7 +347,8 @@ export const AccountsManager: React.FC = () => {
   };
 
   useEffect(() => {
-    loadData();
+    // Если в кэше уже есть данные, загружаем тихо в фоне без блокировки интерфейса
+    loadData(false);
   }, []);
 
   // ==========================================================================
@@ -327,11 +360,17 @@ export const AccountsManager: React.FC = () => {
   // Локальное обновление статуса в стейте, чтобы дерево сразу перерисовалось.
   const applyStatusLocally = (accountNumbers: string[], newStatus: string) => {
     const set = new Set(accountNumbers);
-    setAccounts(prev => prev.map(a =>
-      set.has(a.account_number)
-        ? { ...a, status: newStatus, contract_terminated: newStatus === "terminated" }
-        : a
-    ));
+    setAccounts(prev => {
+      const updated = prev.map(a =>
+        set.has(a.account_number)
+          ? { ...a, status: newStatus, contract_terminated: newStatus === "terminated" }
+          : a
+      );
+      if (cachedAccountsData) {
+        cachedAccountsData.accounts = updated;
+      }
+      return updated;
+    });
   };
 
   // Смена статуса одного счёта.
@@ -390,44 +429,69 @@ export const AccountsManager: React.FC = () => {
     }
   };
 
-  // --- Построение дерева адресов: Город -> Дом -> Подъезды со счетчиками ---
+  // Интерфейс для оптимизированного дерева дома
+  interface HouseTreeNode {
+    all: Account[];
+    debtorsCount: number;
+    entrances: Record<string, Account[]>;
+    entranceDebtors: Record<string, number>;
+    sortedEntranceKeys: string[];
+  }
+
+  // --- Построение дерева адресов: Город -> Дом -> Подъезды с O(1) счетчиками ---
   const addressTree = useMemo(() => {
-    // tree: city -> houseKey -> { all: Account[], entrances: Record<string, Account[]> }
-    const tree: Record<string, Record<string, { all: Account[]; entrances: Record<string, Account[]> }>> = {};
+    const tree: Record<string, Record<string, HouseTreeNode>> = {};
 
     accounts.forEach(acc => {
       const { city, houseKey } = extractAddressParts(acc.address);
       const entrance = getAccountEntrance(acc);
+      const isDebt = Number(acc.debt_amount) > 0;
 
       if (!tree[city]) tree[city] = {};
       if (!tree[city][houseKey]) {
-        tree[city][houseKey] = { all: [], entrances: {} };
+        tree[city][houseKey] = {
+          all: [],
+          debtorsCount: 0,
+          entrances: {},
+          entranceDebtors: {},
+          sortedEntranceKeys: []
+        };
       }
-      tree[city][houseKey].all.push(acc);
+
+      const houseNode = tree[city][houseKey];
+      houseNode.all.push(acc);
+      if (isDebt) houseNode.debtorsCount++;
 
       if (entrance) {
-        if (!tree[city][houseKey].entrances[entrance]) {
-          tree[city][houseKey].entrances[entrance] = [];
+        if (!houseNode.entrances[entrance]) {
+          houseNode.entrances[entrance] = [];
+          houseNode.entranceDebtors[entrance] = 0;
         }
-        tree[city][houseKey].entrances[entrance].push(acc);
+        houseNode.entrances[entrance].push(acc);
+        if (isDebt) houseNode.entranceDebtors[entrance]++;
       }
+    });
+
+    // Сортируем подъезды заранее один раз при построении дерева (исключает тормоза в цикле рендера)
+    Object.values(tree).forEach(cityHouses => {
+      Object.values(cityHouses).forEach(hNode => {
+        hNode.sortedEntranceKeys = Object.keys(hNode.entrances).sort((a, b) => {
+          const numA = parseInt(a, 10) || 0;
+          const numB = parseInt(b, 10) || 0;
+          return numA - numB;
+        });
+      });
     });
 
     return tree;
   }, [accounts]);
 
-  // Список доступных подъездов для выбранного дома, отсортированный по возрастанию
+  // Список доступных подъездов для выбранного дома (O(1) доступ к уже отсортированному массиву)
   const availableEntrancesForSelectedHouse = useMemo(() => {
     if (!selectedHouse || !selectedCity || !addressTree[selectedCity] || !addressTree[selectedCity][selectedHouse]) {
       return [];
     }
-    const houseObj = addressTree[selectedCity][selectedHouse];
-    const entranceKeys = Object.keys(houseObj.entrances);
-    return entranceKeys.sort((a, b) => {
-      const numA = parseInt(a, 10) || 0;
-      const numB = parseInt(b, 10) || 0;
-      return numA - numB;
-    });
+    return addressTree[selectedCity][selectedHouse].sortedEntranceKeys;
   }, [selectedHouse, selectedCity, addressTree]);
 
   // --- Фильтрация счетов в правой колонке ---
@@ -490,6 +554,16 @@ export const AccountsManager: React.FC = () => {
       return a.address.localeCompare(b.address);
     });
   }, [accounts, selectedCity, selectedHouse, selectedEntrance, searchQuery, filterType, filterAutopayOnly, autopayMap]);
+
+  // Общее количество страниц пагинации
+  const totalPages = Math.ceil(displayedAccounts.length / pageSize) || 1;
+
+  // Безопасный срез отображаемых счетов для текущей страницы (предотвращает создание 50 000 DOM-узлов)
+  const paginatedAccounts = useMemo(() => {
+    const safePage = Math.max(1, Math.min(currentPage, totalPages));
+    const start = (safePage - 1) * pageSize;
+    return displayedAccounts.slice(start, start + pageSize);
+  }, [displayedAccounts, currentPage, totalPages, pageSize]);
 
   // Статистика по отображаемым счетам
   const stats = useMemo(() => {
@@ -1416,8 +1490,8 @@ export const AccountsManager: React.FC = () => {
                             const isSelected = selectedHouse === houseKey;
                             const isHouseExpanded = !!expandedHouses[houseKey] || (isSelected && selectedEntrance !== null);
                             const accList = houseData.all;
-                            const debtors = accList.filter(a => Number(a.debt_amount) > 0).length;
-                            const entranceKeys = Object.keys(houseData.entrances).sort((a, b) => (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0));
+                            const debtors = houseData.debtorsCount;
+                            const entranceKeys = houseData.sortedEntranceKeys;
                             const hasEntrances = entranceKeys.length > 0;
 
                             return (
@@ -1495,7 +1569,7 @@ export const AccountsManager: React.FC = () => {
                                     {/* Список конкретных подъездов */}
                                     {entranceKeys.map(entKey => {
                                       const entAccounts = houseData.entrances[entKey] || [];
-                                      const entDebtors = entAccounts.filter(a => Number(a.debt_amount) > 0).length;
+                                      const entDebtors = houseData.entranceDebtors[entKey] || 0;
                                       const isEntSelected = isSelected && selectedEntrance === entKey;
 
                                       return (
@@ -1664,7 +1738,7 @@ export const AccountsManager: React.FC = () => {
                   {/* Кнопки каждого конкретного подъезда */}
                   {availableEntrancesForSelectedHouse.map(ent => {
                     const entAccounts = addressTree[selectedCity || "Краснодар"]?.[selectedHouse]?.entrances[ent] || [];
-                    const entDebtors = entAccounts.filter(a => Number(a.debt_amount) > 0).length;
+                    const entDebtors = addressTree[selectedCity || "Краснодар"]?.[selectedHouse]?.entranceDebtors[ent] || 0;
                     const isEntSelected = selectedEntrance === ent;
 
                     return (
@@ -1743,9 +1817,9 @@ export const AccountsManager: React.FC = () => {
                   </p>
                 </div>
               ) : (
-                /* Снято ограничение 100 строк — выводятся ВСЕ квартиры дома */
+                /* Пагинация по 50 карточек: мгновенный рендер DOM без зависаний браузера */
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[640px] overflow-y-auto pr-1">
-                  {displayedAccounts.map(acc => {
+                  {paginatedAccounts.map(acc => {
                     const debt = Number(acc.debt_amount) || 0;
                     const isDebt = debt > 0;
                     const isOverpayment = debt < 0;
@@ -1934,6 +2008,60 @@ export const AccountsManager: React.FC = () => {
                       </div>
                     );
                   })}
+                </div>
+              )}
+
+              {/* Навигация пагинации (страницы, счетчик, кнопки Назад/Вперед) */}
+              {displayedAccounts.length > pageSize && (
+                <div className="pt-3 mt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                  <div className="text-muted-foreground text-xs">
+                    Показано <strong className="text-foreground">{(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, displayedAccounts.length)}</strong> из{" "}
+                    <strong className="text-foreground">{displayedAccounts.length}</strong> счетов
+                  </div>
+
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={currentPage <= 1}
+                      onClick={() => setCurrentPage(1)}
+                      className="h-7 px-2 text-xs rounded-lg"
+                    >
+                      В начало
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={currentPage <= 1}
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      className="h-7 px-2.5 text-xs rounded-lg"
+                    >
+                      Назад
+                    </Button>
+
+                    <span className="px-2 text-xs font-semibold text-foreground">
+                      {currentPage} / {totalPages}
+                    </span>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={currentPage >= totalPages}
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      className="h-7 px-2.5 text-xs rounded-lg"
+                    >
+                      Вперед
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={currentPage >= totalPages}
+                      onClick={() => setCurrentPage(totalPages)}
+                      className="h-7 px-2 text-xs rounded-lg"
+                    >
+                      В конец
+                    </Button>
+                  </div>
                 </div>
               )}
             </CardContent>

@@ -111,6 +111,8 @@ const TasksManager = ({
       console.log(`[TasksManager] Успешно получено задач: ${data?.length || 0}`);
       return data as Task[];
     },
+    refetchInterval: 25000,
+    placeholderData: (previousData) => previousData,
   });
 
   const { data: employees } = useQuery({

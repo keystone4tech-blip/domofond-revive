@@ -30,6 +30,7 @@
 | src/pages/Cabinet.tsx, src/data/projectChangelog.ts | Antigravity | 2026-10-08 07:33 UTC | ✅ освобождён (закоммичено) |
 | server/index.js, src/components/admin/*, src/pages/Admin.tsx | Antigravity | 2026-10-08 07:49 UTC | ✅ освобождён (закоммичено) |
 | src/App.tsx, src/components/crm/InstallerSheetManager.tsx, src/components/crm/VerificationManager.tsx, src/components/crm/CRMDashboard.tsx | Antigravity | 2026-10-08 18:45 UTC | ✅ освобождён (закоммичено) |
+| src/components/admin/AccountsManager.tsx, src/components/crm/AddressesManager.tsx, src/components/crm/RequestsManager.tsx, src/components/crm/TasksManager.tsx | Antigravity | 2026-10-08 18:57 UTC | ✅ освобождён (закоммичено) |
 
 > Правило: `🔒 занят` — не трогать; `✅ освобождён` — можно брать.
 
@@ -183,6 +184,19 @@ Claude, выполнил исправление и деплой по заказ�
 2. **Мгновенный отклик верификации (Optimistic UI)**: в `src/components/crm/VerificationManager.tsx` и `fsm/` внедрен `setQueryData` — при клике «Одобрить» или «Отклонить» заявка исчезает из очереди мгновенно, счетчик уменьшается сразу, без нажатия F5.
 3. **Оптимизация Листа монтажника**: тяжелый перебор 50 000 счетов заменен на сгруппированный хеш-индекс `Map` O(1), устранены зависания браузера.
 4. Проект собран, задеплоен на `45.8.99.238`. Claim снят.
+
+**2026-10-08 19:05 UTC — Antigravity:**
+Устранены зависания и постоянные подгрузки во всей CRM-системе:
+1. **Лицевые счета (`AccountsManager.tsx`)**:
+   - Ликвидировано зависание браузера при открытии: вместо рендеринга 50 000 карточек в один момент внедрена пагинация по 50 строк на страницу с быстрыми срезами `paginatedAccounts`.
+   - В дереве адресов счетчики должников и сортировка подъездов переведены на $O(1)$ в `useMemo`, исключив лаги при поиске.
+   - Внедрен синглтон-кэш: вкладка открывается моментально за 0 мс.
+2. **Адреса и подъезды (`AddressesManager.tsx`)**:
+   - Устранена постоянная подгрузка со спиннером: компонент переведен на React Query с кэшем 5 минут (`crm-addresses-data`).
+   - Сохраняются открытые ветки городов и домов в памяти: дерево больше не схлопывается при переходе между табами.
+3. **Заявки и задачи (`RequestsManager.tsx`, `TasksManager.tsx`)**:
+   - Включен фоновый Smart Polling (25 сек) с `placeholderData` для появления новых заявок в реальном времени онлайн без моргания UI.
+4. Проект собран (`npm run build`), выкачен на боевой сервер `45.8.99.238` через `deploy_dist.py`. Claim снят.
 
 
 

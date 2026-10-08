@@ -183,6 +183,8 @@ const RequestsManager = ({
         (priorityOrder[b.priority as keyof typeof priorityOrder] || 3)
       ) as Request[];
     },
+    refetchInterval: 25000,
+    placeholderData: (previousData) => previousData,
   });
 
   // Fetch request items for all requests

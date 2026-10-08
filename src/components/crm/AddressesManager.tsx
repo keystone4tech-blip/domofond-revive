@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { logDeletion } from "@/lib/audit";
 import { logEntranceStatus } from "@/lib/newBuildings";
@@ -69,50 +70,19 @@ export interface EntranceProductBinding {
   custom_price: number | null;
 }
 
+// Модульное сохранение раскрытых веток дерева, чтобы при переключении табов не сбрасывался фокус
+let savedExpandedCities: Set<string> = new Set();
+let savedExpandedHouses: Set<string> = new Set();
+let savedSelectedEntrance: Entrance | null = null;
+
 export const AddressesManager: React.FC = () => {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  // --- Основные состояния данных ---
-  const [entrances, setEntrances] = useState<Entrance[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [entranceProducts, setEntranceProducts] = useState<Record<string, string[]>>({}); // entrance_id -> array of product_ids
-  const [entranceProductDetails, setEntranceProductDetails] = useState<Record<string, Record<string, EntranceProductBinding>>>({}); // entrance_id -> product_id -> details
-  
-  // --- Состояния загрузки и поиска ---
-  const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-
-  // --- Состояния раскрытия дерева ---
-  const [expandedCities, setExpandedCities] = useState<Set<string>>(new Set());
-  const [expandedHouses, setExpandedHouses] = useState<Set<string>>(new Set());
-  const [selectedEntrance, setSelectedEntrance] = useState<Entrance | null>(null);
-
-  // --- Модальные окна ---
-  const [isAddAddressOpen, setIsAddAddressOpen] = useState(false);
-  const [newAddressForm, setNewAddressForm] = useState({
-    city: "Краснодар",
-    street: "",
-    house: "",
-    entrance: "1",
-    intercom_type: "",
-    notes: ""
-  });
-
-  const [isBindProductsOpen, setIsBindProductsOpen] = useState(false);
-  const [selectedProductIdsToBind, setSelectedProductIdsToBind] = useState<string[]>([]);
-  const [savingBinding, setSavingBinding] = useState(false);
-
-  // Загрузка всех необходимых данных при старте
-  useEffect(() => {
-    console.log("[AddressesManager] Инициализация компонента адресов...");
-    loadAllData();
-  }, []);
-
-  // Функция комплексной загрузки: подъезды, товары и привязки
-  const loadAllData = async () => {
-    setLoading(true);
-    try {
+  // --- Загрузка данных через React Query с умным кэшированием (0 мс при смене вкладок) ---
+  const { data: addressesData, isLoading: queryLoading, refetch } = useQuery({
+    queryKey: ["crm-addresses-data"],
+    queryFn: async () => {
       console.log("[AddressesManager] Запрос списка подъездов и товаров из БД...");
       const [entrancesRes, productsRes, bindingsRes] = await Promise.all([
         supabase.from("entrances" as any).select("*").order("city").order("street").order("house").order("entrance"),
@@ -123,9 +93,6 @@ export const AddressesManager: React.FC = () => {
       if (entrancesRes.error) throw entrancesRes.error;
       if (productsRes.error) throw productsRes.error;
       if (bindingsRes.error) throw bindingsRes.error;
-
-      setEntrances((entrancesRes.data as any) || []);
-      setProducts((productsRes.data as any) || []);
 
       // Группируем связи: entrance_id -> product_id[] и entrance_id -> product_id -> details
       const bindingsMap: Record<string, string[]> = {};
@@ -146,20 +113,101 @@ export const AddressesManager: React.FC = () => {
           custom_price: row.custom_price != null ? Number(row.custom_price) : null,
         };
       });
-      setEntranceProducts(bindingsMap);
-      setEntranceProductDetails(detailsMap);
 
       console.log(`[AddressesManager] Загружено подъездов: ${entrancesRes.data?.length || 0}, товаров: ${productsRes.data?.length || 0}`);
-    } catch (err: any) {
-      console.error("[AddressesManager] Ошибка загрузки адресов:", err);
-      toast({
-        title: "Ошибка загрузки",
-        description: err.message || "Не удалось загрузить данные адресов",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
+      return {
+        entrances: (entrancesRes.data as any) || [] as Entrance[],
+        products: (productsRes.data as any) || [] as Product[],
+        entranceProducts: bindingsMap,
+        entranceProductDetails: detailsMap,
+      };
+    },
+    staleTime: 5 * 60 * 1000, // 5 минут держим данные свежими в памяти
+    gcTime: 30 * 60 * 1000,
+  });
+
+  // Локальные оверлеи для мгновенного Optimistic UI обновления
+  const [localEntrances, setLocalEntrances] = useState<Entrance[] | null>(null);
+  const [localEntranceProducts, setLocalEntranceProducts] = useState<Record<string, string[]> | null>(null);
+  const [localEntranceProductDetails, setLocalEntranceProductDetails] = useState<Record<string, Record<string, EntranceProductBinding>> | null>(null);
+
+  // Итоговые актуальные данные
+  const entrances = localEntrances ?? addressesData?.entrances ?? [];
+  const products = addressesData?.products ?? [];
+  const entranceProducts = localEntranceProducts ?? addressesData?.entranceProducts ?? {};
+  const entranceProductDetails = localEntranceProductDetails ?? addressesData?.entranceProductDetails ?? {};
+
+  // Вспомогательные функции-сеттеры для обратной совместимости с оптимистичным UI
+  const setEntrances = (updater: Entrance[] | ((prev: Entrance[]) => Entrance[])) => {
+    if (typeof updater === "function") {
+      setLocalEntrances(prev => updater(prev ?? addressesData?.entrances ?? []));
+    } else {
+      setLocalEntrances(updater);
     }
+  };
+
+  const setEntranceProducts = (updater: Record<string, string[]> | ((prev: Record<string, string[]>) => Record<string, string[]>)) => {
+    if (typeof updater === "function") {
+      setLocalEntranceProducts(prev => updater(prev ?? addressesData?.entranceProducts ?? {}));
+    } else {
+      setLocalEntranceProducts(updater);
+    }
+  };
+
+  const setEntranceProductDetails = (updater: Record<string, Record<string, EntranceProductBinding>> | ((prev: Record<string, Record<string, EntranceProductBinding>>) => Record<string, Record<string, EntranceProductBinding>>)) => {
+    if (typeof updater === "function") {
+      setLocalEntranceProductDetails(prev => updater(prev ?? addressesData?.entranceProductDetails ?? {}));
+    } else {
+      setLocalEntranceProductDetails(updater);
+    }
+  };
+
+  // --- Состояния загрузки и поиска ---
+  const [manualLoading, setManualLoading] = useState(false);
+  const loading = queryLoading || manualLoading;
+  const setLoading = setManualLoading;
+  const [syncing, setSyncing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // --- Состояния раскрытия дерева (с сохранением состояния между переходами) ---
+  const [expandedCities, setExpandedCities] = useState<Set<string>>(() => new Set(savedExpandedCities));
+  const [expandedHouses, setExpandedHouses] = useState<Set<string>>(() => new Set(savedExpandedHouses));
+  const [selectedEntrance, setSelectedEntrance] = useState<Entrance | null>(() => savedSelectedEntrance);
+
+  // Запоминаем открытые ветки в памяти сессии
+  useEffect(() => {
+    savedExpandedCities = expandedCities;
+  }, [expandedCities]);
+
+  useEffect(() => {
+    savedExpandedHouses = expandedHouses;
+  }, [expandedHouses]);
+
+  useEffect(() => {
+    savedSelectedEntrance = selectedEntrance;
+  }, [selectedEntrance]);
+
+  // --- Модальные окна ---
+  const [isAddAddressOpen, setIsAddAddressOpen] = useState(false);
+  const [newAddressForm, setNewAddressForm] = useState({
+    city: "Краснодар",
+    street: "",
+    house: "",
+    entrance: "1",
+    intercom_type: "",
+    notes: ""
+  });
+
+  const [isBindProductsOpen, setIsBindProductsOpen] = useState(false);
+  const [selectedProductIdsToBind, setSelectedProductIdsToBind] = useState<string[]>([]);
+  const [savingBinding, setSavingBinding] = useState(false);
+
+  // Принудительное обновление всех данных
+  const loadAllData = async () => {
+    setLocalEntrances(null);
+    setLocalEntranceProducts(null);
+    setLocalEntranceProductDetails(null);
+    await queryClient.invalidateQueries({ queryKey: ["crm-addresses-data"] });
   };
 
   // Синхронизация адресов из таблицы счетов (accounts)
