@@ -125,6 +125,40 @@ export const normalizeHouse = (h?: string | null): string => {
   return clean;
 };
 
+/**
+ * Очистка наименования переговорной трубки / ТКП от лишних сервисных пояснений,
+ * длинных текстов в скобках ("(выбирайте если у вас...)", "(оплачиваете только...)")
+ * и префиксов ("Оборудование:", "ТКП:").
+ */
+export const cleanHandsetName = (rawName?: string | null): string => {
+  if (!rawName) return "Трубка ТКП";
+  let name = rawName.trim();
+  // Убираем технические префиксы
+  name = name.replace(/^(?:оборудование|трубка|ткп|монитор|устройство|товар)\s*[:—\-]\s*/i, "");
+  // Убираем длинные пояснения в скобках с условиями заказа
+  name = name.replace(/\s*\([^)]*(?:выбирайт|установлен|оплачив|квартир|монтаж|замен|подключ|акци|льгот)[^)]*\)/gi, "");
+  // Убираем указания штук в конце типа "(1 шт.)", ": 1 шт"
+  name = name.replace(/\s*\(\d+\s*шт\.?\)/gi, "");
+  name = name.replace(/\s*:\s*\d+\s*шт\.?/gi, "");
+  // Схлопываем лишние пробелы и знаки препинания на концах
+  name = name.replace(/^[\s,;—\-]+|[\s,;—\-]+$/g, "").trim();
+  return name || "Трубка ТКП";
+};
+
+/**
+ * Очистка наименования ключа домофона
+ */
+export const cleanKeyName = (rawName?: string | null): string => {
+  if (!rawName) return "Ключ домофона";
+  let name = rawName.trim();
+  name = name.replace(/^(?:ключ[иа]?|ключ домофона)\s*[:—\-]\s*/i, "");
+  name = name.replace(/\s*\([^)]*(?:дополнительн|для|от|вход|штук)[^)]*\)/gi, "");
+  name = name.replace(/\s*\(\d+\s*шт\.?\)/gi, "");
+  name = name.replace(/\s*:\s*\d+\s*шт\.?/gi, "");
+  name = name.replace(/^[\s,;—\-]+|[\s,;—\-]+$/g, "").trim();
+  return name || "Ключ домофона";
+};
+
 export const InstallerSheetManager: React.FC = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -373,15 +407,19 @@ export const InstallerSheetManager: React.FC = () => {
 
   // Универсальный надежный парсер позиций заказа (из связанных items или текста message)
   // ВАЖНО: Строго исключает «Личный кабинет» из графы трубок/ТКП
+  // Вспомогательный парсер структуры заказа (оборудование, ключи, услуги, ЛК)
   const parseOrderDetails = (order: EquipmentOrder, isCredPurchased: boolean) => {
     const keysList: string[] = [];
     let keysCount = 0;
+    const keyItems: { name: string; quantity: number }[] = [];
 
     const handsetsList: string[] = [];
     let handsetsCount = 0;
+    const handsetItems: { name: string; quantity: number }[] = [];
 
     const servicesList: string[] = [];
     let servicesCount = 0;
+    const serviceItems: { name: string; quantity: number }[] = [];
 
     let hasApp = isCredPurchased;
 
@@ -414,10 +452,28 @@ export const InstallerSheetManager: React.FC = () => {
       );
     };
 
+    // Вспомогательная функция: проверка услуг монтажа, замены, установки и работ
+    const isServiceItem = (name: string, cat?: string | null): boolean => {
+      const lower = name.toLowerCase();
+      const catLower = (cat || "").toLowerCase();
+      if (catLower === "service") return true;
+      return (
+        lower.includes("замен") ||
+        lower.includes("монтаж") ||
+        lower.includes("установк") ||
+        lower.includes("демонтаж") ||
+        lower.includes("подключ") ||
+        lower.includes("настройк") ||
+        lower.includes("ремонт") ||
+        lower.includes("выбирайте если") ||
+        lower.includes("оплачиваете только")
+      );
+    };
+
     // Вспомогательная функция: проверка переговорных трубок и ТКП (квартирное оборудование)
     const isHandsetItem = (name: string, cat?: string | null): boolean => {
-      // Личный кабинет, ключи и услуги ни при каких условиях не могут быть трубкой
-      if (isAppItem(name, cat) || isKeyItem(name, cat)) return false;
+      // Личный кабинет, ключи и УСЛУГИ ни при каких условиях не могут быть трубкой!
+      if (isAppItem(name, cat) || isKeyItem(name, cat) || isServiceItem(name, cat)) return false;
 
       const lower = name.toLowerCase();
       const catLower = (cat || "").toLowerCase();
@@ -436,6 +492,7 @@ export const InstallerSheetManager: React.FC = () => {
         lower.includes("cyfral") ||
         lower.includes("метаком") ||
         lower.includes("metakom") ||
+        lower.includes("voice") ||
         lower.includes("факториал");
 
       if (isExplicitHandset) return true;
@@ -471,23 +528,27 @@ export const InstallerSheetManager: React.FC = () => {
 
         // 1.2 Ключи домофона
         if (isKeyItem(name, cat)) {
-          keysList.push(`${name}: ${item.quantity} шт.`);
+          const cleanK = cleanKeyName(name);
+          keysList.push(item.quantity > 1 ? `${cleanK}: ${item.quantity} шт.` : `${cleanK} (1 шт.)`);
           keysCount += item.quantity;
+          keyItems.push({ name: cleanK, quantity: item.quantity });
           return;
         }
 
-        // 1.3 Переговорная трубка / ТКП
-        if (isHandsetItem(name, cat)) {
-          handsetsList.push(`${name} (${item.quantity} шт.)`);
-          handsetsCount += item.quantity;
-          return;
-        }
-
-        // 1.4 Услуги монтажа / подключения
-        const catLower = cat.toLowerCase();
-        if (catLower === "service" || lower.includes("установк") || lower.includes("монтаж") || lower.includes("замен") || lower.includes("подключ")) {
+        // 1.3 Услуги монтажа / подключения / замены
+        if (isServiceItem(name, cat)) {
           servicesList.push(item.quantity > 1 ? `${name} (${item.quantity} шт.)` : name);
           servicesCount += item.quantity;
+          serviceItems.push({ name, quantity: item.quantity });
+          return;
+        }
+
+        // 1.4 Переговорная трубка / ТКП (физическое устройство)
+        if (isHandsetItem(name, cat)) {
+          const cleanH = cleanHandsetName(name);
+          handsetsList.push(item.quantity > 1 ? `${cleanH} (${item.quantity} шт.)` : `${cleanH} (1 шт.)`);
+          handsetsCount += item.quantity;
+          handsetItems.push({ name: cleanH, quantity: item.quantity });
           return;
         }
 
@@ -519,37 +580,44 @@ export const InstallerSheetManager: React.FC = () => {
             const clean = line.replace(/^[—\-*•\s]*(?:Ключи|Ключ)[^:]*:\s*/i, "").trim();
             const qtyMatch = clean.match(/\((\d+)\s*шт/i) || clean.match(/:\s*(\d+)\s*шт/i);
             const qty = qtyMatch ? parseInt(qtyMatch[1], 10) : 1;
-            const name = clean.replace(/\s*\([^)]*\).*/, "").replace(/:\s*\d+\s*шт.*/, "").trim();
-            if (name) {
-              keysList.push(`${name}: ${qty} шт.`);
+            const rawKName = clean.replace(/\s*\([^)]*\).*/, "").replace(/:\s*\d+\s*шт.*/, "").trim();
+            const cleanK = cleanKeyName(rawKName);
+            if (cleanK) {
+              keysList.push(qty > 1 ? `${cleanK}: ${qty} шт.` : `${cleanK} (1 шт.)`);
               keysCount += qty;
+              keyItems.push({ name: cleanK, quantity: qty });
             }
           }
           continue;
         }
 
-        // 2.3 Переговорные трубки / ТКП (только если не приложение и не ключ)
-        if (handsetsList.length === 0 && isHandsetItem(lowerLine)) {
-          const clean = line.replace(/^[—\-*•\s]*(?:Оборудование|Трубка|ТКП)[^:]*:\s*/i, "").trim();
-          const qtyMatch = clean.match(/\((\d+)\s*шт/i);
-          const qty = qtyMatch ? parseInt(qtyMatch[1], 10) : 1;
-          const name = clean.replace(/\s*\([^)]*\).*/, "").trim();
-          if (name && !isAppItem(name)) {
-            handsetsList.push(`${name} (${qty} шт.)`);
-            handsetsCount += qty;
+        // 2.3 Услуги монтажа / замены
+        if (isServiceItem(lowerLine)) {
+          if (servicesList.length === 0) {
+            const clean = line.replace(/^[—\-*•\s]*(?:Услуга|Услуги|Работа)[^:]*:\s*/i, "").trim();
+            const qtyMatch = clean.match(/\((\d+)\s*шт/i);
+            const qty = qtyMatch ? parseInt(qtyMatch[1], 10) : 1;
+            const name = clean.replace(/\s*\([^)]*\).*/, "").trim();
+            if (name) {
+              servicesList.push(qty > 1 ? `${name} (${qty} шт.)` : name);
+              servicesCount += qty;
+              serviceItems.push({ name, quantity: qty });
+            }
           }
           continue;
         }
 
-        // 2.4 Услуги монтажа
-        if (servicesList.length === 0 && (lowerLine.includes("услуг") || lowerLine.includes("установк") || lowerLine.includes("монтаж") || lowerLine.includes("замен"))) {
-          const clean = line.replace(/^[—\-*•\s]*(?:Услуга|Услуги)[^:]*:\s*/i, "").trim();
+        // 2.4 Переговорные трубки / ТКП (только если не приложение, не ключ и не услуга)
+        if (handsetsList.length === 0 && isHandsetItem(lowerLine)) {
+          const clean = line.replace(/^[—\-*•\s]*(?:Оборудование|Трубка|ТКП)[^:]*:\s*/i, "").trim();
           const qtyMatch = clean.match(/\((\d+)\s*шт/i);
           const qty = qtyMatch ? parseInt(qtyMatch[1], 10) : 1;
-          const name = clean.replace(/\s*\([^)]*\).*/, "").trim();
-          if (name) {
-            servicesList.push(qty > 1 ? `${name} (${qty} шт.)` : name);
-            servicesCount += qty;
+          const rawHName = clean.replace(/\s*\([^)]*\).*/, "").trim();
+          const cleanH = cleanHandsetName(rawHName);
+          if (cleanH && !isAppItem(cleanH)) {
+            handsetsList.push(qty > 1 ? `${cleanH} (${qty} шт.)` : `${cleanH} (1 шт.)`);
+            handsetsCount += qty;
+            handsetItems.push({ name: cleanH, quantity: qty });
           }
           continue;
         }
@@ -558,17 +626,21 @@ export const InstallerSheetManager: React.FC = () => {
 
     // Определение графы «Монтаж / Услуги»:
     // 1. Если оплачен монтаж/установка -> пишем «Монтаж»
-    // 2. Если просто трубка (без оплаченной услуги монтажа) -> пишем «Замена»
+    // 2. Если выбрана замена или заказана трубка -> пишем «Замена»
     // 3. Иначе -> «—»
     let serviceDisplay = "—";
     const hasInstallation = servicesList.some(s => {
       const lower = s.toLowerCase();
       return lower.includes("установк") || lower.includes("монтаж") || lower.includes("подключ");
     });
+    const hasReplacement = servicesList.some(s => {
+      const lower = s.toLowerCase();
+      return lower.includes("замен");
+    });
 
     if (hasInstallation) {
       serviceDisplay = "Монтаж";
-    } else if (handsetsCount > 0) {
+    } else if (hasReplacement || handsetsCount > 0) {
       serviceDisplay = "Замена";
     } else if (servicesList.length > 0) {
       const sLower = servicesList.join(" ").toLowerCase();
@@ -582,11 +654,14 @@ export const InstallerSheetManager: React.FC = () => {
     return {
       handset: handsetsList.length > 0 ? handsetsList.join(", ") : "—",
       handsetsCount,
+      handsetItems,
       keys: keysList.length > 0 ? keysList.join(", ") : "—",
       keysCount,
+      keyItems,
       hasApp,
       services: serviceDisplay,
       servicesCount: serviceDisplay !== "—" ? 1 : 0,
+      serviceItems,
       rawServices: servicesList.join(", "),
     };
   };
@@ -746,6 +821,8 @@ export const InstallerSheetManager: React.FC = () => {
       totalServices: number;
       totalApps: number;
       totalRevenue: number;
+      handsetsByType: Record<string, number>;
+      keysByType: Record<string, number>;
     };
   }
 
@@ -763,6 +840,8 @@ export const InstallerSheetManager: React.FC = () => {
       totalServices: number;
       totalApps: number;
       totalRevenue: number;
+      handsetsByType: Record<string, number>;
+      keysByType: Record<string, number>;
     };
   }
 
@@ -864,6 +943,8 @@ export const InstallerSheetManager: React.FC = () => {
       let houseServices = 0;
       let houseApps = 0;
       let houseRevenue = 0;
+      const houseHandsetsByType: Record<string, number> = {};
+      const houseKeysByType: Record<string, number> = {};
 
       // Сортировка подъездов: 1, 2, 3... затем "Без подъезда"
       const sortedEntKeys = Array.from(val.ordersByEntrance.keys()).sort((a, b) => {
@@ -884,6 +965,8 @@ export const InstallerSheetManager: React.FC = () => {
         let entServicesCount = 0;
         let entAppsCount = 0;
         let entRevenueCount = 0;
+        const entHandsetsByType: Record<string, number> = {};
+        const entKeysByType: Record<string, number> = {};
 
         entOrders.forEach((ord) => {
           entRevenueCount += Number(ord.payment_amount || 0);
@@ -896,6 +979,16 @@ export const InstallerSheetManager: React.FC = () => {
           entHandsetsCount += parsed.handsetsCount;
           entServicesCount += parsed.servicesCount;
           if (parsed.hasApp) entAppsCount += 1;
+
+          // Детализация по типам/моделям трубок и ключей
+          parsed.handsetItems.forEach((hi) => {
+            entHandsetsByType[hi.name] = (entHandsetsByType[hi.name] || 0) + hi.quantity;
+            houseHandsetsByType[hi.name] = (houseHandsetsByType[hi.name] || 0) + hi.quantity;
+          });
+          parsed.keyItems.forEach((ki) => {
+            entKeysByType[ki.name] = (entKeysByType[ki.name] || 0) + ki.quantity;
+            houseKeysByType[ki.name] = (houseKeysByType[ki.name] || 0) + ki.quantity;
+          });
         });
 
         houseKeys += entKeysCount;
@@ -915,6 +1008,8 @@ export const InstallerSheetManager: React.FC = () => {
             totalServices: entServicesCount,
             totalApps: entAppsCount,
             totalRevenue: entRevenueCount,
+            handsetsByType: entHandsetsByType,
+            keysByType: entKeysByType,
           },
         });
       });
@@ -933,6 +1028,8 @@ export const InstallerSheetManager: React.FC = () => {
           totalServices: houseServices,
           totalApps: houseApps,
           totalRevenue: houseRevenue,
+          handsetsByType: houseHandsetsByType,
+          keysByType: houseKeysByType,
         },
       });
     });
@@ -951,7 +1048,7 @@ export const InstallerSheetManager: React.FC = () => {
     });
   }, [groupedHouses, selectedServiceType]);
 
-  // 7. Общая сводная статистика по отображаемым домам
+  // 7. Общая сводная статистика по отображаемым домам (включая модели оборудования)
   const stats = useMemo(() => {
     let apartmentsCount = 0;
     let totalKeys = 0;
@@ -959,6 +1056,8 @@ export const InstallerSheetManager: React.FC = () => {
     let totalServices = 0;
     let totalApps = 0;
     let totalRevenue = 0;
+    const handsetsByType: Record<string, number> = {};
+    const keysByType: Record<string, number> = {};
 
     displayedHouses.forEach((hg) => {
       apartmentsCount += hg.stats.apartmentsCount;
@@ -967,6 +1066,13 @@ export const InstallerSheetManager: React.FC = () => {
       totalServices += hg.stats.totalServices;
       totalApps += hg.stats.totalApps;
       totalRevenue += hg.stats.totalRevenue;
+
+      Object.entries(hg.stats.handsetsByType).forEach(([name, count]) => {
+        handsetsByType[name] = (handsetsByType[name] || 0) + count;
+      });
+      Object.entries(hg.stats.keysByType).forEach(([name, count]) => {
+        keysByType[name] = (keysByType[name] || 0) + count;
+      });
     });
 
     return {
@@ -976,6 +1082,8 @@ export const InstallerSheetManager: React.FC = () => {
       totalServices,
       totalApps,
       totalRevenue,
+      handsetsByType,
+      keysByType,
     };
   }, [displayedHouses]);
 
@@ -1493,6 +1601,98 @@ export const InstallerSheetManager: React.FC = () => {
         </div>
       </div>
 
+      {/* 3.1 Складские карточки по конкретным моделям оборудования */}
+      {(Object.keys(stats.handsetsByType).length > 0 || Object.keys(stats.keysByType).length > 0) && (
+        <Card className="border-slate-200/80 dark:border-slate-800/80 shadow-sm bg-gradient-to-r from-purple-500/5 via-slate-50/50 to-amber-500/5 dark:from-purple-950/20 dark:via-slate-900/40 dark:to-amber-950/20">
+          <CardHeader className="p-3.5 pb-2 border-b border-slate-200/50 dark:border-slate-800/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1.5">
+            <div className="flex items-center gap-2">
+              <Package className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+              <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground">
+                Потребность в оборудовании для монтажа (Склад для выезда)
+              </CardTitle>
+            </div>
+            <span className="text-[11px] text-muted-foreground font-medium">
+              Всего позиций к выдаче: <strong className="text-foreground">{stats.totalHandsets + stats.totalKeys + stats.totalApps} шт.</strong>
+            </span>
+          </CardHeader>
+          <CardContent className="p-3.5 pt-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5">
+              {/* Карточки моделей трубок */}
+              {Object.entries(stats.handsetsByType).map(([modelName, count]) => (
+                <div
+                  key={`handset-${modelName}`}
+                  className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-purple-200/70 dark:border-purple-800/50 shadow-xs flex items-center justify-between gap-2"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
+                      <Radio className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-xs font-bold text-foreground block truncate" title={modelName}>
+                        {modelName}
+                      </span>
+                      <span className="text-[10px] text-purple-600 dark:text-purple-400 font-semibold uppercase">
+                        Трубка / ТКП
+                      </span>
+                    </div>
+                  </div>
+                  <Badge className="bg-purple-600 hover:bg-purple-600 text-white font-black text-xs px-2 py-0.5 shrink-0">
+                    {count} шт.
+                  </Badge>
+                </div>
+              ))}
+
+              {/* Карточки ключей */}
+              {Object.entries(stats.keysByType).map(([keyName, count]) => (
+                <div
+                  key={`key-${keyName}`}
+                  className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-amber-200/70 dark:border-amber-800/50 shadow-xs flex items-center justify-between gap-2"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                      <KeyRound className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-xs font-bold text-foreground block truncate" title={keyName}>
+                        {keyName}
+                      </span>
+                      <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold uppercase">
+                        Ключи
+                      </span>
+                    </div>
+                  </div>
+                  <Badge className="bg-amber-600 hover:bg-amber-600 text-white font-black text-xs px-2 py-0.5 shrink-0">
+                    {count} шт.
+                  </Badge>
+                </div>
+              ))}
+
+              {/* Карточка доступа в Личный кабинет */}
+              {stats.totalApps > 0 && (
+                <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-emerald-200/70 dark:border-emerald-800/50 shadow-xs flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                      <CheckCircle2 className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-xs font-bold text-foreground block truncate" title="Личный кабинет умного домофона">
+                        Личный кабинет умного дома
+                      </span>
+                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold uppercase">
+                        Доступ к приложению
+                      </span>
+                    </div>
+                  </div>
+                  <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white font-black text-xs px-2 py-0.5 shrink-0">
+                    {stats.totalApps} шт.
+                  </Badge>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* 4. Отображение актов/нарядов с разбивкой по домам и подъездам */}
       {isOrdersLoading || isAddressesLoading ? (
         <div className="flex items-center justify-center h-48 bg-white/60 dark:bg-slate-900/60 rounded-2xl border border-slate-200/60 dark:border-slate-800/60 shadow-sm">
@@ -1556,12 +1756,16 @@ export const InstallerSheetManager: React.FC = () => {
 
                       <div className="flex items-center gap-2 text-[11px]">
                         {hg.stats.totalHandsets > 0 && (
-                          <span className="text-purple-600 dark:text-purple-400 font-semibold" title="Трубок">
+                          <span className="text-purple-600 dark:text-purple-400 font-semibold" title={
+                            Object.entries(hg.stats.handsetsByType).map(([m, c]) => `${m}: ${c} шт.`).join(", ")
+                          }>
                             📞 {hg.stats.totalHandsets}
                           </span>
                         )}
                         {hg.stats.totalKeys > 0 && (
-                          <span className="text-amber-600 dark:text-amber-400 font-semibold" title="Ключей">
+                          <span className="text-amber-600 dark:text-amber-400 font-semibold" title={
+                            Object.entries(hg.stats.keysByType).map(([k, c]) => `${k}: ${c} шт.`).join(", ")
+                          }>
                             🔑 {hg.stats.totalKeys}
                           </span>
                         )}
@@ -1570,6 +1774,13 @@ export const InstallerSheetManager: React.FC = () => {
                         </span>
                       </div>
                     </div>
+
+                    {/* Детализация моделей трубок для дома во вкладке */}
+                    {Object.keys(hg.stats.handsetsByType).length > 0 && (
+                      <div className="text-[10px] text-purple-700 dark:text-purple-300 font-medium truncate w-full pt-1 border-t border-slate-100/70 dark:border-slate-800/60" title={Object.entries(hg.stats.handsetsByType).map(([m, c]) => `${m}: ${c} шт.`).join(", ")}>
+                        {Object.entries(hg.stats.handsetsByType).map(([m, c]) => `${m}: ${c} шт.`).join(", ")}
+                      </div>
+                    )}
                   </button>
                 );
               })}
@@ -1581,7 +1792,7 @@ export const InstallerSheetManager: React.FC = () => {
             <Card className="border-slate-200/80 dark:border-slate-800/80 shadow-md overflow-hidden bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm">
               {/* Шапка активного дома */}
               <CardHeader className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-800/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <Building2 className="h-5 w-5 text-primary shrink-0" />
                     <CardTitle className="text-base sm:text-lg font-black text-foreground">
@@ -1597,16 +1808,38 @@ export const InstallerSheetManager: React.FC = () => {
                       {activeHouse.entrances.length} {activeHouse.entrances.length === 1 ? "подъезд" : "подъездов"}
                     </Badge>
                     {activeHouse.stats.totalHandsets > 0 && (
-                      <Badge variant="outline" className="text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800/60 bg-purple-50 dark:bg-purple-950/40">
-                        <Radio className="h-3 w-3 mr-1 inline" />
-                        Трубок: {activeHouse.stats.totalHandsets} шт.
-                      </Badge>
+                      <div className="flex flex-wrap items-center gap-1">
+                        <Badge variant="outline" className="font-bold text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/40">
+                          <Radio className="h-3 w-3 mr-1 inline" />
+                          Трубок: {activeHouse.stats.totalHandsets} шт.
+                        </Badge>
+                        {Object.entries(activeHouse.stats.handsetsByType).map(([m, c]) => (
+                          <Badge
+                            key={m}
+                            variant="secondary"
+                            className="text-[11px] font-semibold bg-purple-100/90 dark:bg-purple-900/50 text-purple-800 dark:text-purple-200 border border-purple-200 dark:border-purple-700"
+                          >
+                            {m}: <strong>{c} шт.</strong>
+                          </Badge>
+                        ))}
+                      </div>
                     )}
                     {activeHouse.stats.totalKeys > 0 && (
-                      <Badge variant="outline" className="text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/40">
-                        <KeyRound className="h-3 w-3 mr-1 inline" />
-                        Ключей: {activeHouse.stats.totalKeys} шт.
-                      </Badge>
+                      <div className="flex flex-wrap items-center gap-1">
+                        <Badge variant="outline" className="font-bold text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40">
+                          <KeyRound className="h-3 w-3 mr-1 inline" />
+                          Ключей: {activeHouse.stats.totalKeys} шт.
+                        </Badge>
+                        {Object.entries(activeHouse.stats.keysByType).map(([k, c]) => (
+                          <Badge
+                            key={k}
+                            variant="secondary"
+                            className="text-[11px] font-semibold bg-amber-100/90 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200 border border-amber-200 dark:border-amber-700"
+                          >
+                            {k}: <strong>{c} шт.</strong>
+                          </Badge>
+                        ))}
+                      </div>
                     )}
                     {activeHouse.stats.totalApps > 0 && (
                       <Badge variant="outline" className="text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-950/40">
@@ -1713,13 +1946,25 @@ export const InstallerSheetManager: React.FC = () => {
                           </Badge>
                         </div>
 
-                        {/* Сводка по подъезду */}
+                        {/* Сводка по подъезду с подробными моделями */}
                         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                           {entGroup.stats.totalHandsets > 0 && (
-                            <span>Трубок: <strong className="text-foreground">{entGroup.stats.totalHandsets}</strong></span>
+                            <span className="flex items-center gap-1 text-purple-700 dark:text-purple-300 font-medium">
+                              <span>Трубок: <strong>{entGroup.stats.totalHandsets} шт.</strong></span>
+                              <span className="text-[11px] text-muted-foreground">
+                                ({Object.entries(entGroup.stats.handsetsByType).map(([m, c]) => `${m}: ${c} шт.`).join(", ")})
+                              </span>
+                            </span>
                           )}
                           {entGroup.stats.totalKeys > 0 && (
-                            <span>Ключей: <strong className="text-foreground">{entGroup.stats.totalKeys}</strong></span>
+                            <span className="flex items-center gap-1 text-amber-700 dark:text-amber-300 font-medium">
+                              <span>Ключей: <strong>{entGroup.stats.totalKeys} шт.</strong></span>
+                              {Object.keys(entGroup.stats.keysByType).length > 1 && (
+                                <span className="text-[11px] text-muted-foreground">
+                                  ({Object.entries(entGroup.stats.keysByType).map(([k, c]) => `${k}: ${c} шт.`).join(", ")})
+                                </span>
+                              )}
+                            </span>
                           )}
                           {entGroup.stats.totalApps > 0 && (
                             <span>ЛК: <strong className="text-foreground">{entGroup.stats.totalApps}</strong></span>
