@@ -1215,10 +1215,10 @@ export const InstallerSheetManager: React.FC = () => {
               "Квартира",
               "ФИО Абонента",
               "Контактный телефон",
+              "Монтаж / Замена", // Поставлено сразу после телефона, перед трубкой
               "Трубка",
               "Ключи (шт.)",
               "Личный кабинет",
-              "Монтаж / Замена",
               "Подпись собственника",
             ],
           ];
@@ -1251,10 +1251,10 @@ export const InstallerSheetManager: React.FC = () => {
               order.apartment ? `кв. ${order.apartment}` : "—",
               order.name || "Абонент",
               order.phone || "—",
-              parsed.handset !== "—" ? parsed.handset : "—",
+              parsed.services !== "—" ? parsed.services : "—", // Монтаж / Замена
+              parsed.handset !== "—" ? parsed.handset : "—",   // Трубка
               keysDisplay,
               parsed.hasApp ? "✓ Подключен" : "—",
-              parsed.services !== "—" ? parsed.services : "—",
               "", // Пустая широкая ячейка для личной подписи собственника
             ]);
           });
@@ -1306,17 +1306,17 @@ export const InstallerSheetManager: React.FC = () => {
 
           const ws = XLSX.utils.aoa_to_sheet(sheetData);
 
-          // Ширина колонок для печати листа А4
+          // Ширина колонок для печати листа А4 (увеличены для гарантированной читаемости)
           ws["!cols"] = [
             { wch: 6 },  // № п/п
             { wch: 12 }, // Квартира
             { wch: 28 }, // ФИО Абонента
-            { wch: 18 }, // Контактный телефон
-            { wch: 28 }, // Трубка
+            { wch: 20 }, // Контактный телефон
+            { wch: 18 }, // Монтаж / Замена (между телефоном и трубкой)
+            { wch: 32 }, // Трубка
             { wch: 14 }, // Ключи (шт.)
-            { wch: 16 }, // Личный кабинет
-            { wch: 16 }, // Монтаж / Замена
-            { wch: 32 }, // Подпись собственника
+            { wch: 18 }, // Личный кабинет
+            { wch: 34 }, // Подпись собственника
           ];
 
           // Формируем имя листа Excel (макс 31 символ)
@@ -2028,18 +2028,18 @@ export const InstallerSheetManager: React.FC = () => {
                         <table className="w-full text-xs text-left border-collapse">
                           <thead className="text-[11px] font-bold uppercase bg-slate-50 dark:bg-slate-850 text-muted-foreground border-b border-slate-200/60 dark:border-slate-800/60">
                             <tr>
-                              <th className="px-3 py-2 text-center w-12 font-extrabold">Кв.</th>
+                              <th className="px-3 py-2.5 text-center w-12 font-extrabold">Кв.</th>
                               {activeEntranceTab === "all" && (
-                                <th className="px-2 py-2 text-center w-14 font-semibold">Подъезд</th>
+                                <th className="px-2 py-2.5 text-center w-16 font-semibold">Подъезд</th>
                               )}
-                              <th className="px-3 py-2 font-semibold">Абонент / Телефон</th>
-                              <th className="px-3 py-2 font-semibold">Трубка (ТКП)</th>
-                              <th className="px-3 py-2 font-semibold">Ключи</th>
-                              <th className="px-2 py-2 text-center font-semibold">ЛК</th>
-                              <th className="px-2 py-2 text-center font-semibold">Монтаж</th>
-                              <th className="px-3 py-2 text-right font-semibold">Сумма</th>
-                              <th className="px-3 py-2 text-center font-semibold">Статус</th>
-                              <th className="px-3 py-2 text-center w-24 font-semibold">Наряд</th>
+                              <th className="px-3 py-2.5 font-semibold min-w-[170px]">Абонент / Телефон</th>
+                              <th className="px-2.5 py-2.5 text-center font-semibold w-28">Монтаж / Замена</th>
+                              <th className="px-3 py-2.5 font-semibold min-w-[190px]">Трубка (ТКП)</th>
+                              <th className="px-3 py-2.5 font-semibold min-w-[130px]">Ключи</th>
+                              <th className="px-2 py-2.5 text-center font-semibold w-16">ЛК</th>
+                              <th className="px-3 py-2.5 text-right font-semibold w-24">Сумма</th>
+                              <th className="px-3 py-2.5 text-center font-semibold w-28">Статус</th>
+                              <th className="px-3 py-2.5 text-center w-20 font-semibold">Наряд</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 bg-white dark:bg-slate-900/60">
@@ -2063,107 +2063,107 @@ export const InstallerSheetManager: React.FC = () => {
                                   title="Нажмите, чтобы открыть подробный наряд"
                                 >
                                   {/* Номер квартиры */}
-                                  <td className="px-3 py-2 text-center font-black text-sm text-foreground font-mono bg-slate-50/40 dark:bg-slate-800/30">
+                                  <td className="px-3 py-2.5 text-center font-black text-sm text-foreground font-mono bg-slate-50/40 dark:bg-slate-800/30 align-middle">
                                     {order.apartment || "—"}
                                   </td>
 
                                   {/* Подъезд (если смотрим все подъезды) */}
                                   {activeEntranceTab === "all" && (
-                                    <td className="px-2 py-2 text-center font-semibold text-muted-foreground text-xs">
+                                    <td className="px-2 py-2.5 text-center font-semibold text-muted-foreground text-xs align-middle">
                                       {order.entrance ? `п. ${order.entrance}` : "—"}
                                     </td>
                                   )}
 
-                                  {/* Абонент и телефон */}
-                                  <td className="px-3 py-2">
-                                    <div className="font-bold text-foreground text-xs flex items-center gap-1.5 truncate max-w-[180px]">
-                                      <User className="h-3 w-3 text-primary shrink-0" />
-                                      <span className="truncate">{order.name || "Абонент"}</span>
+                                  {/* Абонент и телефон (без обрезания ФИО) */}
+                                  <td className="px-3 py-2.5 min-w-[170px] align-middle">
+                                    <div className="font-bold text-foreground text-xs flex items-center gap-1.5 break-words">
+                                      <User className="h-3.5 w-3.5 text-primary shrink-0" />
+                                      <span className="break-words leading-tight">{order.name || "Абонент"}</span>
                                     </div>
                                     {order.phone && (
                                       <a
                                         href={`tel:${order.phone}`}
                                         onClick={(e) => e.stopPropagation()}
-                                        className="text-[11px] text-primary hover:underline font-medium flex items-center gap-1 mt-0.5"
+                                        className="text-[11px] text-primary hover:underline font-semibold flex items-center gap-1 mt-1 inline-flex"
                                       >
-                                        <Phone className="h-2.5 w-2.5" />
+                                        <Phone className="h-2.5 w-2.5 shrink-0" />
                                         <span>{order.phone}</span>
                                       </a>
                                     )}
                                   </td>
 
-                                  {/* Трубка (ТКП) — строго без личного кабинета */}
-                                  <td className="px-3 py-2">
-                                    {parsed.handset !== "—" ? (
-                                      <Badge
-                                        variant="outline"
-                                        className="text-[11px] py-0.5 px-2 font-semibold text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/40"
-                                      >
-                                        <Radio className="h-2.5 w-2.5 mr-1 inline shrink-0" />
-                                        <span>{parsed.handset}</span>
+                                  {/* Монтаж / Замена (перенесено перед трубками) */}
+                                  <td className="px-2.5 py-2.5 text-center w-28 align-middle">
+                                    {parsed.services === "Монтаж" ? (
+                                      <Badge className="bg-blue-600 hover:bg-blue-600 text-white font-extrabold text-[11px] py-0.5 px-2.5 shadow-sm">
+                                        Монтаж
+                                      </Badge>
+                                    ) : parsed.services === "Замена" ? (
+                                      <Badge className="bg-amber-600 hover:bg-amber-600 text-white font-extrabold text-[11px] py-0.5 px-2.5 shadow-sm">
+                                        Замена
+                                      </Badge>
+                                    ) : parsed.services !== "—" ? (
+                                      <Badge variant="secondary" className="text-[11px] py-0.5 px-2 font-medium">
+                                        {parsed.services}
                                       </Badge>
                                     ) : (
-                                      <span className="text-muted-foreground text-xs">—</span>
+                                      <span className="text-muted-foreground text-xs font-medium">—</span>
                                     )}
                                   </td>
 
-                                  {/* Ключи */}
-                                  <td className="px-3 py-2">
+                                  {/* Трубка (ТКП) — строго без личного кабинета, с полным переносом без обрезаний */}
+                                  <td className="px-3 py-2.5 min-w-[190px] align-middle">
+                                    {parsed.handset !== "—" ? (
+                                      <Badge
+                                        variant="outline"
+                                        className="text-[11px] py-1 px-2.5 font-semibold text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/40 whitespace-normal text-left inline-flex items-start gap-1.5 leading-snug break-words max-w-full"
+                                      >
+                                        <Radio className="h-3 w-3 mt-0.5 text-purple-600 dark:text-purple-400 shrink-0" />
+                                        <span className="break-words">{parsed.handset}</span>
+                                      </Badge>
+                                    ) : (
+                                      <span className="text-muted-foreground text-xs font-medium">—</span>
+                                    )}
+                                  </td>
+
+                                  {/* Ключи — с полным отображением названий */}
+                                  <td className="px-3 py-2.5 min-w-[130px] align-middle">
                                     {parsed.keys !== "—" ? (
                                       <Badge
                                         variant="outline"
-                                        className="text-[11px] py-0.5 px-2 font-semibold text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40"
+                                        className="text-[11px] py-1 px-2.5 font-semibold text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 whitespace-normal text-left inline-flex items-start gap-1.5 leading-snug break-words max-w-full"
                                       >
-                                        <KeyRound className="h-2.5 w-2.5 mr-1 inline shrink-0" />
-                                        <span>{parsed.keys}</span>
+                                        <KeyRound className="h-3 w-3 mt-0.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                                        <span className="break-words">{parsed.keys}</span>
                                       </Badge>
                                     ) : (
-                                      <span className="text-muted-foreground text-xs">—</span>
+                                      <span className="text-muted-foreground text-xs font-medium">—</span>
                                     )}
                                   </td>
 
                                   {/* Личный кабинет */}
-                                  <td className="px-2 py-2 text-center">
+                                  <td className="px-2 py-2.5 text-center w-16 align-middle">
                                     {parsed.hasApp ? (
-                                      <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white font-extrabold text-[10px] py-0 px-1.5">
+                                      <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white font-extrabold text-[10px] py-0.5 px-2">
                                         ✓ ЛК
                                       </Badge>
                                     ) : (
-                                      <span className="text-muted-foreground text-xs">—</span>
-                                    )}
-                                  </td>
-
-                                  {/* Монтаж / Услуга */}
-                                  <td className="px-2 py-2 text-center">
-                                    {parsed.services === "Монтаж" ? (
-                                      <Badge className="bg-blue-600 hover:bg-blue-600 text-white font-bold text-[10px] py-0 px-1.5">
-                                        Монтаж
-                                      </Badge>
-                                    ) : parsed.services === "Замена" ? (
-                                      <Badge variant="outline" className="text-amber-700 dark:text-amber-300 border-amber-300 bg-amber-50 dark:bg-amber-950/40 font-bold text-[10px] py-0 px-1.5">
-                                        Замена
-                                      </Badge>
-                                    ) : parsed.services !== "—" ? (
-                                      <Badge variant="secondary" className="text-[10px] py-0 px-1.5 font-medium">
-                                        {parsed.services}
-                                      </Badge>
-                                    ) : (
-                                      <span className="text-muted-foreground text-xs">—</span>
+                                      <span className="text-muted-foreground text-xs font-medium">—</span>
                                     )}
                                   </td>
 
                                   {/* Сумма и статус оплаты */}
-                                  <td className="px-3 py-2 text-right">
-                                    <div className="font-extrabold text-foreground text-xs">
+                                  <td className="px-3 py-2.5 text-right w-24 align-middle">
+                                    <div className="font-extrabold text-foreground text-xs whitespace-nowrap">
                                       {Number(order.payment_amount || 0).toFixed(0)} ₽
                                     </div>
                                     <div className="mt-0.5">
                                       {isPaid ? (
-                                        <span className="text-[10px] font-semibold text-green-600 dark:text-green-400">
+                                        <span className="text-[10px] font-semibold text-green-600 dark:text-green-400 whitespace-nowrap">
                                           ✓ Оплачено
                                         </span>
                                       ) : (
-                                        <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+                                        <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 whitespace-nowrap">
                                           ⏳ Ожидает
                                         </span>
                                       )}
