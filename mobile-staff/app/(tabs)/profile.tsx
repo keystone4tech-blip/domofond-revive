@@ -12,11 +12,15 @@ import {
   TouchableOpacity,
   Platform,
   Alert,
+  Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useStaffAuthStore } from '../../src/store/auth.store';
 import { StaffRole } from '../../src/types/staff';
+import { staffApiClient } from '../../src/api/client';
+import { APP_VERSION, APP_DOWNLOAD_URL } from '../../src/config/constants';
+import { compareVersions } from '../../src/components/UpdateCheckerModal';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -26,6 +30,34 @@ export default function ProfileScreen() {
   const shiftStatus = useStaffAuthStore((state) => state.shiftStatus);
   const setShiftStatus = useStaffAuthStore((state) => state.setShiftStatus);
   const logout = useStaffAuthStore((state) => state.logout);
+
+  const handleCheckUpdateManual = async () => {
+    try {
+      const response = await staffApiClient.get<any>('/api/app/version-staff').catch(async () => {
+        return await staffApiClient.get<any>('/api/app/version?app=staff');
+      });
+      const latest = response.data?.latestVersion;
+      if (latest && compareVersions(latest, APP_VERSION) > 0) {
+        Alert.alert(
+          'Доступно обновление',
+          `Вышла новая версия v${latest}. Обновить сейчас?`,
+          [
+            { text: 'Позже', style: 'cancel' },
+            {
+              text: 'Обновить',
+              onPress: () => {
+                Linking.openURL(response.data?.downloadUrl || APP_DOWNLOAD_URL);
+              },
+            },
+          ]
+        );
+      } else {
+        Alert.alert('Обновление не требуется', `У вас установлена актуальная версия (${APP_VERSION}).`);
+      }
+    } catch {
+      Alert.alert('Офис Работа', `Текущая версия приложения: ${APP_VERSION}`);
+    }
+  };
 
   const handleLogout = () => {
     Alert.alert(
@@ -170,12 +202,31 @@ export default function ProfileScreen() {
         </View>
         <View style={styles.infoRow}>
           <Text style={styles.infoLabel}>Версия:</Text>
-          <Text style={styles.infoValue}>1.0.0 (FSM Mobile Core)</Text>
+          <Text style={styles.infoValue}>v1.0.0 (FSM Mobile Core)</Text>
         </View>
         <View style={styles.infoRow}>
           <Text style={styles.infoLabel}>Среда:</Text>
           <Text style={styles.infoValue}>Производственный сервер (HTTPS)</Text>
         </View>
+        <TouchableOpacity
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingTop: 12,
+            marginTop: 10,
+            borderTopWidth: 1,
+            borderTopColor: '#334155',
+          }}
+          onPress={handleCheckUpdateManual}
+          activeOpacity={0.7}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Ionicons name="cloud-download-outline" size={18} color="#00F0FF" />
+            <Text style={{ fontSize: 13, fontWeight: '700', color: '#00F0FF' }}>Проверить обновления</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color="#64748B" />
+        </TouchableOpacity>
       </View>
 
       {/* Кнопка выхода */}

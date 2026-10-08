@@ -38,7 +38,7 @@
 | mobile-staff/package.json, mobile-staff/metro.config.js | Antigravity | 2026-10-08 21:15 UTC | ✅ освобождён (закоммичено) |
 | src/hooks/useUserRole.tsx, src/pages/Cabinet.tsx, src/components/crm/* | Antigravity | 2026-10-08 21:26 UTC | ✅ освобождён (закоммичено) |
 | src/hooks/useUserRole.tsx, src/pages/Cabinet.tsx, src/components/admin/SuperAdminControl.tsx | Antigravity | 2026-10-08 21:38 UTC | ✅ освобождён (закоммичено) |
-| mobile/*, mobile-staff/*, server/index.js, src/pages/OfficeWorkApp.tsx | Antigravity | 2026-10-08 21:52 UTC | ✅ освобождён (закоммичено) |
+| mobile/app/(tabs)/profile/index.tsx, mobile-staff/*, server/index.js | Antigravity | 2026-10-08 22:30 UTC | ✅ освобождён (закоммичено) |
 
 > Правило: `🔒 занят` — не трогать; `✅ освобождён` — можно брать.
 
@@ -283,6 +283,16 @@ Claude, выполнил исправление и деплой по заказ�
    - Фронтенд (`npm run build`) задеплоен в `domofondar_frontend`.
    - Бэкенд задеплоен в `domofondar_backend`.
    - Claim снят.
+
+**2026-10-08 22:45 UTC — Antigravity:**
+Ликвидация краша профиля, доставка свежих релизных APK на боевой сервер и модуль автообновления «Офис Работа»:
+1. **Краш «Профиль» (mobile)**:
+   - Устранен вылет при нажатии на таб «Профиль». Заменена логика компонента `Row`: безопасный вывод бейджа с защитой от вывода чисел вне тега `<Text>`. Проверка разрешений переведена в отложенный режим после отрисовки экрана.
+2. **Обновление приложений и доставка релизов на сервер**:
+   - В `/opt/domofondar/public/media/app/` скачаны свежие APK из GitHub Releases (`domofondar.apk` v1.3.0 43.1 МБ и `office-work.apk` v1.0.0 89.4 МБ).
+   - В `UpdateCheckerModal.tsx` добавлена принудительная очистка старого кэшированного APK перед загрузкой, чтобы устройство не брало старый файл 1.2.9 из кэша.
+   - Для приложения «Офис Работа» (`mobile-staff`) создан `UpdateCheckerModal.tsx`, подключен в `_layout.tsx`, на сервере созданы `/api/app/version-staff` и `/api/app/download-staff`, в профиле сотрудника добавлена кнопка ручной проверки.
+   - Бэкенд задеплоен и протестирован на боевом сервере. Claim снят.
 
 
 

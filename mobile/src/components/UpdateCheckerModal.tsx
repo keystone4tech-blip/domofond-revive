@@ -121,23 +121,20 @@ export function UpdateCheckerModal() {
     // Локальный путь сохранения APK в файловой системе устройства
     const targetFilePath = `${FileSystem.cacheDirectory || FileSystem.documentDirectory}domofondar_${updateInfo?.latestVersion || 'latest'}.apk`;
 
-    // 1. Проверяем, возможно файл этой версии уже полностью скачан
+    // 1. Принудительно очищаем старый локальный APK из кэша, чтобы гарантировать
+    // установку самого свежего релизного билда с сервера без застревания на старом кэше
     try {
-      const existing = await FileSystem.getInfoAsync(targetFilePath);
-      if (existing.exists && existing.size && existing.size > 20 * 1024 * 1024) {
-        console.log('[UpdateChecker] Файл обновления уже сохранен на диске:', targetFilePath);
-        setDownloadProgress(100);
-        setDownloadBytesText('Файл готов к установке');
-        await launchApkInstaller(targetFilePath);
-        return;
-      }
+      await FileSystem.deleteAsync(targetFilePath, { idempotent: true }).catch(() => {});
+      console.log('[UpdateChecker] Предыдущий кэш APK очищен для свежей загрузки');
     } catch (checkErr) {
-      console.log('[UpdateChecker] Проверка имеющегося файла:', checkErr);
+      console.log('[UpdateChecker] Очистка кэша APK:', checkErr);
     }
 
     try {
+      // Добавляем параметр предотвращения кэширования в запрос
+      const freshDownloadUrl = targetUrl.includes('?') ? `${targetUrl}&t=${Date.now()}` : `${targetUrl}?t=${Date.now()}`;
       const downloadResumable = FileSystem.createDownloadResumable(
-        targetUrl,
+        freshDownloadUrl,
         targetFilePath,
         {},
         (data) => {

@@ -68,12 +68,37 @@ export default function ProfileScreen() {
 
   const vStatus: string = (user as any)?.verification_status || (user?.is_verified ? 'verified' : 'unverified');
 
+  // Безопасная инициализация статуса разрешений (с задержкой после отрисовки экрана,
+  // чтобы нативный поток Android не падал при монтировании таба)
   useEffect(() => {
-    (async () => {
-      try { const n = await Notifications.getPermissionsAsync(); setNotifGranted(n.granted); } catch {}
-      try { const m = await ImagePicker.getMediaLibraryPermissionsAsync(); setMediaGranted(m.granted); } catch {}
-      try { if (Location) { const g = await Location.getForegroundPermissionsAsync(); setGeoGranted(g.granted); } else setGeoGranted(null); } catch {}
-    })();
+    let isMounted = true;
+    const timer = setTimeout(async () => {
+      try {
+        if (!isMounted) return;
+        // Проверяем уведомления только если модуль корректно отвечает
+        if (Notifications && typeof Notifications.getPermissionsAsync === 'function') {
+          const n = await Notifications.getPermissionsAsync().catch(() => null);
+          if (isMounted && n) setNotifGranted(Boolean(n.granted));
+        }
+      } catch (err) {
+        console.log('[Profile] Не удалось безопасно проверить статус уведомлений:', err);
+      }
+
+      try {
+        if (!isMounted) return;
+        if (ImagePicker && typeof ImagePicker.getMediaLibraryPermissionsAsync === 'function') {
+          const m = await ImagePicker.getMediaLibraryPermissionsAsync().catch(() => null);
+          if (isMounted && m) setMediaGranted(Boolean(m.granted));
+        }
+      } catch (err) {
+        console.log('[Profile] Не удалось безопасно проверить статус галереи:', err);
+      }
+    }, 400);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
   }, []);
 
   const handleOpenEdit = () => {
@@ -232,24 +257,28 @@ export default function ProfileScreen() {
     { id: 'advertising-consent', title: 'Согласие на рекламную рассылку' },
   ];
 
-  const Row = ({ icon, title, value = '', badge, isDestructive = false, onPress }: any) => (
-    <TouchableOpacity style={styles.menuItem} onPress={onPress} activeOpacity={onPress ? 0.7 : 1}>
-      <View style={styles.menuItemLeft}>
-        <Ionicons name={icon} size={22} color={isDestructive ? colors.error : colors.textMuted} />
-        <Text style={[styles.menuItemTitle, { color: isDestructive ? colors.error : colors.text }]} numberOfLines={1}>{title}</Text>
-        {badge ? (
-          <View style={[styles.warnBadge, { backgroundColor: colors.warning }]}>
-            <Ionicons name="alert" size={11} color="#fff" />
-            <Text style={styles.warnBadgeText}>{badge}</Text>
-          </View>
-        ) : null}
-      </View>
-      <View style={styles.menuItemRight}>
-        {value ? <Text style={[styles.menuItemValue, { color: colors.textSecondary }]} numberOfLines={1}>{value}</Text> : null}
-        {onPress ? <Ionicons name="chevron-forward" size={18} color={colors.textMuted} /> : null}
-      </View>
-    </TouchableOpacity>
-  );
+  const Row = ({ icon, title, value = '', badge, isDestructive = false, onPress }: any) => {
+    const hasBadge = badge !== undefined && badge !== null && badge !== 0 && badge !== false && String(badge).length > 0;
+    const hasValue = value !== undefined && value !== null && String(value).trim().length > 0;
+    return (
+      <TouchableOpacity style={styles.menuItem} onPress={onPress} activeOpacity={onPress ? 0.7 : 1} disabled={!onPress}>
+        <View style={styles.menuItemLeft}>
+          <Ionicons name={icon} size={22} color={isDestructive ? colors.error : colors.textMuted} />
+          <Text style={[styles.menuItemTitle, { color: isDestructive ? colors.error : colors.text }]} numberOfLines={1}>{title}</Text>
+          {hasBadge ? (
+            <View style={[styles.warnBadge, { backgroundColor: colors.warning }]}>
+              <Ionicons name="alert" size={11} color="#fff" />
+              <Text style={styles.warnBadgeText}>{String(badge)}</Text>
+            </View>
+          ) : null}
+        </View>
+        <View style={styles.menuItemRight}>
+          {hasValue ? <Text style={[styles.menuItemValue, { color: colors.textSecondary }]} numberOfLines={1}>{String(value)}</Text> : null}
+          {onPress ? <Ionicons name="chevron-forward" size={18} color={colors.textMuted} /> : null}
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={[styles.safeArea, { backgroundColor: colors.background, paddingTop: Math.max(insets.top, 16) }]}>
@@ -298,7 +327,7 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Данные абонента</Text>
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Row icon="person-circle-outline" title="Мои данные" badge={emptyCount > 0 ? emptyCount : 0} value={emptyCount > 0 ? 'Заполнить' : 'Заполнено'} onPress={handleOpenEdit} />
+            <Row icon="person-circle-outline" title="Мои данные" badge={emptyCount > 0 ? emptyCount : undefined} value={emptyCount > 0 ? 'Заполнить' : 'Заполнено'} onPress={handleOpenEdit} />
           </View>
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 10, padding: 14 }]}>
             <Text style={[styles.dataLine, { color: colors.textSecondary }]}>ФИО: <Text style={{ color: colors.text }}>{user?.full_name || '—'}</Text></Text>

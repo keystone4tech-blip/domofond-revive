@@ -254,15 +254,39 @@ app.get('/api/health', (req, res) => {
 // ВЕРСИЯ МОБИЛЬНОГО ПРИЛОЖЕНИЯ И АВТОМАТИЧЕСКОЕ ОБНОВЛЕНИЕ
 // ------------------------------------------------------------------------------
 
-// Публичный эндпоинт проверки обновлений мобильного приложения «Домофондар»
+// Публичный эндпоинт проверки обновлений мобильного приложения «Домофондар» (и «Офис Работа» при app=staff)
 app.get('/api/app/version', (req, res) => {
+  if (req.query.app === 'staff') {
+    const siteDownloadUrl = 'https://xn--80aha5afebav9a.xn--p1ai/backend-api/api/app/download-staff';
+    const directMediaUrl = 'https://xn--80aha5afebav9a.xn--p1ai/media/app/office-work.apk';
+    const githubFallbackUrl = 'https://github.com/keystone4tech-blip/domofond-revive/releases/download/staff-app-latest/office-work.apk';
+
+    console.log('[Бэкенд: Версия приложения] Запрос проверки обновлений Офис Работа (?app=staff)');
+    return res.json({
+      latestVersion: '1.0.0',
+      versionCode: 1,
+      minSupportedVersion: '1.0.0',
+      downloadUrl: siteDownloadUrl,
+      directMediaUrl: directMediaUrl,
+      fallbackDownloadUrl: githubFallbackUrl,
+      releaseNotes: [
+        'Версия 1.0.0: Мобильное рабочее место мастера «Офис Работа»',
+        'Прямая интеграция со смарт-диспетчерской CRM «ДомофонДар»',
+        'Электронные акты выполненных работ и цифровая подпись клиента',
+        'Автоматический расчет заработной платы и выработки техника'
+      ],
+      isMandatory: false,
+      publishedAt: new Date().toISOString()
+    });
+  }
+
   // Прямая ссылка на APK через бэкенд Express с принудительными заголовками скачивания
   // Это исключает перехват Service Worker и гарантирует моментальный старт загрузки
   const siteDownloadUrl = 'https://xn--80aha5afebav9a.xn--p1ai/backend-api/api/app/download';
   const directMediaUrl = 'https://xn--80aha5afebav9a.xn--p1ai/media/app/domofondar.apk';
   const githubFallbackUrl = 'https://github.com/keystone4tech-blip/domofond-revive/releases/download/app-latest/domofondar.apk';
 
-  console.log('[Бэкенд: Версия приложения] Запрос проверки обновлений с мобильного клиента');
+  console.log('[Бэкенд: Версия приложения] Запрос проверки обновлений с мобильного клиента (жильцы)');
 
   res.json({
     latestVersion: '1.3.0',
@@ -277,6 +301,32 @@ app.get('/api/app/version', (req, res) => {
       'Устранение системных ошибок синтаксического анализа пакетов на Android 8-14+',
       'Полная синхронизация служебного приложения Офис Работа с базой заявок и нарядов CRM',
       'Электронные акты выполненных работ и персональная выработка мастеров'
+    ],
+    isMandatory: false,
+    publishedAt: new Date().toISOString()
+  });
+});
+
+// Публичный эндпоинт проверки обновлений служебного приложения «Офис Работа» (для мастеров и техников)
+app.get('/api/app/version-staff', (req, res) => {
+  const siteDownloadUrl = 'https://xn--80aha5afebav9a.xn--p1ai/backend-api/api/app/download-staff';
+  const directMediaUrl = 'https://xn--80aha5afebav9a.xn--p1ai/media/app/office-work.apk';
+  const githubFallbackUrl = 'https://github.com/keystone4tech-blip/domofond-revive/releases/download/staff-app-latest/office-work.apk';
+
+  console.log('[Бэкенд: Версия приложения Офис Работа] Запрос проверки обновлений для персонала');
+
+  res.json({
+    latestVersion: '1.0.0',
+    versionCode: 1,
+    minSupportedVersion: '1.0.0',
+    downloadUrl: siteDownloadUrl,
+    directMediaUrl: directMediaUrl,
+    fallbackDownloadUrl: githubFallbackUrl,
+    releaseNotes: [
+      'Версия 1.0.0: Мобильное рабочее место мастера «Офис Работа»',
+      'Прямая интеграция со смарт-диспетчерской CRM «ДомофонДар»',
+      'Электронные акты выполненных работ и цифровая подпись клиента',
+      'Автоматический расчет заработной платы и выработки техника'
     ],
     isMandatory: false,
     publishedAt: new Date().toISOString()

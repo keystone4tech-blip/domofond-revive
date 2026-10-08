@@ -9,6 +9,7 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useStaffAuthStore } from '../src/store/auth.store';
 import { useStaffTasksStore } from '../src/store/tasks.store';
+import { UpdateCheckerModal } from '../src/components/UpdateCheckerModal';
 
 export default function RootLayout() {
   const checkAuth = useStaffAuthStore((state) => state.checkAuth);
@@ -35,6 +36,8 @@ export default function RootLayout() {
         <Stack.Screen name="(auth)/login" options={{ animation: 'slide_from_bottom' }} />
         <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
       </Stack>
+      {/* Модальное окно автопроверки и установки обновлений */}
+      <UpdateCheckerModal />
     </SafeAreaProvider>
   );
 }

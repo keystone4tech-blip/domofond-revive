@@ -11,6 +11,44 @@
 > 
 > **Пользователь НЕ ДОЛЖЕН ничего вносить вручную.** Вся статистика и история пополняется ИИ автоматически при каждой задаче.
 
+# 2026-10-09 01:40 — Ликвидация краша экрана «Профиль», доставка релизных APK v1.3.0 на боевой сервер и модуль автообновления для «Офис Работа»
+
+## 1. Задачи и выполненные работы
+- **Клиентское приложение жильцов («Домофондар», `mobile/`) — ликвидация краша профиля и зацикливания обновления**:
+  * **Причина повторного запроса на обновление**:
+    1. На сервере в `/opt/domofondar/public/media/app/` лежал старый APK от 7 октября (1.2.9), потому что workflow деплоя упал и не скачал скомпилированный APK из GitHub Releases.
+    2. В `UpdateCheckerModal.tsx` перед скачиванием стояла проверка `if (existing.exists && existing.size > 20MB) launchApkInstaller(...)` — приложение брало старый кэшированный APK 1.2.9 с диска телефона и устанавливало его заново без загрузки свежего билда.
+  * **Причина падения экрана «Профиль»**:
+    1. Автоматический вызов нативных методов `Notifications.getPermissionsAsync()`, `ImagePicker.getMediaLibraryPermissionsAsync()`, `Location.getForegroundPermissionsAsync()` прямо при монтировании экрана приводил к необработанному исключению в нативном слое Android.
+    2. В компоненте `Row` свойство `badge` передавалось как `badge={emptyCount > 0 ? emptyCount : 0}`, а тернарный оператор `{badge ? ... : null}` при значении 0 выводил примитив числа вне компонента `<Text>`, что вызывало мгновенный краш `Invariant Violation: Text strings must be rendered within a <Text> component`.
+  * **Решение**:
+    1. В `mobile/app/(tabs)/profile/index.tsx` переписан компонент `Row` с безопасными проверками `hasBadge = badge !== undefined && badge !== null && badge !== 0...`, строгим приведением `{String(badge)}` внутри `<Text>`, а в `badge` передается `emptyCount > 0 ? emptyCount : undefined`.
+    2. Проверка разрешений переведена в отложенный фоновый режим с защитой от сбоев нативных модулей.
+    3. В `UpdateCheckerModal.tsx` добавлена принудительная очистка старого кэшированного APK перед загрузкой и параметр `?t=...` для предотвращения HTTP-кэширования.
+- **Доставка скомпилированных релизов на боевой сервер 45.8.99.238**:
+  * С GitHub Releases загружены свежие собранные APK:
+    * `domofondar.apk` (45 293 504 байт / 43.1 МБ, v1.3.0 Build 17)
+    * `office-work.apk` (93 761 772 байт / 89.4 МБ, v1.0.0 Build 1)
+  * Файлы размещены в `/opt/domofondar/public/media/app/` и смонтированы в контейнеры `domofondar_frontend` и `domofondar_backend`.
+  * Эндпоинты `https://домофондар.рф/backend-api/api/app/download` и `https://домофондар.рф/backend-api/api/app/download-staff` отдают файлы с кодом `HTTP 200 OK` и заголовками `Content-Disposition: attachment`.
+- **Служебное приложение сотрудников («Офис Работа», `mobile-staff/`) — система автообновления**:
+  * На бэкенде в `server/index.js` добавлен эндпоинт `GET /api/app/version-staff` (и поддержка `GET /api/app/version?app=staff`) с версией 1.0.0 и прямыми ссылками на загрузку.
+  * Разработан и внедрен компонент `UpdateCheckerModal.tsx` в `mobile-staff/src/components/UpdateCheckerModal.tsx` с прогресс-баром скачивания, процентами и системным установщиком Android IntentLauncher.
+  * `UpdateCheckerModal` смонтирован в корень `mobile-staff/app/_layout.tsx`.
+  * На экран профиля сотрудника `mobile-staff/app/(tabs)/profile.tsx` добавлена кнопка «Проверить обновления» с ручным вызовом API.
+
+## 2. Измененные файлы
+- [`mobile/app/(tabs)/profile/index.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/app/(tabs)/profile/index.tsx) — исправление падения профиля при входе, безопасные бейджи и отложенные разрешения.
+- [`mobile/src/components/UpdateCheckerModal.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/src/components/UpdateCheckerModal.tsx) — принудительная очистка кэшированного APK перед скачиванием свежего релиза.
+- [`server/index.js`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/server/index.js) — эндпоинт /api/app/version-staff и поддержка query app=staff.
+- [`mobile-staff/src/config/constants.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile-staff/src/config/constants.ts) — добавление APP_DOWNLOAD_URL.
+- [`mobile-staff/src/components/UpdateCheckerModal.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile-staff/src/components/UpdateCheckerModal.tsx) — новый компонент проверки и скачивания обновлений.
+- [`mobile-staff/app/_layout.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile-staff/app/_layout.tsx) — подключение UpdateCheckerModal.
+- [`mobile-staff/app/(tabs)/profile.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile-staff/app/(tabs)/profile.tsx) — кнопка проверки обновлений в профиле сотрудника.
+- [`src/data/projectChangelog.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/data/projectChangelog.ts) — актуализация паспорта проекта.
+- [`PROJECT_LOG.md`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/PROJECT_LOG.md) — актуализация журнала проекта.
+- [`AGENT_SYNC.md`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/AGENT_SYNC.md) — фиксация и снятие claim.
+
 # 2026-10-09 01:05 — Клиентское приложение: устранение ошибки обновления на Android; Служебное приложение: ликвидация моков и полная синхронизация с PostgreSQL
 
 ## 1. Задачи и выполненные работы
