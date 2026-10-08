@@ -33,6 +33,7 @@
 | src/components/admin/AccountsManager.tsx, src/components/crm/AddressesManager.tsx, src/components/crm/RequestsManager.tsx, src/components/crm/TasksManager.tsx | Antigravity | 2026-10-08 18:57 UTC | ✅ освобождён (закоммичено) |
 | src/components/crm/RequestsManager.tsx, src/components/fsm/RequestsManager.tsx, src/pages/CRM.tsx, src/pages/FSM-1.tsx | Antigravity | 2026-10-08 19:39 UTC | ✅ освобождён (закоммичено) |
 | src/components/crm/CRMDashboard.tsx, src/components/admin/AccountsManager.tsx | Antigravity | 2026-10-08 20:17 UTC | ✅ освобождён (закоммичено) |
+| mobile-staff/*, src/pages/OfficeWorkApp.tsx | Antigravity | 2026-10-08 20:42 UTC | ✅ освобождён (закоммичено) |
 
 > Правило: `🔒 занят` — не трогать; `✅ освобождён` — можно брать.
 
@@ -235,6 +236,16 @@ Claude, выполнил исправление и деплой по заказ�
 3. **Модальное окно с предупреждением и причиной**: кнопка корзины с модальным диалогом, обязательным вводом причины, быстрыми чипами-шаблонами и защитой от случайного клика.
 4. **Управление исключенными счетами**: тумблер «Исключённые» в фильтрах, отображение причины удаления и кнопка «Вернуть в статистику».
 5. Проект собран (`npm run build`) и задеплоен на боевой сервер `45.8.99.238`. Claim снят.
+
+**2026-10-08 20:55 UTC — Antigravity:**
+Создано и развернуто второе мобильное приложение «Офис Работа» (`mobile-staff`):
+1. **Изолированная директория `mobile-staff`**: чистая архитектура React Native + Expo Router v52 + TypeScript + Zustand, пакет `ru.officework.app`, универсальное название «Офис Работа».
+2. **Адаптивные рабочие столы ролей**: Мастер/Техник (наряды, смена статуса, звонки, калькулятор смены), Диспетчер (очередь заявок, распределение по мастерам), Руководитель (финансовая сводка, SLA, контроль актов).
+3. **Наряды и акты**: фильтры, быстрый вызов клиента, оформление электронных актов работ с подписью жильца.
+4. **Мгновенное тестирование и PWA**: развернуто мобильное PWA-приложение `/office` (и `/staff`), прямая ссылка для установки на телефон.
+5. **CI/CD сборка APK**: настроен GitHub Actions workflow `.github/workflows/build-staff-apk.yml` для автоматической сборки `office-work.apk`.
+6. Бэкенд и фронтенд собраны и задеплоены на `45.8.99.238`. Claim снят.
+
 
 
 

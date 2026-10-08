@@ -319,6 +319,37 @@ app.get('/api/app/download', (req, res) => {
   return res.redirect(githubFallbackUrl);
 });
 
+// Выделенный эндпоинт для прямого скачивания APK служебного приложения «Офис Работа»
+app.get('/api/app/download-staff', (req, res) => {
+  console.log('[Бэкенд: Скачивание Staff APK] Получен запрос на скачивание office-work.apk');
+  const candidatePaths = [
+    path.join(__dirname, '..', 'public', 'media', 'app', 'office-work.apk'),
+    '/usr/share/nginx/html/media/app/office-work.apk',
+    '/public/media/app/office-work.apk',
+    path.join(process.cwd(), 'public', 'media', 'app', 'office-work.apk')
+  ];
+
+  let resolvedPath = null;
+  for (const p of candidatePaths) {
+    if (fs.existsSync(p)) {
+      resolvedPath = p;
+      break;
+    }
+  }
+
+  const githubFallbackUrl = 'https://github.com/keystone4tech-blip/domofond-revive/releases/download/staff-app-latest/office-work.apk';
+
+  if (resolvedPath) {
+    console.log(`[Бэкенд: Скачивание Staff APK] Файл найден: ${resolvedPath}`);
+    res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+    res.setHeader('Content-Disposition', 'attachment; filename="office-work.apk"');
+    res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+    return res.sendFile(resolvedPath);
+  }
+
+  return res.redirect(githubFallbackUrl);
+});
+
 // Вспомогательная функция: извлечение последних 10 цифр номера телефона для унифицированного поиска и сравнения
 // Например: +7 (909) 453-62-41 -> 9094536241; 89094536241 -> 9094536241
 function extractLast10Digits(input) {

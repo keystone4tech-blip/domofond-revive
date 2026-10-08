@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useLocation } from "react-router-dom";
 import { MessageCircle, X, Send, Loader2, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,6 +21,7 @@ function getSessionId() {
 }
 
 export default function ChatWidget() {
+  const location = useLocation();
   const [open, setOpen] = useState(false);
   const [autoOpened, setAutoOpened] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -374,7 +376,7 @@ export default function ChatWidget() {
     }
   };
 
-  if (!isActive) return null;
+  if (!isActive || location.pathname.startsWith("/office") || location.pathname.startsWith("/staff")) return null;
 
   return (
     <>

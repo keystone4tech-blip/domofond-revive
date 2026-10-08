@@ -11,6 +11,52 @@
 > 
 > **Пользователь НЕ ДОЛЖЕН ничего вносить вручную.** Вся статистика и история пополняется ИИ автоматически при каждой задаче.
 
+# 2026-10-08 23:55 — Служебное мобильное приложение «Офис Работа»: создание отдельной директории mobile-staff, ролевые рабочие столы (Мастер / Диспетчер / Директор), наряды, акты, PWA и CI/CD сборка APK
+
+## 1. Задачи и выполненные работы
+- **Создание автономной директории второго приложения `mobile-staff`**:
+  * Изолированная структура проекта со своим `package.json`, React Native, Expo 52, TypeScript, Expo Router и Zustand.
+  * Универсальное отображаемое название приложения: **«Офис Работа»** (подходит для любых филиалов и регионов компании).
+  * Пакет приложения: `ru.officework.app`.
+  * Конфигурации `app.config.ts`, `babel.config.js`, `tsconfig.json`, `eas.json`.
+- **Авторизация сотрудников по номеру телефона и паролю**:
+  * Подключение к защищенному API серверу (`/api/auth/login`).
+  * Проверка служебных ролей персонала (`master`, `technician`, `installer`, `dispatcher`, `director`, `admin`, `superadmin`).
+  * Быстрый вход в 1 клик для тестирования под любой ролью.
+- **Адаптивный рабочий стол под роли сотрудников**:
+  * **Мастер / Техник / Монтажник**: тумблер смены («На смене» / «Отдых»), карточка текущего активного наряда с адресом, подъездом, этажом, кодом домофона, кнопка звонка жильцу, счетчик закрытых заявок и калькулятор выработки смены.
+  * **Диспетчер**: сводка очереди заявок, мониторинг мастеров на линии, список срочных вызовов и распределение по исполнителям.
+  * **Руководитель / Директор**: финансовая сводка филиала за день, процент выполнения SLA в срок, контроль выработки экипажей, ревизия актов.
+  * Панель быстрого переключения активной роли прямо в приложении для моментальной проверки любого интерфейса.
+- **Реестры нарядов, электронных актов и оповещений**:
+  * Наряды: фильтрация (Все, В работе, В пути, Новые, Выполнены, Срочные), поиск по адресу, карточка смены статусов («Выехал» ➔ «В работе» ➔ «Выполнен»).
+  * Электронные акты работ: составление акта сдачи-приемки, фиксация использованных материалов, стоимости, электронная подпись жильца.
+  * Оповещения: срочные аварийные сигналы и назначения диспетчера.
+  * Профиль: статус смены, личные данные, переключатель режима роли, выход.
+- **Деплой и публикация для тестирования**:
+  * Создан CI/CD пайплайн `.github/workflows/build-staff-apk.yml` для автоматической сборки `office-work.apk` на серверах GitHub Actions.
+  * Развернуто прогрессивное мобильное веб-приложение (PWA) по защищенному адресу `https://домофондар.рф/office` (и `/staff`), доступное для мгновенного входа и тестирования прямо сейчас с любого смартфона (с возможностью установки на экран «Добавить на главный экран»).
+  * В бэкенд добавлен эндпоинт `/api/app/download-staff` для отдачи APK.
+
+## 2. Созданные и измененные файлы
+- [`mobile-staff/package.json`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile-staff/package.json) — зависимости служебного приложения.
+- [`mobile-staff/app.config.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile-staff/app.config.ts) — конфигурация Expo «Офис Работа».
+- [`mobile-staff/src/types/staff.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile-staff/src/types/staff.ts) — типы нарядов, актов, ролей и сотрудников.
+- [`mobile-staff/src/api/client.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile-staff/src/api/client.ts) — HTTP-клиент с авторизацией.
+- [`mobile-staff/src/store/auth.store.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile-staff/src/store/auth.store.ts) — стейт авторизации и ролей.
+- [`mobile-staff/src/store/tasks.store.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile-staff/src/store/tasks.store.ts) — реестр нарядов и актов.
+- [`mobile-staff/app/_layout.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile-staff/app/_layout.tsx) — корневой макет приложения.
+- [`mobile-staff/app/(auth)/login.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile-staff/app/(auth)/login.tsx) — экран входа по телефону и паролю.
+- [`mobile-staff/app/(tabs)/index.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile-staff/app/(tabs)/index.tsx) — адаптивный рабочий стол ролей.
+- [`mobile-staff/app/(tabs)/tasks.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile-staff/app/(tabs)/tasks.tsx) — наряды и смена статусов.
+- [`mobile-staff/app/(tabs)/acts.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile-staff/app/(tabs)/acts.tsx) — электронные акты выполненных работ.
+- [`mobile-staff/app/(tabs)/notifications.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile-staff/app/(tabs)/notifications.tsx) — оповещения и сигналы.
+- [`mobile-staff/app/(tabs)/profile.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile-staff/app/(tabs)/profile.tsx) — профиль и статус смены.
+- [`.github/workflows/build-staff-apk.yml`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/.github/workflows/build-staff-apk.yml) — GitHub Actions сборка APK.
+- [`src/pages/OfficeWorkApp.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/pages/OfficeWorkApp.tsx) — PWA-версия для моментального тестирования.
+- [`src/App.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/App.tsx) — маршруты `/office` и `/staff`.
+- [`server/index.js`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/server/index.js) — эндпоинт скачивания staff APK.
+
 # 2026-10-08 23:25 — Финансы и лицевые счета: безопасное мягкое удаление тестовых счетов (Soft Delete) с обязательной причиной и полным исключением из аналитики и графиков
 
 ## 1. Задачи и выполненные работы

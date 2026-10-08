@@ -1,0 +1,154 @@
+# .github/workflows/build-staff-apk.yml
+# Автоматическая компиляция установочного APK для служебного приложения «Офис Работа»
+# Сборка на облачных серверах GitHub Actions с публикацией в Releases и на сервер
+
+name: 🏢 Сборка Android APK (Офис Работа)
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Тип сборки (release / debug)'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+          - release
+          - debug
+
+  push:
+    branches:
+      - main
+    paths:
+      - 'mobile-staff/**'
+      - '.github/workflows/build-staff-apk.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: staff-android-build-${{ github.workflow }}-${{ github.run_id }}
+  cancel-in-progress: false
+
+env:
+  ANDROID_HOME: /usr/local/lib/android/sdk
+  ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+
+jobs:
+  build-apk:
+    name: Сборка установочного APK «Офис Работа»
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: 📥 Получение исходного кода
+        uses: actions/checkout@v4
+
+      - name: 🟢 Настройка Node.js (v22)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: ☕ Настройка Java JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: 📦 Установка зависимостей мобильного приложения
+        run: |
+          echo "[CI/CD] Установка зависимостей в директории mobile-staff..."
+          cd mobile-staff
+          npm install --legacy-peer-deps
+
+      - name: ⚙️ Синхронизация нативного Android проекта (Expo Prebuild)
+        run: |
+          echo "[CI/CD] Запуск Expo Prebuild для приложения Офис Работа..."
+          cd mobile-staff
+          npx expo prebuild --platform android --clean
+
+      - name: 🔑 Выдача прав на gradlew
+        run: |
+          cd mobile-staff/android
+          chmod +x gradlew
+
+      - name: 🔨 Компиляция автономного APK через Gradle
+        run: |
+          cd mobile-staff/android
+          BUILD_TYPE="${{ github.event.inputs.build_type || 'release' }}"
+          echo "[CI/CD] Запуск компиляции APK Офис Работа ($BUILD_TYPE)..."
+          
+          if [ "$BUILD_TYPE" = "debug" ]; then
+            ./gradlew assembleDebug --no-daemon
+          else
+            ./gradlew assembleRelease --no-daemon
+          fi
+
+      - name: 🔐 Проверка, подпись и валидация APK
+        run: |
+          mkdir -p staff-artifacts
+          RAW_APK=$(find mobile-staff/android/app/build/outputs/apk -name "*.apk" | head -n 1)
+          if [ -z "$RAW_APK" ]; then
+            echo "[CI/CD] ОШИБКА: Файл APK не найден!"
+            exit 1
+          fi
+          echo "[CI/CD] Найден исходный APK: $RAW_APK"
+          
+          BUILD_TOOLS_DIR=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -n 1)
+          VERIFY_OUTPUT=$("$BUILD_TOOLS_DIR/apksigner" verify --verbose "$RAW_APK" 2>&1 || true)
+          
+          if echo "$VERIFY_OUTPUT" | grep -q "Verifies: true"; then
+            cp "$RAW_APK" staff-artifacts/office-work.apk
+          else
+            "$BUILD_TOOLS_DIR/zipalign" -p -f 4 "$RAW_APK" staff-artifacts/aligned.apk
+            "$BUILD_TOOLS_DIR/apksigner" sign \
+              --ks mobile-staff/android/app/debug.keystore \
+              --ks-pass pass:android \
+              --key-pass pass:android \
+              --ks-key-alias androiddebugkey \
+              --out staff-artifacts/office-work.apk \
+              staff-artifacts/aligned.apk
+            rm -f staff-artifacts/aligned.apk
+          fi
+          
+          "$BUILD_TOOLS_DIR/apksigner" verify --verbose staff-artifacts/office-work.apk
+          ls -lh staff-artifacts/office-work.apk
+
+      - name: 🚀 Сохранение APK в артефакты GitHub
+        uses: actions/upload-artifact@v4
+        with:
+          name: office-work-apk-bundle
+          path: staff-artifacts/office-work.apk
+          retention-days: 30
+
+      - name: 📦 Публикация в GitHub Releases
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main'
+        with:
+          tag_name: staff-app-latest
+          name: 🏢 Служебное мобильное приложение «Офис Работа» (Android APK)
+          body: |
+            ## 🏢 Универсальное служебное приложение «Офис Работа» для сотрудников
+
+            - **Файл:** `office-work.apk`
+            - **Назначение:** Наряды, заявки, электронные акты, выработка мастеров, диспетчеризация
+            - **Вход:** По номеру телефона и паролю сотрудника CRM
+            
+            ### 📥 Установка на Android:
+            1. Скачайте `office-work.apk` на смартфон.
+            2. Нажмите «Установить».
+          files: |
+            staff-artifacts/office-work.apk
+          draft: false
+          prerelease: false
+
+      - name: 📲 Загрузка APK на боевой сервер
+        uses: appleboy/scp-action@master
+        continue-on-error: true
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          source: "staff-artifacts/office-work.apk"
+          target: "/opt/domofondar/public/media/app"
+          strip_components: 1

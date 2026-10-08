@@ -20,6 +20,7 @@ import Payment from "./pages/Payment";
 import Calculator from "./pages/Calculator";
 import Golosovanie from "./pages/Golosovanie";
 import Project from "./pages/Project";
+import OfficeWorkApp from "./pages/OfficeWorkApp";
 import MobileBottomNav from "./components/MobileBottomNav";
 import ScrollToTop from "./components/ScrollToTop";
 import ChatWidget from "./components/ChatWidget";
@@ -98,6 +99,9 @@ const App = () => (
                     <Route path="/golosovanie" element={<Golosovanie />} />
                     <Route path="/golosovanie/:id" element={<Golosovanie />} />
                     <Route path="/project" element={<Project />} />
+                    {/* Служебное мобильное веб-приложение / PWA «Офис Работа» для сотрудников */}
+                    <Route path="/office" element={<OfficeWorkApp />} />
+                    <Route path="/staff" element={<OfficeWorkApp />} />
                     {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                     <Route path="*" element={<NotFound />} />
                   </Routes>

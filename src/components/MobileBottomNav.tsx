@@ -86,9 +86,15 @@ const MobileBottomNav = () => {
   // Доступ к Инженерному паспорту строго закрыт для всех и открыт ИСКЛЮЧИТЕЛЬНО суперадмину
   const isSuperAdmin = ((user?.email || "").toLowerCase().trim() === "viruscorp4@gmail.com") || userRoles.includes("superadmin");
 
-  // На страницах админки (/admin) и CRM (/crm, /fsm) глобальную нижнюю панель скрываем,
-  // так как там используются свои специализированные мобильные тулбары
-  if (location.pathname.startsWith("/crm") || location.pathname.startsWith("/fsm") || location.pathname.startsWith("/admin")) {
+  // На страницах админки (/admin), CRM (/crm, /fsm) и служебного приложения (/office, /staff)
+  // глобальную нижнюю панель скрываем, так как там используются свои специализированные мобильные тулбары
+  if (
+    location.pathname.startsWith("/crm") ||
+    location.pathname.startsWith("/fsm") ||
+    location.pathname.startsWith("/admin") ||
+    location.pathname.startsWith("/office") ||
+    location.pathname.startsWith("/staff")
+  ) {
     return null;
   }
 
