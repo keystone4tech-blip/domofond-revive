@@ -258,6 +258,16 @@ export const KIND_META: Record<Kind, { label: string; badgeCls: string }> = {
  */
 export const PROJECT_CHANGELOG: ProjectEntry[] = [
   {
+    id: "stage-2026-10-09-0015",
+    datetime: "2026-10-09 00:15",
+    title: "Офис Работа CI/CD: устранение ошибки разрешения query-string в Metro bundler и добавление metro.config.js",
+    description: "Устранена ошибка компиляции JS-бандла release в GitHub Actions (:app:createBundleReleaseJsAndAssets): 1) В dependencies mobile-staff/package.json явно подключена библиотека query-string v7.1.3, требуемая форком getPathFromState.js в expo-router v4, а также react-native-webview. 2) Создан специализированный metro.config.js на основе getDefaultConfig(__dirname) для гарантированного изолированного разрешения всех транзитивных зависимостей сборщиком Metro.",
+    module: "infra_mobile",
+    kind: "fix",
+    hours: 1.0,
+    difficulty: "Средняя",
+  },
+  {
     id: "stage-2026-10-09-0005",
     datetime: "2026-10-09 00:05",
     title: "Личный кабинет суперадмина: модуль прямого скачивания 2 мобильных приложений (Клиентское + Офис Работа APK)",

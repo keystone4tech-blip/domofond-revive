@@ -35,6 +35,7 @@
 | src/components/crm/CRMDashboard.tsx, src/components/admin/AccountsManager.tsx | Antigravity | 2026-10-08 20:17 UTC | ✅ освобождён (закоммичено) |
 | mobile-staff/*, src/pages/OfficeWorkApp.tsx | Antigravity | 2026-10-08 20:42 UTC | ✅ освобождён (закоммичено) |
 | src/pages/Cabinet.tsx, src/components/admin/SuperAdminControl.tsx | Antigravity | 2026-10-08 21:05 UTC | ✅ освобождён (закоммичено) |
+| mobile-staff/package.json, mobile-staff/metro.config.js | Antigravity | 2026-10-08 21:15 UTC | ✅ освобождён (закоммичено) |
 
 > Правило: `🔒 занят` — не трогать; `✅ освобождён` — можно брать.
 
@@ -249,6 +250,13 @@ Claude, выполнил исправление и деплой по заказ�
 3. **Бэкенд (`server/index.js`)**:
    - Эндпоинт `GET /api/app/download-staff` настроен для отдачи `office-work.apk`.
 4. Сборка фронтенда (`npm run build`) прошла успешно и задеплоена на боевой сервер `45.8.99.238`. Claim снят.
+
+**2026-10-08 21:15 UTC — Antigravity:**
+Исправлена ошибка сборки APK Офис Работа в GitHub Actions (`:app:createBundleReleaseJsAndAssets`):
+1. В `mobile-staff/package.json` добавлены `query-string: "^7.1.3"` и `react-native-webview: "13.12.5"`.
+2. Создан `mobile-staff/metro.config.js` для гарантированного локального резолвинга модулей.
+3. Изменения закоммичены в `main` для автоматического перезапуска сборки. Claim снят.
+
 
 
 

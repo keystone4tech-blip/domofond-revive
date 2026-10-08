@@ -11,6 +11,21 @@
 > 
 > **Пользователь НЕ ДОЛЖЕН ничего вносить вручную.** Вся статистика и история пополняется ИИ автоматически при каждой задаче.
 
+# 2026-10-09 00:15 — Офис Работа CI/CD: устранение ошибки разрешения query-string в Metro bundler и добавление metro.config.js
+
+## 1. Задачи и выполненные работы
+- **Устранение сбоя :app:createBundleReleaseJsAndAssets при компиляции APK на GitHub Actions**:
+  * **Причина**: Expo Router v4 во внутреннем форке `getPathFromState.js` обращается к модулю `query-string`. Из-за отсутствия явного объявления в `mobile-staff/package.json` Metro Bundler не мог разрешить зависимость и прерывал сборку с ненулевым кодом выхода.
+  * **Решение**: В зависимости `mobile-staff/package.json` добавлены `query-string` (^7.1.3) и `react-native-webview` (13.12.5), аналогично проверенной конфигурации основного приложения.
+  * **Конфигурация бандлера**: Создан файл `mobile-staff/metro.config.js` с вызовом `getDefaultConfig(__dirname)` для надежного локального разрешения зависимостей.
+
+## 2. Измененные файлы
+- [`mobile-staff/package.json`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile-staff/package.json) — добавлены зависимости query-string и react-native-webview.
+- [`mobile-staff/metro.config.js`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile-staff/metro.config.js) — конфигурация сборщика Metro.
+- [`src/data/projectChangelog.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/data/projectChangelog.ts) — фиксация этапа разработки в реестре.
+- [`AGENT_SYNC.md`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/AGENT_SYNC.md) — фиксация и снятие claim.
+- [`PROJECT_LOG.md`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/PROJECT_LOG.md) — актуализация паспорта проекта.
+
 # 2026-10-09 00:05 — Личный кабинет суперадмина: модуль прямого скачивания 2 мобильных приложений компании (Клиентское «ДомофонДар» + Служебное «Офис Работа» APK)
 
 ## 1. Задачи и выполненные работы
