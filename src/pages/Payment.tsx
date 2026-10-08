@@ -84,8 +84,8 @@ const Payment = () => {
             </Link>
           </div>
 
-          {/* Контейнер фрейма оплаты Банка Кубань Кредит */}
-          <div className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden min-h-[600px]">
+          {/* Контейнер фрейма оплаты Банка Кубань Кредит с поддержкой мобильного скролла */}
+          <div className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-x-auto min-h-[700px] w-full">
             {/* Спиннер во время загрузки */}
             {!iframeLoaded && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm z-10">
@@ -99,12 +99,12 @@ const Payment = () => {
             <iframe 
               src="https://pay.kk.bank/services/33936?hh" 
               frameBorder="0" 
-              scrolling="no" 
-              height="1000" 
+              scrolling="auto" 
+              height="950" 
               width="100%"
               title="Форма оплаты за техническое обслуживание Банка «Кубань Кредит»"
               onLoad={() => setIframeLoaded(true)}
-              className="w-full"
+              className="w-full min-h-[750px] sm:min-h-[900px] border-0"
             />
           </div>
 

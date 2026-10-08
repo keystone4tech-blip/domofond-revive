@@ -699,10 +699,10 @@ const DebtCard = ({
             </div>
           </div>
 
-          {/* Адрес абонента */}
-          <div className="relative z-10 text-xs sm:text-sm text-white/95 mt-3 font-medium flex items-center gap-1.5 truncate">
-            <MapPin className="h-4 w-4 shrink-0 text-white/75" />
-            <span className="truncate">{formatFullAddress(address, apartment)}</span>
+          {/* Адрес абонента — полный адрес без обрезания с адаптивным переносом */}
+          <div className="relative z-10 text-xs sm:text-sm text-white/95 mt-2.5 font-medium flex items-start gap-1.5">
+            <MapPin className="h-4 w-4 shrink-0 text-white/80 mt-0.5" />
+            <span className="break-words leading-snug">{formatFullAddress(address, apartment)}</span>
           </div>
 
           {/* Предупреждение о расторжении договора */}
@@ -712,16 +712,16 @@ const DebtCard = ({
             </div>
           ) : null}
 
-          {/* Информация об обслуживании на карте */}
+          {/* Информация об обслуживании на карте — аккуратный адаптивный перенос */}
           {(account.tariff_price != null || account.has_handset != null || account.is_smart_home != null) && (
-            <div className="relative z-10 mt-3 py-1.5 px-3 rounded-xl bg-black/20 backdrop-blur-md border border-white/10 text-[11px] text-white/90 flex flex-wrap items-center gap-x-3.5 gap-y-1">
+            <div className="relative z-10 mt-3 py-2 px-3 rounded-xl bg-black/25 backdrop-blur-md border border-white/15 text-xs text-white/90 flex flex-wrap items-center gap-x-3 gap-y-1.5 leading-normal">
               {account.tariff_price != null && (
                 <span>Тариф: <strong className="text-white font-bold">{Number(account.tariff_price)} ₽/мес</strong></span>
               )}
-              <span>Трубка: <strong className="text-white">{account.has_handset ? "Есть" : "Нет"}</strong></span>
-              <span>Умный домофон: <strong className="text-white">{account.is_smart_home ? "Да" : "Нет"}</strong></span>
+              <span>Трубка: <strong className="text-white font-semibold">{account.has_handset ? "Есть" : "Нет"}</strong></span>
+              <span>Умный домофон: <strong className="text-white font-semibold">{account.is_smart_home ? "Да" : "Нет"}</strong></span>
               {account.is_smart_home && (
-                <span>ЛК: <strong className="text-white">{account.has_lk ? "Подключён" : "Не подключён"}</strong></span>
+                <span>ЛК: <strong className="text-white font-semibold">{account.has_lk ? "Подключён" : "Не подключён"}</strong></span>
               )}
             </div>
           )}
@@ -736,79 +736,57 @@ const DebtCard = ({
             </div>
           </div>
 
-          {/* Кнопки оплаты внутри карты: на мобильных экранах в столбик во всю ширину, на планшетах/ПК в ряд */}
-          <div className="relative z-10 mt-4 flex flex-col sm:flex-row gap-2.5">
-            {isVerified ? (
-              <>
-                <Button
-                  className="w-full sm:flex-1 h-12 bg-white hover:bg-white/95 text-slate-900 font-extrabold rounded-xl text-sm sm:text-base shadow-lg shadow-black/15 transition-transform active:scale-[0.98] flex items-center justify-center gap-2"
-                  onClick={() => {
-                    const currentDebt = Number(account.debt_amount) || 0;
-                    setPayAmount(currentDebt > 0 ? currentDebt.toFixed(2) : (account.tariff_price ? String(account.tariff_price) : "300"));
-                    setIsYooKassaOpen(true);
-                  }}
-                >
-                  <Zap className="h-5 w-5 text-amber-500 fill-amber-500 shrink-0" />
-                  <span>Быстрая оплата ЮKassa</span>
-                </Button>
+          {/* Кнопки оплаты внутри карты: адаптивные полноценные кнопки с гарантированным переносом строк */}
+          <div className="relative z-10 mt-4 flex flex-col gap-2.5 w-full">
+            <Button
+              className="w-full min-h-[50px] h-auto py-3 px-4 bg-white hover:bg-white/95 text-slate-900 font-extrabold rounded-xl text-sm sm:text-base shadow-lg shadow-black/15 transition-transform active:scale-[0.98] flex items-center justify-center gap-2 whitespace-normal text-center leading-tight"
+              onClick={() => {
+                const cd = Number(account.debt_amount) || 0;
+                const tariff = account.tariff_price != null && Number(account.tariff_price) > 0 ? Number(account.tariff_price).toFixed(2) : "300";
+                // Если есть задолженность — по умолчанию подставляем полный долг, иначе сумму тарифа
+                setPayAmount(cd > 0 ? cd.toFixed(2) : tariff);
+                setIsYooKassaOpen(true);
+              }}
+            >
+              <Zap className="h-5 w-5 text-amber-500 fill-amber-500 shrink-0" />
+              <span>Быстрая оплата ЮKassa</span>
+            </Button>
 
-                <div className="flex gap-2 w-full sm:w-auto">
-                  <Button
-                    variant="ghost"
-                    className="flex-1 sm:flex-none h-12 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white font-bold rounded-xl border border-white/25 text-xs sm:text-sm px-4 transition-transform active:scale-[0.98] flex items-center justify-center"
-                    onClick={() => navigate("/payment")}
-                    title="Оплата через Банк «Кубань Кредит»"
-                  >
-                    <CreditCard className="h-4 w-4 mr-2 shrink-0" />
-                    <span>Банк «Кубань Кредит»</span>
-                  </Button>
+            <div className="flex items-center gap-2 w-full">
+              <Button
+                variant="ghost"
+                className="flex-1 min-h-[46px] h-auto py-2.5 px-3 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white font-bold rounded-xl border border-white/25 text-xs sm:text-sm transition-transform active:scale-[0.98] flex items-center justify-center gap-1.5 whitespace-normal text-center leading-tight"
+                onClick={() => navigate("/payment")}
+                title="Оплата через Банк «Кубань Кредит»"
+              >
+                <CreditCard className="h-4 w-4 shrink-0" />
+                <span>Банк «Кубань Кредит»</span>
+              </Button>
 
-                  <Button
-                    variant="ghost"
-                    className="h-12 w-12 bg-white/15 hover:bg-white/25 backdrop-blur-md text-white font-bold rounded-xl border border-white/20 px-0 transition-transform active:scale-[0.98] shrink-0 flex items-center justify-center"
-                    onClick={() => setIsHistoryOpen(true)}
-                    title="История оплат и электронные чеки"
-                    aria-label="История платежей"
-                  >
-                    <Receipt className="h-5 w-5" />
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <div className="flex gap-2 w-full">
-                <Button
-                  className="flex-1 h-12 bg-white hover:bg-white/95 text-slate-900 font-extrabold rounded-xl text-sm sm:text-base shadow-md flex items-center justify-center"
-                  onClick={() => navigate("/payment")}
-                >
-                  <CreditCard className="h-5 w-5 mr-2 text-slate-700 shrink-0" />
-                  <span>Оплатить (Банк «Кубань Кредит»)</span>
-                </Button>
-
-                <Button
-                  variant="ghost"
-                  className="h-12 w-12 bg-white/15 hover:bg-white/25 backdrop-blur-md text-white font-bold rounded-xl border border-white/20 px-0 transition-transform active:scale-[0.98] shrink-0 flex items-center justify-center"
-                  onClick={() => setIsHistoryOpen(true)}
-                  title="История оплат и электронные чеки"
-                  aria-label="История платежей"
-                >
-                  <Receipt className="h-5 w-5" />
-                </Button>
-              </div>
-            )}
+              <Button
+                variant="ghost"
+                className="min-h-[46px] h-auto w-12 bg-white/15 hover:bg-white/25 backdrop-blur-md text-white font-bold rounded-xl border border-white/20 px-0 transition-transform active:scale-[0.98] shrink-0 flex items-center justify-center"
+                onClick={() => setIsHistoryOpen(true)}
+                title="История оплат и электронные чеки"
+                aria-label="История платежей"
+              >
+                <Receipt className="h-5 w-5" />
+              </Button>
+            </div>
           </div>
 
           {/* Блок автоплатежа внутри карты со стильным тумблером */}
           {isVerified && !account.contract_terminated && account.status !== "terminated" && (
-            <div className="relative z-10 mt-3.5 rounded-xl bg-white/15 backdrop-blur-md border border-white/20 p-3 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="h-8 w-8 rounded-lg bg-white/20 flex items-center justify-center shrink-0 text-white shadow-xs">
+            <div className="relative z-10 mt-3.5 rounded-xl bg-white/15 backdrop-blur-md border border-white/20 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-start sm:items-center gap-2.5 min-w-0">
+                <div className="h-8 w-8 rounded-lg bg-white/20 flex items-center justify-center shrink-0 text-white shadow-xs mt-0.5 sm:mt-0">
                   <Sparkles className="h-4 w-4" />
                 </div>
-                <div className="min-w-0">
-                  <div className={`text-[13px] font-extrabold text-white ${autopay.enabled ? "truncate" : "leading-snug"}`}>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[13px] font-extrabold text-white leading-snug">
                     {autopay.enabled ? `Автоплатёж включён (•••• ${autopay.card_last4 || "карта"})` : "Подключите автоплатёж — и забудьте о квитанциях в ящике"}
                   </div>
-                  <div className={`text-[11px] text-white/85 ${autopay.enabled ? "truncate" : "leading-snug mt-0.5"}`}>
+                  <div className="text-[11px] text-white/85 leading-snug mt-1">
                     {autopay.enabled ? "Ежемесячно списывается остаток лицевого счёта" : "Остаток лицевого счёта спишется сам 4-го числа — без очередей, бумажных квитанций и риска просрочки. Отключить можно в один тап в любой момент."}
                   </div>
                 </div>
@@ -819,7 +797,7 @@ const DebtCard = ({
                   type="button"
                   onClick={disableAutopay}
                   disabled={autopayBusy}
-                  className="shrink-0 text-xs font-bold px-3 py-1.5 rounded-lg bg-white/20 hover:bg-white/30 text-white transition-colors border border-white/30 disabled:opacity-50 active:scale-[0.98]"
+                  className="self-end sm:self-center shrink-0 text-xs font-bold px-3.5 py-2 rounded-lg bg-white/20 hover:bg-white/30 text-white transition-colors border border-white/30 disabled:opacity-50 active:scale-[0.98]"
                 >
                   {autopayBusy ? "…" : "Отключить"}
                 </button>
@@ -828,13 +806,16 @@ const DebtCard = ({
                   type="button"
                   onClick={() => {
                     const cd = Number(account.debt_amount) || 0;
-                    setPayAmount(account.tariff_price != null ? Number(account.tariff_price).toFixed(2) : cd > 0 ? cd.toFixed(2) : "300");
+                    const tariff = account.tariff_price != null && Number(account.tariff_price) > 0 ? Number(account.tariff_price).toFixed(2) : "300";
+                    // Если есть долг — подставляем полный долг, иначе сумму по тарифу
+                    const initialAmount = cd > 0 ? cd.toFixed(2) : tariff;
+                    setPayAmount(initialAmount);
                     setSaveCardForAuto(true);
                     setIsYooKassaOpen(true);
                   }}
-                  className="shrink-0 text-xs font-extrabold px-3 py-1.5 rounded-lg bg-white text-slate-900 hover:bg-white/95 transition-all shadow-sm flex items-center gap-1 active:scale-[0.98]"
+                  className="self-end sm:self-center shrink-0 text-xs font-extrabold px-3.5 py-2 rounded-lg bg-white text-slate-900 hover:bg-white/95 transition-all shadow-sm flex items-center gap-1.5 active:scale-[0.98]"
                 >
-                  <Zap className="h-3 w-3 fill-current text-amber-500" />
+                  <Zap className="h-3.5 w-3.5 fill-current text-amber-500" />
                   Включить
                 </button>
               )}
@@ -856,33 +837,40 @@ const DebtCard = ({
         )}
 
 
-          {/* Диалог быстрой оплаты через платёжный шлюз ЮKassa */}
+          {/* Диалог быстрой оплаты через платёжный шлюз ЮKassa с адаптивным скроллом на мобильных экранах */}
           <Dialog open={isYooKassaOpen} onOpenChange={setIsYooKassaOpen}>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
+            <DialogContent 
+              className="max-w-md w-[calc(100vw-32px)] max-h-[90dvh] sm:max-h-[85vh] flex flex-col p-4 sm:p-6 overflow-hidden rounded-2xl sm:rounded-2xl"
+              onOpenAutoFocus={(e) => {
+                // Предотвращаем автоматическое выделение (selection) текста в поле ввода суммы при открытии диалога
+                e.preventDefault();
+              }}
+            >
+              <DialogHeader className="shrink-0 pb-1">
                 <DialogTitle className="flex items-center gap-2 text-base font-bold">
-                  <div className="h-8 w-8 rounded-full bg-blue-500/10 text-blue-600 dark:text-sky-400 flex items-center justify-center">
+                  <div className="h-8 w-8 rounded-full bg-blue-500/10 text-blue-600 dark:text-sky-400 flex items-center justify-center shrink-0">
                     <Zap className="h-4 w-4 fill-current" />
                   </div>
                   Быстрая оплата ЮKassa
                 </DialogTitle>
-                <DialogDescription>
+                <DialogDescription className="text-xs">
                   Безопасная онлайн-оплата банковской картой, СБП или SberPay
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="space-y-4 py-2">
+              {/* Прокручиваемое содержимое диалога: гарантирует доступность всех полей на мобильных телефонах */}
+              <div className="flex-1 overflow-y-auto pr-1.5 -mr-1 space-y-3.5 py-2 overscroll-contain touch-pan-y">
                 {/* Сведения о лицевом счете */}
-                <div className="p-3.5 rounded-xl border bg-muted/40 space-y-1.5 text-xs">
-                  <div className="flex justify-between">
+                <div className="p-3.5 rounded-xl border bg-muted/40 space-y-2 text-xs">
+                  <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">Лицевой счёт:</span>
-                    <span className="font-mono font-bold text-foreground">{account.account_number}</span>
+                    <span className="font-mono font-bold text-foreground">№ {account.account_number}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Адрес:</span>
-                    <span className="font-medium text-foreground text-right truncate max-w-[240px]">{formatFullAddress(address, apartment)}</span>
+                  <div className="flex justify-between items-start gap-2">
+                    <span className="text-muted-foreground shrink-0">Адрес:</span>
+                    <span className="font-medium text-foreground text-right break-words leading-tight">{formatFullAddress(address, apartment)}</span>
                   </div>
-                  <div className="flex justify-between pt-1 border-t">
+                  <div className="flex justify-between items-center pt-1.5 border-t">
                     <span className="text-muted-foreground">{isDebt ? "Текущий долг:" : "Баланс:"}</span>
                     <span className={`font-bold ${isDebt ? "text-destructive" : "text-green-600"}`}>
                       {debt.toFixed(2)} ₽
@@ -900,7 +888,7 @@ const DebtCard = ({
                     value={payAmount}
                     onChange={(e) => setPayAmount(e.target.value)}
                     placeholder="Введите сумму"
-                    className="text-lg font-bold font-mono"
+                    className="text-lg font-bold text-slate-900 dark:text-white"
                   />
 
                   {/* Быстрые пресеты */}
@@ -954,18 +942,15 @@ const DebtCard = ({
                   </div>
                 </div>
 
-                {/* Итоговая сумма к оплате ТО */}
+                {/* Итоговая сумма к оплате */}
                 {(() => {
                   const base = parseFloat(payAmount) || 0;
                   return (
-                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs space-y-1.5 text-left">
+                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs space-y-1 text-left">
                       <div className="flex justify-between items-center font-bold text-foreground text-sm">
-                        <span>Итого к оплате:</span>
-                        <span className="font-mono font-extrabold text-amber-600 dark:text-amber-400 text-base">{base.toFixed(2)} ₽</span>
+                        <span>Сумма к оплате:</span>
+                        <span className="font-extrabold text-amber-600 dark:text-amber-400 text-base">{base.toFixed(2)} ₽</span>
                       </div>
-                      <p className="text-[10px] text-slate-500 dark:text-slate-400 pt-1 leading-snug">
-                        💡 Возможна оплата за транзакцию.
-                      </p>
                     </div>
                   );
                 })()}
@@ -995,7 +980,8 @@ const DebtCard = ({
                 )}
               </div>
 
-              <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2.5 pt-2">
+              {/* Зафиксированный подвал: кнопка «Оплатить» всегда видна и доступна на экранах любой высоты */}
+              <DialogFooter className="shrink-0 pt-3 border-t border-border/50 flex flex-col-reverse sm:flex-row gap-2 mt-auto bg-background">
                 <Button
                   variant="outline"
                   onClick={() => setIsYooKassaOpen(false)}
@@ -1017,13 +1003,7 @@ const DebtCard = ({
                   ) : (
                     <>
                       <Zap className="h-5 w-5 fill-current" />
-                      <span>
-                        Оплатить {(() => {
-                          const base = parseFloat(payAmount) || 0;
-                          const fee = Math.round(base * 0.05 * 100) / 100;
-                          return `${(base + fee).toFixed(2)} ₽`;
-                        })()}
-                      </span>
+                      <span>Оплатить</span>
                     </>
                   )}
                 </Button>
