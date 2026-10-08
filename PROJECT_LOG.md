@@ -11,6 +11,37 @@
 > 
 > **Пользователь НЕ ДОЛЖЕН ничего вносить вручную.** Вся статистика и история пополняется ИИ автоматически при каждой задаче.
 
+# 2026-10-08 11:35 — Сквозная система аналитики и учёта автоплатежей (рекуррентные платежи ЮKassa)
+
+## 1. Задачи и выполненные работы
+- **Создание структуры хранения транзакций автосписаний (`PostgreSQL`)**:
+  * Создана таблица `autopay_charges` (id, account_number, user_id, period, amount, status, yookassa_payment_id, detail, created_at, уникальный ключ по лицевому счету и периоду) с индексами по номеру счета, периоду и дате.
+  * В вебхуке платежей ЮKassa (`/api/payments/yookassa/webhook`) реализована автоматическая фиксация статуса успешного списания `succeeded` в таблице `autopay_charges`.
+- **Бэкенд аналитики и мониторинга (`server/index.js`)**:
+  * Реализованы административные эндпоинты:
+    1. `GET /api/admin/autopay/stats`: сводная аналитика (активные/отключенные подписки, конверсия базы абонентов, ожидаемый ежемесячный сбор, списано за текущий месяц, общий оборот за все время, статистика успехов и ошибок).
+    2. `GET /api/admin/autopay/subscribers`: реестр всех подключенных абонентов с масками карт, тарифами, суммами списаний и поиском.
+    3. `GET /api/admin/autopay/charges`: журнал всех ежемесячных транзакций автосписаний.
+    4. `GET /api/admin/autopay/subscriber/:accountNumber`: полная детальная история списаний конкретного абонента.
+    5. `GET /api/admin/autopay/active-map`: оптимизированная карта статусов автоплатежей для карточек в реестре абонентов.
+    6. `POST /api/admin/autopay/run`: защищенный ручной запуск списания для тестирования и контроля.
+- **Интерфейс CRM и панели администратора (`AutopayAnalytics.tsx`, `AccountsManager.tsx`, `Admin.tsx`, `CRM.tsx`)**:
+  * Разработан полнофункциональный компонент аналитики `AutopayAnalytics.tsx` со сводными карточками KPI, вкладками «Абоненты» и «Журнал списаний», модалкой истории абонента и запуском списаний.
+  * В `AccountsManager.tsx` в карточке каждого абонента выведен статус автоплатежа (маска карты •••• 1234, бейдж), кнопка просмотра списаний и быстрый фильтр «⚡ Автоплатёж» в шапке реестра.
+  * Добавлена новая вкладка «⚡ Автоплатежи (ЮKassa)» в меню `AdminSidebar.tsx` и `CRMSidebar.tsx`.
+
+## 2. Измененные файлы
+- [`server/index.js`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/server/index.js) — Эндпоинты аналитики, фиксация вебхука ЮKassa.
+- [`src/components/admin/AutopayAnalytics.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/components/admin/AutopayAnalytics.tsx) — Новый компонент аналитики.
+- [`src/components/admin/AccountsManager.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/components/admin/AccountsManager.tsx) — Статусы в карточках, быстрый фильтр, модалка списаний.
+- [`src/components/admin/AdminSidebar.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/components/admin/AdminSidebar.tsx) — Вкладка в админке.
+- [`src/components/crm/CRMSidebar.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/components/crm/CRMSidebar.tsx) — Вкладка в CRM.
+- [`src/pages/Admin.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/pages/Admin.tsx) — Подключение страницы аналитики.
+- [`src/pages/CRM.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/pages/CRM.tsx) — Подключение вкладки в CRM.
+- [`src/types/crmRoles.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/types/crmRoles.ts) — Реестр прав доступа.
+- [`AGENT_SYNC.md`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/AGENT_SYNC.md) — Снятие claim и запись в ленту координации.
+- [`PROJECT_LOG.md`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/PROJECT_LOG.md) — Обновление журнала проекта.
+
 # 2026-10-08 10:35 — Обязательный выбор модели аудиотрубки при заказе установки или замены оборудования
 
 ## 1. Задачи и выполненные работы

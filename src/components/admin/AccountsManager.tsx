@@ -38,7 +38,8 @@ import {
   Users,
   Phone,
   UserCheck,
-  DoorOpen
+  DoorOpen,
+  Zap
 } from "lucide-react";
 
 // Интерфейс лицевого счета абонента
@@ -212,6 +213,56 @@ export const AccountsManager: React.FC = () => {
   const [accountHistoryRows, setAccountHistoryRows] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
+  // --- Автоплатежи (рекуррентные платежи ЮKassa) ---
+  const [autopayMap, setAutopayMap] = useState<Record<string, { is_active: boolean; card_last4: string; card_type: string; created_at: string }>>({});
+  const [filterAutopayOnly, setFilterAutopayOnly] = useState(false);
+  const [selectedAutopayAccount, setSelectedAutopayAccount] = useState<string | null>(null);
+  const [subscriberAutopayData, setSubscriberAutopayData] = useState<{ subscription: any; charges: any[]; account: any } | null>(null);
+  const [loadingAutopayData, setLoadingAutopayData] = useState(false);
+
+  // Загрузка карты автоплатежей с бэкенда для моментального отображения статусов
+  const loadAutopayMap = async () => {
+    try {
+      const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+      const res = await fetch("/backend-api/api/admin/autopay/active-map", {
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        }
+      });
+      if (res.ok) {
+        const d = await res.json();
+        setAutopayMap(d.map || {});
+        console.log(`[AccountsManager] Загружена карта автоплатежей: ${Object.keys(d.map || {}).length} счетов`);
+      }
+    } catch (e) {
+      console.warn("[AccountsManager] Не удалось загрузить карту автоплатежей:", e);
+    }
+  };
+
+  // Загрузка детальной истории списаний автоплатежа по лицевому счету
+  const handleOpenAutopayDetails = async (accNum: string) => {
+    setSelectedAutopayAccount(accNum);
+    setLoadingAutopayData(true);
+    try {
+      const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+      const res = await fetch(`/backend-api/api/admin/autopay/subscriber/${encodeURIComponent(accNum)}`, {
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        }
+      });
+      if (res.ok) {
+        const d = await res.json();
+        setSubscriberAutopayData(d);
+      }
+    } catch (e) {
+      console.error("[AccountsManager] Ошибка загрузки деталей автоплатежа:", e);
+    } finally {
+      setLoadingAutopayData(false);
+    }
+  };
+
   // --- Загрузка счетов и последнего реестра из Supabase ---
   const loadData = async () => {
     try {
@@ -248,6 +299,9 @@ export const AccountsManager: React.FC = () => {
         setExpandedCities(prev => ({ ...prev, [city]: true }));
         if (!selectedCity) setSelectedCity(city);
       }
+
+      // 3. Загружаем карту статусов автоплатежей по лицевым счетам
+      await loadAutopayMap();
     } catch (err: any) {
       console.error("[AccountsManager] Ошибка при загрузке:", err);
       toast({
@@ -423,6 +477,11 @@ export const AccountsManager: React.FC = () => {
       list = list.filter(acc => Number(acc.debt_amount) === 0);
     }
 
+    // Фильтр: только с подключенным автоплатежом
+    if (filterAutopayOnly) {
+      list = list.filter(acc => autopayMap[acc.account_number]?.is_active);
+    }
+
     // Сортировка по номеру квартиры
     return list.sort((a, b) => {
       const numA = parseInt(a.apartment || "0", 10);
@@ -430,7 +489,7 @@ export const AccountsManager: React.FC = () => {
       if (!isNaN(numA) && !isNaN(numB) && numA !== numB) return numA - numB;
       return a.address.localeCompare(b.address);
     });
-  }, [accounts, selectedCity, selectedHouse, selectedEntrance, searchQuery, filterType]);
+  }, [accounts, selectedCity, selectedHouse, selectedEntrance, searchQuery, filterType, filterAutopayOnly, autopayMap]);
 
   // Статистика по отображаемым счетам
   const stats = useMemo(() => {
@@ -1562,6 +1621,20 @@ export const AccountsManager: React.FC = () => {
                   >
                     Переплата
                   </Button>
+                  <Button
+                    variant={filterAutopayOnly ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setFilterAutopayOnly(!filterAutopayOnly)}
+                    className={`rounded-xl h-9 text-xs flex-1 sm:flex-initial gap-1 ${
+                      filterAutopayOnly
+                        ? "bg-amber-500 hover:bg-amber-600 text-white font-bold"
+                        : "text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-800 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+                    }`}
+                    title="Показать только лицевые счета с подключенным автоплатежом ЮKassa"
+                  >
+                    <Zap className="h-3 w-3 fill-current" />
+                    <span>Автоплатёж ({Object.values(autopayMap).filter(v => v.is_active).length})</span>
+                  </Button>
                 </div>
               </div>
 
@@ -1780,6 +1853,31 @@ export const AccountsManager: React.FC = () => {
                                     ЛК активен
                                   </Badge>
                                 )}
+                                {/* Индикатор автоплатежа абонента */}
+                                {(() => {
+                                  const autoInfo = autopayMap[acc.account_number];
+                                  if (!autoInfo) return null;
+                                  return autoInfo.is_active ? (
+                                    <Badge 
+                                      variant="outline" 
+                                      onClick={() => handleOpenAutopayDetails(acc.account_number)}
+                                      className="cursor-pointer text-[10px] px-1.5 py-0 h-4 border-amber-400 dark:border-amber-600 bg-amber-500/15 text-amber-700 dark:text-amber-300 font-bold gap-1 hover:bg-amber-500/25 transition-colors"
+                                      title={`Автоплатёж активен. Карта: •••• ${autoInfo.card_last4}. Нажмите для просмотра истории списаний.`}
+                                    >
+                                      <Zap className="h-2.5 w-2.5 fill-current text-amber-500" />
+                                      <span>Автоплатёж: •••• {autoInfo.card_last4}</span>
+                                    </Badge>
+                                  ) : (
+                                    <Badge 
+                                      variant="outline" 
+                                      onClick={() => handleOpenAutopayDetails(acc.account_number)}
+                                      className="cursor-pointer text-[10px] px-1.5 py-0 h-4 border-slate-300 dark:border-slate-700 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                                      title="Автоплатёж был отключен абонентом. Нажмите для истории."
+                                    >
+                                      <span>Автоплатёж: Откл.</span>
+                                    </Badge>
+                                  );
+                                })()}
                               </div>
                               {acc.payment_type && (
                                 <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
@@ -1790,8 +1888,8 @@ export const AccountsManager: React.FC = () => {
                           );
                         })()}
 
-                        {/* Нижняя плашка: подъезд, квартира, период и кнопка истории */}
-                        <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs">
+                        {/* Нижняя плашка: подъезд, квартира, период и кнопки истории */}
+                        <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs gap-1.5">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             {getAccountEntrance(acc) && (
                               <Badge variant="outline" className="text-[10px] font-semibold border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300">
@@ -1808,16 +1906,30 @@ export const AccountsManager: React.FC = () => {
                             </span>
                           </div>
 
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleOpenAccountHistory(acc)}
-                            className="h-6 px-2 text-[11px] text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg flex items-center gap-1"
-                            title="Посмотреть историю начислений по реестрам"
-                          >
-                            <History className="h-3 w-3" />
-                            <span>История начислений</span>
-                          </Button>
+                          <div className="flex items-center gap-1 shrink-0">
+                            {autopayMap[acc.account_number] && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleOpenAutopayDetails(acc.account_number)}
+                                className="h-6 px-1.5 text-[11px] text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 rounded-lg flex items-center gap-1 font-semibold"
+                                title="История списаний автоплатежа ЮKassa"
+                              >
+                                <Zap className="h-3 w-3 fill-current text-amber-500" />
+                                <span>Автоплатёж</span>
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleOpenAccountHistory(acc)}
+                              className="h-6 px-2 text-[11px] text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg flex items-center gap-1"
+                              title="Посмотреть историю начислений по реестрам"
+                            >
+                              <History className="h-3 w-3" />
+                              <span>История</span>
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     );
@@ -2247,6 +2359,129 @@ export const AccountsManager: React.FC = () => {
               ) : (
                 `Импортировать базу (${parsedSubscribers.length} абонентов)`
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ДИАЛОГ ДЕТАЛЕЙ АВТОПЛАТЕЖА И СХЕМЫ СПИСАНИЙ АБОНЕНТА */}
+      <Dialog open={!!selectedAutopayAccount} onOpenChange={open => !open && setSelectedAutopayAccount(null)}>
+        <DialogContent className="max-w-md max-h-[90vh] flex flex-col p-5 rounded-2xl">
+          <DialogHeader className="shrink-0 pb-2">
+            <DialogTitle className="flex items-center gap-2 text-base font-bold">
+              <Zap className="h-5 w-5 text-amber-500 fill-amber-500" />
+              <span>Автоплатёж л/с № {selectedAutopayAccount}</span>
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              {subscriberAutopayData?.account?.address || "Данные лицевого счёта"}
+              {subscriberAutopayData?.account?.apartment ? `, кв. ${subscriberAutopayData.account.apartment}` : ""}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto space-y-3.5 py-1 text-xs">
+            {loadingAutopayData ? (
+              <div className="py-10 text-center text-muted-foreground flex flex-col items-center gap-2">
+                <Loader2 className="h-6 w-6 animate-spin text-amber-500" />
+                <span>Загрузка данных автоплатежа...</span>
+              </div>
+            ) : !subscriberAutopayData?.subscription ? (
+              <div className="py-8 text-center text-muted-foreground border rounded-xl bg-slate-50 dark:bg-slate-900/50 p-4">
+                <AlertCircle className="h-8 w-8 mx-auto mb-2 text-slate-300 dark:text-slate-700" />
+                <p className="font-semibold text-foreground">Автоплатёж не подключен</p>
+                <p className="text-[11px] mt-1 text-muted-foreground">
+                  Абонент ещё не привязал банковскую карту для регулярного списания за ТО домофона.
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* Карточка подписки */}
+                <div className="p-3.5 rounded-xl border bg-muted/40 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Статус подписки:</span>
+                    {subscriberAutopayData.subscription.is_active ? (
+                      <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 gap-1 font-semibold">
+                        <Zap className="h-2.5 w-2.5 fill-current text-amber-500" />
+                        Активен
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-slate-400">
+                        Отключен
+                      </Badge>
+                    )}
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Привязанная карта:</span>
+                    <span className="font-mono font-bold text-foreground">
+                      •••• {subscriberAutopayData.subscription.card_last4 || "карта"} ({subscriberAutopayData.subscription.card_type || "bank_card"})
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Тариф по счёту:</span>
+                    <span className="font-bold text-foreground">
+                      {subscriberAutopayData.account?.tariff_price ? `${subscriberAutopayData.account.tariff_price} ₽/мес` : "70 ₽/мес"}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center pt-1.5 border-t border-border/50">
+                    <span className="text-muted-foreground">Дата подключения:</span>
+                    <span className="text-muted-foreground">
+                      {subscriberAutopayData.subscription.created_at
+                        ? new Date(subscriberAutopayData.subscription.created_at).toLocaleDateString("ru-RU")
+                        : "—"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* История списаний */}
+                <div className="space-y-2">
+                  <div className="font-bold text-xs uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                    <span>Журнал списаний ({subscriberAutopayData.charges?.length || 0})</span>
+                    <span className="text-[11px] font-normal lowercase">автосписание 4-го числа</span>
+                  </div>
+
+                  {(!subscriberAutopayData.charges || subscriberAutopayData.charges.length === 0) ? (
+                    <div className="p-4 rounded-xl border text-center text-muted-foreground text-[11px] bg-slate-50/50 dark:bg-slate-900/50">
+                      Списаний по карте ещё не зафиксировано. Первое списание произойдет в ближайший расчетный день (4-го числа).
+                    </div>
+                  ) : (
+                    <div className="border rounded-xl overflow-hidden divide-y divide-border/50 max-h-[220px] overflow-y-auto">
+                      {subscriberAutopayData.charges.map((c: any) => (
+                        <div key={c.id} className="p-2.5 flex items-center justify-between hover:bg-muted/20 text-xs">
+                          <div>
+                            <div className="font-bold font-mono text-foreground">Период: {c.period}</div>
+                            <div className="text-[10px] text-muted-foreground">
+                              {new Date(c.created_at).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                            </div>
+                            {c.detail && <div className="text-[10px] text-slate-500 line-clamp-1">{c.detail}</div>}
+                          </div>
+                          <div className="text-right shrink-0">
+                            <div className="font-mono font-bold text-sm text-foreground">
+                              {Number(c.amount || 0).toFixed(2)} ₽
+                            </div>
+                            <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${
+                              c.status === "succeeded" 
+                                ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
+                                : c.status === "processing" 
+                                ? "bg-amber-500/15 text-amber-700" 
+                                : "bg-rose-500/15 text-rose-700"
+                            }`}>
+                              {c.status === "succeeded" ? "Успешно" : c.status === "processing" ? "В обработке" : "Ошибка"}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+
+          <DialogFooter className="shrink-0 pt-2 border-t border-border/50">
+            <Button variant="outline" size="sm" onClick={() => setSelectedAutopayAccount(null)} className="w-full rounded-xl">
+              Закрыть
             </Button>
           </DialogFooter>
         </DialogContent>

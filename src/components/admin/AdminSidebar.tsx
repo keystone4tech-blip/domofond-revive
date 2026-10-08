@@ -5,7 +5,7 @@ import {
   Calculator, Sparkles, Newspaper, Vote, BarChart3, Tag, 
   FileText, Crown, MessageSquare, Hash, Grid, CreditCard, 
   Bot, History, Home, LogOut, Shield, ChevronLeft, ChevronRight, Database,
-  LayoutDashboard, User, Camera, Trash2, FileCode2, X
+  LayoutDashboard, User, Camera, Trash2, FileCode2, X, Zap
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -17,11 +17,12 @@ interface AdminSidebarProps {
   setIsOpen?: (open: boolean) => void;
 }
 
-// 17 элементов навигации разделов управления админ-панели
+// 18 элементов навигации разделов управления админ-панели
 const menuItems = [
   { id: "portfolio", label: "📸 Портфолио и отзывы", icon: Camera },
   { id: "calculations", label: "Расчёты стоимости", icon: Calculator },
   { id: "accounts", label: "Лицевые счета", icon: CreditCard },
+  { id: "autopay", label: "⚡ Автоплатежи (ЮKassa)", icon: Zap },
   { id: "backups", label: "💾 Резервные копии БД", icon: Database },
   { id: "seo", label: "🪄 SEO AI Генератор", icon: Sparkles },
   { id: "autonews", label: "📰 Авто-новости AI", icon: Newspaper },

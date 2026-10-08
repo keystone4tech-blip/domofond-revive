@@ -39,6 +39,7 @@ import NewBuildingsManager from "@/components/crm/NewBuildingsManager";
 import UsersManager from "@/components/crm/UsersManager";
 import AddressesManager from "@/components/crm/AddressesManager";
 import { AccountsManager } from "@/components/admin/AccountsManager";
+import { AutopayAnalytics } from "@/components/admin/AutopayAnalytics";
 import IntercomLoginsManager from "@/components/crm/IntercomLoginsManager";
 import InstallerSheetManager from "@/components/crm/InstallerSheetManager";
 import VerificationManager from "@/components/crm/VerificationManager";
@@ -337,6 +338,13 @@ const CRM = () => {
             {hasPermission("accounts") && (
               <TabsContent value="accounts" className="mt-0 outline-none">
                 <AccountsManager />
+              </TabsContent>
+            )}
+
+            {/* 9.1 Автоплатежи (рекуррентные платежи ЮKassa) */}
+            {hasPermission("autopay") && (
+              <TabsContent value="autopay" className="mt-0 outline-none">
+                <AutopayAnalytics />
               </TabsContent>
             )}
 

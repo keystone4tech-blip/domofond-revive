@@ -1608,8 +1608,25 @@ async function processSuccessfulPayment(yooData, fallbackPayment = null) {
       }
       console.log(`[Бэкенд: Автоплатеж] ✅ Карта •••• ${cardLast4 || 'N/A'} успешно привязана к л/с ${accNumber} для автоплатежей!`);
     }
+
+    // Если платёж был совершён в рамках регулярного автосписания (рекуррента), обновляем статус в журнале autopay_charges
+    if (combinedMeta?.autopay === 'true' || combinedMeta?.autopay === true) {
+      try {
+        const autoPeriod = combinedMeta?.period || currentPeriodMSK();
+        await pool.query(
+          `INSERT INTO autopay_charges (account_number, user_id, period, amount, status, yookassa_payment_id, detail, created_at)
+           VALUES ($1, $2, $3, $4, 'succeeded', $5, 'Платёж успешно списан и подтверждён шлюзом ЮKassa', CURRENT_TIMESTAMP)
+           ON CONFLICT (account_number, period)
+           DO UPDATE SET status = 'succeeded', amount = EXCLUDED.amount, yookassa_payment_id = EXCLUDED.yookassa_payment_id, detail = EXCLUDED.detail`,
+          [accNumber, payUserId || null, autoPeriod, paidAmount, paymentId]
+        );
+        console.log(`[Бэкенд: Автоплатеж] ✅ Журнал списаний autopay_charges обновлен: л/с ${accNumber}, период ${autoPeriod}, сумма ${paidAmount} ₽ (succeeded)`);
+      } catch (chargeRecErr) {
+        console.warn('[Бэкенд: Автоплатеж] Предупреждение обновления autopay_charges при вебхуке:', chargeRecErr.message);
+      }
+    }
   } catch (autoErr) {
-    console.warn('[Бэкенд: Автоплатеж] Не удалось привязать карту для автоплатежа:', autoErr.message);
+    console.warn('[Бэкенд: Автоплатеж] Не удалось обработать данные автоплатежа:', autoErr.message);
   }
 
   let reqId = combinedMeta?.request_id || paymentRecord?.request_id;
@@ -3147,9 +3164,357 @@ function startAutopayScheduler() {
   console.log('[Автосписание] Планировщик запущен (списание 4-го числа каждого месяца, МСК).');
 }
 
-// Ручной запуск автосписания — ТОЛЬКО для суперадмина/админа (тест в тестовом магазине).
-app.post('/api/admin/autopay/run', authenticateToken, async (req, res) => {
-  if (!req.isSuperAdmin && !req.isAdmin) return res.status(403).json({ error: 'Недостаточно прав' });
+// ============================================================================
+//  АДМИНИСТРАТИВНЫЕ ЭНДПОИНТЫ АНАЛИТИКИ И УПРАВЛЕНИЯ АВТОПЛАТЕЖАМИ
+// ============================================================================
+
+/**
+ * 1. Сводная статистика и KPI по автоплатежам для панели управления
+ */
+app.get('/api/admin/autopay/stats', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    await ensureAutopayChargesTable();
+    const period = currentPeriodMSK();
+
+    // Запрос 1: Подписки (активные, отключенные, всего)
+    const subStats = await pool.query(`
+      SELECT 
+        COUNT(*) AS total_subs,
+        COUNT(*) FILTER (WHERE is_active = true) AS active_subs,
+        COUNT(*) FILTER (WHERE is_active = false) AS inactive_subs
+      FROM autopay_subscriptions
+    `);
+
+    // Запрос 2: Общее количество лицевых счетов в системе для расчета конверсии
+    const accStats = await pool.query(`SELECT COUNT(*) AS total_accounts FROM accounts`);
+    const totalAccounts = Number(accStats.rows[0]?.total_accounts) || 0;
+
+    // Запрос 3: Планируемый ежемесячный сбор по активным подпискам
+    const expectedQuery = await pool.query(`
+      SELECT 
+        COALESCE(SUM(
+          CASE 
+            WHEN a.tariff_price IS NOT NULL AND a.tariff_price > 0 THEN a.tariff_price 
+            ELSE 70 
+          END
+        ), 0) AS expected_monthly
+      FROM autopay_subscriptions s
+      LEFT JOIN LATERAL (
+        SELECT tariff_price 
+        FROM accounts 
+        WHERE account_number = s.account_number 
+        ORDER BY period DESC 
+        LIMIT 1
+      ) a ON true
+      WHERE s.is_active = true
+    `);
+
+    // Запрос 4: Фактически списано за текущий период
+    const curMonthStats = await pool.query(`
+      SELECT 
+        COALESCE(SUM(amount), 0) AS cur_amount,
+        COUNT(*) AS cur_count
+      FROM autopay_charges
+      WHERE period = $1 AND status = 'succeeded'
+    `, [period]);
+
+    // Запрос 5: Общий объём автосписаний за всё время
+    const allTimeStats = await pool.query(`
+      SELECT 
+        COALESCE(SUM(amount), 0) AS all_amount,
+        COUNT(*) FILTER (WHERE status = 'succeeded') AS succeeded_count,
+        COUNT(*) FILTER (WHERE status IN ('canceled', 'error')) AS failed_count,
+        COUNT(*) FILTER (WHERE status = 'processing') AS processing_count
+      FROM autopay_charges
+    `);
+
+    const totalSubs = Number(subStats.rows[0]?.total_subs) || 0;
+    const activeSubs = Number(subStats.rows[0]?.active_subs) || 0;
+    const inactiveSubs = Number(subStats.rows[0]?.inactive_subs) || 0;
+    const expectedMonthly = Number(expectedQuery.rows[0]?.expected_monthly) || 0;
+    const curMonthAmount = Number(curMonthStats.rows[0]?.cur_amount) || 0;
+    const curMonthCount = Number(curMonthStats.rows[0]?.cur_count) || 0;
+    const allTimeAmount = Number(allTimeStats.rows[0]?.all_amount) || 0;
+    const succeededCount = Number(allTimeStats.rows[0]?.succeeded_count) || 0;
+    const failedCount = Number(allTimeStats.rows[0]?.failed_count) || 0;
+    const processingCount = Number(allTimeStats.rows[0]?.processing_count) || 0;
+
+    const conversionPercent = totalAccounts > 0 ? ((activeSubs / totalAccounts) * 100).toFixed(2) : '0.00';
+
+    res.json({
+      success: true,
+      currentPeriod: period,
+      totalSubscriptions: totalSubs,
+      activeSubscriptions: activeSubs,
+      inactiveSubscriptions: inactiveSubs,
+      totalAccounts,
+      conversionPercent: Number(conversionPercent),
+      expectedMonthly,
+      currentMonthCharged: curMonthAmount,
+      currentMonthChargesCount: curMonthCount,
+      allTimeCharged: allTimeAmount,
+      succeededCount,
+      failedCount,
+      processingCount,
+    });
+  } catch (err) {
+    console.error('[Бэкенд: Аналитика Автоплатежей] Ошибка получения сводной статистики:', err.message);
+    res.status(500).json({ error: 'Не удалось сформировать статистику автоплатежей' });
+  }
+});
+
+/**
+ * 2. Реестр всех абонентов с автоплатежами с деталями и суммами списаний
+ */
+app.get('/api/admin/autopay/subscribers', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { status, q } = req.query;
+    let whereClauses = [];
+    let params = [];
+
+    if (status === 'active') {
+      whereClauses.push('s.is_active = true');
+    } else if (status === 'inactive') {
+      whereClauses.push('s.is_active = false');
+    }
+
+    if (q && String(q).trim()) {
+      params.push(`%${String(q).trim()}%`);
+      const pIdx = params.length;
+      whereClauses.push(`(
+        s.account_number ILIKE $${pIdx} OR 
+        COALESCE(p.full_name, a.full_name, '') ILIKE $${pIdx} OR 
+        COALESCE(p.phone, a.phone, '') ILIKE $${pIdx} OR 
+        COALESCE(a.address, p.address, '') ILIKE $${pIdx}
+      )`);
+    }
+
+    const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
+    const query = `
+      SELECT 
+        s.id,
+        s.account_number,
+        s.user_id,
+        s.card_first6,
+        s.card_last4,
+        s.card_type,
+        s.card_expiry_year,
+        s.card_expiry_month,
+        s.is_active,
+        s.created_at,
+        s.updated_at,
+        COALESCE(p.full_name, a.full_name, 'Абонент') AS full_name,
+        COALESCE(p.phone, a.phone, '') AS phone,
+        COALESCE(p.email, '') AS email,
+        COALESCE(a.address, p.address, '') AS address,
+        COALESCE(a.apartment, p.apartment, '') AS apartment,
+        a.tariff_price,
+        a.tariff_name,
+        a.debt_amount,
+        COALESCE((
+          SELECT SUM(c.amount) 
+          FROM autopay_charges c 
+          WHERE c.account_number = s.account_number AND c.status = 'succeeded'
+        ), 0) AS total_charged,
+        (
+          SELECT c.created_at 
+          FROM autopay_charges c 
+          WHERE c.account_number = s.account_number 
+          ORDER BY c.created_at DESC 
+          LIMIT 1
+        ) AS last_charge_at,
+        (
+          SELECT c.status 
+          FROM autopay_charges c 
+          WHERE c.account_number = s.account_number 
+          ORDER BY c.created_at DESC 
+          LIMIT 1
+        ) AS last_charge_status,
+        (
+          SELECT c.amount 
+          FROM autopay_charges c 
+          WHERE c.account_number = s.account_number 
+          ORDER BY c.created_at DESC 
+          LIMIT 1
+        ) AS last_charge_amount
+      FROM autopay_subscriptions s
+      LEFT JOIN LATERAL (
+        SELECT full_name, phone, address, apartment, tariff_price, tariff_name, debt_amount 
+        FROM accounts 
+        WHERE account_number = s.account_number 
+        ORDER BY period DESC 
+        LIMIT 1
+      ) a ON true
+      LEFT JOIN profiles p ON p.id = s.user_id
+      ${whereSql}
+      ORDER BY s.created_at DESC;
+    `;
+
+    const result = await pool.query(query, params);
+    res.json({
+      success: true,
+      subscribers: result.rows,
+      count: result.rows.length
+    });
+  } catch (err) {
+    console.error('[Бэкенд: Аналитика Автоплатежей] Ошибка получения списка подписчиков:', err.message);
+    res.status(500).json({ error: 'Не удалось получить список подписчиков' });
+  }
+});
+
+/**
+ * 3. Журнал всех транзакций автосписаний с историей и статусами ЮKassa
+ */
+app.get('/api/admin/autopay/charges', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    await ensureAutopayChargesTable();
+    const { period, status, q, limit = 100, offset = 0 } = req.query;
+    let whereClauses = [];
+    let params = [];
+
+    if (period && String(period).trim()) {
+      params.push(String(period).trim());
+      whereClauses.push(`c.period = $${params.length}`);
+    }
+
+    if (status && String(status).trim() && status !== 'all') {
+      params.push(String(status).trim());
+      whereClauses.push(`c.status = $${params.length}`);
+    }
+
+    if (q && String(q).trim()) {
+      params.push(`%${String(q).trim()}%`);
+      const pIdx = params.length;
+      whereClauses.push(`(
+        c.account_number ILIKE $${pIdx} OR 
+        COALESCE(p.full_name, a.full_name, '') ILIKE $${pIdx} OR 
+        COALESCE(a.address, p.address, '') ILIKE $${pIdx}
+      )`);
+    }
+
+    const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
+    const listQuery = `
+      SELECT 
+        c.id,
+        c.account_number,
+        c.user_id,
+        c.period,
+        c.amount,
+        c.status,
+        c.yookassa_payment_id,
+        c.detail,
+        c.created_at,
+        s.card_last4,
+        s.card_type,
+        s.is_active AS subscription_active,
+        COALESCE(p.full_name, a.full_name, 'Абонент') AS full_name,
+        COALESCE(p.phone, a.phone, '') AS phone,
+        COALESCE(a.address, p.address, '') AS address,
+        COALESCE(a.apartment, p.apartment, '') AS apartment
+      FROM autopay_charges c
+      LEFT JOIN autopay_subscriptions s ON s.account_number = c.account_number
+      LEFT JOIN LATERAL (
+        SELECT full_name, phone, address, apartment 
+        FROM accounts 
+        WHERE account_number = c.account_number 
+        ORDER BY period DESC 
+        LIMIT 1
+      ) a ON true
+      LEFT JOIN profiles p ON p.id = c.user_id
+      ${whereSql}
+      ORDER BY c.created_at DESC
+      LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+    `;
+
+    params.push(Math.min(Number(limit) || 100, 500));
+    params.push(Number(offset) || 0);
+
+    const result = await pool.query(listQuery, params);
+    res.json({
+      success: true,
+      charges: result.rows,
+      count: result.rows.length
+    });
+  } catch (err) {
+    console.error('[Бэкенд: Аналитика Автоплатежей] Ошибка получения журнала списаний:', err.message);
+    res.status(500).json({ error: 'Не удалось получить журнал списаний' });
+  }
+});
+
+/**
+ * 4. Детальная карточка автоплатежа конкретного абонента (подписка + история списаний)
+ */
+app.get('/api/admin/autopay/subscriber/:accountNumber', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { accountNumber } = req.params;
+    if (!accountNumber) return res.status(400).json({ error: 'Лицевой счёт не указан' });
+
+    await ensureAutopayChargesTable();
+
+    // 1. Подписка
+    const subRes = await pool.query(
+      `SELECT * FROM autopay_subscriptions WHERE account_number = $1 ORDER BY id DESC LIMIT 1`,
+      [accountNumber]
+    );
+
+    // 2. История списаний
+    const chargesRes = await pool.query(
+      `SELECT * FROM autopay_charges WHERE account_number = $1 ORDER BY created_at DESC`,
+      [accountNumber]
+    );
+
+    // 3. Данные счёта
+    const accRes = await pool.query(
+      `SELECT account_number, full_name, phone, address, apartment, tariff_price, tariff_name, debt_amount, period, status, contract_terminated
+       FROM accounts WHERE account_number = $1 ORDER BY period DESC LIMIT 1`,
+      [accountNumber]
+    );
+
+    res.json({
+      success: true,
+      subscription: subRes.rows[0] || null,
+      charges: chargesRes.rows,
+      account: accRes.rows[0] || null,
+    });
+  } catch (err) {
+    console.error('[Бэкенд: Аналитика Автоплатежей] Ошибка детальной истории абонента:', err.message);
+    res.status(500).json({ error: 'Не удалось получить детали автоплатежа абонента' });
+  }
+});
+
+/**
+ * 5. Быстрая легковесная карта статусов автоплатежей для карточек в AccountsManager
+ * Отдает { [accountNumber]: { is_active, card_last4, card_type, created_at } }
+ */
+app.get('/api/admin/autopay/active-map', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT account_number, is_active, card_last4, card_type, created_at, updated_at
+       FROM autopay_subscriptions`
+    );
+
+    const map = {};
+    for (const row of result.rows) {
+      map[row.account_number] = {
+        is_active: !!row.is_active,
+        card_last4: row.card_last4 || '••••',
+        card_type: row.card_type || 'bank_card',
+        created_at: row.created_at,
+        updated_at: row.updated_at
+      };
+    }
+
+    res.json({ success: true, map });
+  } catch (err) {
+    console.error('[Бэкенд: Аналитика Автоплатежей] Ошибка карты автоплатежей:', err.message);
+    res.status(500).json({ error: 'Не удалось получить карту автоплатежей' });
+  }
+});
+
+// Ручной запуск автосписания — ТОЛЬКО для суперадмина/директора/админа
+app.post('/api/admin/autopay/run', authenticateToken, requireAdmin, async (req, res) => {
   console.log(`[Автосписание] Ручной запуск от ${req.user.email || req.user.id}`);
   runAutopayCharges('manual:' + (req.user.email || req.user.id)).catch(() => {});
   res.json({ ok: true, started: true, period: currentPeriodMSK() });

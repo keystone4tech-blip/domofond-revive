@@ -91,6 +91,12 @@ export const CRM_TABS: CRMTabDefinition[] = [
   },
 
   // Управление и аналитика
+  {
+    id: "autopay",
+    label: "Автоплатежи (ЮKassa)",
+    description: "Аналитика рекуррентных списаний: привязанные карты, статистика списаний и контроль абонплаты",
+    category: "management"
+  },
   { 
     id: "employees", 
     label: "Сотрудники и роли", 

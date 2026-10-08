@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { 
   LayoutDashboard, ClipboardList, FileText, Package, 
   Users, Building2, MapPin, BarChart3, ShieldCheck, 
-  Home, LogOut, Shield, User, FileSpreadsheet, DoorClosed, KeyRound, ClipboardCheck, Wrench, Construction, BookOpen
+  Home, LogOut, Shield, User, FileSpreadsheet, DoorClosed, KeyRound, ClipboardCheck, Wrench, Construction, BookOpen, Zap
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -105,6 +105,8 @@ export const CRMSidebar = ({ activeTab, setActiveTab, isManager, isOpen, setIsOp
     { id: "addresses", label: "Адреса и подъезды", icon: DoorClosed },
     // Раздел управления и загрузки лицевых счетов для сотрудников
     { id: "accounts", label: "Лицевые счета", icon: FileSpreadsheet },
+    // Раздел аналитики автоплатежей и рекуррентных списаний ЮKassa
+    { id: "autopay", label: "Автоплатежи", icon: Zap },
     // Раздел управления логопасами умного домофона (учетными данными приложения)
     { id: "logins", label: "Логопасы", icon: KeyRound },
     // Раздел кадрового состава и прав доступа

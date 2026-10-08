@@ -14,6 +14,7 @@ import { CalculationsManager } from "@/components/admin/CalculationsManager";
 import { ChatWidgetManager } from "@/components/admin/ChatWidgetManager";
 import { ChatHistoryManager } from "@/components/admin/ChatHistoryManager";
 import { AccountsManager } from "@/components/admin/AccountsManager";
+import { AutopayAnalytics } from "@/components/admin/AutopayAnalytics";
 import { SEOManager } from "@/components/admin/SEOManager";
 import { NewsAutomation } from "@/components/admin/NewsAutomation";
 import { VotingManager } from "@/components/admin/VotingManager";
@@ -240,6 +241,10 @@ const Admin = () => {
 
             <TabsContent value="accounts" className="mt-0 outline-none">
               <AccountsManager />
+            </TabsContent>
+
+            <TabsContent value="autopay" className="mt-0 outline-none">
+              <AutopayAnalytics />
             </TabsContent>
 
             <TabsContent value="backups" className="mt-0 outline-none">
