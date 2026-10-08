@@ -2539,6 +2539,56 @@ const Cabinet = () => {
     return true;
   };
 
+  // Получение совместимого оборудования (трубок ТКП или мониторов) под конкретную услугу
+  const getCompatibleEquipmentsForService = (serviceId: string | null): any[] => {
+    if (!serviceId) return [];
+    return availableProducts
+      .filter((p) => p.category === "equipment" && !isKeyProduct(p))
+      .filter((equip) => {
+        // 1) ПРИОРИТЕТ — явная привязка из вкладки «Подбор оборудования»
+        const svcEquip = serviceProductMap[serviceId];
+        if (svcEquip && svcEquip.size > 0) return svcEquip.has(equip.id);
+        // 2) Запасной вариант — по типу устройства услуги
+        const svc = availableProducts.find((p) => p.id === serviceId) || products.find((p) => p.id === serviceId);
+        const svcType = (svc as any)?.device_type_id;
+        if (svcType) return (equip as any).device_type_id === svcType;
+        return true; // если привязок нет — показываем всё совместимое
+      });
+  };
+
+  // Проверка: требует ли выбранная услуга обязательного выбора оборудования (трубки или монитора)
+  const isEquipmentRequiredForService = (serviceId: string | null): boolean => {
+    if (!serviceId) return false;
+    const service = availableProducts.find((p) => p.id === serviceId) || products.find((p) => p.id === serviceId);
+    if (!service) return false;
+
+    // Услуга не является услугой ЛК или ключей
+    const sName = (service.name || "").toLowerCase();
+    if (sName.includes("кабинет") || sName.includes("ключ")) {
+      return false;
+    }
+
+    // Проверяем по действию услуги (установка / замена)
+    const act = (service as any)?.service_action;
+    if (act === "install" || act === "replace") return true;
+
+    // Проверяем по ключевым словам названия
+    if (
+      sName.includes("установк") ||
+      sName.includes("замен") ||
+      sName.includes("монтаж") ||
+      sName.includes("трубк") ||
+      sName.includes("ткп") ||
+      sName.includes("монитор")
+    ) {
+      return true;
+    }
+
+    // По наличию совместимого оборудования в каталоге
+    const compEquips = getCompatibleEquipmentsForService(serviceId);
+    return compEquips.length > 0;
+  };
+
   // Проверка наличия загруженных логопасов (учетных записей) для текущего подъезда
   useEffect(() => {
     const checkEntranceCredentials = async () => {
@@ -3953,6 +4003,27 @@ const Cabinet = () => {
     if (orderType === "order" && totals.total === 0) {
       toast({ title: "Выберите хотя бы одну платную услугу или оборудование", variant: "destructive" });
       return;
+    }
+
+    // 2. Валидация обязательного выбора трубки при заказе установки или замены оборудования
+    if (orderType === "order" && selectedServiceId) {
+      const isEquipRequired = isEquipmentRequiredForService(selectedServiceId);
+      const compatibleEquips = getCompatibleEquipmentsForService(selectedServiceId);
+
+      if (isEquipRequired && compatibleEquips.length > 0 && !selectedEquipmentId) {
+        console.warn("[Заказ] Ошибка валидации: выбрана услуга монтажа/замены, но не выбрана модель трубки!");
+        toast({
+          title: "Выберите модель аудиотрубки",
+          description: "Для оформления заявки на установку или замену домофона необходимо обязательно выбрать модель трубки из списка оборудования.",
+          variant: "destructive",
+        });
+        
+        // Автоматически плавно скроллим к блоку выбора оборудования
+        if (equipmentSectionRef.current) {
+          equipmentSectionRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+        return;
+      }
     }
 
     setSaving(true);
@@ -7112,6 +7183,16 @@ const Cabinet = () => {
                                     } else {
                                       console.log("[Заявка] Выбрана услуга ID:", service.id, "цена:", effPrice);
                                       setSelectedServiceId(service.id);
+
+                                      // Автоматически предвыбираем первую совместимую модель трубки/оборудования
+                                      const compEquips = getCompatibleEquipmentsForService(service.id);
+                                      if (compEquips.length > 0) {
+                                        if (!selectedEquipmentId || !compEquips.some(e => e.id === selectedEquipmentId)) {
+                                          console.log(`[Заявка] Автопредвыбор совместимой трубки: "${compEquips[0].name}" (${compEquips[0].id})`);
+                                          setSelectedEquipmentId(compEquips[0].id);
+                                        }
+                                      }
+
                                       // Автоскролл к блоку выбора трубок
                                       setTimeout(() => {
                                         if (equipmentSectionRef.current) {
@@ -7171,22 +7252,14 @@ const Cabinet = () => {
                     {selectedServiceId && availableProducts.some(p => p.category === "equipment" && !isKeyProduct(p)) && (
                       <div ref={equipmentSectionRef} className="space-y-2 text-left animate-in fade-in slide-in-from-top-2 duration-300">
                         <div className="flex items-center justify-between">
-                          <Label className="text-sm font-semibold text-foreground flex items-center gap-1.5 font-display">
-                            🏢 Выберите оборудование под вашу услугу
+                          <Label className="text-sm font-semibold text-foreground flex items-center gap-2 font-display">
+                            <span>🏢 Выберите оборудование под вашу услугу</span>
+                            {isEquipmentRequiredForService(selectedServiceId) && (
+                              <span className="text-[11px] px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-600 dark:text-rose-400 font-bold border border-rose-500/25">
+                                * Обязательно
+                              </span>
+                            )}
                           </Label>
-                          {selectedEquipmentId && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                // RULE 2: Логируем сброс трубки для отображения всех моделей
-                                console.log("[Заявка] Сброс трубки абонентом для изменения выбора модели");
-                                setSelectedEquipmentId(null);
-                              }}
-                              className="text-xs text-blue-600 dark:text-sky-400 font-semibold hover:underline"
-                            >
-                              Выбрать другую
-                            </button>
-                          )}
                         </div>
                         <div className="space-y-2">
                           {availableProducts
@@ -7202,7 +7275,6 @@ const Cabinet = () => {
                               if (svcType) return (equip as any).device_type_id === svcType;
                               return true; // ничего не настроено — показываем всё (обратная совместимость)
                             })
-                            .filter(equip => !selectedEquipmentId || equip.id === selectedEquipmentId)
                             .map((equip) => {
                               const effPrice = getEffectiveProductPrice(equip);
                               const hasDiscount = currentMatchedEntrance?.service_type === "installation" && 
@@ -7214,13 +7286,9 @@ const Cabinet = () => {
                                 <div
                                   key={equip.id}
                                   onClick={() => {
-                                    if (isSelected) {
-                                      console.log("[Заявка] Снятие выбора трубки:", equip.name);
-                                      setSelectedEquipmentId(null);
-                                    } else {
-                                      console.log("[Заявка] Выбрана трубка:", equip.name, "цена:", effPrice);
-                                      setSelectedEquipmentId(equip.id);
-                                    }
+                                    // Одиночный выбор трубки: клик переключает на эту модель
+                                    console.log("[Заявка] Выбрана трубка:", equip.name, "цена:", effPrice);
+                                    setSelectedEquipmentId(equip.id);
                                   }}
                                   className={`flex items-center justify-between p-3.5 rounded-xl border cursor-pointer transition-all ${
                                     isSelected
@@ -7376,7 +7444,7 @@ const Cabinet = () => {
                       })()}
 
                       {/* Оборудование (трубка) */}
-                      {selectedEquipmentId && (() => {
+                      {selectedEquipmentId ? (() => {
                         const prod = availableProducts.find(p => p.id === selectedEquipmentId) || products.find(p => p.id === selectedEquipmentId);
                         if (!prod) return null;
                         const pPrice = getEffectiveProductPrice(prod);
@@ -7386,7 +7454,12 @@ const Cabinet = () => {
                             <span className="font-semibold text-foreground">{pPrice.toFixed(0)} ₽</span>
                           </div>
                         );
-                      })()}
+                      })() : (isEquipmentRequiredForService(selectedServiceId) && getCompatibleEquipmentsForService(selectedServiceId).length > 0) ? (
+                        <div className="flex justify-between text-rose-600 dark:text-rose-400 font-semibold text-xs py-1.5 px-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 animate-pulse">
+                          <span>Оборудование:</span>
+                          <span>Трубка не выбрана (обязательно)</span>
+                        </div>
+                      ) : null}
 
                       {/* Ключи */}
                       {keysQuantity > 0 && (() => {
@@ -7452,13 +7525,13 @@ const Cabinet = () => {
                       {(() => {
                         const base = calculateTotals().total || 0;
                         return (
-                          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5 text-left">
+                          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1 text-left">
                             <div className="flex justify-between font-bold text-base text-foreground pt-1">
                               <span>Итого к оплате:</span>
                               <span className="text-blue-600 dark:text-sky-400 font-mono text-xl font-black">{base.toFixed(2)} ₽</span>
                             </div>
                             <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-snug">
-                              💡 Возможна оплата за транзакцию. Оплата производится онлайн через ЮKassa.
+                              Онлайн-оплата заказа производится безопасно через платёжный шлюз ЮKassa.
                             </p>
                           </div>
                         );
@@ -7509,13 +7582,11 @@ const Cabinet = () => {
                       )}
                       {orderType === "repair"
                         ? "Отправить заявку мастеру (бесплатно)"
+                        : (isEquipmentRequiredForService(selectedServiceId) && getCompatibleEquipmentsForService(selectedServiceId).length > 0 && !selectedEquipmentId)
+                        ? "Выберите трубку для оплаты"
                         : calculateTotals().total === 0
                         ? "Оформить заявку"
-                        : `Оплатить заказ (${(() => {
-                            const b = calculateTotals().total || 0;
-                            const f = Math.round(b * 0.05 * 100) / 100;
-                            return (b + f).toFixed(2);
-                          })()} ₽) через ЮKassa`}
+                        : `Оплатить заказ (${calculateTotals().total.toFixed(0)} ₽) через ЮKassa`}
                     </Button>
                   )}
                 </DialogFooter>
