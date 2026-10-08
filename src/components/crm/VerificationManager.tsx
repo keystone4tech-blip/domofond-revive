@@ -40,6 +40,13 @@ import {
   AlertTriangle,
   FileCheck,
   AlertCircle,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  History,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatFullAddress } from "@/lib/addressMatch";
@@ -62,6 +69,16 @@ interface Profile {
   verification_reviewed_at?: string | null;
   created_at: string | null;
   updated_at: string | null;
+  // Счетчик и история изменений данных жильца (для антиспам-фильтра)
+  data_changes_count?: number | null;
+  data_changes_history?: Array<{
+    id: string;
+    status: 'approved' | 'rejected' | 'pending';
+    timestamp: string;
+    reason?: string;
+    old_data?: any;
+    new_data?: any;
+  }> | null;
   // Поля запроса на изменение данных жильца
   pending_data_change?: {
     full_name?: string;
@@ -99,12 +116,29 @@ const DATA_CHANGE_REJECT_REASONS = [
   "Для смены адреса требуется повторное предоставление выписки ЕГРН или договора аренды",
 ];
 
-const VerificationManager: React.FC = () => {
+interface VerificationManagerProps {
+  onNavigate?: (tab: string) => void;
+}
+
+export const VerificationManager: React.FC<VerificationManagerProps> = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Активная вкладка фильтра (включая 'data_changes' для изменения данных)
+  // Активная вкладка фильтра
   const [activeFilter, setActiveFilter] = useState<"pending" | "verified" | "rejected" | "data_changes">("pending");
+
+  // Подвкладка внутри вкладки "Изменение данных": активные или архив/история
+  const [dataChangesSubTab, setDataChangesSubTab] = useState<"pending" | "history">("pending");
+
+  // Поисковый запрос и пагинация
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+
+  // Сброс страницы на первую при смене вкладок или поискового запроса
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeFilter, dataChangesSubTab, searchQuery]);
 
   // Выбранный профиль для просмотра в диалоге верификации
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
@@ -132,8 +166,8 @@ const VerificationManager: React.FC = () => {
   // Просмотр документа в полноэкранном режиме (Zoom)
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
 
-  // Загрузка всех профилей из БД с авто-обновлением в режиме онлайн каждые 5 секунд
-  const { data: profiles, isLoading } = useQuery({
+  // 1. Загрузка всех профилей из БД с авто-обновлением в режиме онлайн каждые 5 секунд
+  const { data: profiles, isLoading: profilesLoading } = useQuery({
     queryKey: ["verification-profiles"],
     queryFn: async () => {
       console.log("[Верификация FSM] Онлайн загрузка списка профилей пользователей...");
@@ -144,8 +178,29 @@ const VerificationManager: React.FC = () => {
       if (error) throw error;
       return (data || []) as Profile[];
     },
-    refetchInterval: 5000, // Обновление каждые 5 секунд для режима онлайн
+    refetchInterval: 5000,
   });
+
+  // 2. Загрузка всех заявок на изменение данных из таблицы requests для полной истории и учета спамеров
+  const { data: dbDataChangeRequests, isLoading: requestsLoading } = useQuery({
+    queryKey: ["verification-db-data-change-requests"],
+    queryFn: async () => {
+      console.log("[Верификация FSM] Загрузка реестра заявок data_change_request...");
+      const { data, error } = await supabase
+        .from("requests")
+        .select("*")
+        .eq("order_type", "data_change_request")
+        .order("created_at", { ascending: false });
+      if (error) {
+        console.warn("[Верификация FSM] Заявки data_change_request не загружены:", error.message);
+        return [];
+      }
+      return data || [];
+    },
+    refetchInterval: 10000,
+  });
+
+  const isLoading = profilesLoading;
 
   // Слушатель событий и кросс-таб синхронизация через localStorage для мгновенного обновления
   useEffect(() => {
@@ -168,29 +223,258 @@ const VerificationManager: React.FC = () => {
     };
   }, [queryClient]);
 
-  // Фильтрация списков по статусу
-  const pendingProfiles = (profiles || []).filter((p) => {
-    if (p.is_verified) return false;
-    if (p.verification_status === "rejected") return false;
-    if (p.verification_status === "pending") return true;
-    if (p.verification_document_url) return true;
-    return false;
-  }).sort((a, b) => {
-    // Первыми показываем тех, у кого прикреплен документ!
-    if (a.verification_document_url && !b.verification_document_url) return -1;
-    if (!a.verification_document_url && b.verification_document_url) return 1;
-    return (b.verification_submitted_at || b.updated_at || "").localeCompare(a.verification_submitted_at || a.updated_at || "");
-  });
+  // Подсчет количества изменений данных для каждого пользователя (детектор спама)
+  const dataChangesCountMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    (dbDataChangeRequests || []).forEach((req: any) => {
+      if (req.client_id) {
+        map[req.client_id] = (map[req.client_id] || 0) + 1;
+      }
+    });
+    (profiles || []).forEach((p: any) => {
+      const explicitCount = p.data_changes_count || 0;
+      const historyLen = Array.isArray(p.data_changes_history) ? p.data_changes_history.length : 0;
+      const currentPending = p.pending_data_change ? 1 : 0;
+      const maxCount = Math.max(map[p.id] || 0, explicitCount, historyLen, currentPending);
+      if (maxCount > 0) {
+        map[p.id] = maxCount;
+      }
+    });
+    return map;
+  }, [dbDataChangeRequests, profiles]);
 
-  const verifiedProfiles = (profiles || []).filter((p) => p.is_verified);
-  const rejectedProfiles = (profiles || []).filter((p) => p.verification_status === "rejected");
+  // Фильтрация списков по статусу верификации документов
+  const allPendingProfiles = useMemo(() => {
+    return (profiles || []).filter((p) => {
+      if (p.is_verified) return false;
+      if (p.verification_status === "rejected") return false;
+      if (p.verification_status === "pending") return true;
+      if (p.verification_document_url) return true;
+      return false;
+    }).sort((a, b) => {
+      if (a.verification_document_url && !b.verification_document_url) return -1;
+      if (!a.verification_document_url && b.verification_document_url) return 1;
+      return (b.verification_submitted_at || b.updated_at || "").localeCompare(a.verification_submitted_at || a.updated_at || "");
+    });
+  }, [profiles]);
 
-  // Фильтрация поступивших заявок на изменение персональных данных абонентов
-  const dataChangeRequests = (profiles || []).filter(
-    (p: any) => p.pending_data_change && typeof p.pending_data_change === "object"
-  );
+  const allVerifiedProfiles = useMemo(() => {
+    return (profiles || []).filter((p) => p.is_verified);
+  }, [profiles]);
 
-  // Одобрение замены персональных данных абонента диспетчером (с Optimistic UI)
+  const allRejectedProfiles = useMemo(() => {
+    return (profiles || []).filter((p) => p.verification_status === "rejected");
+  }, [profiles]);
+
+  // Активные заявки на смену персональных данных абонентов
+  const allDataChangeRequests = useMemo(() => {
+    return (profiles || []).filter(
+      (p: any) => p.pending_data_change && typeof p.pending_data_change === "object"
+    );
+  }, [profiles]);
+
+  // Полная история всех смен данных (завершенные и отклоненные)
+  const allDataChangeHistory = useMemo(() => {
+    const list: Array<{
+      id: string;
+      userId: string;
+      userName: string;
+      phone: string;
+      status: "approved" | "rejected" | "pending";
+      timestamp: string;
+      reason?: string;
+      oldData: any;
+      newData: any;
+      changesCount: number;
+    }> = [];
+
+    // 1. Из таблицы requests (order_type = data_change_request)
+    (dbDataChangeRequests || []).forEach((req: any) => {
+      if (req.status === "pending") return; // активные показываются во вкладке "На проверке"
+      let parsedNotes: any = null;
+      try {
+        if (req.notes && req.notes.startsWith("{")) parsedNotes = JSON.parse(req.notes);
+      } catch (e) {}
+
+      const userProfile = (profiles || []).find(p => p.id === req.client_id);
+      const changesCount = dataChangesCountMap[req.client_id] || 1;
+
+      list.push({
+        id: req.id,
+        userId: req.client_id || "",
+        userName: req.name || userProfile?.full_name || "Абонент",
+        phone: req.phone || userProfile?.phone || "",
+        status: req.status === "completed" ? "approved" : "rejected",
+        timestamp: req.completed_at || req.updated_at || req.created_at,
+        reason: req.notes && !req.notes.startsWith("{") ? req.notes : undefined,
+        oldData: parsedNotes?.old_data || {
+          address: userProfile?.address,
+          apartment: userProfile?.apartment,
+          full_name: userProfile?.full_name,
+        },
+        newData: {
+          address: req.address,
+          apartment: req.apartment,
+          full_name: req.name,
+          phone: req.phone,
+          account_number: parsedNotes?.account_number,
+        },
+        changesCount,
+      });
+    });
+
+    // 2. Из структуры profiles.data_changes_history
+    (profiles || []).forEach((p: any) => {
+      if (Array.isArray(p.data_changes_history)) {
+        p.data_changes_history.forEach((h: any) => {
+          if (!list.some(item => item.id === h.id)) {
+            list.push({
+              id: h.id,
+              userId: p.id,
+              userName: h.new_data?.full_name || p.full_name || "Абонент",
+              phone: h.new_data?.phone || p.phone || "",
+              status: h.status,
+              timestamp: h.timestamp,
+              reason: h.reason,
+              oldData: h.old_data || {},
+              newData: h.new_data || {},
+              changesCount: dataChangesCountMap[p.id] || 1,
+            });
+          }
+        });
+      }
+    });
+
+    return list.sort((a, b) => (b.timestamp || "").localeCompare(a.timestamp || ""));
+  }, [dbDataChangeRequests, profiles, dataChangesCountMap]);
+
+  // Универсальный поиск по массиву записей
+  const filterListBySearch = <T extends any>(items: T[], getFields: (item: T) => (string | null | undefined)[]) => {
+    if (!searchQuery.trim()) return items;
+    const q = searchQuery.toLowerCase().trim();
+    return items.filter(item => {
+      const fields = getFields(item);
+      return fields.some(f => f && String(f).toLowerCase().includes(q));
+    });
+  };
+
+  const pendingProfiles = useMemo(() => {
+    return filterListBySearch(allPendingProfiles, p => [p.full_name, p.phone, p.address, p.apartment, (p as any).account_number]);
+  }, [allPendingProfiles, searchQuery]);
+
+  const verifiedProfiles = useMemo(() => {
+    return filterListBySearch(allVerifiedProfiles, p => [p.full_name, p.phone, p.address, p.apartment, (p as any).account_number]);
+  }, [allVerifiedProfiles, searchQuery]);
+
+  const rejectedProfiles = useMemo(() => {
+    return filterListBySearch(allRejectedProfiles, p => [p.full_name, p.phone, p.address, p.apartment, p.verification_reject_reason, (p as any).account_number]);
+  }, [allRejectedProfiles, searchQuery]);
+
+  const dataChangeRequests = useMemo(() => {
+    return filterListBySearch(allDataChangeRequests, p => [
+      p.full_name, p.phone, p.address, p.apartment,
+      p.pending_data_change?.full_name, p.pending_data_change?.phone, p.pending_data_change?.address, p.pending_data_change?.apartment, p.pending_data_change?.account_number
+    ]);
+  }, [allDataChangeRequests, searchQuery]);
+
+  const dataChangeHistory = useMemo(() => {
+    return filterListBySearch(allDataChangeHistory, h => [
+      h.userName, h.phone, h.reason,
+      h.oldData?.address, h.oldData?.apartment, h.oldData?.full_name,
+      h.newData?.address, h.newData?.apartment, h.newData?.full_name, h.newData?.account_number
+    ]);
+  }, [allDataChangeHistory, searchQuery]);
+
+  // Вспомогательный рендер индикатора антиспама
+  const renderSpamBadge = (count: number) => {
+    if (count <= 1) {
+      return (
+        <Badge variant="outline" className="text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-700 text-[10px] gap-1 font-medium shrink-0">
+          <span>Смен данных: {count}</span>
+        </Badge>
+      );
+    }
+    if (count <= 3) {
+      return (
+        <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 text-[10px] gap-1 font-bold shrink-0">
+          <AlertTriangle className="h-3 w-3 shrink-0" />
+          <span>Смен данных: {count}</span>
+        </Badge>
+      );
+    }
+    return (
+      <Badge className="bg-red-500 text-white border border-red-600 text-[10px] gap-1 font-bold animate-pulse shadow-xs shrink-0">
+        <AlertCircle className="h-3 w-3 shrink-0" />
+        <span>🚨 Спам-фильтр: {count} смен (подозрение на спам)</span>
+      </Badge>
+    );
+  };
+
+  // Вспомогательный рендер панели пагинации страниц
+  const renderPagination = (totalItems: number) => {
+    const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+    if (totalPages <= 1) return null;
+
+    const startIdx = (currentPage - 1) * pageSize + 1;
+    const endIdx = Math.min(currentPage * pageSize, totalItems);
+
+    return (
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-slate-200 dark:border-slate-800 text-xs text-muted-foreground">
+        <div>
+          Показано <span className="font-bold text-foreground">{startIdx}–{endIdx}</span> из <span className="font-bold text-foreground">{totalItems}</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 p-0 rounded-lg"
+            disabled={currentPage === 1}
+            onClick={() => setCurrentPage(1)}
+            title="В начало"
+          >
+            <ChevronsLeft className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 p-0 rounded-lg"
+            disabled={currentPage === 1}
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            title="Предыдущая страница"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+
+          <span className="px-3 font-semibold text-foreground">
+            Стр. {currentPage} из {totalPages}
+          </span>
+
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 p-0 rounded-lg"
+            disabled={currentPage >= totalPages}
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            title="Следующая страница"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 p-0 rounded-lg"
+            disabled={currentPage >= totalPages}
+            onClick={() => setCurrentPage(totalPages)}
+            title="В конец"
+          >
+            <ChevronsRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
+  // Одобрение замены персональных данных абонента диспетчером (с сохранением истории и Optimistic UI)
   const handleApproveDataChange = async (profile: Profile) => {
     try {
       const change = profile.pending_data_change;
@@ -199,7 +483,31 @@ const VerificationManager: React.FC = () => {
       console.log(`[Верификация] Мгновенное подтверждение изменения данных для профиля ID: ${profile.id}`, change);
       const now = new Date().toISOString();
 
-      // 0. МГНОВЕННЫЙ OPTIMISTIC UI (0 мс): сразу удаляем заявку на изменение данных из очереди в памяти браузера!
+      // Запись в историю изменений
+      const existingHistory = Array.isArray(profile.data_changes_history) ? profile.data_changes_history : [];
+      const historyItem = {
+        id: "chg_" + Date.now(),
+        status: "approved" as const,
+        timestamp: now,
+        old_data: change.old_data || {
+          full_name: profile.full_name,
+          phone: profile.phone,
+          address: profile.address,
+          apartment: profile.apartment,
+        },
+        new_data: {
+          full_name: change.full_name?.trim() || profile.full_name,
+          phone: change.phone?.trim() || profile.phone,
+          address: change.address?.trim() || profile.address,
+          apartment: change.apartment !== undefined ? change.apartment?.trim() : profile.apartment,
+          floor: change.floor !== undefined ? change.floor?.trim() : profile.floor,
+          account_number: change.account_number ? change.account_number.trim() : (profile as any).account_number,
+        },
+      };
+      const updatedHistory = [historyItem, ...existingHistory];
+      const newCount = (profile.data_changes_count || 0) + 1;
+
+      // 0. МГНОВЕННЫЙ OPTIMISTIC UI (0 мс)
       queryClient.setQueryData<Profile[]>(["verification-profiles"], (old) => {
         if (!old) return [];
         return old.map((p) =>
@@ -213,7 +521,9 @@ const VerificationManager: React.FC = () => {
                 apartment: change.apartment !== undefined ? change.apartment?.trim() : p.apartment,
                 floor: change.floor !== undefined ? change.floor?.trim() : p.floor,
                 account_number: change.account_number ? change.account_number.trim() : (p as any).account_number,
-                pending_data_change: null, // Заявка мгновенно исчезает с экрана
+                pending_data_change: null,
+                data_changes_count: newCount,
+                data_changes_history: updatedHistory,
               }
             : p
         );
@@ -229,8 +539,8 @@ const VerificationManager: React.FC = () => {
       });
 
       toast({
-        title: "✅ Данные обновлены!",
-        description: `Новые реквизиты для ${change.full_name || profile.full_name} успешно применены.`,
+        title: "✅ Данные обновлены и сохранены в истории!",
+        description: `Новые реквизиты для ${change.full_name || profile.full_name} успешно применены (всего смен: ${newCount}).`,
       });
 
       // 1. Применяем новые реквизиты в PostgreSQL
@@ -245,6 +555,8 @@ const VerificationManager: React.FC = () => {
           floor: change.floor !== undefined ? change.floor?.trim() : profile.floor,
           account_number: change.account_number ? change.account_number.trim() : (profile as any).account_number,
           pending_data_change: null,
+          data_changes_count: newCount,
+          data_changes_history: updatedHistory as any,
           data_change_notification: {
             type: "approved",
             message: `Ваши новые реквизиты успешно подтверждены оператором: ${
@@ -277,11 +589,11 @@ const VerificationManager: React.FC = () => {
       }
 
       queryClient.invalidateQueries({ queryKey: ["verification-profiles"] });
+      queryClient.invalidateQueries({ queryKey: ["verification-db-data-change-requests"] });
       queryClient.invalidateQueries({ queryKey: ["fsm-sidebar-counts"] });
       queryClient.invalidateQueries({ queryKey: ["requests"] });
     } catch (err: any) {
       console.error("[Верификация] Ошибка применения изменений:", err);
-      // В случае сбоя сети откатываем кэш
       queryClient.invalidateQueries({ queryKey: ["verification-profiles"] });
       toast({
         title: "Ошибка обновления данных",
@@ -298,7 +610,7 @@ const VerificationManager: React.FC = () => {
     setIsRejectDataDialogOpen(true);
   };
 
-  // Фиксация отклонения с записью причины в профиль жильца (с Optimistic UI)
+  // Фиксация отклонения с записью причины в профиль жильца и историю
   const handleConfirmRejectDataChange = async () => {
     if (!rejectingDataProfile) return;
 
@@ -306,15 +618,28 @@ const VerificationManager: React.FC = () => {
       setIsRejectingData(true);
       const reason = dataRejectReason.trim() || "Данные не соответствуют реестру абонентов";
       const targetId = rejectingDataProfile.id;
+      const change = rejectingDataProfile.pending_data_change;
       console.log(`[Верификация] Мгновенное отклонение изменения данных для профиля ID: ${targetId}`);
       const now = new Date().toISOString();
+
+      const existingHistory = Array.isArray(rejectingDataProfile.data_changes_history) ? rejectingDataProfile.data_changes_history : [];
+      const historyItem = {
+        id: "chg_" + Date.now(),
+        status: "rejected" as const,
+        reason: reason,
+        timestamp: now,
+        old_data: change?.old_data || {},
+        new_data: change || {},
+      };
+      const updatedHistory = [historyItem, ...existingHistory];
+      const newCount = (rejectingDataProfile.data_changes_count || 0) + 1;
 
       // 0. МГНОВЕННЫЙ OPTIMISTIC UI: заявка сразу убирается с экрана
       queryClient.setQueryData<Profile[]>(["verification-profiles"], (old) => {
         if (!old) return [];
         return old.map((p) =>
           p.id === targetId
-            ? { ...p, pending_data_change: null }
+            ? { ...p, pending_data_change: null, data_changes_count: newCount, data_changes_history: updatedHistory }
             : p
         );
       });
@@ -331,15 +656,17 @@ const VerificationManager: React.FC = () => {
       setRejectingDataProfile(null);
 
       toast({
-        title: "Заявка отклонена",
-        description: `Запрос на изменение данных отклонен. Причина: ${reason}`,
+        title: "Заявка отклонена и сохранена в архиве",
+        description: `Запрос на изменение данных отклонен. Причина: ${reason} (всего обращений: ${newCount})`,
       });
 
-      // 1. Очищаем pending_data_change в profiles и фиксируем письмо-уведомление
+      // 1. Очищаем pending_data_change в profiles, записываем историю и уведомление
       const { error } = await supabase
         .from("profiles")
         .update({
           pending_data_change: null,
+          data_changes_count: newCount,
+          data_changes_history: updatedHistory as any,
           data_change_notification: {
             type: "rejected",
             reason,
@@ -366,6 +693,7 @@ const VerificationManager: React.FC = () => {
       }
 
       queryClient.invalidateQueries({ queryKey: ["verification-profiles"] });
+      queryClient.invalidateQueries({ queryKey: ["verification-db-data-change-requests"] });
       queryClient.invalidateQueries({ queryKey: ["fsm-sidebar-counts"] });
       queryClient.invalidateQueries({ queryKey: ["requests"] });
     } catch (err: any) {
@@ -629,19 +957,19 @@ const VerificationManager: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Шапка и переключатель фильтров */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-2 border-b border-slate-200 dark:border-slate-800">
+      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
         <div>
           <h2 className="text-xl font-black text-foreground flex items-center gap-2">
             <ShieldCheck className="h-6 w-6 text-amber-500" />
             <span>Верификация жильцов</span>
           </h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Проверка документов на право проживания для выдачи доступов к умному домофону
+            Проверка документов на право проживания, учет смен данных и защита от спама
           </p>
         </div>
 
         {/* Табы фильтрации */}
-        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-slate-800/80 text-xs">
+        <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-slate-800/80 text-xs">
           <button
             onClick={() => setActiveFilter("pending")}
             className={cn(
@@ -705,7 +1033,7 @@ const VerificationManager: React.FC = () => {
             )}
           >
             <Edit className="h-3.5 w-3.5" />
-            <span>Изменение данных</span>
+            <span>Смена данных</span>
             {dataChangeRequests.length > 0 && (
               <Badge className={cn("text-[10px] px-1.5 py-0 font-bold", activeFilter === "data_changes" ? "bg-white/20 text-white" : "bg-blue-600 text-white")}>
                 {dataChangeRequests.length}
@@ -715,301 +1043,490 @@ const VerificationManager: React.FC = () => {
         </div>
       </div>
 
-      {/* Список карточек пользователей в выбранной вкладке */}
+      {/* Быстрый поиск и фильтрация */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Быстрый поиск по ФИО, телефону, адресу, квартире..."
+            className="pl-9 pr-9 h-10 rounded-xl bg-card border-slate-200 dark:border-slate-800 text-sm shadow-xs"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5 rounded-md"
+              title="Очистить поиск"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+
+        {activeFilter === "data_changes" && (
+          <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-xs shrink-0">
+            <button
+              onClick={() => setDataChangesSubTab("pending")}
+              className={cn(
+                "px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5",
+                dataChangesSubTab === "pending"
+                  ? "bg-blue-600 text-white shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Clock className="h-3.5 w-3.5" />
+              <span>Ожидают ({dataChangeRequests.length})</span>
+            </button>
+            <button
+              onClick={() => setDataChangesSubTab("history")}
+              className={cn(
+                "px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5",
+                dataChangesSubTab === "history"
+                  ? "bg-slate-900 text-white dark:bg-slate-700 shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <History className="h-3.5 w-3.5" />
+              <span>Архив и история ({dataChangeHistory.length})</span>
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Список карточек пользователей: На проверке */}
       {activeFilter === "pending" && (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {pendingProfiles.length === 0 ? (
             <Card className="border-slate-200 dark:border-slate-800">
               <CardContent className="py-12 text-center text-muted-foreground space-y-2">
                 <CheckCircle className="h-8 w-8 text-green-500 mx-auto" />
-                <p className="font-bold text-sm text-foreground">Нет заявок, ожидающих верификации</p>
+                <p className="font-bold text-sm text-foreground">
+                  {searchQuery ? "По запросу ничего не найдено" : "Нет заявок, ожидающих верификации"}
+                </p>
                 <p className="text-xs">Все поступившие документы проверены диспетчером.</p>
               </CardContent>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {pendingProfiles.map((profile) => {
-                const hasDoc = !!profile.verification_document_url;
-                return (
-                  <Card
-                    key={profile.id}
-                    onClick={() => openProfile(profile)}
-                    className={cn(
-                      "cursor-pointer transition-all hover:shadow-md border",
-                      hasDoc 
-                        ? "border-amber-500/40 bg-amber-500/5 hover:border-amber-500" 
-                        : "border-slate-200 dark:border-slate-800"
-                    )}
-                  >
-                    <CardContent className="p-4 space-y-2.5">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-3">
-                          <div className={cn(
-                            "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
-                            hasDoc ? "bg-amber-500 text-white shadow-xs" : "bg-slate-100 dark:bg-slate-800 text-slate-500"
-                          )}>
-                            {hasDoc ? <FileCheck className="h-5 w-5" /> : <User className="h-5 w-5" />}
-                          </div>
-                          <div>
-                            <p className="font-bold text-sm text-foreground leading-tight">
-                              {profile.full_name || "Имя не указано"}
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              {profile.phone || "Телефон не указан"}
-                            </p>
-                          </div>
-                        </div>
-
-                        {hasDoc ? (
-                          <Badge className="bg-amber-500 text-white text-[10px] font-bold shrink-0">
-                            📄 Документ прикреплен
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-slate-500 text-[10px] shrink-0">
-                            Без документа
-                          </Badge>
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {pendingProfiles
+                  .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+                  .map((profile) => {
+                    const hasDoc = !!profile.verification_document_url;
+                    const spamCount = dataChangesCountMap[profile.id] || 0;
+                    return (
+                      <Card
+                        key={profile.id}
+                        onClick={() => openProfile(profile)}
+                        className={cn(
+                          "cursor-pointer transition-all hover:shadow-md border",
+                          hasDoc 
+                            ? "border-amber-500/40 bg-amber-500/5 hover:border-amber-500" 
+                            : "border-slate-200 dark:border-slate-800"
                         )}
-                      </div>
+                      >
+                        <CardContent className="p-4 space-y-2.5">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-3">
+                              <div className={cn(
+                                "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
+                                hasDoc ? "bg-amber-500 text-white shadow-xs" : "bg-slate-100 dark:bg-slate-800 text-slate-500"
+                              )}>
+                                {hasDoc ? <FileCheck className="h-5 w-5" /> : <User className="h-5 w-5" />}
+                              </div>
+                              <div>
+                                <p className="font-bold text-sm text-foreground leading-tight">
+                                  {profile.full_name || "Имя не указано"}
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  {profile.phone || "Телефон не указан"}
+                                </p>
+                              </div>
+                            </div>
 
-                      <div className="text-xs space-y-1 pt-1 border-t border-slate-100 dark:border-slate-800">
-                        <p className="text-foreground font-semibold flex items-center gap-1.5">
-                          <MapPin className="h-3.5 w-3.5 text-primary shrink-0" />
-                          <span>{formatFullAddress(profile.address, profile.apartment) || "Адрес не указан"}</span>
-                        </p>
-                        <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-0.5">
-                          {getDocumentTypeBadge(profile.verification_document_type) || <span>Тип: Не указан</span>}
-                          {profile.verification_submitted_at && (
-                            <span>{new Date(profile.verification_submitted_at).toLocaleDateString("ru-RU", { hour: "2-digit", minute: "2-digit" })}</span>
-                          )}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
+                            <div className="flex flex-col items-end gap-1 shrink-0">
+                              {hasDoc ? (
+                                <Badge className="bg-amber-500 text-white text-[10px] font-bold">
+                                  📄 Документ
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-slate-500 text-[10px]">
+                                  Без документа
+                                </Badge>
+                              )}
+                              {renderSpamBadge(spamCount)}
+                            </div>
+                          </div>
+
+                          <div className="text-xs space-y-1 pt-1 border-t border-slate-100 dark:border-slate-800">
+                            <p className="text-foreground font-semibold flex items-center gap-1.5">
+                              <MapPin className="h-3.5 w-3.5 text-primary shrink-0" />
+                              <span>{formatFullAddress(profile.address, profile.apartment) || "Адрес не указан"}</span>
+                            </p>
+                            <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-0.5">
+                              {getDocumentTypeBadge(profile.verification_document_type) || <span>Тип: Не указан</span>}
+                              {profile.verification_submitted_at && (
+                                <span>{new Date(profile.verification_submitted_at).toLocaleDateString("ru-RU", { hour: "2-digit", minute: "2-digit" })}</span>
+                              )}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+              </div>
+              {renderPagination(pendingProfiles.length)}
+            </>
           )}
         </div>
       )}
 
       {/* Одобренные пользователи */}
       {activeFilter === "verified" && (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {verifiedProfiles.length === 0 ? (
             <Card className="border-slate-200 dark:border-slate-800">
               <CardContent className="py-12 text-center text-muted-foreground">
-                Нет верифицированных пользователей
+                {searchQuery ? "По запросу ничего не найдено" : "Нет верифицированных пользователей"}
               </CardContent>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {verifiedProfiles.map((profile) => (
-                <Card
-                  key={profile.id}
-                  onClick={() => openProfile(profile)}
-                  className="cursor-pointer hover:shadow-md transition-all border-slate-200 dark:border-slate-800"
-                >
-                  <CardContent className="p-4 space-y-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-green-500/10 text-green-600 dark:text-green-400 flex items-center justify-center shrink-0">
-                          <CheckCircle className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <p className="font-bold text-sm text-foreground">{profile.full_name || "Без имени"}</p>
-                          <p className="text-xs text-muted-foreground">{profile.phone || "Нет телефона"}</p>
-                        </div>
-                      </div>
-                      <Badge className="bg-green-600 text-white text-[10px]">
-                        Верифицирован
-                      </Badge>
-                    </div>
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {verifiedProfiles
+                  .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+                  .map((profile) => {
+                    const spamCount = dataChangesCountMap[profile.id] || 0;
+                    return (
+                      <Card
+                        key={profile.id}
+                        onClick={() => openProfile(profile)}
+                        className="cursor-pointer hover:shadow-md transition-all border-slate-200 dark:border-slate-800"
+                      >
+                        <CardContent className="p-4 space-y-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-xl bg-green-500/10 text-green-600 dark:text-green-400 flex items-center justify-center shrink-0">
+                                <CheckCircle className="h-5 w-5" />
+                              </div>
+                              <div>
+                                <p className="font-bold text-sm text-foreground">{profile.full_name || "Без имени"}</p>
+                                <p className="text-xs text-muted-foreground">{profile.phone || "Нет телефона"}</p>
+                              </div>
+                            </div>
+                            <div className="flex flex-col items-end gap-1 shrink-0">
+                              <Badge className="bg-green-600 text-white text-[10px]">
+                                Верифицирован
+                              </Badge>
+                              {renderSpamBadge(spamCount)}
+                            </div>
+                          </div>
 
-                    <div className="text-xs text-muted-foreground pt-1 border-t border-slate-100 dark:border-slate-800">
-                      <p className="text-foreground font-medium flex items-center gap-1.5">
-                        <MapPin className="h-3.5 w-3.5 text-primary shrink-0" />
-                        <span>{formatFullAddress(profile.address, profile.apartment) || "—"}</span>
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                          <div className="text-xs text-muted-foreground pt-1 border-t border-slate-100 dark:border-slate-800">
+                            <p className="text-foreground font-medium flex items-center gap-1.5">
+                              <MapPin className="h-3.5 w-3.5 text-primary shrink-0" />
+                              <span>{formatFullAddress(profile.address, profile.apartment) || "—"}</span>
+                            </p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+              </div>
+              {renderPagination(verifiedProfiles.length)}
+            </>
           )}
         </div>
       )}
 
       {/* Отклоненные пользователи */}
       {activeFilter === "rejected" && (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {rejectedProfiles.length === 0 ? (
             <Card className="border-slate-200 dark:border-slate-800">
               <CardContent className="py-12 text-center text-muted-foreground">
-                Нет отклоненных заявок
+                {searchQuery ? "По запросу ничего не найдено" : "Нет отклоненных заявок"}
               </CardContent>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {rejectedProfiles.map((profile) => (
-                <Card
-                  key={profile.id}
-                  onClick={() => openProfile(profile)}
-                  className="cursor-pointer hover:shadow-md transition-all border-red-200 dark:border-red-900/40 bg-red-50/20 dark:bg-red-950/10"
-                >
-                  <CardContent className="p-4 space-y-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-red-500/10 text-red-600 flex items-center justify-center shrink-0">
-                          <XCircle className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <p className="font-bold text-sm text-foreground">{profile.full_name || "Без имени"}</p>
-                          <p className="text-xs text-muted-foreground">{profile.phone || "Нет телефона"}</p>
-                        </div>
-                      </div>
-                      <Badge variant="destructive" className="text-[10px]">
-                        Отклонено
-                      </Badge>
-                    </div>
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {rejectedProfiles
+                  .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+                  .map((profile) => {
+                    const spamCount = dataChangesCountMap[profile.id] || 0;
+                    return (
+                      <Card
+                        key={profile.id}
+                        onClick={() => openProfile(profile)}
+                        className="cursor-pointer hover:shadow-md transition-all border-red-200 dark:border-red-900/40 bg-red-50/20 dark:bg-red-950/10"
+                      >
+                        <CardContent className="p-4 space-y-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-xl bg-red-500/10 text-red-600 flex items-center justify-center shrink-0">
+                                <XCircle className="h-5 w-5" />
+                              </div>
+                              <div>
+                                <p className="font-bold text-sm text-foreground">{profile.full_name || "Без имени"}</p>
+                                <p className="text-xs text-muted-foreground">{profile.phone || "Нет телефона"}</p>
+                              </div>
+                            </div>
+                            <div className="flex flex-col items-end gap-1 shrink-0">
+                              <Badge variant="destructive" className="text-[10px]">
+                                Отклонено
+                              </Badge>
+                              {renderSpamBadge(spamCount)}
+                            </div>
+                          </div>
 
-                    <div className="text-xs text-muted-foreground pt-1 border-t border-red-100 dark:border-red-900/30 space-y-1">
-                      <p className="text-foreground font-medium flex items-center gap-1.5">
-                        <MapPin className="h-3.5 w-3.5 text-primary shrink-0" />
-                        <span>{formatFullAddress(profile.address, profile.apartment) || "—"}</span>
-                      </p>
-                      {profile.verification_reject_reason && (
-                        <p className="text-red-600 dark:text-red-400 font-medium">
-                          Причина: {profile.verification_reject_reason}
-                        </p>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                          <div className="text-xs text-muted-foreground pt-1 border-t border-red-100 dark:border-red-900/30 space-y-1">
+                            <p className="text-foreground font-medium flex items-center gap-1.5">
+                              <MapPin className="h-3.5 w-3.5 text-primary shrink-0" />
+                              <span>{formatFullAddress(profile.address, profile.apartment) || "—"}</span>
+                            </p>
+                            {profile.verification_reject_reason && (
+                              <p className="text-red-600 dark:text-red-400 font-medium">
+                                Причина: {profile.verification_reject_reason}
+                              </p>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+              </div>
+              {renderPagination(rejectedProfiles.length)}
+            </>
           )}
         </div>
       )}
 
-      {/* 4. Вкладка "Изменение данных" */}
+      {/* 4. Вкладка "Смена данных" */}
       {activeFilter === "data_changes" && (
         <div className="space-y-4">
-          {dataChangeRequests.length === 0 ? (
-            <Card className="border-slate-200 dark:border-slate-800">
-              <CardContent className="py-12 text-center text-muted-foreground space-y-2">
-                <FileCheck className="h-8 w-8 text-blue-500 mx-auto" />
-                <p className="font-bold text-sm text-foreground">Нет активных заявок на изменение персональных данных</p>
-                <p className="text-xs">Когда абоненты запросят изменение адреса, квартиры или ФИО, запросы появятся здесь.</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 gap-4">
-              {dataChangeRequests.map((profile) => {
-                const change = profile.pending_data_change;
-                const oldData = change?.old_data || {};
-                return (
-                  <Card key={profile.id} className="border border-blue-500/30 dark:border-blue-500/20 bg-blue-50/15 dark:bg-blue-950/10 rounded-2xl shadow-sm">
-                    <CardHeader className="pb-3 border-b border-blue-100 dark:border-blue-900/30">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <Badge className="bg-blue-600 text-white font-bold text-xs">
-                            Заявка на смену данных
-                          </Badge>
-                          {change?.submitted_at && (
-                            <span className="text-xs text-muted-foreground flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              {new Date(change.submitted_at).toLocaleString("ru-RU")}
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-xs font-mono text-muted-foreground">
-                          ID: {profile.id.slice(0, 8)}...
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4 pt-4">
-                      {/* Сравнение реквизитов "Было ➔ Стало" */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Текущие данные (Было) */}
-                        <div className="p-3.5 rounded-xl bg-slate-100/90 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs space-y-2 text-left">
-                          <div className="font-bold text-slate-500 uppercase tracking-wider text-[10px] flex items-center gap-1.5 pb-1 border-b border-slate-200 dark:border-slate-700">
-                            <span>Было (Действующие реквизиты)</span>
-                          </div>
-                          <div><span className="text-muted-foreground">ФИО:</span> <span className="font-medium text-foreground">{oldData.full_name || profile.full_name || "—"}</span></div>
-                          <div><span className="text-muted-foreground">Телефон:</span> <span className="font-medium text-foreground font-mono">{oldData.phone || profile.phone || "—"}</span></div>
-                          <div><span className="text-muted-foreground">Адрес:</span> <span className="font-medium text-foreground">{oldData.address || profile.address || "—"}</span></div>
-                          <div><span className="text-muted-foreground">Квартира:</span> <span className="font-medium text-foreground">{oldData.apartment || profile.apartment || "—"}</span></div>
-                          {oldData.account_number && (
-                            <div><span className="text-muted-foreground">Лицевой счёт:</span> <span className="font-medium text-foreground font-mono">{oldData.account_number}</span></div>
-                          )}
-                        </div>
+          {/* Подвкладка: Ожидают подтверждения */}
+          {dataChangesSubTab === "pending" && (
+            <>
+              {dataChangeRequests.length === 0 ? (
+                <Card className="border-slate-200 dark:border-slate-800">
+                  <CardContent className="py-12 text-center text-muted-foreground space-y-2">
+                    <FileCheck className="h-8 w-8 text-blue-500 mx-auto" />
+                    <p className="font-bold text-sm text-foreground">
+                      {searchQuery ? "По запросу ничего не найдено" : "Нет активных заявок на изменение данных"}
+                    </p>
+                    <p className="text-xs">Когда абоненты запросят изменение адреса, квартиры или ФИО, запросы появятся здесь.</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 gap-4">
+                    {dataChangeRequests
+                      .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+                      .map((profile) => {
+                        const change = profile.pending_data_change;
+                        const oldData = change?.old_data || {};
+                        const spamCount = dataChangesCountMap[profile.id] || 1;
+                        return (
+                          <Card key={profile.id} className="border border-blue-500/30 dark:border-blue-500/20 bg-blue-50/15 dark:bg-blue-950/10 rounded-2xl shadow-sm">
+                            <CardHeader className="pb-3 border-b border-blue-100 dark:border-blue-900/30">
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <Badge className="bg-blue-600 text-white font-bold text-xs">
+                                    Заявка на смену данных
+                                  </Badge>
+                                  {renderSpamBadge(spamCount)}
+                                  {change?.submitted_at && (
+                                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                      <Clock className="h-3 w-3" />
+                                      {new Date(change.submitted_at).toLocaleString("ru-RU")}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-xs font-mono text-muted-foreground">
+                                  ID: {profile.id.slice(0, 8)}...
+                                </div>
+                              </div>
+                            </CardHeader>
+                            <CardContent className="space-y-4 pt-4">
+                              {/* Сравнение реквизитов "Было ➔ Стало" */}
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {/* Текущие данные (Было) */}
+                                <div className="p-3.5 rounded-xl bg-slate-100/90 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs space-y-2 text-left">
+                                  <div className="font-bold text-slate-500 uppercase tracking-wider text-[10px] flex items-center gap-1.5 pb-1 border-b border-slate-200 dark:border-slate-700">
+                                    <span>Было (Действующие реквизиты)</span>
+                                  </div>
+                                  <div><span className="text-muted-foreground">ФИО:</span> <span className="font-medium text-foreground">{oldData.full_name || profile.full_name || "—"}</span></div>
+                                  <div><span className="text-muted-foreground">Телефон:</span> <span className="font-medium text-foreground font-mono">{oldData.phone || profile.phone || "—"}</span></div>
+                                  <div><span className="text-muted-foreground">Адрес:</span> <span className="font-medium text-foreground">{oldData.address || profile.address || "—"}</span></div>
+                                  <div><span className="text-muted-foreground">Квартира:</span> <span className="font-medium text-foreground">{oldData.apartment || profile.apartment || "—"}</span></div>
+                                  {oldData.account_number && (
+                                    <div><span className="text-muted-foreground">Лицевой счёт:</span> <span className="font-medium text-foreground font-mono">{oldData.account_number}</span></div>
+                                  )}
+                                </div>
 
-                        {/* Запрошенные изменения (Стало) */}
-                        <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs space-y-2 text-left">
-                          <div className="font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider text-[10px] flex items-center justify-between pb-1 border-b border-emerald-500/20">
-                            <span>Стало (Новые реквизиты)</span>
-                            <Badge variant="outline" className="border-emerald-500/40 text-emerald-700 dark:text-emerald-300 text-[9px] py-0">На проверке</Badge>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">ФИО:</span>{" "}
-                            <span className={cn("font-medium", change?.full_name !== oldData.full_name && "font-bold text-emerald-700 dark:text-emerald-300 underline decoration-emerald-500/50")}>
-                              {change?.full_name || "—"}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">Телефон:</span>{" "}
-                            <span className={cn("font-medium font-mono", change?.phone !== oldData.phone && "font-bold text-emerald-700 dark:text-emerald-300")}>
-                              {change?.phone || "—"}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">Адрес:</span>{" "}
-                            <span className={cn("font-medium", change?.address !== oldData.address && "font-bold text-emerald-700 dark:text-emerald-300 underline decoration-emerald-500/50")}>
-                              {change?.address || "—"}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">Квартира:</span>{" "}
-                            <span className={cn("font-medium", change?.apartment !== oldData.apartment && "font-bold text-emerald-700 dark:text-emerald-300")}>
-                              {change?.apartment || "—"}
-                            </span>
-                          </div>
-                          {change?.account_number && (
-                            <div>
-                              <span className="text-muted-foreground">Лицевой счёт:</span>{" "}
-                              <span className={cn("font-medium font-mono", change?.account_number !== oldData.account_number && "font-bold text-emerald-700 dark:text-emerald-300")}>
-                                {change.account_number}
-                              </span>
+                                {/* Запрошенные изменения (Стало) */}
+                                <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs space-y-2 text-left">
+                                  <div className="font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider text-[10px] flex items-center justify-between pb-1 border-b border-emerald-500/20">
+                                    <span>Стало (Новые реквизиты)</span>
+                                    <Badge variant="outline" className="border-emerald-500/40 text-emerald-700 dark:text-emerald-300 text-[9px] py-0">На проверке</Badge>
+                                  </div>
+                                  <div>
+                                    <span className="text-muted-foreground">ФИО:</span>{" "}
+                                    <span className={cn("font-medium", change?.full_name !== oldData.full_name && "font-bold text-emerald-700 dark:text-emerald-300 underline decoration-emerald-500/50")}>
+                                      {change?.full_name || "—"}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="text-muted-foreground">Телефон:</span>{" "}
+                                    <span className={cn("font-medium font-mono", change?.phone !== oldData.phone && "font-bold text-emerald-700 dark:text-emerald-300")}>
+                                      {change?.phone || "—"}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="text-muted-foreground">Адрес:</span>{" "}
+                                    <span className={cn("font-medium", change?.address !== oldData.address && "font-bold text-emerald-700 dark:text-emerald-300 underline decoration-emerald-500/50")}>
+                                      {change?.address || "—"}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="text-muted-foreground">Квартира:</span>{" "}
+                                    <span className={cn("font-medium", change?.apartment !== oldData.apartment && "font-bold text-emerald-700 dark:text-emerald-300")}>
+                                      {change?.apartment || "—"}
+                                    </span>
+                                  </div>
+                                  {change?.account_number && (
+                                    <div>
+                                      <span className="text-muted-foreground">Лицевой счёт:</span>{" "}
+                                      <span className={cn("font-medium font-mono", change?.account_number !== oldData.account_number && "font-bold text-emerald-700 dark:text-emerald-300")}>
+                                        {change.account_number}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Кнопки подтверждения или отклонения */}
+                              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200/60 dark:border-slate-800">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="rounded-xl border-red-500/30 text-red-600 hover:bg-red-500/10 text-xs h-9 px-4 gap-1.5 font-bold"
+                                  onClick={() => handleStartRejectDataChange(profile)}
+                                >
+                                  <XCircle className="h-4 w-4" />
+                                  <span>Отклонить</span>
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-9 px-4 gap-1.5 shadow-sm"
+                                  onClick={() => handleApproveDataChange(profile)}
+                                >
+                                  <CheckCircle className="h-4 w-4" />
+                                  <span>Подтвердить замену данных</span>
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                  </div>
+                  {renderPagination(dataChangeRequests.length)}
+                </>
+              )}
+            </>
+          )}
+
+          {/* Подвкладка: Архив и история изменений */}
+          {dataChangesSubTab === "history" && (
+            <>
+              {dataChangeHistory.length === 0 ? (
+                <Card className="border-slate-200 dark:border-slate-800">
+                  <CardContent className="py-12 text-center text-muted-foreground space-y-2">
+                    <History className="h-8 w-8 text-slate-400 mx-auto" />
+                    <p className="font-bold text-sm text-foreground">
+                      {searchQuery ? "По запросу ничего не найдено" : "История изменений пуста"}
+                    </p>
+                    <p className="text-xs">Все подтвержденные и отклоненные изменения реквизитов абонентов сохраняются в этом журнале.</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 gap-4">
+                    {dataChangeHistory
+                      .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+                      .map((item) => (
+                        <Card key={item.id} className="border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm">
+                          <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {item.status === "approved" ? (
+                                  <Badge className="bg-emerald-600 text-white font-bold text-xs gap-1">
+                                    <CheckCircle className="h-3.5 w-3.5" />
+                                    <span>Одобрено</span>
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="destructive" className="font-bold text-xs gap-1">
+                                    <XCircle className="h-3.5 w-3.5" />
+                                    <span>Отклонено</span>
+                                  </Badge>
+                                )}
+                                {renderSpamBadge(item.changesCount)}
+                                <span className="text-xs font-bold text-foreground">
+                                  {item.userName} ({item.phone})
+                                </span>
+                                {item.timestamp && (
+                                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                    <Clock className="h-3 w-3" />
+                                    {new Date(item.timestamp).toLocaleString("ru-RU")}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-xs font-mono text-muted-foreground">
+                                Заявка #{item.id.slice(0, 8)}
+                              </div>
                             </div>
-                          )}
-                        </div>
-                      </div>
+                            {item.status === "rejected" && item.reason && (
+                              <div className="mt-2 p-2 rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/40 text-xs text-red-600 dark:text-red-400 font-medium">
+                                Причина отказа: {item.reason}
+                              </div>
+                            )}
+                          </CardHeader>
+                          <CardContent className="space-y-4 pt-4">
+                            {/* Сравнение Было ➔ Стало */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs space-y-1.5">
+                                <div className="font-bold text-slate-500 uppercase tracking-wider text-[10px] pb-1 border-b border-slate-200 dark:border-slate-700">
+                                  Было (Прежние реквизиты)
+                                </div>
+                                <div><span className="text-muted-foreground">ФИО:</span> <span className="font-medium text-foreground">{item.oldData?.full_name || "—"}</span></div>
+                                <div><span className="text-muted-foreground">Телефон:</span> <span className="font-medium text-foreground font-mono">{item.oldData?.phone || "—"}</span></div>
+                                <div><span className="text-muted-foreground">Адрес:</span> <span className="font-medium text-foreground">{item.oldData?.address || "—"}</span></div>
+                                <div><span className="text-muted-foreground">Квартира:</span> <span className="font-medium text-foreground">{item.oldData?.apartment || "—"}</span></div>
+                              </div>
 
-                      {/* Кнопки подтверждения или отклонения */}
-                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200/60 dark:border-slate-800">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="rounded-xl border-red-500/30 text-red-600 hover:bg-red-500/10 text-xs h-9 px-4 gap-1.5 font-bold"
-                          onClick={() => handleStartRejectDataChange(profile)}
-                        >
-                          <XCircle className="h-4 w-4" />
-                          <span>Отклонить</span>
-                        </Button>
-                        <Button
-                          size="sm"
-                          className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-9 px-4 gap-1.5 shadow-sm"
-                          onClick={() => handleApproveDataChange(profile)}
-                        >
-                          <CheckCircle className="h-4 w-4" />
-                          <span>Подтвердить замену данных</span>
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
+                              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs space-y-1.5">
+                                <div className="font-bold text-slate-500 uppercase tracking-wider text-[10px] pb-1 border-b border-slate-200 dark:border-slate-700">
+                                  Стало (Запрошенные реквизиты)
+                                </div>
+                                <div><span className="text-muted-foreground">ФИО:</span> <span className="font-medium text-foreground">{item.newData?.full_name || "—"}</span></div>
+                                <div><span className="text-muted-foreground">Телефон:</span> <span className="font-medium text-foreground font-mono">{item.newData?.phone || "—"}</span></div>
+                                <div><span className="text-muted-foreground">Адрес:</span> <span className="font-medium text-foreground">{item.newData?.address || "—"}</span></div>
+                                <div><span className="text-muted-foreground">Квартира:</span> <span className="font-medium text-foreground">{item.newData?.apartment || "—"}</span></div>
+                                {item.newData?.account_number && (
+                                  <div><span className="text-muted-foreground">Лицевой счёт:</span> <span className="font-medium text-foreground font-mono">{item.newData?.account_number}</span></div>
+                                )}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                  </div>
+                  {renderPagination(dataChangeHistory.length)}
+                </>
+              )}
+            </>
           )}
         </div>
       )}
