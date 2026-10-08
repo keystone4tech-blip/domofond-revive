@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useUserRole } from "@/hooks/useUserRole";
 import EmployeeOnboarding from "@/components/EmployeeOnboarding";
 import PushNotificationToggle from "@/components/fsm/PushNotificationToggle";
-import { Loader2, LogOut, CheckCircle, Check, AlertCircle, AlertTriangle, ClipboardList, Calendar, Shield, CreditCard, Wallet, Pencil, Trash2, UserCheck, Plus, Minus, Clock, Wrench, CheckCircle2, XCircle, Send, Smartphone, KeyRound, PhoneCall, Headphones, DoorOpen, DoorClosed, Info, User, Phone, Mail, Lock, Lightbulb, Hash, MapPin, Building, Home, Building2, History, FileSpreadsheet, Copy, Eye, EyeOff, ShieldCheck, Sparkles, LayoutDashboard, Zap, Printer, Receipt, FileText, ShoppingBag, HeartHandshake } from "lucide-react";
+import { Loader2, LogOut, CheckCircle, Check, AlertCircle, AlertTriangle, ClipboardList, Calendar, Shield, CreditCard, Wallet, Pencil, Trash2, UserCheck, Plus, Minus, Clock, Wrench, CheckCircle2, XCircle, Send, Smartphone, KeyRound, PhoneCall, Headphones, DoorOpen, DoorClosed, Info, User, Phone, Mail, Lock, Lightbulb, Hash, MapPin, Building, Home, Building2, History, FileSpreadsheet, Copy, Eye, EyeOff, ShieldCheck, Sparkles, LayoutDashboard, Zap, Printer, Receipt, FileText, ShoppingBag, HeartHandshake, Download, Briefcase, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -5097,6 +5097,19 @@ const Cabinet = () => {
                   Дневник разработки
                 </ShinyButton>
               )}
+              {/* Кнопка быстрого перехода к скачиванию 2 приложений для суперадмина */}
+              {isSuperadminUser && (
+                <ShinyButton 
+                  onClick={() => {
+                    const el = document.getElementById("superadmin-apps-section");
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  }} 
+                  className="py-1 px-3 text-xs rounded-xl h-9 bg-gradient-to-r from-sky-500/15 via-blue-500/20 to-indigo-500/15 text-sky-700 dark:text-sky-300 hover:bg-sky-500/25 border border-sky-500/35 font-bold shadow-xs transition-all"
+                >
+                  <Smartphone className="h-3.5 w-3.5 mr-1 text-sky-600 dark:text-sky-400" />
+                  Приложения (2 APK)
+                </ShinyButton>
+              )}
               {/* Push-уведомления (показывается на мобильных устройствах) */}
               <PushNotificationToggle />
               {/* Подписка на рекламные рассылки (акции/скидки/новинки) — вкл/выкл в любой момент (ФЗ «О рекламе» ст.18) */}
@@ -5134,6 +5147,136 @@ const Cabinet = () => {
           </div>
 
           <div className="grid gap-6">
+            {/* ===== БЛОК ПРЯМОГО СКАЧИВАНИЯ 2 МОБИЛЬНЫХ ПРИЛОЖЕНИЙ (СТРОГО ДЛЯ СУПЕРАДМИНА) ===== */}
+            {isSuperadminUser && (
+              <div
+                id="superadmin-apps-section"
+                className="rounded-3xl border border-sky-500/40 bg-gradient-to-br from-slate-900 via-[#0B132B] to-[#1E293B] p-6 text-white shadow-2xl animate-in fade-in slide-in-from-top-3 duration-500 relative overflow-hidden"
+              >
+                {/* Фоновый декоративный бейдж */}
+                <div className="absolute -right-8 -top-8 w-40 h-40 bg-sky-500/10 rounded-full blur-2xl pointer-events-none" />
+                
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 border-b border-slate-700/70 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-sky-500 to-blue-600 flex items-center justify-center shadow-lg shadow-sky-500/25 shrink-0">
+                      <Smartphone className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-sky-500/20 text-sky-300 border border-sky-500/40">
+                          Суперадмин-доступ
+                        </span>
+                        <span className="text-xs text-slate-400 font-mono">Прямое скачивание без авторизации</span>
+                      </div>
+                      <h2 className="text-lg font-extrabold text-white mt-1">
+                        Мобильные приложения компании (2 APK для Android)
+                      </h2>
+                    </div>
+                  </div>
+
+                  <Badge variant="outline" className="self-start sm:self-auto border-emerald-500/40 text-emerald-300 bg-emerald-500/10 px-3 py-1 font-semibold text-xs">
+                    ● Серверные зеркала активны
+                  </Badge>
+                </div>
+
+                {/* 2 карточки приложений рядом */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* КАРТОЧКА 1: КЛИЕНТСКОЕ ПРИЛОЖЕНИЕ «ДОМОФОНДАР» */}
+                  <div className="rounded-2xl bg-[#131D38] border border-slate-700/80 p-5 flex flex-col justify-between hover:border-sky-500/50 transition-all shadow-md group">
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-sky-500/15 text-sky-300 border border-sky-500/30">
+                          1. Клиентское (для жильцов МКД)
+                        </span>
+                        <span className="text-xs font-mono text-slate-400">v1.2.9</span>
+                      </div>
+
+                      <h3 className="text-base font-extrabold text-white flex items-center gap-2 mb-2">
+                        <span>ДомофонДар</span>
+                        <span className="text-xs text-slate-400 font-normal">(ru.domofondar.app)</span>
+                      </h3>
+
+                      <p className="text-xs text-slate-300 leading-relaxed mb-4">
+                        Приложение жителей: видеодомофон, просмотр камер, кнопка открытия подъезда и калитки, оплата абонентской платы ТО через СБП/ЮKassa, подача заявок мастера.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2 pt-3 border-t border-slate-700/70">
+                      <a
+                        href="/backend-api/api/app/download"
+                        download="domofondar.apk"
+                        className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-sky-600 hover:from-blue-500 hover:to-sky-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-sky-600/30 transition-all cursor-pointer"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span>Скачать domofondar.apk (Сервер)</span>
+                      </a>
+
+                      <a
+                        href="https://github.com/keystone4tech-blip/domofond-revive/releases/latest/download/domofondar.apk"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full py-2 px-3 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white font-medium text-[11px] flex items-center justify-center gap-1.5 transition-colors"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+                        <span>Резервная ссылка: GitHub Release APK</span>
+                      </a>
+                    </div>
+                  </div>
+
+                  {/* КАРТОЧКА 2: СЛУЖЕБНОЕ ПРИЛОЖЕНИЕ «ОФИС РАБОТА» */}
+                  <div className="rounded-2xl bg-[#131D38] border border-slate-700/80 p-5 flex flex-col justify-between hover:border-emerald-500/50 transition-all shadow-md group">
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                          2. Служебное (для сотрудников)
+                        </span>
+                        <span className="text-xs font-mono text-slate-400">v1.0.0</span>
+                      </div>
+
+                      <h3 className="text-base font-extrabold text-white flex items-center gap-2 mb-2">
+                        <span>Офис Работа</span>
+                        <span className="text-xs text-slate-400 font-normal">(ru.officework.app)</span>
+                      </h3>
+
+                      <p className="text-xs text-slate-300 leading-relaxed mb-4">
+                        Приложение персонала: мастера, монтажники, диспетчеры, директора. Получение нарядов, навигация по адресам, электронные акты работ с подписью жильца, учет смен и выработки.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2 pt-3 border-t border-slate-700/70">
+                      <a
+                        href="/backend-api/api/app/download-staff"
+                        download="office-work.apk"
+                        className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 transition-all cursor-pointer"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span>Скачать office-work.apk (Сервер)</span>
+                      </a>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <a
+                          href="https://github.com/keystone4tech-blip/domofond-revive/releases/download/staff-app-latest/office-work.apk"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="py-2 px-2.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white font-medium text-[11px] flex items-center justify-center gap-1 transition-colors text-center"
+                        >
+                          <ExternalLink className="w-3 h-3 text-slate-400" />
+                          <span>GitHub Релиз</span>
+                        </a>
+
+                        <button
+                          onClick={() => navigate("/office")}
+                          className="py-2 px-2.5 rounded-lg bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/30 text-sky-300 font-semibold text-[11px] flex items-center justify-center gap-1 transition-colors text-center"
+                        >
+                          <Smartphone className="w-3 h-3 text-sky-400" />
+                          <span>Открыть веб / PWA</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             {/* ===== КАРТА АБОНЕНТА (герой) — всегда сверху, цвет по статусу + анимация ===== */}
             {profile?.address ? (
               <div className="animate-in fade-in slide-in-from-top-2 duration-500">

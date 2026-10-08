@@ -13,7 +13,7 @@ import { SUPERADMIN_EMAIL } from "@/data/projectChangelog";
 import {
   Crown, Shield, UserCheck, Plus, Trash2, Edit3, CheckCircle2,
   AlertTriangle, Lock, Eye, EyeOff, Sparkles, Sliders, Users,
-  Layers, Settings, RefreshCw, Key, FileText, Search
+  Layers, Settings, RefreshCw, Key, FileText, Search, Download, Smartphone, ExternalLink
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -349,6 +349,110 @@ export const SuperAdminControl: React.FC = () => {
               <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
               Обновить
             </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Блок прямого скачивания 2 мобильных приложений компании для суперадмина */}
+      <div className="rounded-2xl border border-sky-500/30 bg-gradient-to-br from-slate-900 via-[#0B132B] to-[#131D38] p-5 text-white shadow-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-800">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400 shrink-0">
+              <Smartphone className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30">
+                  Прямое скачивание
+                </span>
+                <span className="text-xs text-slate-400">Автономные установочные APK для Android</span>
+              </div>
+              <h3 className="text-base font-bold text-white mt-0.5">
+                Мобильные приложения компании
+              </h3>
+            </div>
+          </div>
+          <Badge className="bg-emerald-500/15 text-emerald-300 border-emerald-500/30 text-xs self-start sm:self-auto">
+            ● Прямые серверные ссылки активны
+          </Badge>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* 1. Клиентское приложение */}
+          <div className="bg-[#0F172A] border border-slate-800 rounded-xl p-4 flex flex-col justify-between hover:border-sky-500/40 transition-colors">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-sky-400">1. Для абонентов (жителей МКД)</span>
+                <span className="text-[11px] font-mono text-slate-400">v1.2.9</span>
+              </div>
+              <h4 className="text-sm font-bold text-white mb-1">ДомофонДар (ru.domofondar.app)</h4>
+              <p className="text-xs text-slate-400 mb-4 leading-relaxed">
+                Видеодомофон, открытие дверей, ключи, баланс, оплата абонплаты ТО через СБП/ЮKassa.
+              </p>
+            </div>
+            <div className="space-y-1.5 pt-2 border-t border-slate-800">
+              <a
+                href="/backend-api/api/app/download"
+                download="domofondar.apk"
+                className="w-full py-2 px-3 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Скачать domofondar.apk (Сервер)</span>
+              </a>
+              <a
+                href="https://github.com/keystone4tech-blip/domofond-revive/releases/latest/download/domofondar.apk"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-1.5 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] flex items-center justify-center gap-1 transition-colors"
+              >
+                <ExternalLink className="w-3 h-3 text-slate-400" />
+                <span>Зеркало: GitHub Release</span>
+              </a>
+            </div>
+          </div>
+
+          {/* 2. Служебное приложение */}
+          <div className="bg-[#0F172A] border border-slate-800 rounded-xl p-4 flex flex-col justify-between hover:border-emerald-500/40 transition-colors">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-emerald-400">2. Для персонала компании</span>
+                <span className="text-[11px] font-mono text-slate-400">v1.0.0</span>
+              </div>
+              <h4 className="text-sm font-bold text-white mb-1">Офис Работа (ru.officework.app)</h4>
+              <p className="text-xs text-slate-400 mb-4 leading-relaxed">
+                Мастера, монтажники, диспетчеры. Наряды, навигация, электронные акты с подписью, смены.
+              </p>
+            </div>
+            <div className="space-y-1.5 pt-2 border-t border-slate-800">
+              <a
+                href="/backend-api/api/app/download-staff"
+                download="office-work.apk"
+                className="w-full py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Скачать office-work.apk (Сервер)</span>
+              </a>
+              <div className="grid grid-cols-2 gap-1.5">
+                <a
+                  href="https://github.com/keystone4tech-blip/domofond-revive/releases/download/staff-app-latest/office-work.apk"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="py-1.5 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] flex items-center justify-center gap-1 transition-colors text-center"
+                >
+                  <ExternalLink className="w-3 h-3 text-slate-400" />
+                  <span>GitHub Релиз</span>
+                </a>
+                <a
+                  href="/office"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="py-1.5 px-2 rounded-lg bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/30 text-sky-300 font-semibold text-[11px] flex items-center justify-center gap-1 transition-colors text-center"
+                >
+                  <Smartphone className="w-3 h-3 text-sky-400" />
+                  <span>Веб / PWA</span>
+                </a>
+              </div>
+            </div>
           </div>
         </div>
       </div>
