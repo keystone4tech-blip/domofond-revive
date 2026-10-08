@@ -92,7 +92,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         await get().loadProfile();
       } else {
         // Логинимся по созданному аккаунту
-        await get().login(email, password);
+        await get().login(email || phone, password);
       }
     } catch (error) {
       console.error('[AUTH ERROR] Ошибка при регистрации:', error);

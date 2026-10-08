@@ -199,6 +199,7 @@ export default function ProfileScreen() {
   };
 
   const displayName = user?.full_name || (user as any)?.email || 'Абонент';
+  const displayPhone = user?.phone || 'Телефон не указан';
   const rawAddr = (user as any)?.address || '';
   const apt = (user as any)?.apartment ? String((user as any).apartment).trim() : '';
   const hasAptInAddr = rawAddr && (/кв\.?\s*\d+/i.test(rawAddr) || /квартира\s*\d+/i.test(rawAddr));

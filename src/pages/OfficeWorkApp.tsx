@@ -190,7 +190,7 @@ export default function OfficeWorkApp() {
   // Модалка детального просмотра наряда
   const [selectedTask, setSelectedTask] = useState<TaskItem | null>(null);
 
-  // Проверка сохраненной сессии
+  // Проверка сохраненной сессии и загрузка данных с сервера
   useEffect(() => {
     const saved = localStorage.getItem('officework_session');
     if (saved) {
@@ -201,7 +201,57 @@ export default function OfficeWorkApp() {
         setActiveRole(parsed.role || 'master');
       } catch (e) {}
     }
+    loadData();
   }, []);
+
+  const loadData = async () => {
+    try {
+      const [tasksRes, actsRes] = await Promise.all([
+        fetch('/backend-api/api/tasks').catch(() => null),
+        fetch('/backend-api/api/acts').catch(() => null)
+      ]);
+      if (tasksRes && tasksRes.ok) {
+        const data = await tasksRes.json();
+        if (Array.isArray(data) && data.length > 0) {
+          setTasks(data.map((t: any) => ({
+            id: String(t.id),
+            task_number: t.task_number || `НАРЯД-${String(t.id).slice(0, 6)}`,
+            title: t.title || 'Сервисный наряд',
+            description: t.description || 'Выезд мастера',
+            address: t.address || 'Адрес по согласованию',
+            entrance: t.entrance,
+            floor: t.floor,
+            apartment: t.apartment,
+            intercom_code: t.intercom_code || '#4589',
+            client_name: t.client_name || 'Абонент',
+            client_phone: t.client_phone || '+7 (900) 000-00-00',
+            status: t.status || 'assigned',
+            priority: t.priority || 'medium',
+            scheduled_time: t.scheduled_time || 'Сегодня',
+            payment_amount: t.payment_amount || 0,
+          })));
+        }
+      }
+      if (actsRes && actsRes.ok) {
+        const data = await actsRes.json();
+        if (Array.isArray(data) && data.length > 0) {
+          setActs(data.map((a: any) => ({
+            id: String(a.id),
+            act_number: a.act_number,
+            address: a.address,
+            client_name: a.client_name,
+            works_done: a.works_done,
+            materials: a.materials_used || 'Расходные материалы',
+            total_price: Number(a.total_price) || 0,
+            date: new Date(a.created_at).toLocaleDateString('ru-RU'),
+            signed: a.client_signed !== false,
+          })));
+        }
+      }
+    } catch (e) {
+      console.warn('[OfficeWorkApp] Ошибка загрузки с бэкенда:', e);
+    }
+  };
 
   // Вход
   const handleLogin = (e?: React.FormEvent) => {
@@ -215,6 +265,7 @@ export default function OfficeWorkApp() {
       'officework_session',
       JSON.stringify({ phone, name: userName, role: activeRole })
     );
+    loadData();
     toast.success(`Вход выполнен: ${userName} (${getRoleLabel(activeRole)})`);
   };
 
@@ -226,6 +277,7 @@ export default function OfficeWorkApp() {
       'officework_session',
       JSON.stringify({ phone: '+7 (909) 453-62-41', name: 'Шибаев Сергей Викторович', role })
     );
+    loadData();
     toast.success(`Рабочий стол переключен: ${getRoleLabel(role)}`);
   };
 
@@ -237,21 +289,31 @@ export default function OfficeWorkApp() {
   };
 
   // Смена статуса наряда
-  const handleStatusChange = (taskId: string, newStatus: TaskItem['status']) => {
+  const handleStatusChange = async (taskId: string, newStatus: TaskItem['status']) => {
     setTasks((prev) =>
       prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t))
     );
     if (selectedTask && selectedTask.id === taskId) {
       setSelectedTask({ ...selectedTask, status: newStatus });
     }
+
+    try {
+      await fetch(`/backend-api/api/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+    } catch (err) {}
+
     toast.success(`Статус наряда изменен: ${newStatus}`);
   };
 
   // Сохранение нового акта
-  const handleSaveAct = () => {
+  const handleSaveAct = async () => {
+    const actNumber = `АКТ-${new Date().getFullYear()}/${Math.floor(100 + Math.random() * 900)}`;
     const newAct: ActItem = {
       id: `act-${Date.now()}`,
-      act_number: `АКТ-2026/${Math.floor(100 + Math.random() * 900)}`,
+      act_number: actNumber,
       address: actAddress,
       client_name: actClient,
       works_done: actWorks,
@@ -262,6 +324,25 @@ export default function OfficeWorkApp() {
     };
     setActs([newAct, ...acts]);
     setIsActModalOpen(false);
+
+    try {
+      await fetch('/backend-api/api/acts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          act_number: actNumber,
+          address: actAddress,
+          client_name: actClient,
+          works_done: actWorks,
+          materials_used: actMaterials,
+          total_price: Number(actPrice) || 0,
+          employee_name: userName,
+          employee_role: getRoleLabel(activeRole),
+          client_signed: true,
+        }),
+      });
+    } catch (e) {}
+
     toast.success(`Электронный ${newAct.act_number} подписан и зарегистрирован в CRM!`);
   };
 

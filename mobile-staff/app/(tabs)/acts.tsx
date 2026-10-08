@@ -3,7 +3,7 @@
  * Формирование и просмотр актов сдачи-приемки работ с жильцами
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,8 @@ import {
   ScrollView,
   Platform,
   Alert,
+  RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useStaffTasksStore } from '../../src/store/tasks.store';
@@ -25,7 +27,13 @@ export default function ActsScreen() {
   const acts = useStaffTasksStore((state) => state.acts);
   const tasks = useStaffTasksStore((state) => state.tasks);
   const createAct = useStaffTasksStore((state) => state.createAct);
+  const loadActs = useStaffTasksStore((state) => state.loadActs);
+  const isActsLoading = useStaffTasksStore((state) => state.isActsLoading);
   const user = useStaffAuthStore((state) => state.user);
+
+  useEffect(() => {
+    loadActs();
+  }, []);
 
   // Состояние создания нового акта
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -53,30 +61,39 @@ export default function ActsScreen() {
     setIsModalOpen(true);
   };
 
-  const handleSaveAct = () => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSaveAct = async () => {
     if (!worksDone.trim()) {
       Alert.alert('Внимание', 'Укажите перечень выполненных работ');
       return;
     }
 
+    setIsSubmitting(true);
     const actNumber = `АКТ-${new Date().getFullYear()}/${Math.floor(100 + Math.random() * 900)}`;
 
-    createAct({
-      task_id: selectedTaskId,
-      act_number: actNumber,
-      client_name: clientName || 'Абонент',
-      client_phone: clientPhone || '+7 (900) 000-00-00',
-      address: address || 'Адрес объекта',
-      employee_name: user?.full_name || 'Шибаев Сергей Викторович',
-      employee_role: 'Сервисный мастер',
-      works_done: worksDone.trim(),
-      materials_used: materialsUsed.trim() || 'Без расходных материалов',
-      total_price: Number(totalPrice) || 0,
-      client_signed: isSigned,
-    });
+    try {
+      await createAct({
+        task_id: selectedTaskId,
+        act_number: actNumber,
+        client_name: clientName || 'Абонент',
+        client_phone: clientPhone || '+7 (900) 000-00-00',
+        address: address || 'Адрес объекта',
+        employee_name: user?.full_name || 'Шибаев Сергей Викторович',
+        employee_role: 'Сервисный мастер',
+        works_done: worksDone.trim(),
+        materials_used: materialsUsed.trim() || 'Без расходных материалов',
+        total_price: Number(totalPrice) || 0,
+        client_signed: isSigned,
+      });
 
-    setIsModalOpen(false);
-    Alert.alert('Успешно', `Электронный ${actNumber} подписан и зарегистрирован в CRM!`);
+      setIsModalOpen(false);
+      Alert.alert('Успешно', `Электронный ${actNumber} подписан и зарегистрирован в CRM!`);
+    } catch (e: any) {
+      Alert.alert('Ошибка', 'Не удалось сохранить акт');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const renderActItem = ({ item }: { item: WorkAct }) => (
@@ -145,6 +162,14 @@ export default function ActsScreen() {
         keyExtractor={(item) => item.id}
         renderItem={renderActItem}
         contentContainerStyle={styles.listContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={isActsLoading}
+            onRefresh={loadActs}
+            tintColor="#38BDF8"
+            colors={['#38BDF8', '#10B981']}
+          />
+        }
         ListEmptyComponent={
           <View style={styles.emptyWrap}>
             <Ionicons name="document-text-outline" size={48} color="#64748B" />

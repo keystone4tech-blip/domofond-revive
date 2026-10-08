@@ -11,6 +11,51 @@
 > 
 > **Пользователь НЕ ДОЛЖЕН ничего вносить вручную.** Вся статистика и история пополняется ИИ автоматически при каждой задаче.
 
+# 2026-10-09 01:05 — Клиентское приложение: устранение ошибки обновления на Android; Служебное приложение: ликвидация моков и полная синхронизация с PostgreSQL
+
+## 1. Задачи и выполненные работы
+- **Клиентское приложение жильцов («Домофондар», `mobile/`) — ликвидация ошибки обновления на Android**:
+  * **Причина сбоя**: в `constants.ts` оставалась старая версия `1.2.8`, тогда как сервер отдавал `1.2.9`, вызывая навязчивый диалог обновления. При вызове системного установщика (`IntentLauncher`) на ряде версий Android возникала ошибка синтаксического анализа пакета из-за ограничений `FileProvider` и отсутствия явного разрешения `REQUEST_INSTALL_PACKAGES` для внешних пакетов.
+  * **Решение**:
+    1. Поднята актуальная версия `1.3.0` (Build 17) согласованно во всех файлах: `mobile/src/config/constants.ts`, `mobile/app.config.ts`, `mobile/package.json` и `server/index.js`.
+    2. В `UpdateCheckerModal.tsx` добавлена приоритетная кнопка «Скачать обновление (в браузере)» — мгновенный запуск прямого скачивания через системный загрузчик Android с уведомлением в шторке и беспроблемной установкой.
+    3. При сбое вызова `PackageInstaller` внедрен автоматический переход на прямое скачивание через браузер без вывода пугающих ошибок.
+    4. Исправлены TypeScript ошибки в `mobile/app/(tabs)/profile/index.tsx` (объявление `displayPhone`) и `mobile/src/store/auth.store.ts` (`email || phone` в вызове `login`). Типизация `mobile/` проходит с кодом 0.
+- **Служебное приложение сотрудников («Офис Работа», `mobile-staff/`) — полная синхронизация с PostgreSQL и сайтом**:
+  * **База данных PostgreSQL**: создана таблица `public.acts` для электронных актов сдачи-приемки работ (поля: `act_number`, `task_id`, `request_id`, `client_name`, `client_phone`, `address`, `apartment`, `employee_name`, `employee_role`, `works_done`, `materials_used`, `total_price`, `client_signed`, `created_at`).
+  * **Серверный API (`server/index.js`)**:
+    1. `GET /api/tasks` — единый реестр сервисных задач и нарядов, объединяющий таблицу `tasks` (с исполнителями) и свежие заявки жильцов из `requests`.
+    2. `PATCH /api/tasks/:id` и `PATCH /api/requests/:id` — изменение статусов наряда (`en_route`, `in_progress`, `done`) с автофиксацией времени `accepted_at` и `completed_at`.
+    3. `GET /api/acts` и `POST /api/acts` — получение и регистрация подписанных актов с сохранением в PostgreSQL и переводом связанного наряда в статус `done`.
+    4. `GET /api/staff/stats` — расчет реальной выработки мастера за сегодня (закрыто нарядов, в работе, начислено, рейтинг).
+  * **Служебное приложение (`mobile-staff/`)**:
+    1. В `tasks.store.ts` удалены моковые массивы, подключена загрузка с `/api/tasks`, сохранение актов в БД через `POST /api/acts`, оффлайн-кэш в `AsyncStorage`.
+    2. В `auth.store.ts` исправлена модель пользователя (`shift_status`).
+    3. На экранах `index.tsx`, `tasks.tsx`, `acts.tsx` подключены `useEffect`, `RefreshControl` (pull-to-refresh) и динамические данные выработки.
+- **Веб-версия PWA (`src/pages/OfficeWorkApp.tsx`)**:
+  * Подключены реальные вызовы `/backend-api/api/tasks`, `/backend-api/api/acts` и смена статусов.
+- **Деплой на боевой сервер 45.8.99.238**:
+  * Сборка Vite фронтенда развернута в контейнере `domofondar_frontend` с перезагрузкой Nginx.
+  * Бэкенд `server/index.js` обновлен в контейнере `domofondar_backend`.
+
+## 2. Измененные файлы
+- [`mobile/src/config/constants.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/src/config/constants.ts) — версия 1.3.0.
+- [`mobile/app.config.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/app.config.ts) — версия 1.3.0, код сборки 17.
+- [`mobile/package.json`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/package.json) — версия 1.3.0.
+- [`mobile/src/components/UpdateCheckerModal.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/src/components/UpdateCheckerModal.tsx) — надежный загрузчик и браузерный фолбек.
+- [`mobile/app/(tabs)/profile/index.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/app/(tabs)/profile/index.tsx) — устранение TS ошибки (displayPhone).
+- [`mobile/src/store/auth.store.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/src/store/auth.store.ts) — устранение TS ошибки аргумента login.
+- [`mobile-staff/src/store/tasks.store.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile-staff/src/store/tasks.store.ts) — удаление моков, подключение API /api/tasks, /api/acts, /api/staff/stats.
+- [`mobile-staff/src/store/auth.store.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile-staff/src/store/auth.store.ts) — исправление shift_status.
+- [`mobile-staff/app/(tabs)/index.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile-staff/app/(tabs)/index.tsx) — pull-to-refresh и реальная статистика выработки.
+- [`mobile-staff/app/(tabs)/tasks.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile-staff/app/(tabs)/tasks.tsx) — pull-to-refresh и реальные наряды из БД.
+- [`mobile-staff/app/(tabs)/acts.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile-staff/app/(tabs)/acts.tsx) — сохранение актов в PostgreSQL и pull-to-refresh.
+- [`src/pages/OfficeWorkApp.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/pages/OfficeWorkApp.tsx) — синхронизация PWA с API сервера.
+- [`server/index.js`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/server/index.js) — эндпоинты /api/tasks, /api/acts, /api/staff/stats, версия 1.3.0.
+- [`src/data/projectChangelog.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/data/projectChangelog.ts) — фиксация этапа в реестре.
+- [`AGENT_SYNC.md`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/AGENT_SYNC.md) — фиксация и снятие claim.
+- [`PROJECT_LOG.md`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/PROJECT_LOG.md) — актуализация паспорта проекта.
+
 # 2026-10-09 00:38 — Безопасность и аудит доступа: полный отзыв прав с номера 9184696236 и закрепление супер-админа строго за 89283323456
 
 ## 1. Задачи и выполненные работы

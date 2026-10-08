@@ -3,7 +3,7 @@
  * Полный реестр нарядов с фильтрацией, сменой статуса и быстрым вызовом абонента
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
   Modal,
   ScrollView,
   Platform,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useStaffTasksStore } from '../../src/store/tasks.store';
@@ -26,11 +27,17 @@ export default function TasksScreen() {
   const searchQuery = useStaffTasksStore((state) => state.searchQuery);
   const setSearchQuery = useStaffTasksStore((state) => state.setSearchQuery);
   const updateTaskStatus = useStaffTasksStore((state) => state.updateTaskStatus);
+  const loadTasks = useStaffTasksStore((state) => state.loadTasks);
+  const isLoading = useStaffTasksStore((state) => state.isLoading);
   const callPhone = useStaffTasksStore((state) => state.callPhone);
   const getFilteredTasks = useStaffTasksStore((state) => state.getFilteredTasks);
 
   // Состояние модального окна подробного просмотра наряда
   const [selectedTask, setSelectedTask] = useState<StaffTask | null>(null);
+
+  useEffect(() => {
+    loadTasks();
+  }, []);
 
   const filteredTasks = getFilteredTasks();
 
@@ -168,6 +175,14 @@ export default function TasksScreen() {
         keyExtractor={(item) => String(item.id)}
         renderItem={renderTaskCard}
         contentContainerStyle={styles.listContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={isLoading}
+            onRefresh={loadTasks}
+            tintColor="#38BDF8"
+            colors={['#38BDF8', '#10B981']}
+          />
+        }
         ListEmptyComponent={
           <View style={styles.emptyWrap}>
             <Ionicons name="checkmark-done-circle-outline" size={48} color="#64748B" />

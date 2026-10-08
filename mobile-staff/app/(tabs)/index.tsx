@@ -3,7 +3,7 @@
  * Приложение «Офис Работа»
  */
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Platform,
+  RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -27,7 +28,27 @@ export default function WorkspaceScreen() {
   const setShiftStatus = useStaffAuthStore((state) => state.setShiftStatus);
 
   const tasks = useStaffTasksStore((state) => state.tasks);
+  const stats = useStaffTasksStore((state) => state.stats);
+  const loadTasks = useStaffTasksStore((state) => state.loadTasks);
+  const loadActs = useStaffTasksStore((state) => state.loadActs);
+  const loadStats = useStaffTasksStore((state) => state.loadStats);
+  const isLoading = useStaffTasksStore((state) => state.isLoading);
   const callPhone = useStaffTasksStore((state) => state.callPhone);
+
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Фоновая синхронизация с сервером при открытии экрана
+  useEffect(() => {
+    loadTasks();
+    loadActs();
+    loadStats();
+  }, []);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([loadTasks(), loadActs(), loadStats()]);
+    setRefreshing(false);
+  };
 
   // Активный наряд мастера (в работе или в пути)
   const activeTask = tasks.find((t) => t.status === 'in_progress' || t.status === 'en_route') || tasks[0];
@@ -55,7 +76,18 @@ export default function WorkspaceScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.contentContainer}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor="#38BDF8"
+          colors={['#38BDF8', '#10B981']}
+        />
+      }
+    >
       {/* 1. Верхняя панель (Header) */}
       <View style={styles.header}>
         <View>
@@ -159,7 +191,9 @@ export default function WorkspaceScreen() {
               <Text style={styles.statLabel}>В работе</Text>
             </View>
             <View style={styles.statBox}>
-              <Text style={[styles.statValue, { color: '#10B981' }]}>2 850 ₽</Text>
+              <Text style={[styles.statValue, { color: '#10B981' }]}>
+                {stats.total_earnings_today.toLocaleString('ru-RU')} ₽
+              </Text>
               <Text style={styles.statLabel}>Начислено</Text>
             </View>
           </View>

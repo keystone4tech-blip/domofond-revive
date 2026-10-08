@@ -224,14 +224,8 @@ export function UpdateCheckerModal() {
         console.log('[UpdateChecker] Повреждённый локальный APK удалён из кэша');
       } catch {}
 
-      Alert.alert(
-        'Ошибка обработки пакета',
-        'Android сообщил: «Не удалось обработать пакет».\n\nЭто происходит, если загруженный файл повреждён либо старая версия установлена с другим сертификатом/подписью.\n\nРешение:\n1. Скачать APK напрямую через браузер.\n2. При необходимости удалить старую версию перед установкой новой.',
-        [
-          { text: 'Скачать через браузер', onPress: handleFallbackBrowserDownload },
-          { text: 'Отмена', style: 'cancel', onPress: () => setVisible(false) }
-        ]
-      );
+      // Автоматически перенаправляем на прямое скачивание через браузер, чтобы пользователь без труда получил файл
+      await handleFallbackBrowserDownload();
     } finally {
       setIsDownloading(false);
       isDownloadingRef.current = false;
@@ -381,14 +375,13 @@ export function UpdateCheckerModal() {
               </TouchableOpacity>
             ) : (
               <>
+                {/* 1. Прямая ссылка через браузер (надежный способ без сбоев FileProvider) */}
                 <TouchableOpacity
                   style={[
                     styles.updateButton,
-                    { backgroundColor: isDark ? '#4EDE93' : '#10B981' },
-                    isDownloading && { opacity: 0.6 }
+                    { backgroundColor: isDark ? '#4EDE93' : '#10B981' }
                   ]}
-                  onPress={startNativeDownload}
-                  disabled={isDownloading}
+                  onPress={handleFallbackBrowserDownload}
                   activeOpacity={0.85}
                 >
                   <Ionicons name="download-outline" size={20} color={isDark ? '#081510' : '#FFFFFF'} style={{ marginRight: 8 }} />
@@ -396,22 +389,25 @@ export function UpdateCheckerModal() {
                     styles.updateButtonText,
                     { color: isDark ? '#081510' : '#FFFFFF' }
                   ]}>
-                    Обновить сейчас
+                    Скачать обновление (в браузере)
                   </Text>
                 </TouchableOpacity>
 
-                {downloadError && (
-                  <TouchableOpacity
-                    style={[styles.browserFallbackButton, { borderColor: isDark ? '#38BDF8' : '#0284C7' }]}
-                    onPress={handleFallbackBrowserDownload}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="globe-outline" size={16} color={isDark ? '#38BDF8' : '#0284C7'} style={{ marginRight: 6 }} />
-                    <Text style={[styles.browserFallbackText, { color: isDark ? '#38BDF8' : '#0284C7' }]}>
-                      Скачать через браузер
-                    </Text>
-                  </TouchableOpacity>
-                )}
+                {/* 2. Альтернативное скачивание внутри приложения */}
+                <TouchableOpacity
+                  style={[
+                    styles.browserFallbackButton,
+                    { borderColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)', marginTop: 8 }
+                  ]}
+                  onPress={startNativeDownload}
+                  disabled={isDownloading}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="phone-portrait-outline" size={16} color={isDark ? '#94A3B8' : '#475569'} style={{ marginRight: 6 }} />
+                  <Text style={[styles.browserFallbackText, { color: isDark ? '#CBD5E1' : '#475569' }]}>
+                    Скачать внутри приложения
+                  </Text>
+                </TouchableOpacity>
 
                 {!updateInfo.isMandatory && (
                   <TouchableOpacity

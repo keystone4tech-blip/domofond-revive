@@ -38,6 +38,7 @@
 | mobile-staff/package.json, mobile-staff/metro.config.js | Antigravity | 2026-10-08 21:15 UTC | ✅ освобождён (закоммичено) |
 | src/hooks/useUserRole.tsx, src/pages/Cabinet.tsx, src/components/crm/* | Antigravity | 2026-10-08 21:26 UTC | ✅ освобождён (закоммичено) |
 | src/hooks/useUserRole.tsx, src/pages/Cabinet.tsx, src/components/admin/SuperAdminControl.tsx | Antigravity | 2026-10-08 21:38 UTC | ✅ освобождён (закоммичено) |
+| mobile/*, mobile-staff/*, server/index.js, src/pages/OfficeWorkApp.tsx | Antigravity | 2026-10-08 21:52 UTC | ✅ освобождён (закоммичено) |
 
 > Правило: `🔒 занят` — не трогать; `✅ освобождён` — можно брать.
 
@@ -266,11 +267,23 @@ Claude, выполнил исправление и деплой по заказ�
 3. В `CRMDashboard.tsx` запросы переведены на неблокирующие безопасные промисы с `placeholderData`.
 4. В `TasksManager.tsx` удален дублирующий `setInterval`. Сборка задеплоена на боевой сервер `45.8.99.238`. Claim снят.
 
-**2026-10-08 21:38 UTC — Antigravity:**
-Аудит безопасности и разграничение доступа:
-1. В PostgreSQL с профиля `+7 (918) 469-62-36` полностью отозваны роли `superadmin` и `admin`, назначена строго роль `user`, email отвязан.
-2. Статус создателя и суперадмина закреплен строго за Владимиром Сергеевичем (номер **89283323456** / `+79283323456`, email `viruscorp4@gmail.com`).
-3. В кодовой базе (`useUserRole.tsx`, `Cabinet.tsx`, `SuperAdminControl.tsx`) номер `9184696236` полностью вычищен, доступ суперадмина привязан строго к `89283323456` и `viruscorp4@gmail.com`. Claim снят.
+**2026-10-08 22:05 UTC — Antigravity:**
+Исправление обновления клиентского приложения и полная интеграция служебного приложения «Офис Работа»:
+1. **Клиентское приложение (`mobile/`)**:
+   - Устранена ошибка синтаксического анализа при обновлении: поднята версия 1.3.0 (Build 17) во всех конфигах (`constants.ts`, `app.config.ts`, `package.json`, `server/index.js`).
+   - В `UpdateCheckerModal.tsx` добавлена приоритетная кнопка скачивания через браузер (надежный способ со стандартным DownloadManager Android) и автоматический фолбек при любых ошибках PackageInstaller.
+   - Исправлены ошибки TypeScript в `profile/index.tsx` (переменная `displayPhone`) и `auth.store.ts` (`email || phone`). Проект `mobile/` компилируется начисто без ошибок.
+2. **Служебное приложение («Офис Работа», `mobile-staff/`)**:
+   - В PostgreSQL создана таблица `acts` для электронных актов выполненных работ.
+   - В `server/index.js` реализованы эндпоинты `GET/PATCH /api/tasks`, `GET/POST /api/acts`, `GET /api/staff/stats`.
+   - В `tasks.store.ts` удалены моки: наряды подтягиваются с бэкенда, акты сохраняются в PostgreSQL, поддержан оффлайн-кэш в `AsyncStorage`.
+   - На экранах нарядов, рабочего стола и актов внедрен `RefreshControl` (pull-to-refresh).
+   - В PWA `/office` (`OfficeWorkApp.tsx`) подключены вызовы реального API.
+3. **Деплой**:
+   - Фронтенд (`npm run build`) задеплоен в `domofondar_frontend`.
+   - Бэкенд задеплоен в `domofondar_backend`.
+   - Claim снят.
+
 
 
 

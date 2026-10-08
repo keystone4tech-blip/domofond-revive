@@ -55,7 +55,7 @@ export const useStaffAuthStore = create<AuthState>((set, get) => ({
       full_name: 'Шибаев Сергей Викторович',
       role: role,
       active_view_role: role,
-      shiftStatus: 'on_shift',
+      shift_status: 'on_shift',
       completed_today: 4,
       total_earnings_today: 2850,
       rating: 4.96,

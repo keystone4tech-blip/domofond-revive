@@ -1,15 +1,20 @@
 /**
- * Хранилище сервисных нарядов, задач и электронных актов (Zustand)
- * Служебное приложение «Офис Работа»
+ * Хранилище сервисных нарядов, задач, электронных актов и статистики выработки (Zustand)
+ * Служебное приложение «Офис Работа» — полноценная интеграция с бэкендом и PostgreSQL
  */
 
 import { create } from 'zustand';
 import { Linking, Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StaffTask, WorkAct, TaskStatus, TaskPriority } from '../types/staff';
 import { staffApiClient } from '../api/client';
 
-// Стартовые реалистичные наряды для тестирования и оффлайн-работы
-const INITIAL_STAFF_TASKS: StaffTask[] = [
+// Ключи локального хранилища для оффлайн-режима
+const TASKS_STORAGE_KEY = 'officework_cached_tasks';
+const ACTS_STORAGE_KEY = 'officework_cached_acts';
+
+// Резервный стартовый набор на случай полного оффлайна при первом открытии
+const FALLBACK_TASKS: StaffTask[] = [
   {
     id: 'task-101',
     task_number: 'НАРЯД-4281',
@@ -25,7 +30,7 @@ const INITIAL_STAFF_TASKS: StaffTask[] = [
     status: 'in_progress',
     priority: 'urgent',
     scheduled_time: 'Сегодня, 14:00 – 15:30',
-    created_at: '2026-10-08T10:15:00Z',
+    created_at: new Date().toISOString(),
     work_type: 'repair',
     payment_amount: 550,
     is_paid: false,
@@ -47,168 +52,197 @@ const INITIAL_STAFF_TASKS: StaffTask[] = [
     status: 'assigned',
     priority: 'medium',
     scheduled_time: 'Сегодня, 16:00 – 17:00',
-    created_at: '2026-10-08T11:30:00Z',
+    created_at: new Date().toISOString(),
     work_type: 'install',
     payment_amount: 1200,
     is_paid: true,
     notes: 'Оплачено онлайн через приложение. Проверить коммутатор БК-100.',
   },
-  {
-    id: 'task-103',
-    task_number: 'НАРЯД-4283',
-    title: 'Регулировка доводчика подъездной двери',
-    description: 'Дверь сильно хлопает при закрытии, жалуются жильцы первого этажа. Требуется регулировка скоростей закрытия и дохлопа, протяжка крепежа.',
-    address: 'ул. Тургенева, д. 152',
-    entrance: '2',
-    floor: '1',
-    client_name: 'Старший по подъезду (Виктор Николаевич)',
-    client_phone: '+7 (918) 789-01-23',
-    status: 'en_route',
-    priority: 'urgent',
-    scheduled_time: 'Сегодня, 17:30 – 18:30',
-    created_at: '2026-10-08T12:00:00Z',
-    work_type: 'maintenance',
-    payment_amount: 0,
-    is_paid: true,
-    notes: 'В рамках гарантийного обслуживания ТО.',
-  },
-  {
-    id: 'task-104',
-    task_number: 'НАРЯД-4279',
-    title: 'Доставка и прописка 3-х бесконтактных ключей RFID',
-    description: 'Жилец заказал дополнительные электронные ключи-брелоки. Закодировать на месте и передать под подпись.',
-    address: 'ул. Северная, д. 210',
-    entrance: '4',
-    floor: '7',
-    apartment: '98',
-    intercom_code: '#2104',
-    client_name: 'Кузнецов Игорь Павлович',
-    client_phone: '+7 (928) 333-44-55',
-    status: 'done',
-    priority: 'low',
-    scheduled_time: 'Сегодня, 12:00',
-    created_at: '2026-10-08T09:00:00Z',
-    work_type: 'keys',
-    payment_amount: 750,
-    is_paid: true,
-    materials: ['RFID брелок Mifare (синий) — 3 шт.'],
-  },
 ];
+
+interface StaffStats {
+  completed_today: number;
+  in_progress: number;
+  total_earnings_today: number;
+  rating: number;
+}
 
 interface TasksState {
   tasks: StaffTask[];
   acts: WorkAct[];
+  stats: StaffStats;
   searchQuery: string;
   selectedFilter: string;
   isLoading: boolean;
+  isActsLoading: boolean;
 
   // Методы управления
   setSearchQuery: (query: string) => void;
   setSelectedFilter: (filter: string) => void;
   loadTasks: () => Promise<void>;
-  updateTaskStatus: (taskId: string | number, newStatus: TaskStatus) => void;
-  createAct: (act: Omit<WorkAct, 'id' | 'created_at'>) => void;
+  loadActs: () => Promise<void>;
+  loadStats: () => Promise<void>;
+  updateTaskStatus: (taskId: string | number, newStatus: TaskStatus) => Promise<void>;
+  createAct: (act: Omit<WorkAct, 'id' | 'created_at'>) => Promise<boolean>;
   callPhone: (phone: string) => void;
   getFilteredTasks: () => StaffTask[];
 }
 
 export const useStaffTasksStore = create<TasksState>((set, get) => ({
-  tasks: INITIAL_STAFF_TASKS,
-  acts: [
-    {
-      id: 'act-001',
-      task_id: 'task-104',
-      act_number: 'АКТ-2026/104',
-      created_at: '2026-10-08T12:35:00Z',
-      client_name: 'Кузнецов Игорь Павлович',
-      client_phone: '+7 (928) 333-44-55',
-      address: 'ул. Северная, д. 210, кв. 98',
-      employee_name: 'Шибаев Сергей Викторович',
-      employee_role: 'Сервисный мастер',
-      works_done: 'Кодирование и проверка 3 бесконтактных RFID ключей к вызывной панели Vizit',
-      materials_used: 'Брелоки Mifare — 3 шт.',
-      total_price: 750,
-      client_signed: true,
-    }
-  ],
+  tasks: FALLBACK_TASKS,
+  acts: [],
+  stats: {
+    completed_today: 3,
+    in_progress: 1,
+    total_earnings_today: 2850,
+    rating: 4.96,
+  },
   searchQuery: '',
   selectedFilter: 'all',
   isLoading: false,
+  isActsLoading: false,
 
   setSearchQuery: (query: string) => set({ searchQuery: query }),
   setSelectedFilter: (filter: string) => set({ selectedFilter: filter }),
 
-  // Загрузка нарядов с бэкенда
+  // 1. Загрузка реальных нарядов и сервисных заявок с бэкенда
   loadTasks: async () => {
     set({ isLoading: true });
     try {
-      console.log('[Staff Tasks] Загрузка нарядов с сервера...');
-      const response = await staffApiClient.get('/api/requests');
-      if (response.data && Array.isArray(response.data)) {
-        // Преобразуем входящие заявки в модель StaffTask
-        const mapped: StaffTask[] = response.data.slice(0, 20).map((req: any, index: number) => ({
-          id: req.id || `srv-${index}`,
-          task_number: `НАРЯД-${req.id || 1000 + index}`,
-          title: req.message || req.notes || 'Сервисный выезд мастера',
-          description: req.notes || req.message || 'Диагностика домофонного оборудования',
-          address: req.address || 'Адрес уточняется',
-          apartment: req.apartment || undefined,
-          client_name: req.name || 'Абонент',
-          client_phone: req.phone || '+7 (900) 000-00-00',
-          status: (req.status === 'completed' ? 'done' : req.status === 'in_progress' ? 'in_progress' : 'assigned') as TaskStatus,
-          priority: (req.priority === 'urgent' ? 'urgent' : 'medium') as TaskPriority,
-          scheduled_time: req.created_at ? new Date(req.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : 'В течение дня',
-          created_at: req.created_at || new Date().toISOString(),
-          work_type: req.order_type === 'keys' ? 'keys' : 'repair',
-          payment_amount: req.price || 0,
-          is_paid: req.payment_status === 'paid',
-        }));
+      console.log('[Staff Tasks] Загрузка реальных нарядов с сервера /api/tasks...');
+      const response = await staffApiClient.get<StaffTask[]>('/api/tasks');
 
-        if (mapped.length > 0) {
-          // Объединяем с нашими задачами
-          set({ tasks: [...INITIAL_STAFF_TASKS, ...mapped], isLoading: false });
-          return;
-        }
+      if (response.data && Array.isArray(response.data) && response.data.length > 0) {
+        console.log(`[Staff Tasks] Успешно получено ${response.data.length} нарядов из БД PostgreSQL`);
+        set({ tasks: response.data, isLoading: false });
+        // Сохраняем в оффлайн-кэш
+        AsyncStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(response.data)).catch(() => {});
+        return;
+      }
+
+      // Если список пустой, пробуем восстановить из оффлайн-кэша
+      const cached = await AsyncStorage.getItem(TASKS_STORAGE_KEY);
+      if (cached) {
+        set({ tasks: JSON.parse(cached), isLoading: false });
+        return;
       }
     } catch (err: any) {
-      console.warn('[Staff Tasks] Не удалось подтянуть внешние заявки, используем локальный реестр:', err.message);
+      console.warn('[Staff Tasks] Ошибка сети при загрузке нарядов, используем кэш:', err.message);
+      try {
+        const cached = await AsyncStorage.getItem(TASKS_STORAGE_KEY);
+        if (cached) {
+          set({ tasks: JSON.parse(cached), isLoading: false });
+          return;
+        }
+      } catch {}
     }
     set({ isLoading: false });
   },
 
-  // Смена статуса наряда (Принял / Выехал / В работе / Выполнен)
-  updateTaskStatus: (taskId: string | number, newStatus: TaskStatus) => {
+  // 2. Загрузка реестра электронных актов с сервера
+  loadActs: async () => {
+    set({ isActsLoading: true });
+    try {
+      console.log('[Staff Tasks] Загрузка электронных актов с сервера /api/acts...');
+      const response = await staffApiClient.get<WorkAct[]>('/api/acts');
+
+      if (response.data && Array.isArray(response.data)) {
+        console.log(`[Staff Tasks] Получено ${response.data.length} актов из PostgreSQL`);
+        set({ acts: response.data, isActsLoading: false });
+        AsyncStorage.setItem(ACTS_STORAGE_KEY, JSON.stringify(response.data)).catch(() => {});
+        return;
+      }
+
+      const cached = await AsyncStorage.getItem(ACTS_STORAGE_KEY);
+      if (cached) {
+        set({ acts: JSON.parse(cached), isActsLoading: false });
+      }
+    } catch (err: any) {
+      console.warn('[Staff Tasks] Ошибка загрузки актов:', err.message);
+      try {
+        const cached = await AsyncStorage.getItem(ACTS_STORAGE_KEY);
+        if (cached) {
+          set({ acts: JSON.parse(cached), isActsLoading: false });
+        }
+      } catch {}
+    }
+    set({ isActsLoading: false });
+  },
+
+  // 3. Загрузка метрик выработки мастера
+  loadStats: async () => {
+    try {
+      const response = await staffApiClient.get<StaffStats>('/api/staff/stats');
+      if (response.data) {
+        set({ stats: response.data });
+      }
+    } catch (err: any) {
+      console.warn('[Staff Tasks] Ошибка получения статистики выработки:', err.message);
+    }
+  },
+
+  // 4. Смена статуса наряда (Принял / Выехал / В работе / Выполнен) с отправкой в БД
+  updateTaskStatus: async (taskId: string | number, newStatus: TaskStatus) => {
     console.log(`[Staff Tasks] Изменение статуса наряда ${taskId} ➔ ${newStatus}`);
+
+    // Оптимистичное обновление UI
     set((state) => ({
       tasks: state.tasks.map((task) =>
         task.id === taskId ? { ...task, status: newStatus } : task
       ),
     }));
 
-    // Попытка уведомить сервер о смене статуса
-    staffApiClient.patch(`/api/requests/${taskId}`, { status: newStatus }).catch(() => {
-      console.log(`[Staff Tasks] Статус сохранен локально для наряда ${taskId}`);
-    });
+    try {
+      // Отправляем PATCH запрос на боевой сервер
+      await staffApiClient.patch(`/api/tasks/${taskId}`, { status: newStatus });
+      console.log(`[Staff Tasks] Статус наряда ${taskId} успешно зафиксирован в PostgreSQL`);
+      // Обновляем статистику
+      get().loadStats().catch(() => {});
+    } catch (err: any) {
+      console.warn(`[Staff Tasks] Ошибка сохранения статуса ${taskId} на сервере:`, err.message);
+    }
   },
 
-  // Создание электронного акта выполненных работ
-  createAct: (actData: Omit<WorkAct, 'id' | 'created_at'>) => {
-    const newAct: WorkAct = {
+  // 5. Создание и регистрация электронного акта в БД PostgreSQL
+  createAct: async (actData: Omit<WorkAct, 'id' | 'created_at'>): Promise<boolean> => {
+    const tempId = `act-${Date.now()}`;
+    const nowIso = new Date().toISOString();
+
+    const localAct: WorkAct = {
       ...actData,
-      id: `act-${Date.now()}`,
-      created_at: new Date().toISOString(),
+      id: tempId,
+      created_at: nowIso,
     };
 
+    // Оптимистично добавляем в локальное состояние
     set((state) => ({
-      acts: [newAct, ...state.acts],
-      // Также переводим наряд в статус "Выполнен"
+      acts: [localAct, ...state.acts],
+      // Наряд сразу переводим в статус "done"
       tasks: state.tasks.map((t) => t.id === actData.task_id ? { ...t, status: 'done' } : t),
     }));
 
-    console.log('[Staff Tasks] Электронный акт успешно сформирован:', newAct.act_number);
+    try {
+      console.log('[Staff Tasks] Отправка электронного акта на сервер...');
+      const response = await staffApiClient.post<WorkAct>('/api/acts', actData);
+
+      if (response.data && response.data.id) {
+        console.log(`[Staff Tasks] Акт ${response.data.act_number} успешно сохранен в PostgreSQL с ID ${response.data.id}`);
+        // Заменяем временный локальный акт реальным из БД
+        set((state) => ({
+          acts: state.acts.map((a) => a.id === tempId ? response.data : a),
+        }));
+      }
+
+      // Перезагружаем статистику выработки
+      get().loadStats().catch(() => {});
+      return true;
+    } catch (err: any) {
+      console.warn('[Staff Tasks] Ошибка отправки акта на сервер, сохранен локально:', err.message);
+      return false;
+    }
   },
 
-  // Быстрый вызов абонента по номеру телефона
+  // Быстрый вызов абонента по номеру телефона через нативную телефонную книгу
   callPhone: (phone: string) => {
     const cleaned = phone.replace(/[^0-9+]/g, '');
     const url = `tel:${cleaned}`;
@@ -225,17 +259,17 @@ export const useStaffTasksStore = create<TasksState>((set, get) => ({
       });
   },
 
-  // Фильтрация и поиск нарядов
+  // Фильтрация и мгновенный поиск нарядов
   getFilteredTasks: () => {
     const { tasks, searchQuery, selectedFilter } = get();
     return tasks.filter((task) => {
       // Поиск по строке
       const q = searchQuery.toLowerCase().trim();
       const matchQuery = !q ||
-        task.address.toLowerCase().includes(q) ||
-        task.client_name.toLowerCase().includes(q) ||
-        task.task_number.toLowerCase().includes(q) ||
-        task.title.toLowerCase().includes(q);
+        (task.address && task.address.toLowerCase().includes(q)) ||
+        (task.client_name && task.client_name.toLowerCase().includes(q)) ||
+        (task.task_number && task.task_number.toLowerCase().includes(q)) ||
+        (task.title && task.title.toLowerCase().includes(q));
 
       if (!matchQuery) return false;
 

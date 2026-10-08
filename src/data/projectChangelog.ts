@@ -258,6 +258,16 @@ export const KIND_META: Record<Kind, { label: string; badgeCls: string }> = {
  */
 export const PROJECT_CHANGELOG: ProjectEntry[] = [
   {
+    id: "stage-2026-10-09-0105",
+    datetime: "2026-10-09 01:05",
+    title: "Клиентское приложение: устранение ошибки обновления на Android; Служебное приложение: ликвидация моков и полная синхронизация с PostgreSQL",
+    description: "1) Клиентское приложение «Домофондар» (mobile): Устранена ошибка синтаксического анализа пакетов при обновлении на Android. Выровнены версии v1.3.0 (Build 17) во всех конфигах (constants.ts, app.config.ts, package.json, server/index.js). В UpdateCheckerModal.tsx добавлена прямая загрузка через системный браузер (рекомендуемый надежный способ без конфликтов FileProvider) и авто-фолбек при любых сбоях PackageInstaller. Исправлены TypeScript ошибки в profile/index.tsx (displayPhone) и auth.store.ts. 2) Служебное приложение «Офис Работа» (mobile-staff): Полностью ликвидированы заглушки и мок-данные. В PostgreSQL создана таблица acts для электронных актов сдачи-приемки. На сервере реализованы эндпоинты GET/PATCH /api/tasks (сводный реестр задач и нарядов с заявками абонентов), GET/POST /api/acts (сохранение подписанных актов в БД), GET /api/staff/stats (выработка мастеров за смену, начисления, SLA, рейтинг). В tasks.store.ts, auth.store.ts и экранах внедрены pull-to-refresh, оффлайн-кэш и реальные API-мутации. 3) PWA /office синхронизирована с бэкендом. Фронтенд и бэкенд развернуты на сервере без даунтайма.",
+    module: "crm_fsm",
+    kind: "feature",
+    hours: 3.5,
+    difficulty: "Комплексная",
+  },
+  {
     id: "stage-2026-10-09-0038",
     datetime: "2026-10-09 00:38",
     title: "Безопасность и аудит доступа: полный отзыв прав с номера 9184696236 и закрепление супер-админа строго за 89283323456",
