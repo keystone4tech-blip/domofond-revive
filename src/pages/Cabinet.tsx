@@ -3636,10 +3636,10 @@ const Cabinet = () => {
         throw error;
       }
 
-      // Проверяем, является ли авторизованный пользователь создателем и суперадмином платформы (Владимир Сергеевич)
+      // Проверяем, является ли авторизованный пользователь создателем и суперадмином платформы (Владимир Сергеевич: 89283323456 / viruscorp4@gmail.com)
       const sessionEmail = String(session.user.email || data?.email || "").toLowerCase().trim();
       const sessionPhone = String(session.user.phone || data?.phone || "").replace(/\D/g, "");
-      const isOwner = sessionEmail === "viruscorp4@gmail.com" || sessionPhone.endsWith("9184696236") || sessionPhone.endsWith("9283323456");
+      const isOwner = sessionEmail === "viruscorp4@gmail.com" || sessionPhone.endsWith("9283323456");
       const isSuper = isOwner || (rolesData && rolesData.some((r: any) => r.role === "superadmin"));
       setIsSuperadminUser(isSuper);
 

@@ -11,6 +11,22 @@
 > 
 > **Пользователь НЕ ДОЛЖЕН ничего вносить вручную.** Вся статистика и история пополняется ИИ автоматически при каждой задаче.
 
+# 2026-10-09 00:38 — Безопасность и аудит доступа: полный отзыв прав с номера 9184696236 и закрепление супер-админа строго за 89283323456
+
+## 1. Задачи и выполненные работы
+- **Немедленный аудит безопасности и отзыв привилегий с постороннего номера**:
+  * В базе данных PostgreSQL с профиля `38c5e7a4-0455-4f42-b2ed-a23e68e527d1` (`+7 (918) 469-62-36`) полностью аннулированы любые роли администратора (`DELETE FROM public.user_roles`), присвоена строго базовая роль `user`, email отвязан.
+  * Права создателя и супер-администратора (`superadmin`, `admin`) подтверждены и закреплены исключительно за профилем Владимира Сергеевича `aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa` (телефон **`89283323456`** / `+79283323456`, email `viruscorp4@gmail.com`).
+  * Во всей кодовой базе фронтенда ([`useUserRole.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/hooks/useUserRole.tsx), [`Cabinet.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/pages/Cabinet.tsx), [`SuperAdminControl.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/components/admin/SuperAdminControl.tsx)) удалены упоминания номера `9184696236`, распознавание суперадмина привязано строго к номеру создателя **`89283323456`** (`9283323456`) и email `viruscorp4@gmail.com`.
+
+## 2. Измененные файлы
+- [`src/hooks/useUserRole.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/hooks/useUserRole.tsx) — проверка суперадмина строго по номеру 89283323456 и email.
+- [`src/pages/Cabinet.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/pages/Cabinet.tsx) — проверка суперадмина строго по номеру 89283323456 и email.
+- [`src/components/admin/SuperAdminControl.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/components/admin/SuperAdminControl.tsx) — авторизация в панели строго по 89283323456 и email.
+- [`src/data/projectChangelog.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/data/projectChangelog.ts) — фиксация этапа разработки в реестре.
+- [`AGENT_SYNC.md`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/AGENT_SYNC.md) — фиксация и снятие claim.
+- [`PROJECT_LOG.md`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/PROJECT_LOG.md) — актуализация паспорта проекта.
+
 # 2026-10-09 00:25 — Оптимизация мобильной CRM и авторизация суперадмина: ликвидация паразитного сетевого спама и безотказный доступ по номеру телефона
 
 ## 1. Задачи и выполненные работы

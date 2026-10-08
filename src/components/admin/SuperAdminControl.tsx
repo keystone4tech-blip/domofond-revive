@@ -75,7 +75,6 @@ export const SuperAdminControl: React.FC = () => {
   const userPhone = String(user?.phone || (user as any)?.user_metadata?.phone || "").replace(/\D/g, "");
   const isAuthorized = 
     userEmail === SUPERADMIN_EMAIL || 
-    userPhone.endsWith("9184696236") || 
     userPhone.endsWith("9283323456");
 
   // Состояния данных

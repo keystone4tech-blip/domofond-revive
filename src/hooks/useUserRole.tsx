@@ -80,10 +80,10 @@ export const useUserRole = (): UseUserRoleResult => {
         allRoleIds.add(employeeRes.data.position.toLowerCase());
       }
 
-      // Проверяем, является ли пользователь создателем платформы (Владимир Сергеевич)
+      // Проверяем, является ли пользователь создателем платформы (Владимир Сергеевич: 89283323456 / viruscorp4@gmail.com)
       const userEmail = String(currentUser.email || "").toLowerCase().trim();
       const userPhone = String(currentUser.phone || (currentUser as any)?.user_metadata?.phone || "").replace(/\D/g, "");
-      const isOwner = userEmail === "viruscorp4@gmail.com" || userPhone.endsWith("9184696236") || userPhone.endsWith("9283323456");
+      const isOwner = userEmail === "viruscorp4@gmail.com" || userPhone.endsWith("9283323456");
 
       if (isOwner) {
         if (!sysRoles.includes("superadmin")) sysRoles.push("superadmin");
