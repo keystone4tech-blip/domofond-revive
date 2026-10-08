@@ -1209,19 +1209,17 @@ export const InstallerSheetManager: React.FC = () => {
             [addressHeader],
             [dateHeader],
             [], // Пустая строка-разделитель
-            // Простые и понятные столбцы
+            // Простые и понятные столбцы без сумм и оплат жильцов
             [
               "№ п/п",
               "Квартира",
               "ФИО Абонента",
               "Контактный телефон",
               "Трубка",
-              "Ключи",
+              "Ключи (шт.)",
               "Личный кабинет",
-              "Монтаж / Услуги",
-              "Сумма (₽)",
-              "Статус оплаты",
-              "Подпись абонента о получении оборудования",
+              "Монтаж / Замена",
+              "Подпись собственника",
             ],
           ];
 
@@ -1245,22 +1243,19 @@ export const InstallerSheetManager: React.FC = () => {
             if (parsed.hasApp) subApp += 1;
             subRevenue += Number(order.payment_amount || 0);
 
-            const paymentText = order.payment_status === "paid" 
-              ? `Оплачено (${Number(order.payment_amount || 0).toFixed(0)} ₽)`
-              : `Ожидает (${Number(order.payment_amount || 0).toFixed(0)} ₽)`;
+            // Ключи: прописываем просто количество штук (без названия "Ключ UID электронный:")
+            const keysDisplay = parsed.keysCount > 0 ? `${parsed.keysCount} шт.` : "—";
 
             sheetData.push([
               index + 1,
               order.apartment ? `кв. ${order.apartment}` : "—",
               order.name || "Абонент",
               order.phone || "—",
-              parsed.handset,
-              parsed.keys,
-              parsed.hasApp ? "+" : "—",
-              parsed.services,
-              Number(order.payment_amount || 0).toFixed(0),
-              paymentText,
-              "", // Пустая ячейка для подписи жильца
+              parsed.handset !== "—" ? parsed.handset : "—",
+              keysDisplay,
+              parsed.hasApp ? "✓ Подключен" : "—",
+              parsed.services !== "—" ? parsed.services : "—",
+              "", // Пустая широкая ячейка для личной подписи собственника
             ]);
           });
 
@@ -1271,14 +1266,38 @@ export const InstallerSheetManager: React.FC = () => {
             `Квартир: ${entOrders.length}`,
             "",
             "",
-            `Трубок: ${subHandsets}`,
-            `Ключей: ${subKeys}`,
-            `ЛК (+): ${subApp}`,
-            `Услуг: ${subServices}`,
-            `${subRevenue.toFixed(0)} ₽`,
-            "Все заказы оплачены",
+            `Трубок: ${subHandsets} шт.`,
+            `Ключей: ${subKeys} шт.`,
+            `ЛК: ${subApp} шт.`,
+            "",
             "",
           ]);
+
+          // Блок со списком оборудования и точным количеством штук к выдаче
+          sheetData.push([]);
+          sheetData.push(["СПИСОК ОБОРУДОВАНИЯ И МАТЕРИАЛОВ К ВЫДАЧЕ НА ПОДЪЕЗД:"]);
+          sheetData.push(["№", "Наименование оборудования / материала", "Количество"]);
+
+          let itemIndex = 1;
+
+          // 1. Конкретные модели трубок и мониторов
+          if (Object.keys(entGroup.stats.handsetsByType).length > 0) {
+            Object.entries(entGroup.stats.handsetsByType).forEach(([model, count]) => {
+              sheetData.push([itemIndex++, model, `${count} шт.`]);
+            });
+          } else {
+            sheetData.push([itemIndex++, "Трубки переговорные (не требуются)", "0 шт."]);
+          }
+
+          // 2. Ключи домофона
+          if (subKeys > 0) {
+            sheetData.push([itemIndex++, "Ключи домофона (электронные)", `${subKeys} шт.`]);
+          }
+
+          // 3. Личный кабинет (приложение)
+          if (subApp > 0) {
+            sheetData.push([itemIndex++, "Доступ к Личному кабинету умного дома", `${subApp} шт.`]);
+          }
 
           // Подписи ответственных лиц
           sheetData.push([]);
@@ -1287,19 +1306,17 @@ export const InstallerSheetManager: React.FC = () => {
 
           const ws = XLSX.utils.aoa_to_sheet(sheetData);
 
-          // Ширина колонок для печати
+          // Ширина колонок для печати листа А4
           ws["!cols"] = [
             { wch: 6 },  // № п/п
             { wch: 12 }, // Квартира
-            { wch: 25 }, // ФИО Абонента
+            { wch: 28 }, // ФИО Абонента
             { wch: 18 }, // Контактный телефон
-            { wch: 22 }, // Трубка
-            { wch: 22 }, // Ключи
+            { wch: 28 }, // Трубка
+            { wch: 14 }, // Ключи (шт.)
             { wch: 16 }, // Личный кабинет
-            { wch: 20 }, // Монтаж / Услуги
-            { wch: 12 }, // Сумма (₽)
-            { wch: 22 }, // Статус оплаты
-            { wch: 38 }, // Подпись абонента о получении оборудования
+            { wch: 16 }, // Монтаж / Замена
+            { wch: 32 }, // Подпись собственника
           ];
 
           // Формируем имя листа Excel (макс 31 символ)
