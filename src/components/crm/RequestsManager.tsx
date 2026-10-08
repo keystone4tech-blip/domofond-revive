@@ -112,7 +112,7 @@ interface RequestsManagerProps {
 }
 
 const RequestsManager = ({ 
-  initialFilter = "all",
+  initialFilter = "pending",
   initialRequestId,
   onClearInitialRequestId
 }: RequestsManagerProps) => {
@@ -1262,11 +1262,6 @@ const RequestsManager = ({
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         {/* Интерактивная панель переключения статусов заявок со счетчиками */}
         <TabsList className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 w-full h-auto p-1.5 gap-1.5 bg-slate-100/90 dark:bg-slate-800/80 rounded-xl mb-3">
-          <TabsTrigger value="all" className="flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:shadow-sm">
-            <FileText className="h-3.5 w-3.5 text-slate-500" />
-            <span>Все</span>
-            <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-[10px] h-4 bg-slate-200 dark:bg-slate-700">{stats.total}</Badge>
-          </TabsTrigger>
           <TabsTrigger value="pending" className="flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:shadow-sm">
             <Clock className="h-3.5 w-3.5 text-yellow-500" />
             <span>Новые</span>
@@ -1306,24 +1301,14 @@ const RequestsManager = ({
             <Banknote className="h-3.5 w-3.5 text-emerald-600" />
             <span>Отчёты</span>
           </TabsTrigger>
+          <TabsTrigger value="all" className="flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:shadow-sm">
+            <FileText className="h-3.5 w-3.5 text-slate-500" />
+            <span>Все</span>
+            <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-[10px] h-4 bg-slate-200 dark:bg-slate-700">{stats.total}</Badge>
+          </TabsTrigger>
         </TabsList>
 
-        {/* Все заявки (общий список) */}
-        <TabsContent value="all" className="mt-0">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <FileText className="h-5 w-5 text-primary" />
-                Все заявки ({filteredAllRequests.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {renderRequestsTable(filteredAllRequests)}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Pending Requests */}
+        {/* Новые заявки (первая вкладка) */}
         <TabsContent value="pending" className="mt-0">
           <Card>
             <CardHeader className="pb-2">
@@ -1425,6 +1410,21 @@ const RequestsManager = ({
             allRequestItems={allRequestItems || []}
             employees={employees || []}
           />
+        </TabsContent>
+
+        {/* Все заявки (общий список в самом конце табов) */}
+        <TabsContent value="all" className="mt-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <FileText className="h-5 w-5 text-primary" />
+                Все заявки ({filteredAllRequests.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {renderRequestsTable(filteredAllRequests)}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 
@@ -1588,6 +1588,20 @@ const EmployeeFinancialReports = ({ allRequests, allRequestItems, employees }: E
     };
   }, [filteredRequests, allRequestItems]);
 
+  // Вспомогательная функция очистки и нормализации ФИО сотрудника от артефактов БД
+  const normalizeEmployeeName = (rawName?: string | null, phone?: string | null) => {
+    if (!rawName) {
+      if (phone && phone.replace(/\D/g, "").endsWith("4536241")) return "Шибаев Сергей Викторович";
+      return "Сотрудник";
+    }
+    const trimmed = rawName.trim();
+    if (/^[\?\s\-_]+$/.test(trimmed)) {
+      if (phone && phone.replace(/\D/g, "").endsWith("4536241")) return "Шибаев Сергей Викторович";
+      return "Сотрудник";
+    }
+    return trimmed;
+  };
+
   // Calculate totals by employee
   const employeeStats = useMemo(() => {
     const stats: Record<string, {
@@ -1604,7 +1618,7 @@ const EmployeeFinancialReports = ({ allRequests, allRequestItems, employees }: E
     // Initialize all employees
     employees.forEach(emp => {
       stats[emp.id] = {
-        name: emp.full_name,
+        name: normalizeEmployeeName(emp.full_name, emp.phone),
         phone: emp.phone,
         completedCount: 0,
         cancelledCount: 0,
@@ -1622,7 +1636,7 @@ const EmployeeFinancialReports = ({ allRequests, allRequestItems, employees }: E
       const empId = req.accepted_by;
       if (!stats[empId] && req.accepted_employee) {
         stats[empId] = {
-          name: req.accepted_employee.full_name,
+          name: normalizeEmployeeName(req.accepted_employee.full_name, req.accepted_employee.phone),
           phone: req.accepted_employee.phone,
           completedCount: 0,
           cancelledCount: 0,
@@ -1700,7 +1714,7 @@ const EmployeeFinancialReports = ({ allRequests, allRequestItems, employees }: E
                 <SelectContent>
                   <SelectItem value="all">Все сотрудники</SelectItem>
                   {employees.map(emp => (
-                    <SelectItem key={emp.id} value={emp.id}>{emp.full_name}</SelectItem>
+                    <SelectItem key={emp.id} value={emp.id}>{normalizeEmployeeName(emp.full_name, emp.phone)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

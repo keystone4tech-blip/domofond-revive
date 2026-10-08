@@ -31,7 +31,7 @@
 | server/index.js, src/components/admin/*, src/pages/Admin.tsx | Antigravity | 2026-10-08 07:49 UTC | ✅ освобождён (закоммичено) |
 | src/App.tsx, src/components/crm/InstallerSheetManager.tsx, src/components/crm/VerificationManager.tsx, src/components/crm/CRMDashboard.tsx | Antigravity | 2026-10-08 18:45 UTC | ✅ освобождён (закоммичено) |
 | src/components/admin/AccountsManager.tsx, src/components/crm/AddressesManager.tsx, src/components/crm/RequestsManager.tsx, src/components/crm/TasksManager.tsx | Antigravity | 2026-10-08 18:57 UTC | ✅ освобождён (закоммичено) |
-| src/components/crm/VerificationManager.tsx | Antigravity | 2026-10-08 19:26 UTC | ✅ освобождён (закоммичено) |
+| src/components/crm/RequestsManager.tsx, src/components/fsm/RequestsManager.tsx, src/pages/CRM.tsx, src/pages/FSM-1.tsx | Antigravity | 2026-10-08 19:39 UTC | ✅ освобождён (закоммичено) |
 
 > Правило: `🔒 занят` — не трогать; `✅ освобождён` — можно брать.
 
@@ -207,10 +207,15 @@ Claude, выполнил исправление и деплой по заказ�
 4. **Детектор спамеров**: разработан сквозной алгоритм подсчета количества изменений данных на каждый аккаунт с наглядным бейджем (`renderSpamBadge`: серый при 0-1, желтый при 2-3, красный «🚨 Спам-фильтр: X смен» при 4+ сменах).
 5. Проект собран (`npm run build`), задеплоен на боевой сервер `45.8.99.238`. Claim снят.
 
-**2026-10-08 19:28 UTC — Antigravity:**
-Исправлен баг `ReferenceError: useMemo is not defined` в `src/components/crm/VerificationManager.tsx`:
-- В импорты из React добавлены `useMemo` и `useCallback`.
-- Проект собран (`npm run build`) без ошибок, задеплоен на боевой сервер `45.8.99.238`. Панель верификации жильцов в CRM открывается и функционирует штатно. Claim снят.
+**2026-10-08 19:48 UTC — Antigravity:**
+Заявки и отчёты сотрудников:
+1. **Приоритет новых заявок**: вкладка «Новые» (`pending`) перенесена на 1-е место в таб-баре раздела «Заявки» (`RequestsManager.tsx`), а также установлена стартовой по умолчанию при входе в раздел CRM/FSM. Вкладка «Все» (`all`) перенесена в самый конец.
+2. **Исправление данных сотрудников и директора**:
+   - В БД PostgreSQL на сервере `45.8.99.238` исправлена битая кодировка `?????? ?????? ??????????` для номера `+7 (909) 453-62-41` (генеральный директор Шибаев Сергей Викторович) в таблицах `employees` и `profiles`.
+   - В `RequestsManager.tsx` добавлена защитная санитизация `normalizeEmployeeName` с автоподстановкой корректного ФИО при обнаружении артефактов `????`.
+3. `fsm/RequestsManager.tsx` переведен на прямой реэкспорт без дублирования кода.
+4. Проект собран (`npm run build`), выкачен на боевой сервер `45.8.99.238` через `deploy_dist.py`. Claim снят.
+
 
 
 

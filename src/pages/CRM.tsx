@@ -163,7 +163,7 @@ const CRM = () => {
       setStatusFilter(filter);
     } else {
       if (tab === "requests") {
-        setStatusFilter("all");
+        setStatusFilter("pending");
       } else if (tab === "tasks") {
         setStatusFilter("pending");
       }
