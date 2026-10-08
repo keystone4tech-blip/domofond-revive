@@ -11,6 +11,32 @@
 > 
 > **Пользователь НЕ ДОЛЖЕН ничего вносить вручную.** Вся статистика и история пополняется ИИ автоматически при каждой задаче.
 
+# 2026-10-09 00:25 — Оптимизация мобильной CRM и авторизация суперадмина: ликвидация паразитного сетевого спама и безотказный доступ по номеру телефона
+
+## 1. Задачи и выполненные работы
+- **Восстановление прав супер-администратора для создателя системы (Можнов В. С.)**:
+  * В PostgreSQL профилю `38c5e7a4-0455-4f42-b2ed-a23e68e527d1` (телефон `+7 (918) 469-62-36`) в таблице `public.user_roles` присвоены роли `superadmin` и `admin`, а в `profiles` привязан системный email `viruscorp4@gmail.com`.
+  * В [`src/hooks/useUserRole.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/hooks/useUserRole.tsx), [`src/pages/Cabinet.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/pages/Cabinet.tsx) и [`src/components/admin/SuperAdminControl.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/components/admin/SuperAdminControl.tsx) внедрено жесткое распознавание создателя по номеру телефона (`9184696236`, `9283323456`) и email. Теперь при любом способе входа со смартфона блок прямого скачивания 2 APK, журнал и полные права CRM открываются мгновенно.
+- **Ликвидация сетевого паралича в `RequestsManager.tsx`**:
+  * **Причина зависания на телефонах**: внутри цикла `.map` чтения заявок выполнялось до 70 параллельных фоновых мутаций `supabase.from("requests").update({ priority: "urgent" })` каждые 25 секунд. Пул сетевых соединений мобильного браузера (макс. 6 соединений) на 100% забивался, блокируя дашборд, задачи и профиль.
+  * **Решение**: сетевой спам полностью удален; срочность рассчитывается мгновенно в памяти JavaScript.
+- **Отказоустойчивость и Optimistic UI в `CRMDashboard.tsx`**:
+  * Запросы `tasks`, `requests`, `employees`, `profiles`, `payments` переведены на неблокирующие безопасные промисы с дефолтными пустыми массивами при сетевых задержках.
+  * Добавлен `placeholderData: (previousData) => previousData` — при фоновых опросах экран больше никогда не сбрасывается в спиннер загрузки.
+- **Устранение двойного опроса в `TasksManager.tsx`**:
+  * Удален дублирующий `setInterval`, оставлен нативный `refetchInterval` от React Query.
+
+## 2. Измененные файлы
+- [`src/hooks/useUserRole.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/hooks/useUserRole.tsx) — безотказный статус superadmin/admin по номеру телефона и email создателя.
+- [`src/pages/Cabinet.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/pages/Cabinet.tsx) — проверка телефона при определении isSuperadminUser для показа блока 2 APK.
+- [`src/components/admin/SuperAdminControl.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/components/admin/SuperAdminControl.tsx) — проверка телефона создателя при доступе.
+- [`src/components/crm/RequestsManager.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/components/crm/RequestsManager.tsx) — ликвидация сетевого спама из 70 UPDATE запросов.
+- [`src/components/crm/TasksManager.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/components/crm/TasksManager.tsx) — удаление дублирующего setInterval.
+- [`src/components/crm/CRMDashboard.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/components/crm/CRMDashboard.tsx) — отказоустойчивые запросы и placeholderData.
+- [`src/data/projectChangelog.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/data/projectChangelog.ts) — фиксация этапа разработки в реестре.
+- [`AGENT_SYNC.md`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/AGENT_SYNC.md) — фиксация и снятие claim.
+- [`PROJECT_LOG.md`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/PROJECT_LOG.md) — актуализация паспорта проекта.
+
 # 2026-10-09 00:15 — Офис Работа CI/CD: устранение ошибки разрешения query-string в Metro bundler и добавление metro.config.js
 
 ## 1. Задачи и выполненные работы

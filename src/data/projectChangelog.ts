@@ -258,6 +258,16 @@ export const KIND_META: Record<Kind, { label: string; badgeCls: string }> = {
  */
 export const PROJECT_CHANGELOG: ProjectEntry[] = [
   {
+    id: "stage-2026-10-09-0025",
+    datetime: "2026-10-09 00:25",
+    title: "Оптимизация мобильной CRM и авторизация суперадмина: ликвидация паразитного сетевого спама и безотказный доступ по номеру телефона",
+    description: "Комплексное устранение долгой загрузки дашборда и отображения панели суперадмина на смартфонах: 1) В базе данных PostgreSQL профилю создателя (Можнов В. С., телефон +79184696236) присвоены системные роли superadmin и admin, привязан email viruscorp4@gmail.com. 2) В useUserRole.tsx, Cabinet.tsx и SuperAdminControl.tsx добавлено прямое распознавание суперадмина по номеру телефона (9184696236 / 9283323456) для мгновенного появления блока скачивания APK и полного доступа к CRM. 3) В RequestsManager.tsx ликвидирован сетевой спам из 70 параллельных UPDATE-запросов в цикле map, блокировавших сетевой пул мобильных браузеров. 4) В CRMDashboard.tsx запросы переведены на отказоустойчивые неблокирующие промисы с placeholderData, устранив зависание со спиннером.",
+    module: "crm_fsm",
+    kind: "fix",
+    hours: 2.0,
+    difficulty: "Высокая",
+  },
+  {
     id: "stage-2026-10-09-0015",
     datetime: "2026-10-09 00:15",
     title: "Офис Работа CI/CD: устранение ошибки разрешения query-string в Metro bundler и добавление metro.config.js",

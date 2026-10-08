@@ -3623,11 +3623,6 @@ const Cabinet = () => {
         setUserRoles(roles);
       }
 
-      // Проверяем, является ли авторизованный пользователь создателем и суперадмином платформы
-      const sessionEmail = String(session.user.email || "").toLowerCase().trim();
-      const isSuper = sessionEmail === "viruscorp4@gmail.com" || (rolesData && rolesData.some((r: any) => r.role === "superadmin"));
-      setIsSuperadminUser(isSuper);
-
       // Загружаем профиль пользователя из таблицы profiles
       console.log("[Cabinet Auth] Загрузка профиля пользователя...");
       const { data, error } = await supabase
@@ -3640,6 +3635,13 @@ const Cabinet = () => {
         console.error("[Cabinet Auth] Не удалось загрузить профиль пользователя из БД:", error);
         throw error;
       }
+
+      // Проверяем, является ли авторизованный пользователь создателем и суперадмином платформы (Владимир Сергеевич)
+      const sessionEmail = String(session.user.email || data?.email || "").toLowerCase().trim();
+      const sessionPhone = String(session.user.phone || data?.phone || "").replace(/\D/g, "");
+      const isOwner = sessionEmail === "viruscorp4@gmail.com" || sessionPhone.endsWith("9184696236") || sessionPhone.endsWith("9283323456");
+      const isSuper = isOwner || (rolesData && rolesData.some((r: any) => r.role === "superadmin"));
+      setIsSuperadminUser(isSuper);
 
       console.log("[Cabinet Auth] Профиль пользователя успешно загружен, инициализируем стейты...");
       setProfile(data);

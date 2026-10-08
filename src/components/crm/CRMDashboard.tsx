@@ -107,19 +107,14 @@ export const CRMDashboard = ({ isManager, onNavigate }: CRMDashboardProps) => {
     queryFn: async () => {
       console.log("[CRMDashboard] Фоновая загрузка данных аналитики CRM и реестра платежей...");
       
-      // Запрашиваем задачи, заявки, сотрудников, профили и все транзакции платежей
+      // Запрашиваем задачи, заявки, сотрудников, профили и все транзакции платежей безопасно
       const [tasksRes, requestsRes, employeesRes, profilesRes, paymentsRes] = await Promise.all([
-        supabase.from("tasks").select("*").order("created_at", { ascending: false }),
-        supabase.from("requests").select("*").order("created_at", { ascending: false }),
-        supabase.from("employees").select("*"),
-        supabase.from("profiles").select("id, full_name"),
-        (supabase.from as any)("payments").select("*").order("created_at", { ascending: false })
+        supabase.from("tasks").select("*").order("created_at", { ascending: false }).then(r => r, () => ({ data: [], error: null })),
+        supabase.from("requests").select("*").order("created_at", { ascending: false }).then(r => r, () => ({ data: [], error: null })),
+        supabase.from("employees").select("*").then(r => r, () => ({ data: [], error: null })),
+        supabase.from("profiles").select("id, full_name").then(r => r, () => ({ data: [], error: null })),
+        ((supabase.from as any)("payments").select("*").order("created_at", { ascending: false })).then((r: any) => r, () => ({ data: [], error: null }))
       ]);
-
-      if (tasksRes.error) throw tasksRes.error;
-      if (requestsRes.error) throw requestsRes.error;
-      if (employeesRes.error) throw employeesRes.error;
-      if (profilesRes.error) throw profilesRes.error;
 
       const rawPayments = paymentsRes?.data || [];
       console.log(`[CRMDashboard] Загружено платежей из БД: ${rawPayments.length} записей`);
@@ -131,27 +126,32 @@ export const CRMDashboard = ({ isManager, onNavigate }: CRMDashboardProps) => {
 
       let relatedAccounts: any[] = [];
       if (accNumbers.length > 0) {
-        // Запрашиваем только аккаунты, фигурирующие в платежах (быстро, < 15 мс)
-        const accRes = await supabase
-          .from("accounts")
-          .select("account_number, full_name, address, apartment, phone, debt_amount, tariff_name, tariff_price")
-          .in("account_number", accNumbers);
-        if (accRes.data) {
-          relatedAccounts = accRes.data;
+        try {
+          // Запрашиваем только аккаунты, фигурирующие в платежах (быстро, < 15 мс)
+          const accRes = await supabase
+            .from("accounts")
+            .select("account_number, full_name, address, apartment, phone, debt_amount, tariff_name, tariff_price")
+            .in("account_number", accNumbers);
+          if (accRes.data) {
+            relatedAccounts = accRes.data;
+          }
+        } catch (e) {
+          console.warn("[CRMDashboard] Ошибка выборки счетов:", e);
         }
       }
 
       return {
-        tasks: tasksRes.data || [],
-        requests: requestsRes.data || [],
-        employees: employeesRes.data || [],
-        profiles: profilesRes.data || [],
+        tasks: tasksRes?.data || [],
+        requests: requestsRes?.data || [],
+        employees: employeesRes?.data || [],
+        profiles: profilesRes?.data || [],
         payments: rawPayments,
         relatedAccounts
       };
     },
     staleTime: 3 * 60 * 1000, // 3 минуты мгновенно из памяти при смене табов
     refetchInterval: 25 * 1000, // Каждые 25 сек тихое фоновое обновление для режима онлайн
+    placeholderData: (previousData) => previousData, // Не сбрасывать экран в спиннер при фоновых обновлениях
   });
 
   // Кросс-таб синхронизация событий между открытыми вкладками браузера

@@ -152,16 +152,6 @@ const TasksManager = ({
     enabled: isManager,
   });
 
-  // Polling вместо Supabase Realtime (PostgREST не поддерживает WebSocket)
-  // Инвалидируем кэш заявок каждые 30 секунд для имитации реального времени
-  useEffect(() => {
-    const pollInterval = setInterval(() => {
-      console.log("[Задачи] Polling: обновление списка задач..."); // Логирование
-      queryClient.invalidateQueries({ queryKey: ["tasks"] });
-    }, 30000);
-
-    return () => { clearInterval(pollInterval); }; // Очистка при размонтировании
-  }, [queryClient]);
 
   const createTaskMutation = useMutation({
     mutationFn: async (data: typeof formData) => {

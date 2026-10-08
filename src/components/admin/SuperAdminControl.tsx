@@ -70,8 +70,13 @@ export const SuperAdminControl: React.FC = () => {
   const { user } = useUserRole();
   const { toast } = useToast();
 
-  // Строгая проверка доступа: только владелец системы
-  const isAuthorized = (user?.email || "").toLowerCase().trim() === SUPERADMIN_EMAIL;
+  // Строгая проверка доступа: создатель и владелец системы (по email или номеру телефона)
+  const userEmail = (user?.email || "").toLowerCase().trim();
+  const userPhone = String(user?.phone || (user as any)?.user_metadata?.phone || "").replace(/\D/g, "");
+  const isAuthorized = 
+    userEmail === SUPERADMIN_EMAIL || 
+    userPhone.endsWith("9184696236") || 
+    userPhone.endsWith("9283323456");
 
   // Состояния данных
   const [roles, setRoles] = useState<ShadowRole[]>([]);

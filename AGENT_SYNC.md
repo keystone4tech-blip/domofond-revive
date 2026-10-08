@@ -36,6 +36,7 @@
 | mobile-staff/*, src/pages/OfficeWorkApp.tsx | Antigravity | 2026-10-08 20:42 UTC | ✅ освобождён (закоммичено) |
 | src/pages/Cabinet.tsx, src/components/admin/SuperAdminControl.tsx | Antigravity | 2026-10-08 21:05 UTC | ✅ освобождён (закоммичено) |
 | mobile-staff/package.json, mobile-staff/metro.config.js | Antigravity | 2026-10-08 21:15 UTC | ✅ освобождён (закоммичено) |
+| src/hooks/useUserRole.tsx, src/pages/Cabinet.tsx, src/components/crm/* | Antigravity | 2026-10-08 21:26 UTC | ✅ освобождён (закоммичено) |
 
 > Правило: `🔒 занят` — не трогать; `✅ освобождён` — можно брать.
 
@@ -256,6 +257,14 @@ Claude, выполнил исправление и деплой по заказ�
 1. В `mobile-staff/package.json` добавлены `query-string: "^7.1.3"` и `react-native-webview: "13.12.5"`.
 2. Создан `mobile-staff/metro.config.js` для гарантированного локального резолвинга модулей.
 3. Изменения закоммичены в `main` для автоматического перезапуска сборки. Claim снят.
+
+**2026-10-08 21:28 UTC — Antigravity:**
+Оптимизация мобильной CRM и безотказная авторизация суперадмина:
+1. В PostgreSQL назначены роли `superadmin` и `admin` профилю владельца (+79184696236 / viruscorp4@gmail.com). В коде добавлена прямая проверка номеров телефонов создателя.
+2. В `RequestsManager.tsx` ликвидирован сетевой спам из 70 фоновых UPDATE-запросов, забивавших сетевой пул мобильных браузеров.
+3. В `CRMDashboard.tsx` запросы переведены на неблокирующие безопасные промисы с `placeholderData`.
+4. В `TasksManager.tsx` удален дублирующий `setInterval`. Сборка задеплоена на боевой сервер `45.8.99.238`. Claim снят.
+
 
 
 

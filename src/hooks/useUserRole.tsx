@@ -80,12 +80,25 @@ export const useUserRole = (): UseUserRoleResult => {
         allRoleIds.add(employeeRes.data.position.toLowerCase());
       }
 
+      // Проверяем, является ли пользователь создателем платформы (Владимир Сергеевич)
+      const userEmail = String(currentUser.email || "").toLowerCase().trim();
+      const userPhone = String(currentUser.phone || (currentUser as any)?.user_metadata?.phone || "").replace(/\D/g, "");
+      const isOwner = userEmail === "viruscorp4@gmail.com" || userPhone.endsWith("9184696236") || userPhone.endsWith("9283323456");
+
+      if (isOwner) {
+        if (!sysRoles.includes("superadmin")) sysRoles.push("superadmin");
+        if (!sysRoles.includes("admin")) sysRoles.push("admin");
+        if (!allRoleIds.has("superadmin")) allRoleIds.add("superadmin");
+        if (!allRoleIds.has("admin")) allRoleIds.add("admin");
+      }
+
       const assignedRolesList = Array.from(allRoleIds);
       setAssignedRoles(assignedRolesList);
       console.log("[useUserRole] Назначенные роли пользователя:", assignedRolesList);
 
       // Проверяем, является ли пользователь директором или супер-админом
       const isDirectorOrAdmin = 
+        isOwner ||
         sysRoles.includes("superadmin") || 
         sysRoles.includes("admin") || 
         sysRoles.includes("director") ||

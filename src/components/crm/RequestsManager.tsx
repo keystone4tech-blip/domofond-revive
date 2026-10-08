@@ -158,18 +158,12 @@ const RequestsManager = ({
 
       if (error) throw error;
 
-      // Auto-upgrade priority for old pending requests
+      // Клиентский расчет срочности для старых открытых заявок (без сетевого спама)
       const now = new Date();
       const updatedData = (data || []).map(req => {
         if (req.status === "pending" || req.status === "in_progress") {
           const daysSinceCreated = differenceInDays(now, new Date(req.created_at));
           if (daysSinceCreated >= 2 && req.priority !== "urgent") {
-            // Update in background
-            supabase
-              .from("requests")
-              .update({ priority: "urgent" })
-              .eq("id", req.id)
-              .then();
             return { ...req, priority: "urgent" };
           }
         }
