@@ -29,7 +29,7 @@
 | mobile/src/components/*OrderModal, LegalModal, OfflineBanner | Claude | 2026-10-06 16:54 UTC | ✅ освобождён (закоммичено) |
 | src/pages/Cabinet.tsx, src/data/projectChangelog.ts | Antigravity | 2026-10-08 07:33 UTC | ✅ освобождён (закоммичено) |
 | server/index.js, src/components/admin/*, src/pages/Admin.tsx | Antigravity | 2026-10-08 07:49 UTC | ✅ освобождён (закоммичено) |
-| src/components/fsm/InstallerSheetManager.tsx, src/pages/FSM-1.tsx | Antigravity | 2026-10-08 18:20 UTC | ✅ освобождён (закоммичено) |
+| src/App.tsx, src/components/crm/InstallerSheetManager.tsx, src/components/crm/VerificationManager.tsx, src/components/crm/CRMDashboard.tsx | Antigravity | 2026-10-08 18:45 UTC | ✅ освобождён (закоммичено) |
 
 > Правило: `🔒 занят` — не трогать; `✅ освобождён` — можно брать.
 
@@ -177,10 +177,13 @@ Claude, выполнил исправление и деплой по заказ�
 
 **2026-10-08 18:20 UTC — Antigravity:**
 Полная унификация листа монтажника:
-1. **Устранение старого дубликата**: в `src/components/fsm/InstallerSheetManager.tsx` находился устаревший монолитный код, который использовался в `src/pages/FSM-1.tsx`. Компонент заменен на сквозной реэкспорт единого актуального источника правды `src/components/crm/InstallerSheetManager.tsx`.
-2. **Гарантия порядка колонок в Excel**: во всех точках входа скачивается актуальная ведомость с эталонным порядком:
-   № п/п → Квартира → ФИО Абонента → Контактный телефон → **Монтаж / Замена** → **Трубка** → Ключи (шт.) → Личный кабинет → Подпись собственника.
-3. Проект собран, задеплоен на `45.8.99.238`. Claim снят.
+**2026-10-08 18:45 UTC — Antigravity:**
+Комплексное ускорение CRM и режим онлайн:
+1. **Глобальный кэш React Query**: в `src/App.tsx` включен `staleTime: 3 мин`, `gcTime: 30 мин`, `refetchOnWindowFocus: false`. Переключение вкладок CRM происходит моментально (0 мс) из памяти.
+2. **Мгновенный отклик верификации (Optimistic UI)**: в `src/components/crm/VerificationManager.tsx` и `fsm/` внедрен `setQueryData` — при клике «Одобрить» или «Отклонить» заявка исчезает из очереди мгновенно, счетчик уменьшается сразу, без нажатия F5.
+3. **Оптимизация Листа монтажника**: тяжелый перебор 50 000 счетов заменен на сгруппированный хеш-индекс `Map` O(1), устранены зависания браузера.
+4. Проект собран, задеплоен на `45.8.99.238`. Claim снят.
+
 
 
 

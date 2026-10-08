@@ -34,11 +34,11 @@ export const CRMDashboard = ({ isManager, onNavigate }: CRMDashboardProps) => {
   const [period, setPeriod] = useState<AnalyticsPeriod>("30_days");
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Запрос сырых данных для аналитики
+  // Запрос сырых данных для аналитики (с быстрым кэшированием и легким фоновым опросом)
   const { data: rawData, isLoading } = useQuery({
     queryKey: ["crm-dashboard-raw-data"],
     queryFn: async () => {
-      console.log("[CRMDashboard] Загрузка сырых данных для аналитики CRM...");
+      console.log("[CRMDashboard] Фоновая загрузка данных аналитики CRM...");
       const [tasksRes, requestsRes, employeesRes, profilesRes] = await Promise.all([
         supabase.from("tasks").select("*").order("created_at", { ascending: false }),
         supabase.from("requests").select("*").order("created_at", { ascending: false }),
@@ -57,27 +57,21 @@ export const CRMDashboard = ({ isManager, onNavigate }: CRMDashboardProps) => {
         employees: employeesRes.data || [],
         profiles: profilesRes.data || []
       };
-    }
+    },
+    staleTime: 3 * 60 * 1000, // 3 минуты мгновенно из памяти при смене табов
+    refetchInterval: 25 * 1000, // Каждые 25 сек тихое фоновое обновление для режима онлайн
   });
 
-  // Подписка на Supabase Realtime изменения в реальном времени
+  // Кросс-таб синхронизация событий между открытыми вкладками браузера
   useEffect(() => {
-    console.log("[FSMDashboard] Подключение к realtime-каналам изменений таблиц...");
-    const channel = supabase
-      .channel("fsm-dashboard-realtime-sync")
-      .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, (payload) => {
-        console.log("[Realtime] Обнаружено изменение в таблице задач (tasks):", payload.eventType);
-        queryClient.invalidateQueries({ queryKey: ["fsm-dashboard-raw-data"] });
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "requests" }, (payload) => {
-        console.log("[Realtime] Обнаружено изменение в таблице заявок (requests):", payload.eventType);
-        queryClient.invalidateQueries({ queryKey: ["fsm-dashboard-raw-data"] });
-      })
-      .subscribe();
-
+    const handleSync = (e: StorageEvent) => {
+      if (e.key === "verification_last_update" || e.key === "crm_data_sync") {
+        queryClient.invalidateQueries({ queryKey: ["crm-dashboard-raw-data"] });
+      }
+    };
+    window.addEventListener("storage", handleSync);
     return () => {
-      console.log("[FSMDashboard] Отключение от каналов realtime...");
-      supabase.removeChannel(channel);
+      window.removeEventListener("storage", handleSync);
     };
   }, [queryClient]);
 

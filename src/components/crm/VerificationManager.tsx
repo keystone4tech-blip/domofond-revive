@@ -190,17 +190,51 @@ const VerificationManager: React.FC = () => {
     (p: any) => p.pending_data_change && typeof p.pending_data_change === "object"
   );
 
-  // Одобрение замены персональных данных абонента диспетчером
+  // Одобрение замены персональных данных абонента диспетчером (с Optimistic UI)
   const handleApproveDataChange = async (profile: Profile) => {
     try {
       const change = profile.pending_data_change;
       if (!change) return;
 
-      console.log(`[Верификация FSM] Подтверждение изменения данных для профиля ID: ${profile.id}`, change);
+      console.log(`[Верификация] Мгновенное подтверждение изменения данных для профиля ID: ${profile.id}`, change);
       const now = new Date().toISOString();
 
-      // 1. Применяем новые реквизиты в profiles и формируем системное уведомление (письмо) жильцу
-      const { data, error } = await supabase
+      // 0. МГНОВЕННЫЙ OPTIMISTIC UI (0 мс): сразу удаляем заявку на изменение данных из очереди в памяти браузера!
+      queryClient.setQueryData<Profile[]>(["verification-profiles"], (old) => {
+        if (!old) return [];
+        return old.map((p) =>
+          p.id === profile.id
+            ? {
+                ...p,
+                full_name: change.full_name?.trim() || p.full_name,
+                phone: change.phone?.trim() || p.phone,
+                email: change.email?.trim() || (p as any).email,
+                address: change.address?.trim() || p.address,
+                apartment: change.apartment !== undefined ? change.apartment?.trim() : p.apartment,
+                floor: change.floor !== undefined ? change.floor?.trim() : p.floor,
+                account_number: change.account_number ? change.account_number.trim() : (p as any).account_number,
+                pending_data_change: null, // Заявка мгновенно исчезает с экрана
+              }
+            : p
+        );
+      });
+
+      // Мгновенно уменьшаем счетчик бейджа в сайдбаре
+      queryClient.setQueryData<any>(["fsm-sidebar-counts"], (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          pendingVerifications: Math.max(0, (old.pendingVerifications || 1) - 1),
+        };
+      });
+
+      toast({
+        title: "✅ Данные обновлены!",
+        description: `Новые реквизиты для ${change.full_name || profile.full_name} успешно применены.`,
+      });
+
+      // 1. Применяем новые реквизиты в PostgreSQL
+      const { error } = await supabase
         .from("profiles")
         .update({
           full_name: change.full_name?.trim() || profile.full_name,
@@ -210,7 +244,7 @@ const VerificationManager: React.FC = () => {
           apartment: change.apartment !== undefined ? change.apartment?.trim() : profile.apartment,
           floor: change.floor !== undefined ? change.floor?.trim() : profile.floor,
           account_number: change.account_number ? change.account_number.trim() : (profile as any).account_number,
-          pending_data_change: null, // Очищаем заявку, так как она одобрена
+          pending_data_change: null,
           data_change_notification: {
             type: "approved",
             message: `Ваши новые реквизиты успешно подтверждены оператором: ${
@@ -223,9 +257,7 @@ const VerificationManager: React.FC = () => {
             timestamp: now,
           },
         })
-        .eq("id", profile.id)
-        .select("*")
-        .single();
+        .eq("id", profile.id);
 
       if (error) throw error;
 
@@ -241,19 +273,16 @@ const VerificationManager: React.FC = () => {
           .eq("client_id", profile.id)
           .eq("order_type", "data_change_request");
       } catch (reqErr) {
-        console.warn("[Верификация FSM] Заявка в requests не обновлена:", reqErr);
+        console.warn("[Верификация] Заявка в requests не обновлена:", reqErr);
       }
-
-      toast({
-        title: "✅ Данные обновлены!",
-        description: `Новые реквизиты для ${change.full_name || profile.full_name} успешно применены.`,
-      });
 
       queryClient.invalidateQueries({ queryKey: ["verification-profiles"] });
       queryClient.invalidateQueries({ queryKey: ["fsm-sidebar-counts"] });
       queryClient.invalidateQueries({ queryKey: ["requests"] });
     } catch (err: any) {
-      console.error("[Верификация FSM] Ошибка применения изменений:", err);
+      console.error("[Верификация] Ошибка применения изменений:", err);
+      // В случае сбоя сети откатываем кэш
+      queryClient.invalidateQueries({ queryKey: ["verification-profiles"] });
       toast({
         title: "Ошибка обновления данных",
         description: err.message || "Не удалось сохранить новые данные.",
@@ -269,17 +298,44 @@ const VerificationManager: React.FC = () => {
     setIsRejectDataDialogOpen(true);
   };
 
-  // Фиксация отклонения с записью причины в профиль жильца
+  // Фиксация отклонения с записью причины в профиль жильца (с Optimistic UI)
   const handleConfirmRejectDataChange = async () => {
     if (!rejectingDataProfile) return;
 
     try {
       setIsRejectingData(true);
       const reason = dataRejectReason.trim() || "Данные не соответствуют реестру абонентов";
-      console.log(`[Верификация FSM] Отклонение изменения данных для профиля ID: ${rejectingDataProfile.id}, причина: ${reason}`);
+      const targetId = rejectingDataProfile.id;
+      console.log(`[Верификация] Мгновенное отклонение изменения данных для профиля ID: ${targetId}`);
       const now = new Date().toISOString();
 
-      // 1. Очищаем pending_data_change в profiles и фиксируем письмо-уведомление об отклонении
+      // 0. МГНОВЕННЫЙ OPTIMISTIC UI: заявка сразу убирается с экрана
+      queryClient.setQueryData<Profile[]>(["verification-profiles"], (old) => {
+        if (!old) return [];
+        return old.map((p) =>
+          p.id === targetId
+            ? { ...p, pending_data_change: null }
+            : p
+        );
+      });
+
+      queryClient.setQueryData<any>(["fsm-sidebar-counts"], (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          pendingVerifications: Math.max(0, (old.pendingVerifications || 1) - 1),
+        };
+      });
+
+      setIsRejectDataDialogOpen(false);
+      setRejectingDataProfile(null);
+
+      toast({
+        title: "Заявка отклонена",
+        description: `Запрос на изменение данных отклонен. Причина: ${reason}`,
+      });
+
+      // 1. Очищаем pending_data_change в profiles и фиксируем письмо-уведомление
       const { error } = await supabase
         .from("profiles")
         .update({
@@ -291,7 +347,7 @@ const VerificationManager: React.FC = () => {
             timestamp: now,
           },
         })
-        .eq("id", rejectingDataProfile.id);
+        .eq("id", targetId);
 
       if (error) throw error;
 
@@ -303,24 +359,18 @@ const VerificationManager: React.FC = () => {
             status: "cancelled",
             notes: `❌ Отклонено оператором. Причина: ${reason}`,
           })
-          .eq("client_id", rejectingDataProfile.id)
+          .eq("client_id", targetId)
           .eq("order_type", "data_change_request");
       } catch (reqErr) {
-        console.warn("[Верификация FSM] Заявка в requests не обновлена:", reqErr);
+        console.warn("[Верификация] Заявка в requests не обновлена:", reqErr);
       }
 
-      toast({
-        title: "Заявка отклонена",
-        description: `Запрос на изменение данных отклонен. Причина: ${reason}`,
-      });
-
-      setIsRejectDataDialogOpen(false);
-      setRejectingDataProfile(null);
       queryClient.invalidateQueries({ queryKey: ["verification-profiles"] });
       queryClient.invalidateQueries({ queryKey: ["fsm-sidebar-counts"] });
       queryClient.invalidateQueries({ queryKey: ["requests"] });
     } catch (err: any) {
-      console.error("[Верификация FSM] Ошибка отклонения данных:", err);
+      console.error("[Верификация] Ошибка отклонения данных:", err);
+      queryClient.invalidateQueries({ queryKey: ["verification-profiles"] });
       toast({
         title: "Ошибка отклонения",
         description: err.message,
@@ -342,14 +392,48 @@ const VerificationManager: React.FC = () => {
     });
   };
 
-  // Одобрение верификации жильца
+  // Одобрение верификации жильца (МГНОВЕННЫЙ ОТКЛИК OPTIMISTIC UI)
   const handleApprove = async (profileId: string) => {
     try {
-      console.log(`[Верификация FSM] Одобрение верификации для профиля ID: ${profileId}`);
+      console.log(`[Верификация] Мгновенное одобрение верификации для профиля ID: ${profileId}`);
       const now = new Date().toISOString();
 
-      // 1. Обновляем статус в profiles
-      const { data, error } = await supabase
+      // 0. МГНОВЕННЫЙ OPTIMISTIC UI (0 миллисекунд!):
+      // Карточка мгновенно исчезает из вкладки «Ожидают» прямо на глазах у диспетчера!
+      queryClient.setQueryData<Profile[]>(["verification-profiles"], (old) => {
+        if (!old) return [];
+        return old.map((p) =>
+          p.id === profileId
+            ? {
+                ...p,
+                is_verified: true,
+                verification_status: "verified",
+                verification_reviewed_at: now,
+                verification_reject_reason: null,
+              }
+            : p
+        );
+      });
+
+      // Мгновенно уменьшаем счетчик новых верификаций в сайдбаре
+      queryClient.setQueryData<any>(["fsm-sidebar-counts"], (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          pendingVerifications: Math.max(0, (old.pendingVerifications || 1) - 1),
+        };
+      });
+
+      // Мгновенно закрываем диалог просмотра
+      setSelectedProfile(null);
+
+      toast({
+        title: "🛡️ Пользователь верифицирован!",
+        description: "Профиль успешно подтвержден. Доступ к умному домофону открыт.",
+      });
+
+      // 1. Обновляем статус в profiles в PostgreSQL
+      const { error } = await supabase
         .from("profiles")
         .update({
           is_verified: true,
@@ -357,11 +441,9 @@ const VerificationManager: React.FC = () => {
           verification_reviewed_at: now,
           verification_reject_reason: null,
         })
-        .eq("id", profileId)
-        .select("*")
-        .single();
+        .eq("id", profileId);
 
-      if (error || !data) throw error;
+      if (error) throw error;
 
       // 2. Завершаем соответствующий наряд в requests
       try {
@@ -374,26 +456,21 @@ const VerificationManager: React.FC = () => {
           .eq("client_id", profileId)
           .eq("order_type", "verification_request");
       } catch (reqErr) {
-        console.warn("[Верификация FSM] Заявка в requests не обновлена:", reqErr);
+        console.warn("[Верификация] Заявка в requests не обновлена:", reqErr);
       }
 
-      toast({
-        title: "🛡️ Пользователь верифицирован!",
-        description: `Профиль ${data.full_name || ""} успешно подтвержден. Доступ к умному домофону открыт.`,
-      });
-
-      // Мгновенное обновление списков и счетчиков в меню
-      queryClient.invalidateQueries({ queryKey: ["verification-profiles"] });
-      queryClient.invalidateQueries({ queryKey: ["fsm-sidebar-counts"] });
-      queryClient.invalidateQueries({ queryKey: ["fsm-bottom-nav-counts"] });
+      // Синхронизация между соседними вкладками браузера
       try {
         localStorage.setItem("verification_last_update", Date.now().toString());
         window.dispatchEvent(new Event("verification_submitted"));
       } catch (e) {}
 
-      setSelectedProfile(null);
+      queryClient.invalidateQueries({ queryKey: ["verification-profiles"] });
+      queryClient.invalidateQueries({ queryKey: ["fsm-sidebar-counts"] });
     } catch (err: any) {
-      console.error("[Верификация FSM] Ошибка одобрения:", err);
+      console.error("[Верификация] Ошибка одобрения:", err);
+      // При сетевой ошибке откатываем кэш
+      queryClient.invalidateQueries({ queryKey: ["verification-profiles"] });
       toast({
         title: "Ошибка верификации",
         description: err.message || "Не удалось подтвердить пользователя.",
@@ -408,17 +485,51 @@ const VerificationManager: React.FC = () => {
     setIsRejectDialogOpen(true);
   };
 
-  // Подтверждение отклонения с фиксацией причины
+  // Подтверждение отклонения с фиксацией причины (МГНОВЕННЫЙ OPTIMISTIC UI)
   const handleConfirmReject = async () => {
     if (!selectedProfile) return;
 
     try {
       setIsRejecting(true);
       const reason = rejectReason.trim() || "Документ не прошел проверку подлинности";
-      console.log(`[Верификация FSM] Отклонение верификации для профиля ID: ${selectedProfile.id}, причина: ${reason}`);
+      const targetId = selectedProfile.id;
+      console.log(`[Верификация] Мгновенное отклонение верификации для профиля ID: ${targetId}, причина: ${reason}`);
       const now = new Date().toISOString();
 
-      // 1. Обновляем профиль: is_verified = false, verification_status = 'rejected'
+      // 0. МГНОВЕННЫЙ OPTIMISTIC UI: карточка сразу уходит из списка «Ожидают»
+      queryClient.setQueryData<Profile[]>(["verification-profiles"], (old) => {
+        if (!old) return [];
+        return old.map((p) =>
+          p.id === targetId
+            ? {
+                ...p,
+                is_verified: false,
+                verification_status: "rejected",
+                verification_reject_reason: reason,
+                verification_reviewed_at: now,
+              }
+            : p
+        );
+      });
+
+      // Мгновенно уменьшаем счетчик бейджа
+      queryClient.setQueryData<any>(["fsm-sidebar-counts"], (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          pendingVerifications: Math.max(0, (old.pendingVerifications || 1) - 1),
+        };
+      });
+
+      setIsRejectDialogOpen(false);
+      setSelectedProfile(null);
+
+      toast({
+        title: "Заявка отклонена",
+        description: `Причина отказа зафиксирована: ${reason}`,
+      });
+
+      // 1. Обновляем профиль в PostgreSQL: is_verified = false, verification_status = 'rejected'
       const { error } = await supabase
         .from("profiles")
         .update({
@@ -427,7 +538,7 @@ const VerificationManager: React.FC = () => {
           verification_reject_reason: reason,
           verification_reviewed_at: now,
         })
-        .eq("id", selectedProfile.id);
+        .eq("id", targetId);
 
       if (error) throw error;
 
@@ -438,30 +549,23 @@ const VerificationManager: React.FC = () => {
           .update({
             status: "cancelled",
           })
-          .eq("client_id", selectedProfile.id)
+          .eq("client_id", targetId)
           .eq("order_type", "verification_request");
       } catch (reqErr) {
-        console.warn("[Верификация FSM] Заявка в requests не обновлена:", reqErr);
+        console.warn("[Верификация] Заявка в requests не обновлена:", reqErr);
       }
 
-      toast({
-        title: "Заявка отклонена",
-        description: `Причина отказа зафиксирована: ${reason}`,
-      });
-
-      setIsRejectDialogOpen(false);
-      setSelectedProfile(null);
-      
-      // Мгновенное обновление списков и счетчиков в меню
-      queryClient.invalidateQueries({ queryKey: ["verification-profiles"] });
-      queryClient.invalidateQueries({ queryKey: ["fsm-sidebar-counts"] });
-      queryClient.invalidateQueries({ queryKey: ["fsm-bottom-nav-counts"] });
+      // Синхронизация между соседними вкладками
       try {
         localStorage.setItem("verification_last_update", Date.now().toString());
         window.dispatchEvent(new Event("verification_submitted"));
       } catch (e) {}
+
+      queryClient.invalidateQueries({ queryKey: ["verification-profiles"] });
+      queryClient.invalidateQueries({ queryKey: ["fsm-sidebar-counts"] });
     } catch (err: any) {
-      console.error("[Верификация FSM] Ошибка отклонения:", err);
+      console.error("[Верификация] Ошибка отклонения:", err);
+      queryClient.invalidateQueries({ queryKey: ["verification-profiles"] });
       toast({
         title: "Ошибка отклонения",
         description: err.message,

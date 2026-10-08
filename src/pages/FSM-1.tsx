@@ -32,7 +32,7 @@ import AddressesManager from "@/components/fsm/AddressesManager";
 import { AccountsManager } from "@/components/admin/AccountsManager";
 import IntercomLoginsManager from "@/components/fsm/IntercomLoginsManager";
 import InstallerSheetManager from "@/components/crm/InstallerSheetManager";
-import VerificationManager from "@/components/fsm/VerificationManager";
+import VerificationManager from "@/components/crm/VerificationManager";
 import FSMBottomNav from "@/components/fsm/FSMBottomNav";
 import { FSMSidebar } from "@/components/fsm/FSMSidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";

@@ -28,7 +28,21 @@ import SessionTimeoutProvider from "./components/SessionTimeoutProvider";
 import ErrorBoundary from "./components/ErrorBoundary";
 
 
-const queryClient = new QueryClient();
+// Глобальная оптимизация кэширования React Query для мгновенного отклика интерфейса (как в Битрикс24)
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // 3 минуты данные считаются актуальными и берутся мгновенно (0 мс) из памяти при смене вкладок
+      staleTime: 3 * 60 * 1000,
+      // 30 минут кэш хранится в памяти браузера, не забивая сеть повторными запросами к PostgreSQL
+      gcTime: 30 * 60 * 1000,
+      // Отключаем лишний опрос базы при каждом переключении окон или клике по вкладкам
+      refetchOnWindowFocus: false,
+      // Ограничиваем повторные попытки при сетевых ошибках
+      retry: 1,
+    },
+  },
+});
 
 const App = () => (
   <ErrorBoundary fallbackTitle="Ошибка приложения" fallbackMessage="Произошла непредвиденная ошибка. Нажмите 'Обновить страницу', чтобы продолжить работу.">

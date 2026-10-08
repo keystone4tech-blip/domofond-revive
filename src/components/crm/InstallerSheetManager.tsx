@@ -322,11 +322,11 @@ export const InstallerSheetManager: React.FC = () => {
     setSelectedEntrance("all");
   };
 
-  // 2. Загрузка всех заказов оборудования
+  // 2. Загрузка всех заказов оборудования (с умным кэшированием и легким фоновым опросом)
   const { data: rawOrders, isLoading: isOrdersLoading } = useQuery({
     queryKey: ["equipment-orders-all"],
     queryFn: async () => {
-      console.log("[Лист монтажника] Загрузка заказов оборудования...");
+      console.log("[Лист монтажника] Фоновая загрузка заказов оборудования...");
       const { data, error } = await supabase
         .from("requests")
         .select("*")
@@ -335,13 +335,15 @@ export const InstallerSheetManager: React.FC = () => {
       if (error) throw error;
       return (data || []) as EquipmentOrder[];
     },
+    staleTime: 3 * 60 * 1000, // 3 минуты данные мгновенно берутся из оперативной памяти
+    refetchInterval: 15 * 1000, // Каждые 15 сек тихий фоновый опрос для режима онлайн
   });
 
   // 3. Загрузка позиций заказов
   const { data: requestItems } = useQuery({
     queryKey: ["equipment-request-items"],
     queryFn: async () => {
-      console.log("[Лист монтажника] Загрузка позиций товаров и услуг...");
+      console.log("[Лист монтажника] Фоновая загрузка позиций товаров и услуг...");
       const { data, error } = await supabase
         .from("request_items")
         .select(`
@@ -351,6 +353,8 @@ export const InstallerSheetManager: React.FC = () => {
       if (error) throw error;
       return (data || []) as RequestItem[];
     },
+    staleTime: 3 * 60 * 1000, // 3 минуты в кэше
+    refetchInterval: 20 * 1000,
   });
 
   // Загрузка адресов квартир из accounts для автоопределения подъезда по номеру квартиры для всех объектов
@@ -368,7 +372,7 @@ export const InstallerSheetManager: React.FC = () => {
       }
       return data || [];
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 10 * 60 * 1000, // 10 минут в кэше (справочник редко меняется)
   });
 
   // Загрузка оплаченных учетных данных умного домофона (Личный кабинет) по всей компании
@@ -699,6 +703,25 @@ export const InstallerSheetManager: React.FC = () => {
     };
   };
 
+  // Высокоскоростной хеш-индекс квартир O(1): группирует адреса по номеру квартиры
+  // Сокращает объем перебора с 50 000 записей до 1-2 кандидатов, исключая подвисание интерфейса
+  const accountsByAptIndex = useMemo(() => {
+    const map = new Map<string, { addressLower: string; entrance: string }[]>();
+    if (!allAccounts || allAccounts.length === 0) return map;
+
+    allAccounts.forEach(a => {
+      const aptClean = (a.apartment || "").trim().replace(/\D/g, "");
+      if (!aptClean || !a.address) return;
+      const matchEnt = a.address.match(/(?:п\.|п|подъезд)\s*(\d+)/i);
+      if (!matchEnt) return;
+
+      const list = map.get(aptClean) || [];
+      list.push({ addressLower: a.address.toLowerCase(), entrance: matchEnt[1] });
+      map.set(aptClean, list);
+    });
+    return map;
+  }, [allAccounts]);
+
   // Привязываем позиции к заказам и парсим адресные поля при отсутствии
   const enrichedOrders = useMemo(() => {
     if (!rawOrders) return [];
@@ -742,27 +765,26 @@ export const InstallerSheetManager: React.FC = () => {
         }
       }
 
-      // Если подъезд не указан в заказе, автоопределяем его из базы лицевых счетов
-      if (!e && apt && allAccounts && allAccounts.length > 0) {
+      // Высокоскоростное автоопределение подъезда через сгруппированный хеш-индекс (O(1) вместо 50,000 итераций)
+      if (!e && apt && accountsByAptIndex.size > 0) {
         const cleanApt = apt.replace(/\D/g, "");
-        const foundAcc = allAccounts.find(a => {
-          const aClean = (a.apartment || "").trim().replace(/\D/g, "");
-          if (aClean !== cleanApt) return false;
-          const addrLower = (a.address || "").toLowerCase();
-          if (s) {
-            const cleanStreet = s.replace(/[()\/.,]/g, " ").toLowerCase();
-            const streetWords = cleanStreet.split(/\s+/).filter(w => w.length > 2 && !["ул", "улица", "пос", "пер", "проезд"].includes(w));
-            const matchesStreet = streetWords.some(w => addrLower.includes(w));
-            if (!matchesStreet) return false;
+        const candidates = accountsByAptIndex.get(cleanApt);
+        if (candidates && candidates.length > 0) {
+          const matched = candidates.find(cand => {
+            if (s) {
+              const cleanStreet = s.replace(/[()\/.,]/g, " ").toLowerCase();
+              const streetWords = cleanStreet.split(/\s+/).filter(w => w.length > 2 && !["ул", "улица", "пос", "пер", "проезд"].includes(w));
+              const matchesStreet = streetWords.some(w => cand.addressLower.includes(w));
+              if (!matchesStreet) return false;
+            }
+            if (h && !cand.addressLower.includes(h.toLowerCase())) {
+              return false;
+            }
+            return true;
+          });
+          if (matched) {
+            e = matched.entrance;
           }
-          if (h && !addrLower.includes(h.toLowerCase())) {
-            return false;
-          }
-          return true;
-        });
-        if (foundAcc) {
-          const matchEnt = foundAcc.address.match(/(?:п\.|п|подъезд)\s*(\d+)/i);
-          if (matchEnt) e = matchEnt[1];
         }
       }
 
@@ -775,7 +797,7 @@ export const InstallerSheetManager: React.FC = () => {
         items,
       };
     });
-  }, [rawOrders, requestItems, allAccounts, addressData]);
+  }, [rawOrders, requestItems, accountsByAptIndex, addressData]);
 
   // 4. Фильтрация заказов по выбранному дому, подъезду, статусу оплаты и мгновенному онлайн-поиску
   const filteredOrders = useMemo(() => {
