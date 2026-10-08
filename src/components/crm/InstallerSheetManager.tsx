@@ -28,6 +28,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import RequestDetails from "./RequestDetails";
 
 // Иконки
 import {
@@ -45,6 +52,11 @@ import {
   FileSpreadsheet,
   Check,
   Loader2,
+  Eye,
+  FileText,
+  Layers,
+  ChevronRight,
+  ExternalLink,
 } from "lucide-react";
 
 // Интерфейс позиции заказа
@@ -80,6 +92,14 @@ interface EquipmentOrder {
   payment_amount: number | null;
   payment_method: string | null;
   created_at: string;
+  updated_at?: string;
+  assigned_to?: string | null;
+  accepted_by?: string | null;
+  accepted_at?: string | null;
+  completed_at?: string | null;
+  notes?: string | null;
+  assigned_employee?: { id: string; full_name: string; phone: string | null } | null;
+  accepted_employee?: { id: string; full_name: string; phone: string | null } | null;
   items?: RequestItem[];
 }
 
@@ -95,6 +115,13 @@ export const InstallerSheetManager: React.FC = () => {
   const [selectedServiceType, setSelectedServiceType] = useState<string>("all"); // "all", "installation", "maintenance", "rent"
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [onlyPaid, setOnlyPaid] = useState<boolean>(true); // По умолчанию только оплаченные
+
+  // Иерархическая навигация по вкладкам: активный дом и активный подъезд
+  const [selectedHouseKey, setSelectedHouseKey] = useState<string | null>(null);
+  const [activeEntranceTab, setActiveEntranceTab] = useState<string>("all"); // "all" или номер подъезда
+
+  // Состояние модального окна наряда (заявка для открытия в RequestDetails)
+  const [selectedOrderForModal, setSelectedOrderForModal] = useState<EquipmentOrder | null>(null);
 
   // 1. Загрузка справочника адресов (из подъездов entrances и существующих заявок requests)
   const { data: addressData, isLoading: isAddressesLoading } = useQuery({
@@ -295,6 +322,7 @@ export const InstallerSheetManager: React.FC = () => {
   }, [allCredentials]);
 
   // Универсальный надежный парсер позиций заказа (из связанных items или текста message)
+  // ВАЖНО: Строго исключает «Личный кабинет» из графы трубок/ТКП
   const parseOrderDetails = (order: EquipmentOrder, isCredPurchased: boolean) => {
     const keysList: string[] = [];
     let keysCount = 0;
@@ -307,30 +335,115 @@ export const InstallerSheetManager: React.FC = () => {
 
     let hasApp = isCredPurchased;
 
+    // Вспомогательная функция: проверка принадлежности к Личному кабинету / приложению
+    const isAppItem = (name: string, cat?: string | null): boolean => {
+      const lower = name.toLowerCase();
+      const catLower = (cat || "").toLowerCase();
+      return (
+        lower.includes("личный кабинет") ||
+        lower.includes("приложение") ||
+        lower.includes("умный дом") ||
+        lower.includes("логин") ||
+        lower.includes("пароль") ||
+        lower.includes("доступ в лк") ||
+        lower.includes("подключение к приложению") ||
+        catLower.includes("app")
+      );
+    };
+
+    // Вспомогательная функция: проверка ключей (исключаем выключатели, переключатели)
+    const isKeyItem = (name: string, cat?: string | null): boolean => {
+      const lower = name.toLowerCase();
+      const catLower = (cat || "").toLowerCase();
+      return (
+        catLower === "key" ||
+        (/(?:^|\s)ключ/i.test(lower) &&
+          !lower.includes("выключатель") &&
+          !lower.includes("переключатель") &&
+          !lower.includes("подключ"))
+      );
+    };
+
+    // Вспомогательная функция: проверка переговорных трубок и ТКП (квартирное оборудование)
+    const isHandsetItem = (name: string, cat?: string | null): boolean => {
+      // Личный кабинет, ключи и услуги ни при каких условиях не могут быть трубкой
+      if (isAppItem(name, cat) || isKeyItem(name, cat)) return false;
+
+      const lower = name.toLowerCase();
+      const catLower = (cat || "").toLowerCase();
+
+      // Явные ключевые слова для трубок / ТКП / мониторов
+      const isExplicitHandset =
+        lower.includes("ткп") ||
+        lower.includes("трубк") ||
+        lower.includes("аудиотрубк") ||
+        lower.includes("видеомонитор") ||
+        lower.includes("монитор") ||
+        lower.includes("укп") ||
+        lower.includes("vizit") ||
+        lower.includes("визит") ||
+        lower.includes("цифрал") ||
+        lower.includes("cyfral") ||
+        lower.includes("метаком") ||
+        lower.includes("metakom") ||
+        lower.includes("факториал");
+
+      if (isExplicitHandset) return true;
+
+      // Если в категории указано equipment, но это не общеподъездная панель, замок или кнопка
+      if (catLower === "equipment") {
+        const isCommonHardware =
+          lower.includes("панель") ||
+          lower.includes("бвд") ||
+          lower.includes("бп") ||
+          lower.includes("коммутатор") ||
+          lower.includes("доводчик") ||
+          lower.includes("замок") ||
+          lower.includes("кнопк");
+        return !isCommonHardware;
+      }
+
+      return false;
+    };
+
     // 1. Сначала извлекаем из связанных позиций request_items
     if (order.items && order.items.length > 0) {
       order.items.forEach(item => {
         const name = (item.product?.name || "Товар").trim();
-        const cat = (item.product?.category || "").toLowerCase();
+        const cat = item.product?.category || "";
         const lower = name.toLowerCase();
 
-        // RULE 2: Надежная проверка ключей домофона (исключаем выключатели, переключатели и подключения)
-        const isKey = cat === "key" || (/(?:^|\s)ключ/i.test(lower) && !lower.includes("выключатель") && !lower.includes("переключатель") && !lower.includes("подключ"));
-        if (isKey) {
+        // 1.1 Личный кабинет / мобильное приложение (строгий приоритет)
+        if (isAppItem(name, cat)) {
+          hasApp = true;
+          return;
+        }
+
+        // 1.2 Ключи домофона
+        if (isKeyItem(name, cat)) {
           keysList.push(`${name}: ${item.quantity} шт.`);
           keysCount += item.quantity;
-        } else if (cat === "equipment" || lower.includes("ткп") || lower.includes("трубк") || lower.includes("домофон") || lower.includes("панель")) {
+          return;
+        }
+
+        // 1.3 Переговорная трубка / ТКП
+        if (isHandsetItem(name, cat)) {
           handsetsList.push(`${name} (${item.quantity} шт.)`);
           handsetsCount += item.quantity;
-        } else if (cat === "service" || lower.includes("установк") || lower.includes("монтаж") || lower.includes("замен") || lower.includes("подключ")) {
+          return;
+        }
+
+        // 1.4 Услуги монтажа / подключения
+        const catLower = cat.toLowerCase();
+        if (catLower === "service" || lower.includes("установк") || lower.includes("монтаж") || lower.includes("замен") || lower.includes("подключ")) {
           servicesList.push(item.quantity > 1 ? `${name} (${item.quantity} шт.)` : name);
           servicesCount += item.quantity;
-        } else if (lower.includes("личный кабинет") || lower.includes("приложение") || lower.includes("логин") || lower.includes("умный дом")) {
-          hasApp = true;
-        } else {
-          servicesList.push(`${name} (${item.quantity} шт.)`);
-          servicesCount += item.quantity;
+          return;
         }
+
+        // Прочие позиции
+        servicesList.push(`${name} (${item.quantity} шт.)`);
+        servicesCount += item.quantity;
       });
     }
 
@@ -344,38 +457,41 @@ export const InstallerSheetManager: React.FC = () => {
         }
         const lowerLine = line.toLowerCase();
 
-        // Проверка Личного кабинета / приложения
-        if (lowerLine.includes("личный кабинет") || lowerLine.includes("приложение") || lowerLine.includes("умный дом") || lowerLine.includes("логин")) {
+        // 2.1 Проверка Личного кабинета / приложения
+        if (isAppItem(lowerLine)) {
           hasApp = true;
+          continue; // Ни в коем случае не обрабатывать как оборудование!
         }
 
-        // Оборудование / трубки
-        if (handsetsList.length === 0 && (lowerLine.includes("оборудование") || lowerLine.includes("трубк") || lowerLine.includes("ткп"))) {
-          const clean = line.replace(/^[—\-*•\s]*(?:Оборудование|Трубка)[^:]*:\s*/i, "").trim();
+        // 2.2 Ключи
+        if (isKeyItem(lowerLine)) {
+          if (keysList.length === 0) {
+            const clean = line.replace(/^[—\-*•\s]*(?:Ключи|Ключ)[^:]*:\s*/i, "").trim();
+            const qtyMatch = clean.match(/\((\d+)\s*шт/i) || clean.match(/:\s*(\d+)\s*шт/i);
+            const qty = qtyMatch ? parseInt(qtyMatch[1], 10) : 1;
+            const name = clean.replace(/\s*\([^)]*\).*/, "").replace(/:\s*\d+\s*шт.*/, "").trim();
+            if (name) {
+              keysList.push(`${name}: ${qty} шт.`);
+              keysCount += qty;
+            }
+          }
+          continue;
+        }
+
+        // 2.3 Переговорные трубки / ТКП (только если не приложение и не ключ)
+        if (handsetsList.length === 0 && isHandsetItem(lowerLine)) {
+          const clean = line.replace(/^[—\-*•\s]*(?:Оборудование|Трубка|ТКП)[^:]*:\s*/i, "").trim();
           const qtyMatch = clean.match(/\((\d+)\s*шт/i);
           const qty = qtyMatch ? parseInt(qtyMatch[1], 10) : 1;
           const name = clean.replace(/\s*\([^)]*\).*/, "").trim();
-          if (name) {
+          if (name && !isAppItem(name)) {
             handsetsList.push(`${name} (${qty} шт.)`);
             handsetsCount += qty;
           }
           continue;
         }
 
-        // Ключи (с защитой от слов 'выключатель', 'переключатель', 'подключение')
-        if (keysList.length === 0 && /(?:^|\s)ключ/i.test(lowerLine) && !lowerLine.includes("выключатель") && !lowerLine.includes("переключатель") && !lowerLine.includes("подключ")) {
-          const clean = line.replace(/^[—\-*•\s]*(?:Ключи|Ключ)[^:]*:\s*/i, "").trim();
-          const qtyMatch = clean.match(/\((\d+)\s*шт/i);
-          const qty = qtyMatch ? parseInt(qtyMatch[1], 10) : 1;
-          const name = clean.replace(/\s*\([^)]*\).*/, "").trim();
-          if (name) {
-            keysList.push(`${name}: ${qty} шт.`);
-            keysCount += qty;
-          }
-          continue;
-        }
-
-        // Услуги монтажа
+        // 2.4 Услуги монтажа
         if (servicesList.length === 0 && (lowerLine.includes("услуг") || lowerLine.includes("установк") || lowerLine.includes("монтаж") || lowerLine.includes("замен"))) {
           const clean = line.replace(/^[—\-*•\s]*(?:Услуга|Услуги)[^:]*:\s*/i, "").trim();
           const qtyMatch = clean.match(/\((\d+)\s*шт/i);
@@ -798,6 +914,30 @@ export const InstallerSheetManager: React.FC = () => {
       totalRevenue,
     };
   }, [displayedHouses]);
+
+  // 7.1 Активный дом для вкладочной навигации (Дома -> Подъезды -> Квартиры)
+  const activeHouse = useMemo(() => {
+    if (displayedHouses.length === 0) return null;
+    if (selectedHouseKey) {
+      const found = displayedHouses.find(h => h.houseKey === selectedHouseKey);
+      if (found) return found;
+    }
+    return displayedHouses[0];
+  }, [displayedHouses, selectedHouseKey]);
+
+  // Автоматическая синхронизация выбранного дома при смене фильтров
+  React.useEffect(() => {
+    if (displayedHouses.length > 0) {
+      const exists = displayedHouses.some(h => h.houseKey === selectedHouseKey);
+      if (!exists) {
+        setSelectedHouseKey(displayedHouses[0].houseKey);
+        setActiveEntranceTab("all");
+      }
+    } else {
+      setSelectedHouseKey(null);
+      setActiveEntranceTab("all");
+    }
+  }, [displayedHouses, selectedHouseKey]);
 
   // 7. Мутация смены статуса выполнения наряда
   const updateStatusMutation = useMutation({
@@ -1305,52 +1445,122 @@ export const InstallerSheetManager: React.FC = () => {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-6">
-          {displayedHouses.map((houseGroup) => (
-            <Card key={houseGroup.houseKey} className="border-slate-200/80 dark:border-slate-800/80 shadow-md overflow-hidden bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm">
-              {/* Заголовок дома: темный фон dark:bg-slate-800/70 для идеальной видимости белого текста */}
+        <div className="space-y-5">
+          {/* УРОВЕНЬ 1: Вкладки домов со сводной информацией */}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-primary" />
+                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  Дома в работе ({displayedHouses.length})
+                </span>
+              </div>
+              <span className="text-[11px] text-muted-foreground hidden sm:inline">
+                Выберите дом для просмотра подъездов и квартир
+              </span>
+            </div>
+
+            {/* Горизонтальная лента вкладок домов */}
+            <div className="flex gap-2.5 overflow-x-auto pb-2 pt-0.5 scrollbar-thin">
+              {displayedHouses.map((hg) => {
+                const isSelected = activeHouse?.houseKey === hg.houseKey;
+                return (
+                  <button
+                    key={hg.houseKey}
+                    onClick={() => {
+                      setSelectedHouseKey(hg.houseKey);
+                      setActiveEntranceTab("all");
+                    }}
+                    className={cn(
+                      "text-left p-3 rounded-xl border transition-all shrink-0 flex flex-col justify-between gap-2 min-w-[220px] sm:min-w-[260px]",
+                      isSelected
+                        ? "bg-primary/10 border-primary text-foreground shadow-md ring-2 ring-primary/40 dark:bg-primary/20"
+                        : "bg-white/80 dark:bg-slate-900/80 border-slate-200/80 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700 text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-1.5 w-full">
+                      <span className="font-bold text-sm text-foreground line-clamp-1">
+                        {hg.fullAddress}
+                      </span>
+                      {renderServiceTypeBadge(hg.serviceType, true)}
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 text-xs w-full pt-1 border-t border-slate-100 dark:border-slate-800/60">
+                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-semibold">
+                        {hg.stats.apartmentsCount} кв. ({hg.entrances.length} п.)
+                      </Badge>
+
+                      <div className="flex items-center gap-2 text-[11px]">
+                        {hg.stats.totalHandsets > 0 && (
+                          <span className="text-purple-600 dark:text-purple-400 font-semibold" title="Трубок">
+                            📞 {hg.stats.totalHandsets}
+                          </span>
+                        )}
+                        {hg.stats.totalKeys > 0 && (
+                          <span className="text-amber-600 dark:text-amber-400 font-semibold" title="Ключей">
+                            🔑 {hg.stats.totalKeys}
+                          </span>
+                        )}
+                        <span className="font-extrabold text-foreground ml-1">
+                          {hg.stats.totalRevenue.toFixed(0)} ₽
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* УРОВЕНЬ 2: Выбранный дом и его подъезды */}
+          {activeHouse && (
+            <Card className="border-slate-200/80 dark:border-slate-800/80 shadow-md overflow-hidden bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm">
+              {/* Шапка активного дома */}
               <CardHeader className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-800/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div className="space-y-1">
+                <div className="space-y-1.5">
                   <div className="flex flex-wrap items-center gap-2">
                     <Building2 className="h-5 w-5 text-primary shrink-0" />
                     <CardTitle className="text-base sm:text-lg font-black text-foreground">
-                      {houseGroup.fullAddress}
+                      {activeHouse.fullAddress}
                     </CardTitle>
-                    {renderServiceTypeBadge(houseGroup.serviceType)}
+                    {renderServiceTypeBadge(activeHouse.serviceType)}
                   </div>
-                  <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
                     <Badge variant="secondary" className="font-bold">
-                      {houseGroup.stats.apartmentsCount} {houseGroup.stats.apartmentsCount === 1 ? "заказ" : "заказов"}
+                      {activeHouse.stats.apartmentsCount} {activeHouse.stats.apartmentsCount === 1 ? "квартира" : "квартир"}
                     </Badge>
-                    {houseGroup.stats.totalHandsets > 0 && (
+                    <Badge variant="outline" className="font-semibold">
+                      {activeHouse.entrances.length} {activeHouse.entrances.length === 1 ? "подъезд" : "подъездов"}
+                    </Badge>
+                    {activeHouse.stats.totalHandsets > 0 && (
                       <Badge variant="outline" className="text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800/60 bg-purple-50 dark:bg-purple-950/40">
                         <Radio className="h-3 w-3 mr-1 inline" />
-                        Трубок: {houseGroup.stats.totalHandsets} шт.
+                        Трубок: {activeHouse.stats.totalHandsets} шт.
                       </Badge>
                     )}
-                    {houseGroup.stats.totalKeys > 0 && (
+                    {activeHouse.stats.totalKeys > 0 && (
                       <Badge variant="outline" className="text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/40">
                         <KeyRound className="h-3 w-3 mr-1 inline" />
-                        Ключей: {houseGroup.stats.totalKeys} шт.
+                        Ключей: {activeHouse.stats.totalKeys} шт.
                       </Badge>
                     )}
-                    {houseGroup.stats.totalApps > 0 && (
+                    {activeHouse.stats.totalApps > 0 && (
                       <Badge variant="outline" className="text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-950/40">
                         <CheckCircle2 className="h-3 w-3 mr-1 inline" />
-                        ЛК (+): {houseGroup.stats.totalApps}
+                        ЛК (+): {activeHouse.stats.totalApps}
                       </Badge>
                     )}
                     <span className="font-extrabold text-foreground ml-1">
-                      {houseGroup.stats.totalRevenue.toFixed(0)} ₽
+                      {activeHouse.stats.totalRevenue.toFixed(0)} ₽
                     </span>
                   </div>
                 </div>
 
-                {/* Кнопка экспорта именно этого дома */}
+                {/* Кнопка выгрузки Excel именно по этому дому */}
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => handleExportExcel(houseGroup)}
+                  onClick={() => handleExportExcel(activeHouse)}
                   className="gap-1.5 text-xs font-bold border-emerald-600/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 shrink-0"
                 >
                   <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" />
@@ -1358,217 +1568,346 @@ export const InstallerSheetManager: React.FC = () => {
                 </Button>
               </CardHeader>
 
-              {/* Секции по каждому подъезду дома */}
-              <CardContent className="p-0 divide-y divide-slate-100 dark:divide-slate-800">
-                {houseGroup.entrances.map((entGroup) => (
-                  <div key={entGroup.entrance} className="p-4 sm:p-5 space-y-3">
-                    {/* Заголовок подъезда */}
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <DoorClosed className="h-4 w-4 text-primary shrink-0" />
-                        <h3 className="font-bold text-sm text-foreground">
-                          {entGroup.entrance === "Без подъезда" ? "Подъезд не указан" : `Подъезд №${entGroup.entrance}`}
-                        </h3>
-                        {renderServiceTypeBadge(entGroup.serviceType, true)}
-                        <Badge variant="secondary" className="text-[11px] font-semibold">
-                          {entGroup.orders.length} {entGroup.orders.length === 1 ? "квартира" : "квартир"}
+              {/* Вкладки подъездов выбранного дома */}
+              <div className="p-3 sm:p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-850/50">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-semibold text-muted-foreground mr-1 flex items-center gap-1">
+                    <DoorClosed className="h-3.5 w-3.5 text-primary" />
+                    Подъезды:
+                  </span>
+                  {/* Кнопка "Все подъезды" */}
+                  <button
+                    onClick={() => setActiveEntranceTab("all")}
+                    className={cn(
+                      "px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border",
+                      activeEntranceTab === "all"
+                        ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                        : "bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <span>Все подъезды</span>
+                    <Badge
+                      variant="secondary"
+                      className={cn(
+                        "text-[10px] px-1.5 py-0",
+                        activeEntranceTab === "all" ? "bg-primary-foreground/20 text-white" : ""
+                      )}
+                    >
+                      {activeHouse.stats.apartmentsCount}
+                    </Badge>
+                  </button>
+
+                  {/* Кнопки отдельных подъездов */}
+                  {activeHouse.entrances.map((entGroup) => {
+                    const isTabActive = activeEntranceTab === entGroup.entrance;
+                    return (
+                      <button
+                        key={entGroup.entrance}
+                        onClick={() => setActiveEntranceTab(entGroup.entrance)}
+                        className={cn(
+                          "px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border",
+                          isTabActive
+                            ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                            : "bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        <DoorClosed className="h-3.5 w-3.5" />
+                        <span>
+                          {entGroup.entrance === "Без подъезда" ? "Без подъезда" : `Подъезд №${entGroup.entrance}`}
+                        </span>
+                        <Badge
+                          variant="secondary"
+                          className={cn(
+                            "text-[10px] px-1.5 py-0",
+                            isTabActive ? "bg-primary-foreground/20 text-white" : ""
+                          )}
+                        >
+                          {entGroup.orders.length}
                         </Badge>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* УРОВЕНЬ 3: Компактная таблица нарядов квартир */}
+              <CardContent className="p-0">
+                {activeHouse.entrances
+                  .filter((entGroup) => activeEntranceTab === "all" || activeEntranceTab === entGroup.entrance)
+                  .map((entGroup) => (
+                    <div key={entGroup.entrance} className="border-b last:border-b-0 border-slate-100 dark:border-slate-800">
+                      {/* Шапка секции подъезда */}
+                      <div className="px-4 py-2.5 bg-slate-100/60 dark:bg-slate-800/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-slate-200/50 dark:border-slate-800/50">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <DoorClosed className="h-4 w-4 text-primary shrink-0" />
+                          <h3 className="font-extrabold text-sm text-foreground">
+                            {entGroup.entrance === "Без подъезда" ? "Подъезд не указан" : `Подъезд №${entGroup.entrance}`}
+                          </h3>
+                          {renderServiceTypeBadge(entGroup.serviceType, true)}
+                          <Badge variant="secondary" className="text-[11px] font-semibold">
+                            {entGroup.orders.length} {entGroup.orders.length === 1 ? "квартира" : "квартир"}
+                          </Badge>
+                        </div>
+
+                        {/* Сводка по подъезду */}
+                        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                          {entGroup.stats.totalHandsets > 0 && (
+                            <span>Трубок: <strong className="text-foreground">{entGroup.stats.totalHandsets}</strong></span>
+                          )}
+                          {entGroup.stats.totalKeys > 0 && (
+                            <span>Ключей: <strong className="text-foreground">{entGroup.stats.totalKeys}</strong></span>
+                          )}
+                          {entGroup.stats.totalApps > 0 && (
+                            <span>ЛК: <strong className="text-foreground">{entGroup.stats.totalApps}</strong></span>
+                          )}
+                          <span>Сумма: <strong className="text-foreground">{entGroup.stats.totalRevenue.toFixed(0)} ₽</strong></span>
+                        </div>
                       </div>
 
-                      {/* Мини-сводка подъезда */}
-                      <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                        {entGroup.stats.totalHandsets > 0 && <span>Трубок: <strong className="text-foreground">{entGroup.stats.totalHandsets}</strong></span>}
-                        {entGroup.stats.totalKeys > 0 && <span>Ключей: <strong className="text-foreground">{entGroup.stats.totalKeys}</strong></span>}
-                        {entGroup.stats.totalApps > 0 && <span>ЛК: <strong className="text-foreground">{entGroup.stats.totalApps}</strong></span>}
-                        <span>Сумма: <strong className="text-foreground">{entGroup.stats.totalRevenue.toFixed(0)} ₽</strong></span>
+                      {/* Компактная таблица нарядов в стиле раздела заявок */}
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs text-left border-collapse">
+                          <thead className="text-[11px] font-bold uppercase bg-slate-50 dark:bg-slate-850 text-muted-foreground border-b border-slate-200/60 dark:border-slate-800/60">
+                            <tr>
+                              <th className="px-3 py-2 text-center w-12 font-extrabold">Кв.</th>
+                              {activeEntranceTab === "all" && (
+                                <th className="px-2 py-2 text-center w-14 font-semibold">Подъезд</th>
+                              )}
+                              <th className="px-3 py-2 font-semibold">Абонент / Телефон</th>
+                              <th className="px-3 py-2 font-semibold">Трубка (ТКП)</th>
+                              <th className="px-3 py-2 font-semibold">Ключи</th>
+                              <th className="px-2 py-2 text-center font-semibold">ЛК</th>
+                              <th className="px-2 py-2 text-center font-semibold">Монтаж</th>
+                              <th className="px-3 py-2 text-right font-semibold">Сумма</th>
+                              <th className="px-3 py-2 text-center font-semibold">Статус</th>
+                              <th className="px-3 py-2 text-center w-24 font-semibold">Наряд</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 bg-white dark:bg-slate-900/60">
+                            {entGroup.orders.map((order) => {
+                              const isCompleted = order.status === "completed";
+                              const isPaid = order.payment_status === "paid";
+                              const isCredPurchased = Boolean(
+                                purchasedAppsMap.get(`${(order.street || "").toLowerCase()}___${(order.house || "").toLowerCase()}___${(order.apartment || "").trim().toLowerCase()}`) ||
+                                purchasedAppsMap.get((order.apartment || "").trim())
+                              );
+                              const parsed = parseOrderDetails(order, isCredPurchased);
+
+                              return (
+                                <tr
+                                  key={order.id}
+                                  onClick={() => setSelectedOrderForModal(order)}
+                                  className={cn(
+                                    "cursor-pointer hover:bg-primary/[0.06] transition-colors group",
+                                    isCompleted && "bg-green-500/[0.03] dark:bg-green-500/[0.02]"
+                                  )}
+                                  title="Нажмите, чтобы открыть подробный наряд"
+                                >
+                                  {/* Номер квартиры */}
+                                  <td className="px-3 py-2 text-center font-black text-sm text-foreground font-mono bg-slate-50/40 dark:bg-slate-800/30">
+                                    {order.apartment || "—"}
+                                  </td>
+
+                                  {/* Подъезд (если смотрим все подъезды) */}
+                                  {activeEntranceTab === "all" && (
+                                    <td className="px-2 py-2 text-center font-semibold text-muted-foreground text-xs">
+                                      {order.entrance ? `п. ${order.entrance}` : "—"}
+                                    </td>
+                                  )}
+
+                                  {/* Абонент и телефон */}
+                                  <td className="px-3 py-2">
+                                    <div className="font-bold text-foreground text-xs flex items-center gap-1.5 truncate max-w-[180px]">
+                                      <User className="h-3 w-3 text-primary shrink-0" />
+                                      <span className="truncate">{order.name || "Абонент"}</span>
+                                    </div>
+                                    {order.phone && (
+                                      <a
+                                        href={`tel:${order.phone}`}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="text-[11px] text-primary hover:underline font-medium flex items-center gap-1 mt-0.5"
+                                      >
+                                        <Phone className="h-2.5 w-2.5" />
+                                        <span>{order.phone}</span>
+                                      </a>
+                                    )}
+                                  </td>
+
+                                  {/* Трубка (ТКП) — строго без личного кабинета */}
+                                  <td className="px-3 py-2">
+                                    {parsed.handset !== "—" ? (
+                                      <Badge
+                                        variant="outline"
+                                        className="text-[11px] py-0.5 px-2 font-semibold text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/40"
+                                      >
+                                        <Radio className="h-2.5 w-2.5 mr-1 inline shrink-0" />
+                                        <span>{parsed.handset}</span>
+                                      </Badge>
+                                    ) : (
+                                      <span className="text-muted-foreground text-xs">—</span>
+                                    )}
+                                  </td>
+
+                                  {/* Ключи */}
+                                  <td className="px-3 py-2">
+                                    {parsed.keys !== "—" ? (
+                                      <Badge
+                                        variant="outline"
+                                        className="text-[11px] py-0.5 px-2 font-semibold text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40"
+                                      >
+                                        <KeyRound className="h-2.5 w-2.5 mr-1 inline shrink-0" />
+                                        <span>{parsed.keys}</span>
+                                      </Badge>
+                                    ) : (
+                                      <span className="text-muted-foreground text-xs">—</span>
+                                    )}
+                                  </td>
+
+                                  {/* Личный кабинет */}
+                                  <td className="px-2 py-2 text-center">
+                                    {parsed.hasApp ? (
+                                      <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white font-extrabold text-[10px] py-0 px-1.5">
+                                        ✓ ЛК
+                                      </Badge>
+                                    ) : (
+                                      <span className="text-muted-foreground text-xs">—</span>
+                                    )}
+                                  </td>
+
+                                  {/* Монтаж / Услуга */}
+                                  <td className="px-2 py-2 text-center">
+                                    {parsed.services === "Монтаж" ? (
+                                      <Badge className="bg-blue-600 hover:bg-blue-600 text-white font-bold text-[10px] py-0 px-1.5">
+                                        Монтаж
+                                      </Badge>
+                                    ) : parsed.services === "Замена" ? (
+                                      <Badge variant="outline" className="text-amber-700 dark:text-amber-300 border-amber-300 bg-amber-50 dark:bg-amber-950/40 font-bold text-[10px] py-0 px-1.5">
+                                        Замена
+                                      </Badge>
+                                    ) : parsed.services !== "—" ? (
+                                      <Badge variant="secondary" className="text-[10px] py-0 px-1.5 font-medium">
+                                        {parsed.services}
+                                      </Badge>
+                                    ) : (
+                                      <span className="text-muted-foreground text-xs">—</span>
+                                    )}
+                                  </td>
+
+                                  {/* Сумма и статус оплаты */}
+                                  <td className="px-3 py-2 text-right">
+                                    <div className="font-extrabold text-foreground text-xs">
+                                      {Number(order.payment_amount || 0).toFixed(0)} ₽
+                                    </div>
+                                    <div className="mt-0.5">
+                                      {isPaid ? (
+                                        <span className="text-[10px] font-semibold text-green-600 dark:text-green-400">
+                                          ✓ Оплачено
+                                        </span>
+                                      ) : (
+                                        <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+                                          ⏳ Ожидает
+                                        </span>
+                                      )}
+                                    </div>
+                                  </td>
+
+                                  {/* Статус монтажа и быстрая отметка */}
+                                  <td className="px-3 py-2 text-center">
+                                    <div className="flex items-center justify-center gap-1.5">
+                                      {isCompleted ? (
+                                        <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-300/40 font-bold text-[11px] py-0 px-1.5">
+                                          ✓ Выдано
+                                        </Badge>
+                                      ) : (
+                                        <Badge variant="outline" className="text-amber-700 dark:text-amber-400 border-amber-300 font-semibold text-[11px] py-0 px-1.5">
+                                          В очереди
+                                        </Badge>
+                                      )}
+
+                                      {/* Быстрая кнопка смены статуса (без открытия модалки) */}
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground shrink-0"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          updateStatusMutation.mutate({
+                                            id: order.id,
+                                            newStatus: isCompleted ? "in_progress" : "completed",
+                                          });
+                                        }}
+                                        disabled={updateStatusMutation.isPending}
+                                        title={isCompleted ? "Вернуть в очередь" : "Отметить как выдано"}
+                                      >
+                                        <Check className={cn("h-3 w-3", isCompleted ? "text-emerald-600" : "text-muted-foreground")} />
+                                      </Button>
+                                    </div>
+                                  </td>
+
+                                  {/* Кнопка открытия наряда */}
+                                  <td className="px-3 py-2 text-center">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-6 px-2 text-[11px] font-semibold gap-1 text-primary hover:text-primary hover:bg-primary/10 border-primary/30"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedOrderForModal(order);
+                                      }}
+                                    >
+                                      <FileText className="h-3 w-3" />
+                                      <span>Наряд</span>
+                                    </Button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
                       </div>
                     </div>
-
-                    {/* Таблица нарядов подъезда */}
-                    <div className="overflow-x-auto rounded-xl border border-slate-200/60 dark:border-slate-800/60">
-                      <table className="w-full text-sm text-left border-collapse">
-                        <thead className="text-[11px] font-bold uppercase bg-slate-100/80 dark:bg-slate-800/70 text-muted-foreground border-b border-slate-200/60 dark:border-slate-800/60">
-                          <tr>
-                            <th className="px-3 py-2.5 text-center w-14">Кв.</th>
-                            <th className="px-3 py-2.5 text-center w-14">Подъезд</th>
-                            <th className="px-4 py-2.5">Абонент / Телефон</th>
-                            <th className="px-3 py-2.5">Трубка</th>
-                            <th className="px-3 py-2.5">Ключи</th>
-                            <th className="px-3 py-2.5 text-center">Личный кабинет</th>
-                            <th className="px-3 py-2.5">Монтаж / Услуги</th>
-                            <th className="px-3 py-2.5 text-right">Сумма</th>
-                            <th className="px-3 py-2.5 text-center">Оплата</th>
-                            <th className="px-3 py-2.5 text-center">Статус монтажа</th>
-                            <th className="px-4 py-2.5 text-center">Действие</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 bg-white dark:bg-slate-900/60">
-                          {entGroup.orders.map((order) => {
-                            const isCompleted = order.status === "completed";
-                            const isPaid = order.payment_status === "paid";
-                            const isCredPurchased = Boolean(
-                              purchasedAppsMap.get(`${(order.street || "").toLowerCase()}___${(order.house || "").toLowerCase()}___${(order.apartment || "").trim().toLowerCase()}`) ||
-                              purchasedAppsMap.get((order.apartment || "").trim())
-                            );
-                            const parsed = parseOrderDetails(order, isCredPurchased);
-
-                            return (
-                              <tr
-                                key={order.id}
-                                className={cn(
-                                  "hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-all",
-                                  isCompleted && "bg-green-500/[0.04] dark:bg-green-500/[0.03]"
-                                )}
-                              >
-                                {/* Квартира */}
-                                <td className="px-3 py-2.5 text-center font-extrabold text-base text-foreground font-mono">
-                                  {order.apartment || "—"}
-                                </td>
-
-                                {/* Подъезд */}
-                                <td className="px-3 py-2.5 text-center font-semibold text-muted-foreground text-xs">
-                                  {order.entrance ? `п. ${order.entrance}` : "—"}
-                                </td>
-
-                                {/* Абонент и телефон */}
-                                <td className="px-4 py-2.5">
-                                  <div className="font-bold text-foreground flex items-center gap-1.5">
-                                    <User className="h-3.5 w-3.5 text-primary shrink-0" />
-                                    <span>{order.name || "Абонент"}</span>
-                                  </div>
-                                  {order.phone && (
-                                    <a
-                                      href={`tel:${order.phone}`}
-                                      className="text-xs text-primary hover:underline font-medium flex items-center gap-1 mt-0.5"
-                                    >
-                                      <Phone className="h-3 w-3" />
-                                      <span>{order.phone}</span>
-                                    </a>
-                                  )}
-                                </td>
-
-                                {/* Трубка */}
-                                <td className="px-3 py-2.5">
-                                  {parsed.handset !== "—" ? (
-                                    <Badge variant="outline" className="text-xs py-0.5 px-2 font-semibold text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/40 whitespace-nowrap">
-                                      <Radio className="h-3 w-3 mr-1 inline shrink-0" />
-                                      <span>{parsed.handset}</span>
-                                    </Badge>
-                                  ) : (
-                                    <span className="text-muted-foreground text-xs">—</span>
-                                  )}
-                                </td>
-
-                                {/* Ключи */}
-                                <td className="px-3 py-2.5">
-                                  {parsed.keys !== "—" ? (
-                                    <Badge variant="outline" className="text-xs py-0.5 px-2 font-semibold text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 whitespace-nowrap">
-                                      <KeyRound className="h-3 w-3 mr-1 inline shrink-0" />
-                                      <span>{parsed.keys}</span>
-                                    </Badge>
-                                  ) : (
-                                    <span className="text-muted-foreground text-xs">—</span>
-                                  )}
-                                </td>
-
-                                {/* Личный кабинет */}
-                                <td className="px-3 py-2.5 text-center">
-                                  {parsed.hasApp ? (
-                                    <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white font-extrabold text-xs py-0.5 px-2">
-                                      + Оплачен
-                                    </Badge>
-                                  ) : (
-                                    <span className="text-muted-foreground text-xs">—</span>
-                                  )}
-                                </td>
-
-                                {/* Монтаж / Услуги */}
-                                <td className="px-3 py-2.5">
-                                  {parsed.services === "Монтаж" ? (
-                                    <Badge className="bg-blue-600 hover:bg-blue-600 text-white font-bold text-xs py-0.5 px-2 whitespace-nowrap">
-                                      Монтаж
-                                    </Badge>
-                                  ) : parsed.services === "Замена" ? (
-                                    <Badge variant="outline" className="text-amber-700 dark:text-amber-300 border-amber-300 bg-amber-50 dark:bg-amber-950/40 font-bold text-xs py-0.5 px-2 whitespace-nowrap">
-                                      Замена
-                                    </Badge>
-                                  ) : parsed.services !== "—" ? (
-                                    <Badge variant="secondary" className="text-xs py-0.5 px-2 font-medium whitespace-nowrap">
-                                      {parsed.services}
-                                    </Badge>
-                                  ) : (
-                                    <span className="text-muted-foreground text-xs">—</span>
-                                  )}
-                                </td>
-
-                                {/* Сумма */}
-                                <td className="px-3 py-2.5 text-right font-extrabold text-foreground whitespace-nowrap">
-                                  {Number(order.payment_amount || 0).toFixed(0)} ₽
-                                </td>
-
-                                {/* Статус оплаты */}
-                                <td className="px-3 py-2.5 text-center whitespace-nowrap">
-                                  {isPaid ? (
-                                    <Badge className="bg-green-600 hover:bg-green-600 text-white font-bold text-[10px] py-0.5 px-2">
-                                      ✓ Оплачено
-                                    </Badge>
-                                  ) : (
-                                    <Badge className="bg-amber-500 hover:bg-amber-500 text-white font-bold text-[10px] py-0.5 px-2">
-                                      ⏳ Ожидает
-                                    </Badge>
-                                  )}
-                                </td>
-
-                                {/* Статус монтажа */}
-                                <td className="px-3 py-2.5 text-center whitespace-nowrap">
-                                  {isCompleted ? (
-                                    <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-300/40 font-bold text-xs">
-                                      ✓ Выдано
-                                    </Badge>
-                                  ) : (
-                                    <Badge variant="outline" className="text-amber-700 dark:text-amber-400 border-amber-300 font-semibold text-xs">
-                                      В очереди
-                                    </Badge>
-                                  )}
-                                </td>
-
-                                {/* Действие */}
-                                <td className="px-4 py-2.5 text-center">
-                                  {isCompleted ? (
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      className="h-7 text-xs text-muted-foreground hover:text-foreground"
-                                      onClick={() => updateStatusMutation.mutate({ id: order.id, newStatus: "in_progress" })}
-                                      disabled={updateStatusMutation.isPending}
-                                    >
-                                      Отменить
-                                    </Button>
-                                  ) : (
-                                    <Button
-                                      size="sm"
-                                      className="h-7 text-xs font-bold bg-primary hover:bg-primary/90 text-primary-foreground"
-                                      onClick={() => updateStatusMutation.mutate({ id: order.id, newStatus: "completed" })}
-                                      disabled={updateStatusMutation.isPending}
-                                    >
-                                      <Check className="h-3 w-3 mr-1" />
-                                      Выдано
-                                    </Button>
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                ))}
+                  ))}
               </CardContent>
             </Card>
-          ))}
+          )}
         </div>
       )}
+
+      {/* МОДАЛЬНОЕ ОКНО: Подробный наряд из заявок */}
+      <Dialog
+        open={!!selectedOrderForModal}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedOrderForModal(null);
+            // Инвалидируем запросы для обновления статусов
+            queryClient.invalidateQueries({ queryKey: ["equipment-orders-all"] });
+            queryClient.invalidateQueries({ queryKey: ["requests"] });
+          }
+        }}
+      >
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base font-bold">
+              <ClipboardCheck className="h-5 w-5 text-primary" />
+              <span>
+                Наряд монтажника — Заявка #{selectedOrderForModal?.id.slice(0, 8)}
+                {selectedOrderForModal?.apartment ? ` (кв. ${selectedOrderForModal.apartment})` : ""}
+              </span>
+            </DialogTitle>
+          </DialogHeader>
+          {selectedOrderForModal && (
+            <RequestDetails
+              request={selectedOrderForModal as any}
+              onBack={() => {
+                setSelectedOrderForModal(null);
+                queryClient.invalidateQueries({ queryKey: ["equipment-orders-all"] });
+                queryClient.invalidateQueries({ queryKey: ["requests"] });
+              }}
+              isManager={isManager}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
