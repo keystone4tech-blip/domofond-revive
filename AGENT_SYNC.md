@@ -32,7 +32,7 @@
 | src/App.tsx, src/components/crm/InstallerSheetManager.tsx, src/components/crm/VerificationManager.tsx, src/components/crm/CRMDashboard.tsx | Antigravity | 2026-10-08 18:45 UTC | ✅ освобождён (закоммичено) |
 | src/components/admin/AccountsManager.tsx, src/components/crm/AddressesManager.tsx, src/components/crm/RequestsManager.tsx, src/components/crm/TasksManager.tsx | Antigravity | 2026-10-08 18:57 UTC | ✅ освобождён (закоммичено) |
 | src/components/crm/RequestsManager.tsx, src/components/fsm/RequestsManager.tsx, src/pages/CRM.tsx, src/pages/FSM-1.tsx | Antigravity | 2026-10-08 19:39 UTC | ✅ освобождён (закоммичено) |
-| src/components/crm/CRMDashboard.tsx, src/components/fsm/FSMDashboard.tsx | Antigravity | 2026-10-08 19:54 UTC | ✅ освобождён (закоммичено) |
+| src/components/crm/CRMDashboard.tsx, src/components/admin/AccountsManager.tsx | Antigravity | 2026-10-08 20:17 UTC | ✅ освобождён (закоммичено) |
 
 > Правило: `🔒 занят` — не трогать; `✅ освобождён` — можно брать.
 
@@ -227,6 +227,15 @@ Claude, выполнил исправление и деплой по заказ�
 4. **Интерактивный реестр платежей**:
    - Быстрый поиск онлайн (л/с, ФИО, адрес, телефон, сумма, транзакция ЮKassa), мультифильтры (тип, статус, метод), пагинация (по 10, 25, 50 строк), быстрые переходы «К счёту» и «К заявке».
 5. Проект успешно собран (`npm run build`) и задеплоен на боевой сервер `45.8.99.238` через `deploy_dist.py`. Claim снят.
+
+**2026-10-08 20:25 UTC — Antigravity:**
+Реализовано безопасное мягкое удаление (Soft Delete) тестовых счетов и платежей:
+1. **Миграция БД**: в `payments` и `accounts` добавлены поля `is_deleted`, `deleted_reason`, `deleted_at`, `deleted_by`. Записи физически не удаляются, сохраняя аудит.
+2. **Исключение из статистики**: все финансовые метрики (выручка ТО, заказы, средний чек, количество) и двухслойный график выручки Recharts фильтруются строго по не удаленным записям.
+3. **Модальное окно с предупреждением и причиной**: кнопка корзины с модальным диалогом, обязательным вводом причины, быстрыми чипами-шаблонами и защитой от случайного клика.
+4. **Управление исключенными счетами**: тумблер «Исключённые» в фильтрах, отображение причины удаления и кнопка «Вернуть в статистику».
+5. Проект собран (`npm run build`) и задеплоен на боевой сервер `45.8.99.238`. Claim снят.
+
 
 
 

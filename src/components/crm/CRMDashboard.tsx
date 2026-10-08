@@ -1,13 +1,24 @@
 // src/components/crm/CRMDashboard.tsx
 // Аналитический дашборд CRM / FSM с комплексным финансовым модулем (ТО, заказы, онлайн-платежи)
 // Включает учет ЮKassa (СБП, Карты, SberPay), абонентской платы по лицевым счетам и нарядов мастеров
+// Поддерживает функцию мягкого удаления (Soft Delete) тестовых счетов с указанием причины
 
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
 import { 
@@ -20,7 +31,8 @@ import {
   ArrowUpRight, Calendar, Search, Award, ShieldAlert, Zap, History,
   CreditCard, Filter, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
   TrendingUp, RefreshCw, X, Receipt, Smartphone, Check, ExternalLink,
-  Layers, ShoppingBag, Wrench, ShieldCheck, ArrowDownRight, Wallet
+  Layers, ShoppingBag, Wrench, ShieldCheck, ArrowDownRight, Wallet,
+  Trash2, RotateCcw, HelpCircle, Eye, EyeOff
 } from "lucide-react";
 import { 
   format, differenceInMinutes, parseISO, subDays, 
@@ -63,10 +75,16 @@ export interface UnifiedPaymentItem {
   description?: string;
   transactionId?: string;
   requestId?: string;
+  // Поля мягкого удаления тестовых счетов
+  isDeleted: boolean;
+  deletedReason?: string;
+  deletedAt?: string;
+  deletedBy?: string;
 }
 
 export const CRMDashboard = ({ isManager, onNavigate }: CRMDashboardProps) => {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [period, setPeriod] = useState<AnalyticsPeriod>("30_days");
 
   // Состояния фильтров и поиска в модуле финансов
@@ -74,8 +92,14 @@ export const CRMDashboard = ({ isManager, onNavigate }: CRMDashboardProps) => {
   const [paymentTypeFilter, setPaymentTypeFilter] = useState<"all" | PaymentItemType>("all");
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<"all" | PaymentItemStatus>("all");
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<"all" | PaymentItemMethod>("all");
+  const [showDeletedPayments, setShowDeletedPayments] = useState(false);
   const [paymentPage, setPaymentPage] = useState(1);
   const [paymentPageSize, setPaymentPageSize] = useState(10);
+
+  // Состояния модального окна пометки счета на удаление (как тестового)
+  const [deleteModalItem, setDeleteModalItem] = useState<UnifiedPaymentItem | null>(null);
+  const [deleteReasonInput, setDeleteReasonInput] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Запрос сырых данных для аналитики (с фоновым опросом и прямым подключением платежей ЮKassa)
   const { data: rawData, isLoading } = useQuery({
@@ -201,6 +225,12 @@ export const CRMDashboard = ({ isManager, onNavigate }: CRMDashboardProps) => {
         meta = {};
       }
 
+      // Проверка пометки мягкого удаления (is_deleted)
+      const isDeleted = Boolean(p.is_deleted || meta.is_deleted === true || meta.is_deleted === "true");
+      const deletedReason = p.deleted_reason || meta.deleted_reason || "";
+      const deletedAt = p.deleted_at || meta.deleted_at || "";
+      const deletedBy = p.deleted_by || meta.deleted_by || "";
+
       const isOrder = meta.is_order === true || meta.is_order === "true" || meta.order_type === "equipment_order";
       const isRequest = !isOrder && Boolean(p.request_id);
 
@@ -267,6 +297,10 @@ export const CRMDashboard = ({ isManager, onNavigate }: CRMDashboardProps) => {
         description: p.description || "",
         transactionId: p.yookassa_payment_id || p.id,
         requestId: p.request_id || undefined,
+        isDeleted,
+        deletedReason,
+        deletedAt,
+        deletedBy
       });
     });
 
@@ -279,6 +313,8 @@ export const CRMDashboard = ({ isManager, onNavigate }: CRMDashboardProps) => {
 
       const isCash = r.payment_method !== "online";
       const isPaid = r.payment_status === "paid";
+      const isDeleted = Boolean((r as any).is_deleted || (r.notes && r.notes.includes("[Исключено из статистики]")));
+      const deletedReason = (r as any).deleted_reason || (r.notes && r.notes.includes("[Исключено из статистики]") ? r.notes : "");
 
       allTransactions.push({
         id: `req-${r.id}`,
@@ -298,13 +334,21 @@ export const CRMDashboard = ({ isManager, onNavigate }: CRMDashboardProps) => {
         description: r.message || `Вызов мастера #${r.id.substring(0, 8)}`,
         transactionId: r.id,
         requestId: r.id,
+        isDeleted,
+        deletedReason,
+        deletedAt: r.updated_at,
+        deletedBy: ""
       });
     });
 
     // 3. Фильтрация транзакций по выбранному периоду
     const periodTransactions = allTransactions.filter(t => filterByPeriod(t.createdAt));
 
-    // 4. Подсчет финансовых показателей
+    // ВАЖНО: Для расчета выручки, сводных KPI и графиков используются ИСКЛЮЧИТЕЛЬНО активные (НЕ удаленные) счета!
+    const activeTransactions = periodTransactions.filter(t => !t.isDeleted);
+    const deletedCount = periodTransactions.filter(t => t.isDeleted).length;
+
+    // 4. Подсчет финансовых показателей только по чистым (активным) платежам
     let totalRevenue = 0;
     let maintenanceRevenue = 0;
     let servicesRevenue = 0;
@@ -323,7 +367,7 @@ export const CRMDashboard = ({ isManager, onNavigate }: CRMDashboardProps) => {
     let maintenanceCount = 0;
     let servicesCount = 0;
 
-    periodTransactions.forEach(t => {
+    activeTransactions.forEach(t => {
       if (t.status === "succeeded") {
         totalRevenue += t.amount;
         succeededCount++;
@@ -380,7 +424,7 @@ export const CRMDashboard = ({ isManager, onNavigate }: CRMDashboardProps) => {
       };
     }).reverse();
 
-    // 6. Подготовка точек графика динамики выручки (с разбивкой: Абонплата ТО vs Заказы и услуги)
+    // 6. Подготовка точек графика динамики выручки (строится ТОЛЬКО по activeTransactions)
     let financeGraphData: Array<{
       name: string;
       dateKey: string;
@@ -396,7 +440,7 @@ export const CRMDashboard = ({ isManager, onNavigate }: CRMDashboardProps) => {
       financeGraphData = days.map(d => {
         const dateStr = format(d, "yyyy-MM-dd");
         const label = format(d, "d MMM", { locale: ru });
-        const dayTx = periodTransactions.filter(t => t.status === "succeeded" && format(new Date(t.createdAt), "yyyy-MM-dd") === dateStr);
+        const dayTx = activeTransactions.filter(t => t.status === "succeeded" && format(new Date(t.createdAt), "yyyy-MM-dd") === dateStr);
         const maintenance = dayTx.filter(t => t.type === "maintenance").reduce((s, t) => s + t.amount, 0);
         const services = dayTx.filter(t => t.type !== "maintenance").reduce((s, t) => s + t.amount, 0);
         return {
@@ -415,7 +459,7 @@ export const CRMDashboard = ({ isManager, onNavigate }: CRMDashboardProps) => {
       financeGraphData = days.map(d => {
         const dateStr = format(d, "yyyy-MM-dd");
         const label = format(d, "d MMM", { locale: ru });
-        const dayTx = periodTransactions.filter(t => t.status === "succeeded" && format(new Date(t.createdAt), "yyyy-MM-dd") === dateStr);
+        const dayTx = activeTransactions.filter(t => t.status === "succeeded" && format(new Date(t.createdAt), "yyyy-MM-dd") === dateStr);
         const maintenance = dayTx.filter(t => t.type === "maintenance").reduce((s, t) => s + t.amount, 0);
         const services = dayTx.filter(t => t.type !== "maintenance").reduce((s, t) => s + t.amount, 0);
         return {
@@ -431,7 +475,7 @@ export const CRMDashboard = ({ isManager, onNavigate }: CRMDashboardProps) => {
         const d = subDays(now, 29 - idx);
         const dateStr = format(d, "yyyy-MM-dd");
         const label = format(d, "d MMM", { locale: ru });
-        const dayTx = periodTransactions.filter(t => t.status === "succeeded" && format(new Date(t.createdAt), "yyyy-MM-dd") === dateStr);
+        const dayTx = activeTransactions.filter(t => t.status === "succeeded" && format(new Date(t.createdAt), "yyyy-MM-dd") === dateStr);
         const maintenance = dayTx.filter(t => t.type === "maintenance").reduce((s, t) => s + t.amount, 0);
         const services = dayTx.filter(t => t.type !== "maintenance").reduce((s, t) => s + t.amount, 0);
         return {
@@ -448,7 +492,7 @@ export const CRMDashboard = ({ isManager, onNavigate }: CRMDashboardProps) => {
         const dateStr = format(d, "yyyy-MM-dd");
         const label = format(d, "d MMM", { locale: ru });
         const dStart = subDays(d, 2);
-        const dayTx = periodTransactions.filter(t => {
+        const dayTx = activeTransactions.filter(t => {
           if (t.status !== "succeeded") return false;
           const txDate = new Date(t.createdAt);
           return txDate >= dStart && txDate <= d;
@@ -470,7 +514,7 @@ export const CRMDashboard = ({ isManager, onNavigate }: CRMDashboardProps) => {
         const dateStr = format(d, "yyyy-MM-dd");
         const label = format(d, "d MMM", { locale: ru });
         const dStart = subDays(d, 1);
-        const dayTx = periodTransactions.filter(t => {
+        const dayTx = activeTransactions.filter(t => {
           if (t.status !== "succeeded") return false;
           const txDate = new Date(t.createdAt);
           return txDate >= dStart && txDate <= d;
@@ -580,7 +624,7 @@ export const CRMDashboard = ({ isManager, onNavigate }: CRMDashboardProps) => {
       pendingRequests: filteredRequests.filter(r => r.status === "pending").length,
       cancelledRequests: filteredRequests.filter(r => r.status === "cancelled").length,
 
-      // Финансовая аналитика
+      // Финансовая аналитика (только по активным транзакциям)
       totalRevenue,
       maintenanceRevenue,
       servicesRevenue,
@@ -599,6 +643,7 @@ export const CRMDashboard = ({ isManager, onNavigate }: CRMDashboardProps) => {
       avgCheck,
       financeGraphData,
       allTransactions: periodTransactions,
+      deletedCount,
 
       urgentRequests,
       priorityData,
@@ -614,6 +659,11 @@ export const CRMDashboard = ({ isManager, onNavigate }: CRMDashboardProps) => {
     if (!analytics?.allTransactions) return [];
 
     return analytics.allTransactions.filter(item => {
+      // Фильтр показа удаленных (по умолчанию скрыты, если не включен тумблер showDeletedPayments)
+      if (!showDeletedPayments && item.isDeleted) {
+        return false;
+      }
+
       // Фильтр по типу операции
       if (paymentTypeFilter !== "all" && item.type !== paymentTypeFilter) {
         return false;
@@ -636,14 +686,15 @@ export const CRMDashboard = ({ isManager, onNavigate }: CRMDashboardProps) => {
         const inDesc = item.description?.toLowerCase().includes(query);
         const inTx = item.transactionId?.toLowerCase().includes(query);
         const inAmt = item.amount.toString().includes(query);
+        const inReason = item.deletedReason?.toLowerCase().includes(query);
 
-        if (!inAcc && !inName && !inAddr && !inPhone && !inDesc && !inTx && !inAmt) {
+        if (!inAcc && !inName && !inAddr && !inPhone && !inDesc && !inTx && !inAmt && !inReason) {
           return false;
         }
       }
       return true;
     });
-  }, [analytics?.allTransactions, paymentTypeFilter, paymentStatusFilter, paymentMethodFilter, paymentSearchTerm]);
+  }, [analytics?.allTransactions, showDeletedPayments, paymentTypeFilter, paymentStatusFilter, paymentMethodFilter, paymentSearchTerm]);
 
   // Пагинация таблицы платежей
   const totalPaymentPages = Math.ceil(filteredPayments.length / paymentPageSize) || 1;
@@ -655,7 +706,7 @@ export const CRMDashboard = ({ isManager, onNavigate }: CRMDashboardProps) => {
   // Сброс страницы при изменении фильтров или поиска
   useEffect(() => {
     setPaymentPage(1);
-  }, [paymentTypeFilter, paymentStatusFilter, paymentMethodFilter, paymentSearchTerm, paymentPageSize]);
+  }, [paymentTypeFilter, paymentStatusFilter, paymentMethodFilter, paymentSearchTerm, paymentPageSize, showDeletedPayments]);
 
   // Взаимодействие при переходе к конкретной задаче или заявке
   const handleItemClick = (type: "requests" | "tasks", status: string, id: string) => {
@@ -671,6 +722,130 @@ export const CRMDashboard = ({ isManager, onNavigate }: CRMDashboardProps) => {
     console.log(`[CRMDashboard] Переход к лицевому счету: ${accNumber}`);
     if (onNavigate) {
       onNavigate("accounts", accNumber);
+    }
+  };
+
+  // Подтверждение пометки счета на удаление (исключение из статистики)
+  const handleConfirmDelete = async () => {
+    if (!deleteModalItem || !deleteReasonInput.trim()) return;
+    setIsDeleting(true);
+
+    try {
+      const reason = deleteReasonInput.trim();
+      const nowIso = new Date().toISOString();
+      let currentUser = "Администратор CRM";
+      try {
+        const { data: authData } = await supabase.auth.getUser();
+        if (authData?.user?.email) currentUser = authData.user.email;
+      } catch (e) {
+        // ignore
+      }
+
+      console.log(`[CRMDashboard] Исключение счёта ${deleteModalItem.id} из статистики. Причина: "${reason}", автор: ${currentUser}`);
+
+      if (deleteModalItem.source === "payment_gateway") {
+        // Обновляем таблицу payments в базе PostgreSQL: поля is_deleted, deleted_reason, deleted_at, deleted_by
+        const existing = rawData?.payments.find((p: any) => p.id === deleteModalItem.id);
+        let meta: any = {};
+        try {
+          meta = typeof existing?.metadata === "string" ? JSON.parse(existing.metadata) : (existing?.metadata || {});
+        } catch (err) {
+          meta = {};
+        }
+        meta.is_deleted = true;
+        meta.deleted_reason = reason;
+        meta.deleted_at = nowIso;
+        meta.deleted_by = currentUser;
+
+        const { error } = await (supabase.from as any)("payments")
+          .update({
+            is_deleted: true,
+            deleted_reason: reason,
+            deleted_at: nowIso,
+            deleted_by: currentUser,
+            metadata: JSON.stringify(meta)
+          })
+          .eq("id", deleteModalItem.id);
+
+        if (error) {
+          console.warn("[CRMDashboard] Ошибка прямого update payments, пробуем fallback:", error);
+          throw error;
+        }
+      } else if (deleteModalItem.requestId) {
+        // Для нарядов мастеров фиксируем пометку исключения в примечаниях
+        const { error } = await supabase.from("requests")
+          .update({
+            notes: `[Исключено из статистики]: ${reason}`
+          } as any)
+          .eq("id", deleteModalItem.requestId);
+        if (error) throw error;
+      }
+
+      toast({
+        title: "Счёт исключён из статистики",
+        description: `Счёт на сумму ${deleteModalItem.amount.toLocaleString()} ₽ помечен как тестовый/удалённый и больше не учитывается в выручке`,
+      });
+
+      // Инвалидируем кэш для моментального пересчета аналитики
+      queryClient.invalidateQueries({ queryKey: ["crm-dashboard-raw-data"] });
+      localStorage.setItem("crm_data_sync", Date.now().toString());
+      setDeleteModalItem(null);
+      setDeleteReasonInput("");
+    } catch (err: any) {
+      console.error("[CRMDashboard] Ошибка пометки на удаление:", err);
+      toast({
+        title: "Ошибка",
+        description: err.message || "Не удалось исключить счёт",
+        variant: "destructive"
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // Восстановление ранее исключенного счёта
+  const handleRestorePayment = async (item: UnifiedPaymentItem) => {
+    try {
+      console.log(`[CRMDashboard] Восстановление счёта ${item.id} в статистику...`);
+      if (item.source === "payment_gateway") {
+        const existing = rawData?.payments.find((p: any) => p.id === item.id);
+        let meta: any = {};
+        try {
+          meta = typeof existing?.metadata === "string" ? JSON.parse(existing.metadata) : (existing?.metadata || {});
+        } catch (err) {
+          meta = {};
+        }
+        meta.is_deleted = false;
+        delete meta.deleted_reason;
+        delete meta.deleted_at;
+        delete meta.deleted_by;
+
+        const { error } = await (supabase.from as any)("payments")
+          .update({
+            is_deleted: false,
+            deleted_reason: null,
+            deleted_at: null,
+            deleted_by: null,
+            metadata: JSON.stringify(meta)
+          })
+          .eq("id", item.id);
+
+        if (error) throw error;
+      }
+
+      toast({
+        title: "Счёт восстановлен",
+        description: `Счёт на ${item.amount.toLocaleString()} ₽ успешно возвращён в финансовую статистику`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["crm-dashboard-raw-data"] });
+      localStorage.setItem("crm_data_sync", Date.now().toString());
+    } catch (err: any) {
+      console.error("[CRMDashboard] Ошибка восстановления счёта:", err);
+      toast({
+        title: "Ошибка",
+        description: err.message || "Не удалось восстановить счёт",
+        variant: "destructive"
+      });
     }
   };
 
@@ -1077,7 +1252,7 @@ export const CRMDashboard = ({ isManager, onNavigate }: CRMDashboardProps) => {
         {/* ========================================================================= */}
         <TabsContent value="finance" className="space-y-6 outline-none">
           
-          {/* Сводные финансовые показатели за выбранный период */}
+          {/* Сводные финансовые показатели за выбранный период (только по активным счетам) */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             
             {/* Карточка 1: Общая выручка */}
@@ -1169,7 +1344,7 @@ export const CRMDashboard = ({ isManager, onNavigate }: CRMDashboardProps) => {
                     Динамика финансовых поступлений
                   </CardTitle>
                   <CardDescription className="text-xs">
-                    Посуточный объем платежей с разделением на абонплату ТО и заказы
+                    Посуточный объем чистых платежей (без тестовых и исключённых счетов)
                   </CardDescription>
                 </div>
                 <div className="flex items-center gap-3 text-xs font-semibold">
@@ -1300,7 +1475,7 @@ export const CRMDashboard = ({ isManager, onNavigate }: CRMDashboardProps) => {
             </Card>
           </div>
 
-          {/* Реестр финансовых операций и абонентской платы с фильтрами и поиском */}
+          {/* Реестр финансовых операций и абонентской платы с фильтрами, поиском и Soft Delete */}
           <Card className="border-border/50 bg-white/40 dark:bg-slate-900/40 backdrop-blur-md">
             <CardHeader className="pb-3 flex flex-col gap-3">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -1310,7 +1485,7 @@ export const CRMDashboard = ({ isManager, onNavigate }: CRMDashboardProps) => {
                     Реестр платежей и абонентской платы
                   </CardTitle>
                   <CardDescription className="text-xs">
-                    Все операции эквайринга, оплат по лицевым счетам и платных вызовов ({filteredPayments.length} записей на {filteredPayments.reduce((s, p) => s + (p.status === 'succeeded' ? p.amount : 0), 0).toLocaleString()} ₽)
+                    Все операции эквайринга, оплат по лицевым счетам и платных вызовов ({filteredPayments.length} записей на {filteredPayments.reduce((s, p) => s + (p.status === 'succeeded' && !p.isDeleted ? p.amount : 0), 0).toLocaleString()} ₽)
                   </CardDescription>
                 </div>
                 
@@ -1319,7 +1494,7 @@ export const CRMDashboard = ({ isManager, onNavigate }: CRMDashboardProps) => {
                   <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                   <input
                     type="text"
-                    placeholder="Поиск по л/с, ФИО, адресу, тел, ID..."
+                    placeholder="Поиск по л/с, ФИО, адресу, тел, сумме..."
                     value={paymentSearchTerm}
                     onChange={(e) => setPaymentSearchTerm(e.target.value)}
                     className="pl-9 pr-8 py-2 w-full bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-medium border border-transparent focus:border-primary focus:outline-none transition-all"
@@ -1335,138 +1510,157 @@ export const CRMDashboard = ({ isManager, onNavigate }: CRMDashboardProps) => {
                 </div>
               </div>
 
-              {/* Панель фильтров: по типу, статусу и способу оплаты */}
-              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-200/50 dark:border-slate-800/50">
-                <span className="text-xs font-bold text-muted-foreground flex items-center gap-1 shrink-0">
-                  <Filter className="h-3.5 w-3.5" /> Фильтры:
-                </span>
+              {/* Панель фильтров: по типу, статусу, способу оплаты и скрытию удаленных */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200/50 dark:border-slate-800/50">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-bold text-muted-foreground flex items-center gap-1 shrink-0">
+                    <Filter className="h-3.5 w-3.5" /> Фильтры:
+                  </span>
 
-                {/* Фильтр: Тип операции */}
-                <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg text-xs">
-                  <button
-                    onClick={() => setPaymentTypeFilter("all")}
-                    className={cn(
-                      "px-2 py-1 rounded-md transition-all font-medium",
-                      paymentTypeFilter === "all" ? "bg-white dark:bg-slate-700 font-bold shadow-xs text-foreground" : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    Все типы
-                  </button>
-                  <button
-                    onClick={() => setPaymentTypeFilter("maintenance")}
-                    className={cn(
-                      "px-2 py-1 rounded-md transition-all font-medium flex items-center gap-1",
-                      paymentTypeFilter === "maintenance" ? "bg-white dark:bg-slate-700 font-bold shadow-xs text-blue-600 dark:text-blue-400" : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    🏷️ ТО (абонплата)
-                  </button>
-                  <button
-                    onClick={() => setPaymentTypeFilter("order")}
-                    className={cn(
-                      "px-2 py-1 rounded-md transition-all font-medium flex items-center gap-1",
-                      paymentTypeFilter === "order" ? "bg-white dark:bg-slate-700 font-bold shadow-xs text-purple-600 dark:text-purple-400" : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    📦 Заказы
-                  </button>
-                  <button
-                    onClick={() => setPaymentTypeFilter("request")}
-                    className={cn(
-                      "px-2 py-1 rounded-md transition-all font-medium flex items-center gap-1",
-                      paymentTypeFilter === "request" ? "bg-white dark:bg-slate-700 font-bold shadow-xs text-emerald-600 dark:text-emerald-400" : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    🔧 Заявки мастеров
-                  </button>
+                  {/* Фильтр: Тип операции */}
+                  <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg text-xs">
+                    <button
+                      onClick={() => setPaymentTypeFilter("all")}
+                      className={cn(
+                        "px-2 py-1 rounded-md transition-all font-medium",
+                        paymentTypeFilter === "all" ? "bg-white dark:bg-slate-700 font-bold shadow-xs text-foreground" : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      Все типы
+                    </button>
+                    <button
+                      onClick={() => setPaymentTypeFilter("maintenance")}
+                      className={cn(
+                        "px-2 py-1 rounded-md transition-all font-medium flex items-center gap-1",
+                        paymentTypeFilter === "maintenance" ? "bg-white dark:bg-slate-700 font-bold shadow-xs text-blue-600 dark:text-blue-400" : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      🏷️ ТО (абонплата)
+                    </button>
+                    <button
+                      onClick={() => setPaymentTypeFilter("order")}
+                      className={cn(
+                        "px-2 py-1 rounded-md transition-all font-medium flex items-center gap-1",
+                        paymentTypeFilter === "order" ? "bg-white dark:bg-slate-700 font-bold shadow-xs text-purple-600 dark:text-purple-400" : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      📦 Заказы
+                    </button>
+                    <button
+                      onClick={() => setPaymentTypeFilter("request")}
+                      className={cn(
+                        "px-2 py-1 rounded-md transition-all font-medium flex items-center gap-1",
+                        paymentTypeFilter === "request" ? "bg-white dark:bg-slate-700 font-bold shadow-xs text-emerald-600 dark:text-emerald-400" : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      🔧 Заявки мастеров
+                    </button>
+                  </div>
+
+                  {/* Фильтр: Статус платежа */}
+                  <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg text-xs">
+                    <button
+                      onClick={() => setPaymentStatusFilter("all")}
+                      className={cn(
+                        "px-2 py-1 rounded-md transition-all font-medium",
+                        paymentStatusFilter === "all" ? "bg-white dark:bg-slate-700 font-bold shadow-xs text-foreground" : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      Все статусы
+                    </button>
+                    <button
+                      onClick={() => setPaymentStatusFilter("succeeded")}
+                      className={cn(
+                        "px-2 py-1 rounded-md transition-all font-medium text-emerald-600 dark:text-emerald-400",
+                        paymentStatusFilter === "succeeded" ? "bg-white dark:bg-slate-700 font-bold shadow-xs" : "hover:text-foreground"
+                      )}
+                    >
+                      ✅ Оплачено
+                    </button>
+                    <button
+                      onClick={() => setPaymentStatusFilter("pending")}
+                      className={cn(
+                        "px-2 py-1 rounded-md transition-all font-medium text-amber-600 dark:text-amber-400",
+                        paymentStatusFilter === "pending" ? "bg-white dark:bg-slate-700 font-bold shadow-xs" : "hover:text-foreground"
+                      )}
+                    >
+                      ⏳ Ожидает
+                    </button>
+                    <button
+                      onClick={() => setPaymentStatusFilter("canceled")}
+                      className={cn(
+                        "px-2 py-1 rounded-md transition-all font-medium text-red-600 dark:text-red-400",
+                        paymentStatusFilter === "canceled" ? "bg-white dark:bg-slate-700 font-bold shadow-xs" : "hover:text-foreground"
+                      )}
+                    >
+                      ❌ Отменено
+                    </button>
+                  </div>
+
+                  {/* Фильтр: Метод оплаты */}
+                  <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg text-xs">
+                    <button
+                      onClick={() => setPaymentMethodFilter("all")}
+                      className={cn(
+                        "px-2 py-1 rounded-md transition-all font-medium",
+                        paymentMethodFilter === "all" ? "bg-white dark:bg-slate-700 font-bold shadow-xs text-foreground" : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      Все методы
+                    </button>
+                    <button
+                      onClick={() => setPaymentMethodFilter("bank_card")}
+                      className={cn(
+                        "px-2 py-1 rounded-md transition-all font-medium",
+                        paymentMethodFilter === "bank_card" ? "bg-white dark:bg-slate-700 font-bold shadow-xs text-blue-600" : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      💳 Карта
+                    </button>
+                    <button
+                      onClick={() => setPaymentMethodFilter("sbp")}
+                      className={cn(
+                        "px-2 py-1 rounded-md transition-all font-medium",
+                        paymentMethodFilter === "sbp" ? "bg-white dark:bg-slate-700 font-bold shadow-xs text-emerald-600" : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      ⚡ СБП
+                    </button>
+                    <button
+                      onClick={() => setPaymentMethodFilter("sberbank")}
+                      className={cn(
+                        "px-2 py-1 rounded-md transition-all font-medium",
+                        paymentMethodFilter === "sberbank" ? "bg-white dark:bg-slate-700 font-bold shadow-xs text-green-700" : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      🟢 SberPay
+                    </button>
+                    <button
+                      onClick={() => setPaymentMethodFilter("cash")}
+                      className={cn(
+                        "px-2 py-1 rounded-md transition-all font-medium",
+                        paymentMethodFilter === "cash" ? "bg-white dark:bg-slate-700 font-bold shadow-xs text-amber-600" : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      💵 Наличные
+                    </button>
+                  </div>
                 </div>
 
-                {/* Фильтр: Статус платежа */}
-                <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg text-xs">
+                {/* Тумблер отображения тестовых / исключённых счетов */}
+                <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setPaymentStatusFilter("all")}
+                    onClick={() => setShowDeletedPayments(!showDeletedPayments)}
                     className={cn(
-                      "px-2 py-1 rounded-md transition-all font-medium",
-                      paymentStatusFilter === "all" ? "bg-white dark:bg-slate-700 font-bold shadow-xs text-foreground" : "text-muted-foreground hover:text-foreground"
+                      "px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 border transition-all",
+                      showDeletedPayments 
+                        ? "bg-red-500/10 border-red-500/30 text-red-600 dark:text-red-400" 
+                        : "bg-slate-100 dark:bg-slate-800 border-transparent text-muted-foreground hover:text-foreground"
                     )}
+                    title={showDeletedPayments ? "Скрыть исключённые счета" : "Показать счета, исключённые из статистики"}
                   >
-                    Все статусы
-                  </button>
-                  <button
-                    onClick={() => setPaymentStatusFilter("succeeded")}
-                    className={cn(
-                      "px-2 py-1 rounded-md transition-all font-medium text-emerald-600 dark:text-emerald-400",
-                      paymentStatusFilter === "succeeded" ? "bg-white dark:bg-slate-700 font-bold shadow-xs" : "hover:text-foreground"
-                    )}
-                  >
-                    ✅ Оплачено
-                  </button>
-                  <button
-                    onClick={() => setPaymentStatusFilter("pending")}
-                    className={cn(
-                      "px-2 py-1 rounded-md transition-all font-medium text-amber-600 dark:text-amber-400",
-                      paymentStatusFilter === "pending" ? "bg-white dark:bg-slate-700 font-bold shadow-xs" : "hover:text-foreground"
-                    )}
-                  >
-                    ⏳ Ожидает
-                  </button>
-                  <button
-                    onClick={() => setPaymentStatusFilter("canceled")}
-                    className={cn(
-                      "px-2 py-1 rounded-md transition-all font-medium text-red-600 dark:text-red-400",
-                      paymentStatusFilter === "canceled" ? "bg-white dark:bg-slate-700 font-bold shadow-xs" : "hover:text-foreground"
-                    )}
-                  >
-                    ❌ Отменено
-                  </button>
-                </div>
-
-                {/* Фильтр: Метод оплаты */}
-                <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg text-xs">
-                  <button
-                    onClick={() => setPaymentMethodFilter("all")}
-                    className={cn(
-                      "px-2 py-1 rounded-md transition-all font-medium",
-                      paymentMethodFilter === "all" ? "bg-white dark:bg-slate-700 font-bold shadow-xs text-foreground" : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    Все методы
-                  </button>
-                  <button
-                    onClick={() => setPaymentMethodFilter("bank_card")}
-                    className={cn(
-                      "px-2 py-1 rounded-md transition-all font-medium",
-                      paymentMethodFilter === "bank_card" ? "bg-white dark:bg-slate-700 font-bold shadow-xs text-blue-600" : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    💳 Карта
-                  </button>
-                  <button
-                    onClick={() => setPaymentMethodFilter("sbp")}
-                    className={cn(
-                      "px-2 py-1 rounded-md transition-all font-medium",
-                      paymentMethodFilter === "sbp" ? "bg-white dark:bg-slate-700 font-bold shadow-xs text-emerald-600" : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    ⚡ СБП
-                  </button>
-                  <button
-                    onClick={() => setPaymentMethodFilter("sberbank")}
-                    className={cn(
-                      "px-2 py-1 rounded-md transition-all font-medium",
-                      paymentMethodFilter === "sberbank" ? "bg-white dark:bg-slate-700 font-bold shadow-xs text-green-700" : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    🟢 SberPay
-                  </button>
-                  <button
-                    onClick={() => setPaymentMethodFilter("cash")}
-                    className={cn(
-                      "px-2 py-1 rounded-md transition-all font-medium",
-                      paymentMethodFilter === "cash" ? "bg-white dark:bg-slate-700 font-bold shadow-xs text-amber-600" : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    💵 Наличные
+                    {showDeletedPayments ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                    <span>Исключённые ({analytics.deletedCount})</span>
                   </button>
                 </div>
               </div>
@@ -1482,18 +1676,23 @@ export const CRMDashboard = ({ isManager, onNavigate }: CRMDashboardProps) => {
                       <th className="px-4 py-3 text-center">Способ оплаты</th>
                       <th className="px-4 py-3 text-center">Статус</th>
                       <th className="px-4 py-3 text-right">Сумма (₽)</th>
-                      <th className="px-4 py-3 text-center">Действие</th>
+                      <th className="px-4 py-3 text-center">Действия</th>
                     </tr>
                   </thead>
                   <tbody>
                     {paginatedPayments.map((item) => (
                       <tr 
                         key={item.id} 
-                        className="border-b hover:bg-slate-50/70 dark:hover:bg-slate-800/30 transition-all"
+                        className={cn(
+                          "border-b transition-all",
+                          item.isDeleted 
+                            ? "bg-red-500/5 dark:bg-red-950/15 hover:bg-red-500/10 opacity-75" 
+                            : "hover:bg-slate-50/70 dark:hover:bg-slate-800/30"
+                        )}
                       >
                         {/* Дата и время */}
                         <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
-                          <p className="font-semibold text-foreground">
+                          <p className={cn("font-semibold text-foreground", item.isDeleted && "line-through text-muted-foreground")}>
                             {format(new Date(item.createdAt), "dd.MM.yyyy")}
                           </p>
                           <p className="text-[10px] text-muted-foreground">
@@ -1506,7 +1705,9 @@ export const CRMDashboard = ({ isManager, onNavigate }: CRMDashboardProps) => {
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <Badge className={cn(
                               "text-[9px] h-5 py-0 px-2 font-bold",
-                              item.type === "maintenance" 
+                              item.isDeleted
+                                ? "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30"
+                                : item.type === "maintenance" 
                                 ? "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30" 
                                 : item.type === "order"
                                 ? "bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/30"
@@ -1514,7 +1715,22 @@ export const CRMDashboard = ({ isManager, onNavigate }: CRMDashboardProps) => {
                             )} variant="outline">
                               {item.typeLabel}
                             </Badge>
+
+                            {item.isDeleted && (
+                              <Badge className="bg-red-600 text-white text-[9px] h-5 py-0 px-1.5 font-bold">
+                                🗑️ Исключён из статистики
+                              </Badge>
+                            )}
                           </div>
+
+                          {/* Причина удаления */}
+                          {item.isDeleted && item.deletedReason && (
+                            <p className="text-[10px] text-red-600 dark:text-red-400 font-medium mt-1 italic flex items-center gap-1">
+                              <span>Причина:</span>
+                              <span className="font-semibold">{item.deletedReason}</span>
+                            </p>
+                          )}
+
                           {item.accountNumber ? (
                             <button
                               onClick={() => handleAccountClick(item.accountNumber)}
@@ -1537,8 +1753,10 @@ export const CRMDashboard = ({ isManager, onNavigate }: CRMDashboardProps) => {
                         </td>
 
                         {/* Плательщик, адрес и телефон */}
-                        <td className="px-4 py-3 max-w-[280px]">
-                          <p className="font-semibold text-foreground truncate">{item.clientName}</p>
+                        <td className="px-4 py-3 max-w-[260px]">
+                          <p className={cn("font-semibold text-foreground truncate", item.isDeleted && "line-through text-muted-foreground")}>
+                            {item.clientName}
+                          </p>
                           <p className="text-[11px] text-muted-foreground truncate" title={item.address}>
                             📍 {item.address}
                           </p>
@@ -1578,45 +1796,74 @@ export const CRMDashboard = ({ isManager, onNavigate }: CRMDashboardProps) => {
                         <td className="px-4 py-3 text-center whitespace-nowrap">
                           <Badge className={cn(
                             "text-[10px] h-5 py-0 px-2 font-bold",
-                            item.status === "succeeded" 
+                            item.isDeleted
+                              ? "bg-slate-500 text-white"
+                              : item.status === "succeeded" 
                               ? "bg-emerald-600 dark:bg-emerald-600 text-white" 
                               : item.status === "pending"
                               ? "bg-amber-500 text-white animate-pulse"
                               : "bg-red-500 text-white"
                           )}>
-                            {item.statusLabel}
+                            {item.isDeleted ? "Исключён" : item.statusLabel}
                           </Badge>
                         </td>
 
                         {/* Сумма */}
-                        <td className="px-4 py-3 text-right font-black text-foreground whitespace-nowrap">
+                        <td className="px-4 py-3 text-right font-black whitespace-nowrap">
                           <span className={cn(
                             "text-sm font-black",
-                            item.status === "succeeded" ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
+                            item.isDeleted 
+                              ? "line-through text-slate-400" 
+                              : item.status === "succeeded" 
+                              ? "text-emerald-600 dark:text-emerald-400" 
+                              : "text-muted-foreground"
                           )}>
                             {item.amount.toLocaleString()} ₽
                           </span>
                         </td>
 
-                        {/* Действие / переход */}
+                        {/* Действие / переход и кнопка Soft Delete */}
                         <td className="px-4 py-3 text-center whitespace-nowrap">
-                          {item.accountNumber ? (
-                            <button
-                              onClick={() => handleAccountClick(item.accountNumber)}
-                              className="px-2.5 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary text-xs font-semibold transition-all"
-                            >
-                              К счёту
-                            </button>
-                          ) : item.requestId ? (
-                            <button
-                              onClick={() => handleItemClick("requests", "pending", item.requestId!)}
-                              className="px-2.5 py-1 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 text-xs font-semibold transition-all"
-                            >
-                              К заявке
-                            </button>
-                          ) : (
-                            <span className="text-muted-foreground text-xs">—</span>
-                          )}
+                          <div className="flex items-center justify-center gap-1.5">
+                            {item.accountNumber ? (
+                              <button
+                                onClick={() => handleAccountClick(item.accountNumber)}
+                                className="px-2 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary text-xs font-semibold transition-all"
+                              >
+                                К счёту
+                              </button>
+                            ) : item.requestId ? (
+                              <button
+                                onClick={() => handleItemClick("requests", "pending", item.requestId!)}
+                                className="px-2 py-1 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 text-xs font-semibold transition-all"
+                              >
+                                К заявке
+                              </button>
+                            ) : null}
+
+                            {/* Кнопка мягкого удаления / восстановления */}
+                            {!item.isDeleted ? (
+                              <button
+                                onClick={() => {
+                                  setDeleteModalItem(item);
+                                  setDeleteReasonInput("");
+                                }}
+                                className="p-1 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-all"
+                                title="Исключить счёт из статистики (пометить как тестовый)"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleRestorePayment(item)}
+                                className="p-1 px-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-all flex items-center gap-1 text-[11px] font-bold"
+                                title="Вернуть счёт в финансовую статистику"
+                              >
+                                <RotateCcw className="h-3.5 w-3.5" />
+                                <span>Вернуть</span>
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1706,6 +1953,112 @@ export const CRMDashboard = ({ isManager, onNavigate }: CRMDashboardProps) => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* ========================================================================= */}
+      {/* МОДАЛЬНОЕ ОКНО: ПОМЕТКА СЧЁТА НА УДАЛЕНИЕ (С ПРЕДУПРЕЖДЕНИЕМ И ПРИЧИНОЙ) */}
+      {/* ========================================================================= */}
+      <Dialog open={!!deleteModalItem} onOpenChange={(open) => !open && setDeleteModalItem(null)}>
+        <DialogContent className="max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600 dark:text-red-400 text-base font-bold">
+              <AlertTriangle className="h-5 w-5 text-red-500 shrink-0" />
+              Исключение счёта из статистики
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground pt-1 leading-relaxed">
+              ⚠️ Запись <b>не удаляется физически</b> из базы данных для сохранения бухгалтерского аудита, но помечается как тестовая и <b>полностью исключается из финансовых отчетов, графиков и расчёта выручки</b>.
+            </DialogDescription>
+          </DialogHeader>
+
+          {deleteModalItem && (
+            <div className="space-y-4 py-2">
+              {/* Краткая карточка помечаемого счёта */}
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-800 space-y-1.5 text-xs">
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Назначение:</span>
+                  <Badge variant="outline" className="font-bold text-[10px]">{deleteModalItem.typeLabel}</Badge>
+                </div>
+                {deleteModalItem.accountNumber && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Лицевой счёт:</span>
+                    <span className="font-mono font-bold text-foreground">л/с {deleteModalItem.accountNumber}</span>
+                  </div>
+                )}
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Плательщик:</span>
+                  <span className="font-semibold text-foreground truncate max-w-[200px]">{deleteModalItem.clientName}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Адрес:</span>
+                  <span className="text-muted-foreground truncate max-w-[220px]" title={deleteModalItem.address}>📍 {deleteModalItem.address}</span>
+                </div>
+                <div className="flex justify-between items-center pt-1 border-t border-slate-200/40 dark:border-slate-700/40">
+                  <span className="text-muted-foreground">Сумма к исключению:</span>
+                  <span className="font-black text-red-600 dark:text-red-400 text-base">{deleteModalItem.amount.toLocaleString()} ₽</span>
+                </div>
+              </div>
+
+              {/* Поле ввода обязательной причины */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-foreground flex items-center justify-between">
+                  <span>Причина пометки удаления <span className="text-red-500">*</span></span>
+                  <span className="text-[10px] text-muted-foreground">Обязательное поле</span>
+                </label>
+                <textarea
+                  placeholder="Укажите причину (например: Тестовый счёт при проверке ЮKassa, ошибочная проводка, дубликат)..."
+                  value={deleteReasonInput}
+                  onChange={(e) => setDeleteReasonInput(e.target.value)}
+                  rows={3}
+                  className="w-full text-xs p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 focus:outline-none focus:border-red-500 transition-all resize-none"
+                />
+              </div>
+
+              {/* Быстрые шаблоны причин */}
+              <div className="space-y-1">
+                <span className="text-[10px] text-muted-foreground font-semibold">Быстрые шаблоны:</span>
+                <div className="flex flex-wrap gap-1 text-[10px]">
+                  {[
+                    "Тестовый платёж при разработке",
+                    "Тестовый лицевой счёт",
+                    "Ошибочная проводка",
+                    "Дубликат операции"
+                  ].map((chip) => (
+                    <button
+                      key={chip}
+                      type="button"
+                      onClick={() => setDeleteReasonInput(chip)}
+                      className="px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-muted-foreground hover:text-foreground transition-all"
+                    >
+                      + {chip}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200/50 dark:border-slate-800/50">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setDeleteModalItem(null)} 
+              disabled={isDeleting}
+              className="text-xs font-medium"
+            >
+              Отмена
+            </Button>
+            <Button 
+              variant="destructive" 
+              size="sm" 
+              onClick={handleConfirmDelete} 
+              disabled={!deleteReasonInput.trim() || isDeleting}
+              className="font-bold gap-1.5 text-xs bg-red-600 hover:bg-red-700"
+            >
+              {isDeleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+              Исключить из статистики
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
