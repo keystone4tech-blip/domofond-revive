@@ -103,6 +103,28 @@ interface EquipmentOrder {
   items?: RequestItem[];
 }
 
+// Вспомогательная функция нормализации улицы (убирает "(ул)", "ул.", "улица", лишние пробелы)
+export const normalizeStreet = (s?: string | null): string => {
+  if (!s) return "";
+  return s
+    .toLowerCase()
+    .replace(/ё/g, "е")
+    .replace(/\(ул\)|ул\.?|улица/gi, "")
+    .replace(/[^a-zа-я0-9]+/gi, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+};
+
+// Вспомогательная функция нормализации номера дома (схлопывает "3, корп. 1", "3 к2" -> "3к1", "3к2")
+export const normalizeHouse = (h?: string | null): string => {
+  if (!h) return "";
+  let clean = h.toLowerCase().replace(/ё/g, "е").trim();
+  clean = clean.replace(/[,\.]/g, " ");
+  clean = clean.replace(/(?:корпус|корп|к)\s*(\d+)/gi, "к$1");
+  clean = clean.replace(/\s+/g, "");
+  return clean;
+};
+
 export const InstallerSheetManager: React.FC = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -148,13 +170,17 @@ export const InstallerSheetManager: React.FC = () => {
       const houseEntranceMap = new Map<string, Set<string>>();
       const entranceServiceTypeMap = new Map<string, string>();
       const houseServiceTypeMap = new Map<string, Set<string>>();
+      
+      // Карты с нормализованными ключами для надежного сопоставления корпусов ("3, корп. 1" <-> "3к1")
+      const normHouseServiceTypeMap = new Map<string, Set<string>>();
+      const normEntranceServiceTypeMap = new Map<string, string>();
+      const canonicalHouseMap = new Map<string, string>(); // normStreet___normHouse -> оригинальный house из entrances
 
       const addAddress = (street?: string | null, house?: string | null, entrance?: string | null, serviceType?: string | null) => {
         if (!street || !house) return;
         const s = street.trim();
         const h = house.trim();
         const e = entrance ? entrance.trim() : "";
-        const st = serviceType || "maintenance";
 
         if (!streetMap.has(s)) {
           streetMap.set(s, new Set());
@@ -169,17 +195,38 @@ export const InstallerSheetManager: React.FC = () => {
 
         const lowerS = s.toLowerCase();
         const lowerH = h.toLowerCase();
-        if (e) {
-          entranceServiceTypeMap.set(`${lowerS}___${lowerH}___${e}`, st);
+        const normS = normalizeStreet(s);
+        const normH = normalizeHouse(h);
+        const normKey = `${normS}___${normH}`;
+
+        // Фиксируем канонический вид дома из реестра entrances
+        if (serviceType && !canonicalHouseMap.has(normKey)) {
+          canonicalHouseMap.set(normKey, h);
         }
-        if (!houseServiceTypeMap.has(`${lowerS}___${lowerH}`)) {
-          houseServiceTypeMap.set(`${lowerS}___${lowerH}`, new Set());
+
+        // ВАЖНО: Привязываем serviceType ТОЛЬКО если он явно передан из таблицы entrances!
+        // Ни в коем случае не подмешиваем дефолтный "maintenance" из requests, иначе монтажные объекты получают статус "Частично монтаж"!
+        if (serviceType) {
+          if (e) {
+            entranceServiceTypeMap.set(`${lowerS}___${lowerH}___${e}`, serviceType);
+            normEntranceServiceTypeMap.set(`${normKey}___${e}`, serviceType);
+          }
+          if (!houseServiceTypeMap.has(`${lowerS}___${lowerH}`)) {
+            houseServiceTypeMap.set(`${lowerS}___${lowerH}`, new Set());
+          }
+          houseServiceTypeMap.get(`${lowerS}___${lowerH}`)!.add(serviceType);
+
+          if (!normHouseServiceTypeMap.has(normKey)) {
+            normHouseServiceTypeMap.set(normKey, new Set());
+          }
+          normHouseServiceTypeMap.get(normKey)!.add(serviceType);
         }
-        houseServiceTypeMap.get(`${lowerS}___${lowerH}`)!.add(st);
       };
 
+      // 1. Сначала загружаем официальный реестр подъездов с точными статусами (ТО / Монтаж / Аренда)
       entrances?.forEach(item => addAddress(item.street, item.house, item.entrance, item.service_type));
-      reqAddresses?.forEach(item => addAddress(item.street, item.house, item.entrance));
+      // 2. Для адресов из requests передаем serviceType = null (только для выпадающих списков фильтра, не портя статусы!)
+      reqAddresses?.forEach(item => addAddress(item.street, item.house, item.entrance, null));
 
       const streets = Array.from(streetMap.keys()).sort((a, b) => a.localeCompare(b, "ru"));
 
@@ -189,6 +236,9 @@ export const InstallerSheetManager: React.FC = () => {
         houseEntranceMap,
         entranceServiceTypeMap,
         houseServiceTypeMap,
+        normHouseServiceTypeMap,
+        normEntranceServiceTypeMap,
+        canonicalHouseMap,
       };
     },
   });
@@ -564,7 +614,8 @@ export const InstallerSheetManager: React.FC = () => {
       if (!s || !h || !apt) {
         const addr = order.address || "";
         const streetMatch = addr.match(/(?:ул\.|улица)\s*([^,]+)/i) || addr.match(/,\s*([^,]+?)\s*\(ул\)/i);
-        const houseMatch = addr.match(/(?:д\.|дом)\s*([^,]+)/i);
+        // Улучшенный парсер номера дома: захватывает номер дома целиком с корпусом ("3, корп. 1", "3 к2") до подъезда или квартиры
+        const houseMatch = addr.match(/(?:д\.|дом)\s*([0-9a-zа-я\s\/\.,\-_]+?)(?=,?\s*(?:п\.|подъезд|кв\.|квартира|$))/i);
         const entranceMatch = addr.match(/(?:п\.|подъезд)\s*([^,]+)/i);
         const aptMatch = addr.match(/(?:кв\.|квартира)\s*([^,]+)/i);
 
@@ -572,6 +623,15 @@ export const InstallerSheetManager: React.FC = () => {
         if (!h && houseMatch) h = houseMatch[1].trim();
         if (!e && entranceMatch) e = entranceMatch[1].trim();
         if (!apt && aptMatch) apt = aptMatch[1].trim();
+      }
+
+      // Канонизация номера дома по справочнику entrances (например, "3, корп. 1" -> "3к1")
+      if (s && h && addressData?.canonicalHouseMap) {
+        const normKey = `${normalizeStreet(s)}___${normalizeHouse(h)}`;
+        const canonicalH = addressData.canonicalHouseMap.get(normKey);
+        if (canonicalH) {
+          h = canonicalH;
+        }
       }
 
       // Если подъезд не указан в заказе, автоопределяем его из базы лицевых счетов
@@ -607,7 +667,7 @@ export const InstallerSheetManager: React.FC = () => {
         items,
       };
     });
-  }, [rawOrders, requestItems, allAccounts]);
+  }, [rawOrders, requestItems, allAccounts, addressData]);
 
   // 4. Фильтрация заказов по выбранному дому, подъезду, статусу оплаты и мгновенному онлайн-поиску
   const filteredOrders = useMemo(() => {
@@ -706,10 +766,13 @@ export const InstallerSheetManager: React.FC = () => {
     };
   }
 
-  // Определение типа обслуживания для дома
+  // Определение типа обслуживания для дома (с нормализованным поиском по реестру entrances)
   const getHouseServiceType = (street: string, house: string): string => {
-    const key = `${street.trim().toLowerCase()}___${house.trim().toLowerCase()}`;
-    const typesSet = addressData?.houseServiceTypeMap?.get(key);
+    const directKey = `${street.trim().toLowerCase()}___${house.trim().toLowerCase()}`;
+    const normKey = `${normalizeStreet(street)}___${normalizeHouse(house)}`;
+    
+    // Ищем точный набор типов подъездов дома
+    const typesSet = addressData?.houseServiceTypeMap?.get(directKey) || addressData?.normHouseServiceTypeMap?.get(normKey);
     if (!typesSet || typesSet.size === 0) return "maintenance";
     const types = Array.from(typesSet);
     if (types.every(t => t === "installation")) return "installation";
@@ -719,10 +782,11 @@ export const InstallerSheetManager: React.FC = () => {
     return "mixed";
   };
 
-  // Определение типа обслуживания для подъезда
+  // Определение типа обслуживания для подъезда (с нормализованным поиском по реестру entrances)
   const getEntranceServiceType = (street: string, house: string, entrance: string): string => {
-    const key = `${street.trim().toLowerCase()}___${house.trim().toLowerCase()}___${entrance.trim()}`;
-    return addressData?.entranceServiceTypeMap?.get(key) || "maintenance";
+    const directKey = `${street.trim().toLowerCase()}___${house.trim().toLowerCase()}___${entrance.trim()}`;
+    const normKey = `${normalizeStreet(street)}___${normalizeHouse(house)}___${entrance.trim()}`;
+    return addressData?.entranceServiceTypeMap?.get(directKey) || addressData?.normEntranceServiceTypeMap?.get(normKey) || "maintenance";
   };
 
   // Визуальный бейдж статуса дома / подъезда
