@@ -558,8 +558,11 @@ export const InstallerSheetManager: React.FC = () => {
       });
     }
 
-    // 2. Если в items не найдено позиций, аккуратно парсим текст order.message
-    if (order.message) {
+    // 2. Если в items не найдено позиций (старый формат), аккуратно парсим текст order.message
+    // ВАЖНО: Если у заказа уже есть структурированные items, текст message для номенклатуры НЕ парсим!
+    const hasStructuredItems = Boolean(order.items && order.items.length > 0);
+
+    if (!hasStructuredItems && order.message) {
       const lines = order.message.split("\n");
       for (const rawLine of lines) {
         const line = rawLine.trim();
@@ -567,6 +570,26 @@ export const InstallerSheetManager: React.FC = () => {
           continue;
         }
         const lowerLine = line.toLowerCase();
+
+        // 2.0 КАТЕГОРИЧЕСКИЙ ФИЛЬТР: Комментарии клиента, примечания и переписка НИ ПРИ КАКИХ УСЛОВИЯХ не являются оборудованием!
+        const isCommentOrNote =
+          lowerLine.includes("комментар") ||
+          lowerLine.includes("примечан") ||
+          lowerLine.includes("пожелан") ||
+          lowerLine.includes("клиент:") ||
+          lowerLine.includes("клиент написал") ||
+          lowerLine.includes("здравствуй") ||
+          lowerLine.includes("хотим") ||
+          lowerLine.includes("просьб") ||
+          lowerLine.includes("сообщен") ||
+          line.includes("💬") ||
+          line.includes("❓") ||
+          line.includes("ℹ️") ||
+          line.includes("📝");
+
+        if (isCommentOrNote) {
+          continue; // Пропускаем строки комментариев клиента!
+        }
 
         // 2.1 Проверка Личного кабинета / приложения
         if (isAppItem(lowerLine)) {
@@ -607,9 +630,15 @@ export const InstallerSheetManager: React.FC = () => {
           continue;
         }
 
-        // 2.4 Переговорные трубки / ТКП (только если не приложение, не ключ и не услуга)
+        // 2.4 Переговорные трубки / ТКП (только если не приложение, не ключ, не услуга и не длинный связный текст)
         if (handsetsList.length === 0 && isHandsetItem(lowerLine)) {
-          const clean = line.replace(/^[—\-*•\s]*(?:Оборудование|Трубка|ТКП)[^:]*:\s*/i, "").trim();
+          // Защита от связных предложений и переписки: название оборудования не может быть длинным связным предложением
+          const isSentence = line.split(/\s+/).length > 7;
+          if (isSentence) {
+            continue;
+          }
+
+          const clean = line.replace(/^[—\-*•\s]*(?:Оборудование|Трубка|ТКП|Модель|Устройство)[^:]*:\s*/i, "").trim();
           const qtyMatch = clean.match(/\((\d+)\s*шт/i);
           const qty = qtyMatch ? parseInt(qtyMatch[1], 10) : 1;
           const rawHName = clean.replace(/\s*\([^)]*\).*/, "").trim();
@@ -624,31 +653,35 @@ export const InstallerSheetManager: React.FC = () => {
       }
     }
 
-    // Определение графы «Монтаж / Услуги»:
-    // 1. Если оплачен монтаж/установка -> пишем «Монтаж»
-    // 2. Если выбрана замена или заказана трубка -> пишем «Замена»
-    // 3. Иначе -> «—»
+    // Определение графы «Монтаж / Замена»:
+    // ПРАВИЛО: Графа относится ИСКЛЮЧИТЕЛЬНО к трубкам в квартирах!
+    // 1. Если трубка НЕ заказана (handsetsCount === 0) -> СТРОГО «—» (для ключей, ЛК и взносов никаких монтажей/замен нет)
+    // 2. Если трубка заказана (handsetsCount > 0):
+    //    - Если оплачена услуга монтажа/прокладки -> пишем «Монтаж»
+    //    - Иначе (только замена трубки или покупка без кабеля) -> пишем «Замена»
     let serviceDisplay = "—";
-    const hasInstallation = servicesList.some(s => {
-      const lower = s.toLowerCase();
-      return lower.includes("установк") || lower.includes("монтаж") || lower.includes("подключ");
-    });
-    const hasReplacement = servicesList.some(s => {
-      const lower = s.toLowerCase();
-      return lower.includes("замен");
-    });
+    if (handsetsCount > 0) {
+      const hasInstallation = servicesList.some(s => {
+        const lower = s.toLowerCase();
+        return (
+          lower.includes("монтаж ткп") ||
+          lower.includes("монтаж трубки") ||
+          lower.includes("установка ткп") ||
+          lower.includes("установка трубки") ||
+          lower.includes("прокладка") ||
+          (lower.includes("монтаж") && !lower.includes("замен")) ||
+          (lower.includes("установк") && !lower.includes("замен"))
+        );
+      });
 
-    if (hasInstallation) {
-      serviceDisplay = "Монтаж";
-    } else if (hasReplacement || handsetsCount > 0) {
-      serviceDisplay = "Замена";
-    } else if (servicesList.length > 0) {
-      const sLower = servicesList.join(" ").toLowerCase();
-      if (sLower.includes("замен")) {
-        serviceDisplay = "Замена";
+      if (hasInstallation) {
+        serviceDisplay = "Монтаж";
       } else {
-        serviceDisplay = servicesList.join(", ");
+        serviceDisplay = "Замена";
       }
+    } else {
+      // Трубка не заказана -> строго прочерк «—»
+      serviceDisplay = "—";
     }
 
     return {
