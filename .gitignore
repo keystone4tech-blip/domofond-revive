@@ -69,6 +69,7 @@ backups/
 *.xlsx
 *.xls
 scratch_*.*
+scratch/
 *.sql
 !init-scripts/*.sql
 !migration_*.sql
