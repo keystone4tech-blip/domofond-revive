@@ -4219,6 +4219,47 @@ function require1CApiKey(req, res, next) {
   next();
 }
 
+// Функция интеллектуального парсинга адреса для передачи в 1С
+function extractAddressParts(row) {
+  let street = (row.street || '').trim();
+  let house = (row.house || '').trim();
+  let entrance = (row.entrance || '').trim();
+  let apartment = (row.apartment || '').trim();
+  const address = (row.address || '').trim();
+
+  if (address) {
+    // 1. Извлечение улицы: после Краснодара и до номера дома
+    if (!street) {
+      const streetMatch = address.match(/(?:Краснодар,\s*|г\.\s*Краснодар,\s*)([^,]+?)(?:,\s*д\.|\s*д\.|\s*дом)/i);
+      if (streetMatch) street = streetMatch[1].trim();
+    }
+    // 2. Извлечение номера дома
+    if (!house) {
+      const houseMatch = address.match(/(?:д\.|дом)\s*([^,]+?)(?:,\s*п\.|\s*п\.|\s*кв\.|\s*$)/i);
+      if (houseMatch) house = houseMatch[1].trim();
+    }
+    // 3. Извлечение подъезда
+    if (!entrance) {
+      const entMatch = address.match(/(?:п\.|подъезд|под\.)\s*([0-9]+)/i);
+      if (entMatch) entrance = entMatch[1].trim();
+    }
+    // 4. Извлечение квартиры
+    if (!apartment) {
+      const aptMatch = address.match(/(?:кв\.|квартира)\s*([0-9]+)/i);
+      if (aptMatch) apartment = aptMatch[1].trim();
+    }
+  }
+
+  return {
+    ...row,
+    city: 'Краснодар',
+    street,
+    house,
+    entrance,
+    apartment
+  };
+}
+
 /**
  * 1. Получение очереди событий для 1С (заявки на ремонт, заказы оборудования)
  * Вызывается скриптом bridge.ps1 с офисного компьютера
@@ -4239,7 +4280,7 @@ app.get('/api/1c/pull-events', require1CApiKey, async (req, res) => {
     // Если очередь пуста, автоматически подтягиваем несинхронизированные заявки жильцов из requests
     if (queueRes.rows.length === 0) {
       const pendingRequests = await pool.query(
-        `SELECT r.id, r.name, r.phone, r.address, r.apartment, r.street, r.house,
+        `SELECT r.id, r.name, r.phone, r.address, r.apartment, r.street, r.house, r.entrance,
                 r.message, r.order_type, r.status, r.created_at,
                 p.full_name as master_name
          FROM requests r
@@ -4250,8 +4291,9 @@ app.get('/api/1c/pull-events', require1CApiKey, async (req, res) => {
         [Math.min(limit, 5)]
       );
 
-      // Регистрируем найденные заявки в очереди
-      for (const reqRow of pendingRequests.rows) {
+      // Регистрируем найденные заявки в очереди с обогащенным адресом
+      for (const rawReq of pendingRequests.rows) {
+        const reqRow = extractAddressParts(rawReq);
         const insertRes = await pool.query(
           `INSERT INTO sync_queue_1c (entity_type, entity_id, event_type, payload, status)
            VALUES ('request', $1, 'create', $2, 'pending')
