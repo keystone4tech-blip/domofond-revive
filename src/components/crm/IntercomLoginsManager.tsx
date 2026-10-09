@@ -68,8 +68,9 @@ const parseAddressString = (raw: string) => {
   console.log("[Парсер адреса] Анализ строки:", raw);
   let clean = raw.replace(/_logins\.xls.*$/i, "").replace(/\.xls.*$/i, "").trim();
   
-  // Убираем префикс "Список сгенерированных учетных данных для адреса:"
-  clean = clean.replace(/^.*(?:для адреса|адрес)[:\s]*/i, "").trim();
+  // Убираем любой префикс "Список сгенерированных учетных данных для адреса:" или "адрес:"
+  clean = clean.replace(/^.*?(?:для адреса|адреса|адрес)[:\s]*/i, "").trim();
+  clean = clean.replace(/^[а-яa-z]:\s*/i, "").trim();
 
   const parts = clean.split(/,\s*/);
   let city = "";
@@ -78,12 +79,12 @@ const parseAddressString = (raw: string) => {
   let entrance = "";
 
   if (parts.length >= 4) {
-    city = parts[0].trim();
+    city = parts[0].replace(/^.*:\s*/, "").trim();
     street = parts[1].trim();
     house = parts[2].trim().replace(/_/g, "/");
     entrance = parts[3].replace(/^(?:п\.|подъезд\s*|п\s*)/i, "").trim();
   } else if (parts.length === 3) {
-    city = parts[0].trim();
+    city = parts[0].replace(/^.*:\s*/, "").trim();
     street = parts[1].trim();
     const houseMatch = parts[2].match(/^([^\s,]+)(?:\s+(?:п\.|подъезд)?\s*(\d+))?/i);
     if (houseMatch) {
@@ -418,6 +419,7 @@ export const IntercomLoginsManager: React.FC = () => {
 
     try {
       const recordsToInsert = parsedRows.map(row => ({
+        address: `${uploadCity.trim()}, ${uploadStreet.trim()}, ${uploadHouse.trim()}`,
         city: uploadCity.trim(),
         street: uploadStreet.trim(),
         house: uploadHouse.trim(),

@@ -38,6 +38,9 @@ PRODUCTION_CREDENTIALS_AND_RECOVERY.md
 
 # Database Backups & Dumps
 backups/
+1с/
+1c/
+*.dt
 *.sql.gz
 *.dump
 *.tar.gz

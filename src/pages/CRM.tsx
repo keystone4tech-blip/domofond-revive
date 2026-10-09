@@ -44,6 +44,7 @@ import IntercomLoginsManager from "@/components/crm/IntercomLoginsManager";
 import InstallerSheetManager from "@/components/crm/InstallerSheetManager";
 import VerificationManager from "@/components/crm/VerificationManager";
 import InstructionsManager from "@/components/crm/InstructionsManager";
+import PageInstructionAccordion from "@/components/crm/PageInstructionAccordion";
 import CRMBottomNav from "@/components/crm/CRMBottomNav";
 import { CRMSidebar } from "@/components/crm/CRMSidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -262,6 +263,9 @@ const CRM = () => {
 
         {/* Главная рабочая область контента */}
         <main className="flex-1 p-3 sm:p-4 lg:p-6 pb-28 sm:pb-32 lg:pb-8 w-full overflow-x-hidden min-w-0">
+          {/* Сворачиваемая пошаговая инструкция для активной вкладки */}
+          <PageInstructionAccordion tabId={activeTab} />
+
           <Tabs
             value={activeTab}
             onValueChange={(val) => handleTabChange(val)}
