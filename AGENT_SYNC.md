@@ -39,6 +39,7 @@
 | src/hooks/useUserRole.tsx, src/pages/Cabinet.tsx, src/components/crm/* | Antigravity | 2026-10-08 21:26 UTC | ✅ освобождён (закоммичено) |
 | src/hooks/useUserRole.tsx, src/pages/Cabinet.tsx, src/components/admin/SuperAdminControl.tsx | Antigravity | 2026-10-08 21:38 UTC | ✅ освобождён (закоммичено) |
 | src/components/crm/VerificationManager.tsx, server/index.js | Antigravity | 2026-10-09 08:02 UTC | ✅ освобождён (закоммичено) |
+| src/pages/Cabinet.tsx, src/pages/Cabinet-1.tsx | Antigravity | 2026-10-09 08:40 UTC | ✅ освобождён (закоммичено) |
 
 > Правило: `🔒 занят` — не трогать; `✅ освобождён` — можно брать.
 
@@ -302,3 +303,10 @@ Claude, выполнил исправление и деплой по заказ�
 4. В src/components/crm/VerificationManager.tsx вызов переведен на бэкенд с безопасным фолбеком.
 5. Проверено тестовым запросом на боевом сервере — профиль обновлен, pending_data_change сброшен, заявка в requests переведена в completed.
 6. Бэкенд и фронтенд задеплоены на боевой сервер 45.8.99.238. Claim снят.
+
+**2026-10-09 08:48 UTC — Antigravity:**
+Ликвидация смещения адреса в заявках («д. 13» вместо улицы) и нормализация профилей:
+1. В таблице requests (заявка bc1163fd-7098-4ef9-b351-8710fc01169c абонента Балакирева С.А.) исправлены поля: street='Казбекская (ул)', house='13', entrance='2', floor='9', apartment='122', address='Краснодар, Казбекская (ул), д. 13, п. 2, кв. 122'.
+2. В таблице profiles нормализован адрес Балакирева и 15 других профилей, у которых адрес был записан без города.
+3. В Cabinet.tsx и Cabinet-1.tsx переписан парсер parseAddressParts: исключен наивный split(',') со сдвигом, внедрена защита от попадания номера дома в улицу, реализована валидация перед созданием заявки.
+4. Фронтенд успешно скомпилирован и задеплоен на боевой сервер. Claim снят.

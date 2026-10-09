@@ -147,42 +147,73 @@ const extractHousePartFromCacheAddr = (cacheAddr: string): string => {
 };
 
 // Гарантируем префикс города. Все парсеры адреса ниже считают parts[0] городом, parts[1] улицей.
-// Профили, сохранённые старым визардом без города ("Улица, д. Дом, п N"), из-за этого читались
-// со сдвигом (в улицу попадал корпус). Эта функция добавляет "Краснодар," если города нет —
-// и старые, и новые адреса парсятся одинаково правильно.
+// Гарантируем префикс города/населенного пункта.
+// Если адрес сохранен без города ("Казбекская (ул), д. 13, п 2"), эта функция добавляет "Краснодар, "
+// чтобы все компоненты и парсеры корректно определяли название улицы.
 const ensureCityPrefix = (addr: string): string => {
   if (!addr) return addr;
-  const first = (addr.split(",")[0] || "").trim().toLowerCase();
-  if (/краснодар|^город\b|^г\.?\s/.test(first)) return addr;               // город уже есть
-  if (/^(пос|посёлок|поселок|ст-ца|станица|хутор|х\.|аул|снт|днт|тер)\b/.test(first)) return addr; // иной нас. пункт
-  return `Краснодар, ${addr}`;
+  const trimmed = addr.trim();
+  const first = (trimmed.split(",")[0] || "").trim().toLowerCase();
+  // Уже указан город или населенный пункт:
+  if (/краснодар|^город\b|^г\.?\s/.test(first)) return trimmed;
+  if (/^(пос|посёлок|поселок|ст-ца|станица|хутор|х\.|аул|снт|днт|тер|пгт|с\.|село)\b/.test(first)) return trimmed;
+  if (/^(новая адыгея|адыгея|яблоновский|энем|тахтамукай|майкоп|сочи|новороссийск|анапа|геленджик)\b/.test(first)) return trimmed;
+  return `Краснодар, ${trimmed}`;
 };
 
-const parseAddressParts = (fullAddr: string) => {
+// Интеллектуальный парсер адреса: надежно разделяет улицу и номер дома, исключая сдвиги
+const parseAddressParts = (fullAddr: string): { street: string; house: string } => {
   if (!fullAddr) return { street: "", house: "" };
-  fullAddr = ensureCityPrefix(fullAddr);
+  const prefixed = ensureCityPrefix(fullAddr);
   
-  // Очищаем адрес от подъезда и квартиры
-  // Заменяем \d+ на [а-яa-z0-9-+]+ для корректного вырезания квартир с литерами (например, "15а")
-  const cleanAddr = fullAddr
+  // Убираем подъезд и квартиру из хвоста
+  const clean = prefixed
     .replace(/,\s*(?:п(?:одъезд)?\.?\s*\d+).*$/i, "")
-    .replace(/,\s*(?:кв\.?\s*[а-яa-z0-9-+]+).*$/i, "");
-    
-  const parts = cleanAddr.split(",");
-  let parsedStreet = "";
-  let parsedHouse = "";
-  
-  if (parts.length >= 3) {
-    parsedStreet = parts[1].trim();
-    // Соединяем все последующие части (дом, корпус) через запятую и очищаем от "д."
-    parsedHouse = parts.slice(2).join(", ").trim().replace(/^(д\.\s*|дом\s*)/i, "").trim();
-  } else if (parts.length === 2) {
-    parsedStreet = parts[0].trim();
-    parsedHouse = parts[1].trim().replace(/^(д\.\s*|дом\s*)/i, "").trim();
-  } else {
-    parsedStreet = fullAddr || "";
+    .replace(/,\s*(?:кв\.?\s*[а-яa-z0-9-+]+).*$/i, "")
+    .trim();
+
+  const parts = clean.split(",").map(p => p.trim()).filter(Boolean);
+  if (parts.length === 0) return { street: "", house: "" };
+  if (parts.length === 1) return { street: parts[0], house: "" };
+
+  // Ищем индекс части с домом (начинается с д., дом или содержит номер дома)
+  let houseIdx = -1;
+  for (let i = 1; i < parts.length; i++) {
+    if (/^(?:д\.|дом)\s*\d+/i.test(parts[i]) || /^\d+[а-яa-z0-9\/-]*/i.test(parts[i])) {
+      houseIdx = i;
+      break;
+    }
   }
-  return { street: parsedStreet, house: parsedHouse };
+
+  let street = "";
+  let house = "";
+
+  if (houseIdx !== -1) {
+    if (houseIdx === 1 && parts.length === 2 && !/краснодар/i.test(parts[0])) {
+      street = parts[0];
+    } else {
+      street = parts.slice(1, houseIdx).join(", ");
+      if (!street) street = parts[0];
+    }
+    house = parts.slice(houseIdx).join(", ").replace(/^(?:д\.\s*|дом\s*)/i, "").trim();
+  } else {
+    if (parts.length >= 3) {
+      street = parts[1];
+      house = parts.slice(2).join(", ").replace(/^(?:д\.\s*|дом\s*)/i, "").trim();
+    } else {
+      street = parts[0];
+      house = parts[1].replace(/^(?:д\.\s*|дом\s*)/i, "").trim();
+    }
+  }
+
+  // Очищаем улицу от ошибочных 'д. 13' (защита от сдвига)
+  if (/^(?:д\.|дом)\s*\d+/i.test(street)) {
+    const swap = street;
+    street = parts[0] !== "Краснодар" ? parts[0] : "";
+    if (!house) house = swap.replace(/^(?:д\.\s*|дом\s*)/i, "").trim();
+  }
+
+  return { street, house };
 };
 
 const DebtCard = ({ 
@@ -2191,14 +2222,12 @@ const Cabinet = () => {
     let effHouse = orderHouse || displayHouse || "";
     let effEntrance = orderEntrance || entrance || userAccount?.entrance || profile?.entrance || "";
 
-    // Фоллбек: если поля формы пусты, извлекаем напрямую из адреса договора или профиля
+    // Фоллбек: если поля формы пусты, извлекаем напрямую из адреса договора или профиля через надежный парсер
     const rawAddress = userAccount?.address || profile?.address || address || "";
     if ((!effStreet || !effHouse) && rawAddress) {
-      const parts = rawAddress.split(",");
-      if (parts.length >= 3) {
-        if (!effStreet) effStreet = parts[1].trim();
-        if (!effHouse) effHouse = extractHousePartFromCacheAddr(rawAddress);
-      }
+      const parsedAddr = parseAddressParts(rawAddress);
+      if (!effStreet && parsedAddr.street) effStreet = parsedAddr.street;
+      if (!effHouse && parsedAddr.house) effHouse = parsedAddr.house;
     }
     if (!effEntrance && rawAddress) {
       const entMatch = rawAddress.match(/(?:^|,|\s)(?:п|подъезд|под\.?|п\.)\s*(\d+)/i);
@@ -3653,13 +3682,16 @@ const Cabinet = () => {
       let houseVal = displayHouse || "";
       let entVal = entrance || "";
 
-      // Если displayStreet или displayHouse пустые, пробуем извлечь из сырого адреса
+      // Если displayStreet или displayHouse пустые, либо в streetVal ошибочно попал номер дома ("д. 13"),
+      // извлекаем и нормализуем улицу и дом через интеллектуальный parseAddressParts
       const rawAddress = userAccount?.address || profile?.address || address || "";
-      if ((!streetVal || !houseVal) && rawAddress) {
-        const parts = rawAddress.split(",");
-        if (parts.length >= 3) {
-          if (!streetVal) streetVal = parts[1].trim();
-          if (!houseVal) houseVal = extractHousePartFromCacheAddr(rawAddress);
+      if ((!streetVal || !houseVal || /^(?:д\.|дом)\s*\d+/i.test(streetVal)) && rawAddress) {
+        const parsedOrderAddr = parseAddressParts(rawAddress);
+        if ((!streetVal || /^(?:д\.|дом)\s*\d+/i.test(streetVal)) && parsedOrderAddr.street) {
+          streetVal = parsedOrderAddr.street;
+        }
+        if (!houseVal && parsedOrderAddr.house) {
+          houseVal = parsedOrderAddr.house;
         }
       }
 
@@ -3706,10 +3738,25 @@ const Cabinet = () => {
       return;
     }
 
-    if (!orderStreet || !orderStreet.trim() || !orderHouse || !orderHouse.trim()) {
+    // Проверка и защита: если в orderStreet по ошибке попал номер дома ("д. 13" или "13"),
+    // пытаемся восстановить правильную улицу из исходного адреса профиля/счета
+    let effectiveStreet = orderStreet.trim();
+    let effectiveHouse = orderHouse.trim();
+    if (/^(?:д\.|дом)\s*\d+/i.test(effectiveStreet) || /^\d+[а-яa-z0-9\/-]*$/i.test(effectiveStreet)) {
+      console.warn(`[Заказ] Внимание: в поле улицы обнаружен номер дома "${effectiveStreet}". Восстанавливаем через parseAddressParts...`);
+      const recovered = parseAddressParts(userAccount?.address || profile?.address || address || "");
+      if (recovered.street && !/^(?:д\.|дом)\s*\d+/i.test(recovered.street)) {
+        effectiveStreet = recovered.street;
+        if (!effectiveHouse && recovered.house) effectiveHouse = recovered.house;
+        setOrderStreet(effectiveStreet);
+        if (effectiveHouse) setOrderHouse(effectiveHouse);
+      }
+    }
+
+    if (!effectiveStreet || !effectiveHouse || /^(?:д\.|дом)\s*\d+/i.test(effectiveStreet)) {
       toast({ 
         title: "Не указан адрес вызова", 
-        description: "Пожалуйста, обязательно заполните название улицы и номер дома.",
+        description: "Пожалуйста, обязательно заполните корректное название улицы и номер дома.",
         variant: "destructive" 
       });
       return;
@@ -3795,11 +3842,17 @@ const Cabinet = () => {
       }
 
       // Составляем полный адрес для заявки
-      const cleanOrderStreet = orderStreet.trim();
-      const cleanOrderHouse = orderHouse.trim();
+      const cleanOrderStreet = effectiveStreet;
+      const cleanOrderHouse = effectiveHouse.replace(/^(?:д\.\s*|дом\s*)/i, "").trim();
       const cleanOrderApartment = orderPremiseType === "private" ? "" : orderApartment.trim();
       
-      const orderFullAddress = `г. Краснодар, ${cleanOrderStreet}, д. ${cleanOrderHouse}${
+      const cityPrefix = /^(?:г\.?\s*краснодар|краснодар|новая адыгея|адыгея|пос\.|станица)/i.test(cleanOrderStreet)
+        ? ""
+        : "г. Краснодар, ";
+
+      const housePart = cleanOrderHouse ? `д. ${cleanOrderHouse}` : "";
+      
+      const orderFullAddress = `${cityPrefix}${cleanOrderStreet}${housePart ? `, ${housePart}` : ""}${
         orderEntrance ? `, п. ${orderEntrance}` : ""
       }${
         cleanOrderApartment ? `, кв. ${cleanOrderApartment}` : ""
