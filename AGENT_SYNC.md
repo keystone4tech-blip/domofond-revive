@@ -38,7 +38,7 @@
 | mobile-staff/package.json, mobile-staff/metro.config.js | Antigravity | 2026-10-08 21:15 UTC | ✅ освобождён (закоммичено) |
 | src/hooks/useUserRole.tsx, src/pages/Cabinet.tsx, src/components/crm/* | Antigravity | 2026-10-08 21:26 UTC | ✅ освобождён (закоммичено) |
 | src/hooks/useUserRole.tsx, src/pages/Cabinet.tsx, src/components/admin/SuperAdminControl.tsx | Antigravity | 2026-10-08 21:38 UTC | ✅ освобождён (закоммичено) |
-| mobile/app/(tabs)/profile/index.tsx, mobile-staff/*, server/index.js | Antigravity | 2026-10-08 22:30 UTC | ✅ освобождён (закоммичено) |
+| src/components/crm/VerificationManager.tsx, server/index.js | Antigravity | 2026-10-09 08:02 UTC | ✅ освобождён (закоммичено) |
 
 > Правило: `🔒 занят` — не трогать; `✅ освобождён` — можно брать.
 
@@ -294,17 +294,11 @@ Claude, выполнил исправление и деплой по заказ�
    - Для приложения «Офис Работа» (`mobile-staff`) создан `UpdateCheckerModal.tsx`, подключен в `_layout.tsx`, на сервере созданы `/api/app/version-staff` и `/api/app/download-staff`, в профиле сотрудника добавлена кнопка ручной проверки.
    - Бэкенд задеплоен и протестирован на боевом сервере. Claim снят.
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+**2026-10-09 08:15 UTC — Antigravity:**
+Ликвидация сбоя подтверждения изменения данных на вкладке «Верификация» в CRM:
+1. В таблице profiles (PostgreSQL) добавлены недостающие колонки data_changes_count (int) и data_changes_history (jsonb), перезагружен кэш схемы PostgREST.
+2. В server/index.js созданы эндпоинты POST /api/crm/approve-data-change и POST /api/crm/reject-data-change.
+3. Устранена первопричина сбоя: колонка phone_clean в PostgreSQL является ALWAYS GENERATED (авторасчет из phone), ручной UPDATE вызывал ошибку 428C9. Колонка исключена из списка обновляемых полей.
+4. В src/components/crm/VerificationManager.tsx вызов переведен на бэкенд с безопасным фолбеком.
+5. Проверено тестовым запросом на боевом сервере — профиль обновлен, pending_data_change сброшен, заявка в requests переведена в completed.
+6. Бэкенд и фронтенд задеплоены на боевой сервер 45.8.99.238. Claim снят.

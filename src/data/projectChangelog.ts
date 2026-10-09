@@ -258,6 +258,16 @@ export const KIND_META: Record<Kind, { label: string; badgeCls: string }> = {
  */
 export const PROJECT_CHANGELOG: ProjectEntry[] = [
   {
+    id: "stage-2026-10-09-1115",
+    datetime: "2026-10-09 11:15",
+    title: "Ликвидация сбоя подтверждения изменения данных абонента на вкладке «Верификация» в CRM/FSM",
+    description: "Устранена критическая ошибка сохранения при нажатии кнопки «Подтвердить изменения» в карточке абонента с запросом на смену реквизитов (pending_data_change): 1) В PostgreSQL добавлены недостающие колонки profiles.data_changes_count и profiles.data_changes_history (JSONB), перезагружена схема PostgREST. 2) Разработан надежный серверный эндпоинт POST /api/crm/approve-data-change, обновляющий профиль абонента с очисткой pending_data_change, сохранением аудита истории изменений, закрытием заявки в таблице requests (status: completed) и отправкой Push-уведомления жильцу в мобильное приложение. 3) Устранена первопричина ошибки PostgreSQL 'column phone_clean is a generated column' (код 428C9) — исключено прямое обновление GENERATED ALWAYS колонки phone_clean из SQL UPDATE на сервере и в клиенте VerificationManager.tsx. Изменения протестированы на боевой БД и успешно задеплоены.",
+    module: "crm_fsm",
+    kind: "fix",
+    hours: 4,
+    difficulty: "Высокая",
+  },
+  {
     id: "stage-2026-10-09-0140",
     datetime: "2026-10-09 01:40",
     title: "Ликвидация краша экрана «Профиль», доставка релизных APK v1.3.0 на боевой сервер и модуль автообновления для «Офис Работа»",

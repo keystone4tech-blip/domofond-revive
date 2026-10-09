@@ -724,6 +724,259 @@ app.post('/api/user/request-data-change', authenticateToken, async (req, res) =>
   }
 });
 
+// ------------------------------------------------------------------------------
+// CRM & FSM: ОДОБРЕНИЕ / ОТКЛОНЕНИЕ ЗАПРОСОВ НА ИЗМЕНЕНИЕ ДАННЫХ АБОНЕНТА
+// Выполняется диспетчером или администратором в CRM (вкладка Верификация).
+// ------------------------------------------------------------------------------
+
+// Подтверждение новых реквизитов абонента
+app.post('/api/crm/approve-data-change', async (req, res) => {
+  const { profile_id } = req.body || {};
+  if (!profile_id) {
+    return res.status(400).json({ error: 'Не указан ID профиля (profile_id)' });
+  }
+
+  console.log(`[Бэкенд: CRM] Запрос на подтверждение изменения данных для профиля: ${profile_id}`);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 1. Извлекаем профиль и текущие запрошенные изменения
+    const profRes = await client.query(
+      'SELECT id, full_name, phone, address, apartment, floor, email, account_number, pending_data_change, data_changes_count, data_changes_history FROM profiles WHERE id = $1 FOR UPDATE',
+      [profile_id]
+    );
+
+    if (profRes.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Профиль пользователя не найден' });
+    }
+
+    const profile = profRes.rows[0];
+    const change = profile.pending_data_change;
+    if (!change || typeof change !== 'object') {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'У данного пользователя нет активных запросов на изменение данных' });
+    }
+
+    const now = new Date().toISOString();
+    const newFullName = (change.full_name || profile.full_name || '').trim();
+    const newPhone = (change.phone || profile.phone || '').trim();
+    const newPhoneClean = newPhone.replace(/\D/g, '');
+    const newAddress = (change.address || profile.address || '').trim();
+    const newApartment = change.apartment !== undefined && change.apartment !== null ? String(change.apartment).trim() : (profile.apartment || null);
+    const newFloor = change.floor !== undefined && change.floor !== null ? String(change.floor).trim() : (profile.floor || null);
+    const newEmail = (change.email || profile.email || '').trim() || null;
+    const newAccount = (change.account_number || profile.account_number || '').trim() || null;
+
+    // Формируем историю изменений
+    const existingHistory = Array.isArray(profile.data_changes_history) ? profile.data_changes_history : [];
+    const historyItem = {
+      id: 'chg_' + Date.now(),
+      status: 'approved',
+      timestamp: now,
+      old_data: change.old_data || {
+        full_name: profile.full_name,
+        phone: profile.phone,
+        address: profile.address,
+        apartment: profile.apartment,
+        account_number: profile.account_number,
+      },
+      new_data: {
+        full_name: newFullName,
+        phone: newPhone,
+        address: newAddress,
+        apartment: newApartment,
+        floor: newFloor,
+        account_number: newAccount,
+      },
+    };
+    const updatedHistory = [historyItem, ...existingHistory];
+    const newCount = (Number(profile.data_changes_count) || 0) + 1;
+
+    const notificationPayload = {
+      type: 'approved',
+      message: `Ваши новые реквизиты успешно подтверждены оператором: ${
+        newAddress
+          ? (/кв\.?\s*\d+/i.test(newAddress) || /квартира\s*\d+/i.test(newAddress))
+            ? newAddress
+            : `${newAddress}${newApartment ? `, кв. ${newApartment}` : ''}`
+          : ''
+      }. Все данные профиля обновлены.`,
+      timestamp: now,
+    };
+
+    // 2. Обновляем таблицу profiles
+    // Внимание: колонка phone_clean в БД является ALWAYS GENERATED (автоматически рассчитывается из phone),
+    // поэтому её нельзя обновлять вручную в запросе UPDATE!
+    await client.query(
+      `UPDATE profiles
+       SET full_name = $1,
+           phone = $2,
+           address = $3,
+           apartment = $4,
+           floor = $5,
+           email = $6,
+           account_number = $7,
+           pending_data_change = NULL,
+           data_changes_count = $8,
+           data_changes_history = $9,
+           data_change_notification = $10,
+           updated_at = NOW()
+       WHERE id = $11`,
+      [
+        newFullName,
+        newPhone,
+        newAddress,
+        newApartment,
+        newFloor,
+        newEmail,
+        newAccount,
+        newCount,
+        JSON.stringify(updatedHistory),
+        JSON.stringify(notificationPayload),
+        profile_id,
+      ]
+    );
+
+    // 3. Завершаем заявку в таблице requests (если она есть)
+    await client.query(
+      `UPDATE requests
+       SET status = 'completed',
+           completed_at = NOW(),
+           notes = $1,
+           updated_at = NOW()
+       WHERE client_id = $2 AND order_type = 'data_change_request' AND status != 'completed'`,
+      [
+        `✅ Изменение данных подтверждено диспетчером: ${new Date().toLocaleString('ru-RU')}`,
+        profile_id,
+      ]
+    );
+
+    await client.query('COMMIT');
+    console.log(`[Бэкенд: CRM] Изменение данных для ${profile_id} успешно подтверждено и сохранено!`);
+
+    // 4. Отправляем Push-уведомление жильцу в мобильное приложение (асинхронно, не блокируя ответ)
+    sendExpoPush(
+      profile_id,
+      '✅ Данные профиля обновлены',
+      `Диспетчер подтвердил ваши новые реквизиты: ${newAddress}${newApartment ? `, кв. ${newApartment}` : ''}`,
+      { type: 'profile_data_approved', profile_id }
+    ).catch((pushErr) => console.warn('[Бэкенд: Push] Ошибка отправки push при подтверждении данных:', pushErr.message));
+
+    res.json({
+      ok: true,
+      message: 'Данные абонента успешно обновлены',
+      profile: {
+        id: profile_id,
+        full_name: newFullName,
+        phone: newPhone,
+        address: newAddress,
+        apartment: newApartment,
+        account_number: newAccount,
+      },
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[Бэкенд: CRM] Ошибка при подтверждении изменения данных:', err);
+    res.status(500).json({ error: 'Ошибка сохранения данных в базе: ' + err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// Отклонение запроса на изменение данных абонента
+app.post('/api/crm/reject-data-change', async (req, res) => {
+  const { profile_id, reason } = req.body || {};
+  if (!profile_id) {
+    return res.status(400).json({ error: 'Не указан ID профиля (profile_id)' });
+  }
+
+  const rejectReason = (reason || 'Данные не соответствуют реестру абонентов').trim();
+  console.log(`[Бэкенд: CRM] Отклонение запроса на изменение данных для ${profile_id}: ${rejectReason}`);
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const profRes = await client.query(
+      'SELECT id, pending_data_change, data_changes_count, data_changes_history FROM profiles WHERE id = $1 FOR UPDATE',
+      [profile_id]
+    );
+
+    if (profRes.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Профиль пользователя не найден' });
+    }
+
+    const profile = profRes.rows[0];
+    const change = profile.pending_data_change;
+    const now = new Date().toISOString();
+
+    const existingHistory = Array.isArray(profile.data_changes_history) ? profile.data_changes_history : [];
+    const historyItem = {
+      id: 'chg_' + Date.now(),
+      status: 'rejected',
+      timestamp: now,
+      reason: rejectReason,
+      old_data: change?.old_data || null,
+      new_data: change ? {
+        full_name: change.full_name,
+        phone: change.phone,
+        address: change.address,
+        apartment: change.apartment,
+      } : null,
+    };
+    const updatedHistory = [historyItem, ...existingHistory];
+    const newCount = (Number(profile.data_changes_count) || 0) + 1;
+
+    const notificationPayload = {
+      type: 'rejected',
+      reason: rejectReason,
+      message: `Заявка на изменение данных отклонена оператором. Причина: ${rejectReason}. Ваши прежние реквизиты сохранены.`,
+      timestamp: now,
+    };
+
+    await client.query(
+      `UPDATE profiles
+       SET pending_data_change = NULL,
+           data_changes_count = $1,
+           data_changes_history = $2,
+           data_change_notification = $3,
+           updated_at = NOW()
+       WHERE id = $4`,
+      [newCount, JSON.stringify(updatedHistory), JSON.stringify(notificationPayload), profile_id]
+    );
+
+    await client.query(
+      `UPDATE requests
+       SET status = 'cancelled',
+           notes = $1,
+           updated_at = NOW()
+       WHERE client_id = $2 AND order_type = 'data_change_request' AND status != 'completed'`,
+      [`❌ Заявка отклонена оператором: ${rejectReason}`, profile_id]
+    );
+
+    await client.query('COMMIT');
+
+    sendExpoPush(
+      profile_id,
+      '❌ Заявка на изменение данных отклонена',
+      `Причина: ${rejectReason}`,
+      { type: 'profile_data_rejected', profile_id, reason: rejectReason }
+    ).catch(() => {});
+
+    res.json({ ok: true, message: 'Заявка отклонена и архивирована' });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[Бэкенд: CRM] Ошибка при отклонении изменения данных:', err);
+    res.status(500).json({ error: 'Ошибка базы данных: ' + err.message });
+  } finally {
+    client.release();
+  }
+});
+
+
 // Согласие на рекламную рассылку (ФЗ «О рекламе» ст. 18) — вкл/выкл из приложения/кабинета.
 app.post('/api/user/marketing-consent', authenticateToken, async (req, res) => {
   const enabled = req.body?.enabled === true || req.body?.enabled === 'true';

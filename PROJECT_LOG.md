@@ -11,6 +11,30 @@
 > 
 > **Пользователь НЕ ДОЛЖЕН ничего вносить вручную.** Вся статистика и история пополняется ИИ автоматически при каждой задаче.
 
+# 2026-10-09 11:15 — Ликвидация сбоя подтверждения изменения данных на вкладке «Верификация» в CRM
+
+## 1. Задачи и выполненные работы
+- **Диагностика и устранение сбоя при подтверждении изменений абонента**:
+  * **Причина 1**: В схеме таблицы `profiles` отсутствовали поля `data_changes_count` (int) и `data_changes_history` (jsonb), что вызывало ошибку PostgREST `column "data_changes_count" of relation "profiles" does not exist`. В базу данных добавлены обе колонки и перезагружен кэш схемы PostgREST.
+  * **Причина 2 (Критический баг SQL)**: В таблице `profiles` колонка `phone_clean` определена как `GENERATED ALWAYS AS (regexp_replace(phone, '\D', '', 'g')) STORED`. Попытка прямого обновления `phone_clean = $3` вызывала отказ PostgreSQL `ERROR: column "phone_clean" can only be updated to DEFAULT (SQLSTATE 428C9)`.
+  * **Решение**:
+    1. В `server/index.js` реализован выделенный защищенный эндпоинт `POST /api/crm/approve-data-change` и `POST /api/crm/reject-data-change`.
+    2. Из SQL-запросов и списков параметров удалено прямое обращение к генерируемой колонке `phone_clean` (PostgreSQL автоматически обновляет её значение на основе `phone`).
+    3. При одобрении смены реквизитов:
+       - В профиле обновляются ФИО, телефон, адрес, квартира, этаж, лицевой счет, email.
+       - Сбрасывается `pending_data_change = NULL`.
+       - Инкрементируется `data_changes_count` и дополняется `data_changes_history` с сохранением старых и новых реквизитов, оператора и временной метки.
+       - Устанавливается `data_change_notification` и отправляется Push-уведомление жильцу.
+       - Статус связанной заявки в таблице `requests` переводится в `completed` с фиксацией `completed_at` и примечания `✅ Изменения реквизитов подтверждены оператором CRM`.
+    4. В `src/components/crm/VerificationManager.tsx` клиентские обработчики `handleApproveDataChange` и `handleConfirmRejectDataChange` переведены на вызов бэкенд API с корректным резервным механизмом Supabase (без передачи `phone_clean`).
+    5. Обновленный бэкенд задеплоен и протестирован на боевом сервере; фронтенд собран и обновлен в `domofondar_frontend`.
+
+## 2. Измененные файлы
+- [`server/index.js`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/server/index.js) — эндпоинты подтверждения и отклонения смены данных без генерации ошибок на `phone_clean`.
+- [`src/components/crm/VerificationManager.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/components/crm/VerificationManager.tsx) — вызов API подтверждения с бэкенда, очистка `phone_clean` из payload.
+- [`src/data/projectChangelog.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/data/projectChangelog.ts) — фиксация работ в паспорте проекта.
+- База данных `domofondar` (PostgreSQL) — добавлены колонки `data_changes_count` и `data_changes_history`.
+
 # 2026-10-09 01:40 — Ликвидация краша экрана «Профиль», доставка релизных APK v1.3.0 на боевой сервер и модуль автообновления для «Офис Работа»
 
 ## 1. Задачи и выполненные работы

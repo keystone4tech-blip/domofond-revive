@@ -543,17 +543,32 @@ export const VerificationManager: React.FC<VerificationManagerProps> = () => {
         description: `Новые реквизиты для ${change.full_name || profile.full_name} успешно применены (всего смен: ${newCount}).`,
       });
 
-      // 1. Применяем новые реквизиты в PostgreSQL
-      const { error } = await supabase
-        .from("profiles")
-        .update({
+      // 1. Применяем новые реквизиты: сначала через надежный бэкенд API с транзакцией и Push-уведомлением
+      let serverSuccess = false;
+      try {
+        const resp = await fetch("/backend-api/api/crm/approve-data-change", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ profile_id: profile.id }),
+        });
+        if (resp.ok) {
+          const resData = await resp.json().catch(() => null);
+          if (resData && resData.ok) {
+            serverSuccess = true;
+            console.log("[Верификация] Изменение данных успешно зафиксировано через CRM бэкенд!");
+          }
+        }
+      } catch (backendErr) {
+        console.warn("[Верификация] Бэкенд API недоступен, выполняем резервное сохранение через Supabase:", backendErr);
+      }
+
+      // Резервное прямое сохранение через Supabase, если бэкенд не ответил
+      if (!serverSuccess) {
+        // Примечание: phone_clean не передаем, так как в БД это ALWAYS GENERATED колонка
+        const updatePayload: Record<string, any> = {
           full_name: change.full_name?.trim() || profile.full_name,
           phone: change.phone?.trim() || profile.phone,
-          email: change.email?.trim() || (profile as any).email,
           address: change.address?.trim() || profile.address,
-          apartment: change.apartment !== undefined ? change.apartment?.trim() : profile.apartment,
-          floor: change.floor !== undefined ? change.floor?.trim() : profile.floor,
-          account_number: change.account_number ? change.account_number.trim() : (profile as any).account_number,
           pending_data_change: null,
           data_changes_count: newCount,
           data_changes_history: updatedHistory as any,
@@ -568,24 +583,42 @@ export const VerificationManager: React.FC<VerificationManagerProps> = () => {
             }. Все данные профиля обновлены.`,
             timestamp: now,
           },
-        })
-        .eq("id", profile.id);
+        };
 
-      if (error) throw error;
+        if (change.apartment !== undefined && change.apartment !== null) {
+          updatePayload.apartment = String(change.apartment).trim();
+        }
+        if (change.floor !== undefined && change.floor !== null) {
+          updatePayload.floor = String(change.floor).trim();
+        }
+        if (change.account_number) {
+          updatePayload.account_number = String(change.account_number).trim();
+        }
+        if (change.email) {
+          updatePayload.email = String(change.email).trim();
+        }
 
-      // 2. Завершаем соответствующую заявку в requests
-      try {
-        await supabase
-          .from("requests")
-          .update({
-            status: "completed",
-            completed_at: now,
-            notes: `✅ Изменение данных подтверждено оператором: ${new Date().toLocaleString()}`,
-          })
-          .eq("client_id", profile.id)
-          .eq("order_type", "data_change_request");
-      } catch (reqErr) {
-        console.warn("[Верификация] Заявка в requests не обновлена:", reqErr);
+        const { error } = await supabase
+          .from("profiles")
+          .update(updatePayload)
+          .eq("id", profile.id);
+
+        if (error) throw error;
+
+        // 2. Завершаем соответствующую заявку в requests
+        try {
+          await supabase
+            .from("requests")
+            .update({
+              status: "completed",
+              completed_at: now,
+              notes: `✅ Изменение данных подтверждено оператором: ${new Date().toLocaleString()}`,
+            })
+            .eq("client_id", profile.id)
+            .eq("order_type", "data_change_request");
+        } catch (reqErr) {
+          console.warn("[Верификация] Заявка в requests не обновлена:", reqErr);
+        }
       }
 
       queryClient.invalidateQueries({ queryKey: ["verification-profiles"] });
@@ -660,36 +693,56 @@ export const VerificationManager: React.FC<VerificationManagerProps> = () => {
         description: `Запрос на изменение данных отклонен. Причина: ${reason} (всего обращений: ${newCount})`,
       });
 
-      // 1. Очищаем pending_data_change в profiles, записываем историю и уведомление
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          pending_data_change: null,
-          data_changes_count: newCount,
-          data_changes_history: updatedHistory as any,
-          data_change_notification: {
-            type: "rejected",
-            reason,
-            message: `Заявка на изменение данных отклонена оператором. Причина: ${reason}. Ваши прежние реквизиты сохранены.`,
-            timestamp: now,
-          },
-        })
-        .eq("id", targetId);
-
-      if (error) throw error;
-
-      // 2. Отклоняем наряд в requests
+      // 1. Очищаем pending_data_change: сначала через CRM бэкенд API с транзакцией и Push
+      let serverSuccess = false;
       try {
-        await supabase
-          .from("requests")
+        const resp = await fetch("/backend-api/api/crm/reject-data-change", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ profile_id: targetId, reason }),
+        });
+        if (resp.ok) {
+          const resData = await resp.json().catch(() => null);
+          if (resData && resData.ok) {
+            serverSuccess = true;
+            console.log("[Верификация] Отклонение данных успешно зафиксировано через CRM бэкенд!");
+          }
+        }
+      } catch (backendErr) {
+        console.warn("[Верификация] Бэкенд API недоступен, выполняем резервное сохранение через Supabase:", backendErr);
+      }
+
+      if (!serverSuccess) {
+        const { error } = await supabase
+          .from("profiles")
           .update({
-            status: "cancelled",
-            notes: `❌ Отклонено оператором. Причина: ${reason}`,
+            pending_data_change: null,
+            data_changes_count: newCount,
+            data_changes_history: updatedHistory as any,
+            data_change_notification: {
+              type: "rejected",
+              reason,
+              message: `Заявка на изменение данных отклонена оператором. Причина: ${reason}. Ваши прежние реквизиты сохранены.`,
+              timestamp: now,
+            },
           })
-          .eq("client_id", targetId)
-          .eq("order_type", "data_change_request");
-      } catch (reqErr) {
-        console.warn("[Верификация] Заявка в requests не обновлена:", reqErr);
+          .eq("id", targetId);
+
+        if (error) throw error;
+
+        // 2. Отклоняем наряд в requests
+        try {
+          await supabase
+            .from("requests")
+            .update({
+              status: "cancelled",
+              notes: `❌ Отклонено оператором. Причина: ${reason}`,
+            })
+            .eq("client_id", targetId)
+            .eq("order_type", "data_change_request");
+        } catch (reqErr) {
+          console.warn("[Верификация] Заявка в requests не обновлена:", reqErr);
+        }
       }
 
       queryClient.invalidateQueries({ queryKey: ["verification-profiles"] });
