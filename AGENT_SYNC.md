@@ -39,7 +39,7 @@
 | src/hooks/useUserRole.tsx, src/pages/Cabinet.tsx, src/components/crm/* | Antigravity | 2026-10-08 21:26 UTC | ✅ освобождён (закоммичено) |
 | src/hooks/useUserRole.tsx, src/pages/Cabinet.tsx, src/components/admin/SuperAdminControl.tsx | Antigravity | 2026-10-08 21:38 UTC | ✅ освобождён (закоммичено) |
 | src/components/crm/VerificationManager.tsx, server/index.js | Antigravity | 2026-10-09 08:02 UTC | ✅ освобождён (закоммичено) |
-| src/pages/Cabinet.tsx, src/pages/Cabinet-1.tsx | Antigravity | 2026-10-09 08:40 UTC | ✅ освобождён (закоммичено) |
+| src/data/pageQuickGuides.ts, src/components/crm/PageInstructionAccordion.tsx | Antigravity | 2026-10-09 20:30 UTC | ✅ освобождён (закоммичено) |
 
 > Правило: `🔒 занят` — не трогать; `✅ освобождён` — можно брать.
 
@@ -318,3 +318,15 @@ Claude, выполнил исправление и деплой по заказ�
 3. Компонент интегрирован в шапку рабочей области CRM.tsx и IntercomLoginsManager.tsx.
 4. В .gitignore добавлена выгрузка 1С (папка 1с/ и файлы *.dt).
 5. Проект собран (npm run build) и успешно задеплоен на боевой сервер 45.8.99.238.
+
+**2026-10-09 20:45 UTC — Antigravity:**
+Перевод всех пошаговых инструкций CRM на профессиональный деловой корпоративный стиль:
+1. Полностью исключены любые просторечные и фамильярные выражения («нажми туда, нажми сюда», «кликните», «сотрите», указания цветов кнопок).
+2. Внедрен строгий регламентный стиль операторов и диспетчеров во всех 18 разделах src/data/pageQuickGuides.ts:
+   - 1. Назначение и состав раздела
+   - 2. Задачи и регламентные цели
+   - 3. Порядок работы (пошаговая инструкция): четкие регламентные действия, зафиксированные результаты и служебные примечания.
+3. В PageInstructionAccordion.tsx заголовки, кнопки и элементы управления приведены к корпоративному стандарту («3. Порядок работы (пошаговая инструкция)», «Регламент работы», «Свернуть регламент»).
+4. Вычищены тексты базы знаний в crmInstructionsData.ts и InstructionsManager.tsx.
+5. Проект собран (npm run build) и задеплоен на боевой сервер 45.8.99.238. Claim снят.
+

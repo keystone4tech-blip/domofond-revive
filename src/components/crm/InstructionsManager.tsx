@@ -141,7 +141,7 @@ export const InstructionsManager: React.FC<InstructionsManagerProps> = ({ onNavi
           </h1>
 
           <p className="text-sm md:text-base text-blue-100/90 leading-relaxed">
-            Все разделы представлены в компактном виде. Кликните по интересующему разделу или воспользуйтесь поиском, чтобы развернуть подробные регламенты и пошаговые сценарии работы.
+            Все разделы представлены в структурированном виде. Выберите интересующий раздел или воспользуйтесь поиском, чтобы ознакомиться с регламентами и пошаговыми сценариями работы.
           </p>
 
           <div className="flex flex-wrap items-center gap-3 pt-2 text-xs text-blue-200">
