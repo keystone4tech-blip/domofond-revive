@@ -1,0 +1,26 @@
+{
+  "_comment": "Конфигурация интеграционного шлюза «ДомофонДар» <-> 1С:Предприятие 8.3",
+  "site": {
+    "url": "https://xn--80aha5afebav9a.xn--p1ai/backend-api",
+    "apiKey": "dd_1c_sync_sec_key_2026_domofon",
+    "pollIntervalSeconds": 10,
+    "syncStockIntervalMinutes": 5
+  },
+  "oneC": {
+    "connectionType": "file",
+    "fileBaseDirectory": "C:\\Users\\Keystone-Tech\\Documents\\InfoBase3",
+    "serverCluster": "127.0.0.1",
+    "serverBaseName": "domofondar",
+    "user": "Александра",
+    "password": "2026",
+    "platformVersion": "8.3",
+    "defaultWarehouse": "Основной склад",
+    "defaultPriceType": "Розничная",
+    "defaultOrganization": "ООО \"ДомофонДар\""
+  },
+  "logging": {
+    "level": "INFO",
+    "logToFile": true,
+    "logFilePath": "bridge.log"
+  }
+}

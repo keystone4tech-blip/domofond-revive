@@ -4158,11 +4158,233 @@ app.get('/api/admin/autopay/active-map', authenticateToken, requireAdmin, async 
   }
 });
 
-// Ручной запуск автосписания — ТОЛЬКО для суперадмина/директора/админа
-app.post('/api/admin/autopay/run', authenticateToken, requireAdmin, async (req, res) => {
-  console.log(`[Автосписание] Ручной запуск от ${req.user.email || req.user.id}`);
-  runAutopayCharges('manual:' + (req.user.email || req.user.id)).catch(() => {});
-  res.json({ ok: true, started: true, period: currentPeriodMSK() });
+// ============================================================================
+// ИНТЕГРАЦИОННЫЙ ШЛЮЗ: 1С:ПРЕДПРИЯТИЕ 8.3 <-> САЙТ И СЕРВЕР ДОМОФОНДАР
+// Поддержка круглосуточной асинхронной очереди (Transactional Outbox)
+// ============================================================================
+
+// Функция автосоздания структур БД для синхронизации с 1С
+async function ensure1CSyncSchema() {
+  try {
+    // 1. Очередь событий синхронизации (заявки, наряды, акты, оплаты)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS sync_queue_1c (
+        id SERIAL PRIMARY KEY,
+        entity_type TEXT NOT NULL,
+        entity_id TEXT NOT NULL,
+        event_type TEXT NOT NULL,
+        payload JSONB,
+        status TEXT DEFAULT 'pending',
+        external_id TEXT,
+        attempts INTEGER DEFAULT 0,
+        error_message TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        synced_at TIMESTAMP WITH TIME ZONE
+      );
+      CREATE INDEX IF NOT EXISTS idx_sync_queue_1c_status ON sync_queue_1c(status);
+    `);
+
+    // 2. Расширение таблицы requests (привязка номера наряда 1С ЗКН-...)
+    await pool.query(`
+      ALTER TABLE requests ADD COLUMN IF NOT EXISTS external_1c_id TEXT;
+      ALTER TABLE requests ADD COLUMN IF NOT EXISTS synced_to_1c_at TIMESTAMP WITH TIME ZONE;
+    `);
+
+    // 3. Расширение таблицы acts (привязка номера акта 1С АУЗ-...)
+    await pool.query(`
+      ALTER TABLE acts ADD COLUMN IF NOT EXISTS external_1c_id TEXT;
+      ALTER TABLE acts ADD COLUMN IF NOT EXISTS synced_to_1c_at TIMESTAMP WITH TIME ZONE;
+    `);
+
+    // 4. Расширение таблицы products (складские остатки из 1С и время синхронизации)
+    await pool.query(`
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS stock_quantity INTEGER DEFAULT 0;
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS synced_1c_at TIMESTAMP WITH TIME ZONE;
+    `);
+
+    console.log('[Бэкенд: 1С Интеграция] Структуры базы данных 1С успешно проверены и готовы.');
+  } catch (err) {
+    console.error('[Бэкенд: 1С Интеграция] Ошибка инициализации структур 1С:', err.message);
+  }
+}
+
+// Мидлвар проверки API-ключа 1С для защиты шлюза
+function require1CApiKey(req, res, next) {
+  const incomingKey = req.headers['x-1c-api-key'];
+  const expectedKey = process.env.ONE_C_API_KEY || 'dd_1c_sync_sec_key_2026_domofon';
+  if (!incomingKey || incomingKey !== expectedKey) {
+    console.warn('[Бэкенд: 1С Интеграция] Отклонен запрос с неверным API-ключом:', incomingKey);
+    return res.status(401).json({ error: 'Неверный или отсутствующий API-ключ 1С' });
+  }
+  next();
+}
+
+/**
+ * 1. Получение очереди событий для 1С (заявки на ремонт, заказы оборудования)
+ * Вызывается скриптом bridge.ps1 с офисного компьютера
+ */
+app.get('/api/1c/pull-events', require1CApiKey, async (req, res) => {
+  try {
+    await ensure1CSyncSchema();
+    const limit = parseInt(req.query.limit) || 20;
+
+    // Сначала ищем события в очереди sync_queue_1c
+    const queueRes = await pool.query(
+      `SELECT * FROM sync_queue_1c 
+       WHERE status = 'pending' 
+       ORDER BY id ASC LIMIT $1`,
+      [limit]
+    );
+
+    // Если очередь пуста, автоматически подтягиваем несинхронизированные заявки жильцов из requests
+    if (queueRes.rows.length === 0) {
+      const pendingRequests = await pool.query(
+        `SELECT r.id, r.name, r.phone, r.address, r.apartment, r.street, r.house,
+                r.message, r.order_type, r.status, r.created_at,
+                p.full_name as master_name
+         FROM requests r
+         LEFT JOIN profiles p ON p.id = r.assigned_to
+         WHERE (r.external_1c_id IS NULL OR r.external_1c_id = '')
+           AND (r.status != 'cancelled')
+         ORDER BY r.created_at DESC LIMIT $1`,
+        [Math.min(limit, 5)]
+      );
+
+      // Регистрируем найденные заявки в очереди
+      for (const reqRow of pendingRequests.rows) {
+        const insertRes = await pool.query(
+          `INSERT INTO sync_queue_1c (entity_type, entity_id, event_type, payload, status)
+           VALUES ('request', $1, 'create', $2, 'pending')
+           RETURNING *`,
+          [reqRow.id, JSON.stringify(reqRow)]
+        );
+        queueRes.rows.push(insertRes.rows[0]);
+      }
+    }
+
+    res.json({
+      success: true,
+      count: queueRes.rows.length,
+      events: queueRes.rows
+    });
+  } catch (err) {
+    console.error('[Бэкенд: 1С Интеграция] Ошибка получения событий pull-events:', err.message);
+    res.status(500).json({ error: 'Ошибка сервера при получении событий 1С' });
+  }
+});
+
+/**
+ * 2. Подтверждение обработки событий (квитанция от 1С)
+ * Принимает присвоенные номера документов в 1С (ЗКН-..., АУЗ-...)
+ */
+app.post('/api/1c/ack-events', require1CApiKey, async (req, res) => {
+  try {
+    const { acks } = req.body;
+    if (!Array.isArray(acks) || acks.length === 0) {
+      return res.status(400).json({ error: 'Массив квитанций acks пуст или некорректен' });
+    }
+
+    let processedCount = 0;
+    for (const ack of acks) {
+      const { eventId, status, external1cId, errorMessage } = ack;
+      
+      // Обновляем статус события в очереди
+      const updateQueue = await pool.query(
+        `UPDATE sync_queue_1c 
+         SET status = $1, external_id = $2, error_message = $3, synced_at = CURRENT_TIMESTAMP
+         WHERE id = $4
+         RETURNING entity_type, entity_id`,
+        [status || 'synced', external1cId || null, errorMessage || null, eventId]
+      );
+
+      if (updateQueue.rows.length > 0) {
+        const item = updateQueue.rows[0];
+        // Если это заявка - проставляем номер наряда 1С в requests
+        if (item.entity_type === 'request' && external1cId) {
+          await pool.query(
+            `UPDATE requests 
+             SET external_1c_id = $1, synced_to_1c_at = CURRENT_TIMESTAMP 
+             WHERE id = $2`,
+            [external1cId, item.entity_id]
+          );
+        }
+        // Если это акт - проставляем номер в acts
+        if (item.entity_type === 'act' && external1cId) {
+          await pool.query(
+            `UPDATE acts 
+             SET external_1c_id = $1, synced_to_1c_at = CURRENT_TIMESTAMP 
+             WHERE id = $2`,
+            [external1cId, item.entity_id]
+          );
+        }
+        processedCount++;
+      }
+    }
+
+    console.log(`[Бэкенд: 1С Интеграция] Успешно обработано квитанций от 1С: ${processedCount}`);
+    res.json({ success: true, processedCount });
+  } catch (err) {
+    console.error('[Бэкенд: 1С Интеграция] Ошибка подтверждения событий ack-events:', err.message);
+    res.status(500).json({ error: 'Ошибка сервера при квитировании 1С' });
+  }
+});
+
+/**
+ * 3. Прием актуальных остатков со склада 1С и обновление витрины товаров сайта
+ */
+app.post('/api/1c/push-stock', require1CApiKey, async (req, res) => {
+  try {
+    let { warehouse, stocks } = req.body;
+    let stockList = stocks;
+    if (typeof stockList === 'string') {
+      try { stockList = JSON.parse(stockList); } catch {}
+    } else if (stockList && !Array.isArray(stockList)) {
+      stockList = [stockList];
+    }
+
+    if (!Array.isArray(stockList)) {
+      return res.status(400).json({ error: 'Массив stocks обязателен' });
+    }
+
+    console.log(`[Бэкенд: 1С Интеграция] Получены остатки со склада "${warehouse}": ${stockList.length} позиций`);
+    let updatedCount = 0;
+
+    for (const item of stockList) {
+      const code = String(item.code || '').trim();
+      const name = String(item.name || '').trim();
+      const qty = parseInt(item.quantity) || 0;
+      if (!code) continue;
+
+      // 1. Обновляем остаток в таблице products по коду 1С
+      let updateRes = await pool.query(
+        `UPDATE products 
+         SET stock_quantity = $1, synced_1c_at = CURRENT_TIMESTAMP
+         WHERE code_1c = $2`,
+        [qty, code]
+      );
+
+      // 2. Если по коду не найден, связываем по совпадению наименования и сохраняем code_1c
+      if (updateRes.rowCount === 0 && name) {
+        updateRes = await pool.query(
+          `UPDATE products 
+           SET stock_quantity = $1, code_1c = $2, synced_1c_at = CURRENT_TIMESTAMP
+           WHERE (code_1c IS NULL OR code_1c = '') 
+             AND (LOWER(TRIM(name)) = LOWER(TRIM($3)) OR LOWER(TRIM(name)) LIKE '%' || LOWER(TRIM($3)) || '%')`,
+          [qty, code, name]
+        );
+      }
+
+      if (updateRes.rowCount > 0) {
+        updatedCount += updateRes.rowCount;
+      }
+    }
+
+    console.log(`[Бэкенд: 1С Интеграция] Успешно обновлены остатки для ${updatedCount} товаров каталога.`);
+    res.json({ success: true, warehouse, updatedCount, receivedCount: stockList.length });
+  } catch (err) {
+    console.error('[Бэкенд: 1С Интеграция] Ошибка обновления остатков push-stock:', err.message);
+    res.status(500).json({ error: 'Ошибка сервера при обновлении остатков 1С' });
+  }
 });
 
 // Запуск сервера

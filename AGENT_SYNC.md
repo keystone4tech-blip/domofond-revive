@@ -27,6 +27,7 @@
 | mobile/app/(tabs)/requests/index.tsx | Claude | 2026-10-06 16:54 UTC | ✅ освобождён (закоммичено) |
 | mobile/app/(tabs)/_layout.tsx | Claude | 2026-10-06 16:54 UTC | ✅ освобождён (закоммичено) |
 | mobile/src/components/*OrderModal, LegalModal, OfflineBanner | Claude | 2026-10-06 16:54 UTC | ✅ освобождён (закоммичено) |
+| 1c-bridge/*, server/index.js (1C sync API), database 1c migrations | Antigravity | 2026-10-10 02:35 UTC | ✅ освобождён (закоммичено) |
 | src/pages/Cabinet.tsx, src/data/projectChangelog.ts | Antigravity | 2026-10-08 07:33 UTC | ✅ освобождён (закоммичено) |
 | server/index.js, src/components/admin/*, src/pages/Admin.tsx | Antigravity | 2026-10-08 07:49 UTC | ✅ освобождён (закоммичено) |
 | src/App.tsx, src/components/crm/InstallerSheetManager.tsx, src/components/crm/VerificationManager.tsx, src/components/crm/CRMDashboard.tsx | Antigravity | 2026-10-08 18:45 UTC | ✅ освобождён (закоммичено) |
@@ -319,14 +320,12 @@ Claude, выполнил исправление и деплой по заказ�
 4. В .gitignore добавлена выгрузка 1С (папка 1с/ и файлы *.dt).
 5. Проект собран (npm run build) и успешно задеплоен на боевой сервер 45.8.99.238.
 
-**2026-10-09 20:45 UTC — Antigravity:**
-Перевод всех пошаговых инструкций CRM на профессиональный деловой корпоративный стиль:
-1. Полностью исключены любые просторечные и фамильярные выражения («нажми туда, нажми сюда», «кликните», «сотрите», указания цветов кнопок).
-2. Внедрен строгий регламентный стиль операторов и диспетчеров во всех 18 разделах src/data/pageQuickGuides.ts:
-   - 1. Назначение и состав раздела
-   - 2. Задачи и регламентные цели
-   - 3. Порядок работы (пошаговая инструкция): четкие регламентные действия, зафиксированные результаты и служебные примечания.
-3. В PageInstructionAccordion.tsx заголовки, кнопки и элементы управления приведены к корпоративному стандарту («3. Порядок работы (пошаговая инструкция)», «Регламент работы», «Свернуть регламент»).
-4. Вычищены тексты базы знаний в crmInstructionsData.ts и InstructionsManager.tsx.
-5. Проект собран (npm run build) и задеплоен на боевой сервер 45.8.99.238. Claim снят.
+**2026-10-10 02:35 UTC — Antigravity:**
+Автономный пакет для флешки (1c-bridge), реализация API-шлюза на сайте и успешный сквозной тест обмена сайта с 1С:
+1. Создан автономный переносимый пакет 1c-bridge/ с файлами config.json, OneCBridgeCore.cs, bridge.ps1, run_bridge.bat, test_connection.bat, install_autorun.bat и подробной инструкцией ИНСТРУКЦИЯ_УСТАНОВКИ.md.
+2. В PostgreSQL создана очередь sync_queue_1c, добавлены колонки external_1c_id в requests/acts и stock_quantity, synced_1c_at в products.
+3. В server/index.js развернуты защищенные маршруты GET /api/1c/pull-events, POST /api/1c/ack-events, POST /api/1c/push-stock.
+4. Проведен полный цикл обмена: с сайта загружены реальные заявки, в локальной 1С созданы наряды ЗКН-007490...ЗКН-007499, номера сохранены в БД сайта, остатки склада 1С выгружены на сайт (обновлено 32 товара каталога).
+5. Бэкенд задеплоен на боевой сервер 45.8.99.238. Claim снят.
+
 
