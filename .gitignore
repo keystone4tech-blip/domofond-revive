@@ -36,11 +36,25 @@ PRODUCTION_CREDENTIALS_AND_RECOVERY.md
 *.cert
 *.crt
 
-# Database Backups & Dumps
+# Database Backups & 1C:Enterprise (STRICTLY PRIVATE - NEVER COMMIT)
 backups/
 1с/
 1c/
+1[сcСC]/
+1[сcСC]/**
 *.dt
+*.1cd
+*.1CD
+*.cf
+*.cfu
+*.epf
+*.erf
+*.mxl
+*.cfl
+*.lgd
+*.cgr
+*.1CL
+1Cv8*
 *.sql.gz
 *.dump
 *.tar.gz
