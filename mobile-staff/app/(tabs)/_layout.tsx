@@ -1,14 +1,30 @@
 /**
  * Навигационный макет нижнего таб-бара (Tabs Layout)
  * Приложение «Офис Работа»
+ *
+ * Вкладки показываются по правам сотрудника (единая модель с сайтом, таблица crm_roles).
+ * В режиме предпросмотра роли (супер-админ) учитываются права выбранной роли.
  */
 
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Platform } from 'react-native';
+import { useStaffAuthStore, computeEffectivePermissions } from '../../src/store/auth.store';
 
 export default function TabsLayout() {
+  const permissions = useStaffAuthStore((s) => s.permissions);
+  const previewRole = useStaffAuthStore((s) => s.previewRole);
+  const allRoles = useStaffAuthStore((s) => s.allRoles);
+  const allTabIds = useStaffAuthStore((s) => s.allTabIds);
+
+  const eff = computeEffectivePermissions(permissions, previewRole, allRoles, allTabIds);
+  const can = (id: string) => eff.includes(id);
+
+  // Доступность вкладок приложения (переиспользуем id разделов сайта)
+  const canTasks = can('tasks');
+  const canActs = can('installer-sheet') || can('tasks');
+
   return (
     <Tabs
       screenOptions={{
@@ -29,7 +45,7 @@ export default function TabsLayout() {
         },
       }}
     >
-      {/* 1. Адаптивный рабочий стол под роль */}
+      {/* 1. Адаптивный рабочий стол под роль — виден всегда */}
       <Tabs.Screen
         name="index"
         options={{
@@ -40,29 +56,31 @@ export default function TabsLayout() {
         }}
       />
 
-      {/* 2. Наряды и заявки */}
+      {/* 2. Наряды и заявки — право "tasks" */}
       <Tabs.Screen
         name="tasks"
         options={{
           title: 'Наряды',
+          href: canTasks ? undefined : null,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? 'clipboard' : 'clipboard-outline'} size={22} color={color} />
           ),
         }}
       />
 
-      {/* 3. Электронные акты выполненных работ */}
+      {/* 3. Электронные акты выполненных работ — право "installer-sheet" (или "tasks") */}
       <Tabs.Screen
         name="acts"
         options={{
           title: 'Акты',
+          href: canActs ? undefined : null,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? 'document-text' : 'document-text-outline'} size={22} color={color} />
           ),
         }}
       />
 
-      {/* 4. Оповещения и срочные сигналы */}
+      {/* 4. Оповещения — видно всем */}
       <Tabs.Screen
         name="notifications"
         options={{
@@ -73,7 +91,7 @@ export default function TabsLayout() {
         }}
       />
 
-      {/* 5. Профиль сотрудника и переключение роли */}
+      {/* 5. Профиль сотрудника и переключение роли — видно всем */}
       <Tabs.Screen
         name="profile"
         options={{

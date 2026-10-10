@@ -25,7 +25,8 @@ export default function WorkspaceScreen() {
   const router = useRouter();
   const user = useStaffAuthStore((state) => state.user);
   const activeViewRole = useStaffAuthStore((state) => state.activeViewRole);
-  const setActiveViewRole = useStaffAuthStore((state) => state.setActiveViewRole);
+  const previewRole = useStaffAuthStore((state) => state.previewRole);
+  const setPreviewRole = useStaffAuthStore((state) => state.setPreviewRole);
   const shiftStatus = useStaffAuthStore((state) => state.shiftStatus);
   const setShiftStatus = useStaffAuthStore((state) => state.setShiftStatus);
 
@@ -100,7 +101,7 @@ export default function WorkspaceScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.companyName}>Офис Работа</Text>
-          <Text style={styles.employeeName}>{user?.full_name || 'Шибаев Сергей Викторович'}</Text>
+          <Text style={styles.employeeName}>{user?.full_name || 'Сотрудник'}</Text>
         </View>
 
         {/* Тумблер смены */}
@@ -127,6 +128,16 @@ export default function WorkspaceScreen() {
           Рабочий стол: <Text style={styles.roleBannerBold}>{getRoleLabel(activeViewRole)}</Text>
         </Text>
       </View>
+
+      {/* Баннер режима предпросмотра роли (супер-админ) */}
+      {previewRole && (
+        <TouchableOpacity style={styles.previewBanner} onPress={() => setPreviewRole(null)} activeOpacity={0.85}>
+          <Ionicons name="eye" size={16} color="#FBBF24" style={{ marginRight: 8 }} />
+          <Text style={styles.previewBannerText}>
+            Предпросмотр роли: {getRoleLabel(activeViewRole)}. Нажмите, чтобы выйти.
+          </Text>
+        </TouchableOpacity>
+      )}
 
       {/* Баннер проверки разрешений и фонового режима */}
       {hasMissingPermissions && (
@@ -274,8 +285,8 @@ export default function WorkspaceScreen() {
             </View>
             <View style={styles.dispStatDivider} />
             <View style={styles.dispStatItem}>
-              <Text style={[styles.dispStatNumber, { color: '#10B981' }]}>6</Text>
-              <Text style={styles.dispStatLabel}>Мастеров online</Text>
+              <Text style={[styles.dispStatNumber, { color: '#10B981' }]}>{doneTodayCount}</Text>
+              <Text style={styles.dispStatLabel}>Выполнено</Text>
             </View>
           </View>
 
@@ -311,21 +322,21 @@ export default function WorkspaceScreen() {
           {/* Финансово-операционная сводка */}
           <View style={styles.directorHeaderCard}>
             <Text style={styles.directorCardSubtitle}>СВОДКА ЗА ТЕКУЩИЙ ДЕНЬ</Text>
-            <Text style={styles.directorRevenue}>48 200 ₽</Text>
-            <Text style={styles.directorRevenueDesc}>Выручка по выполненным заявкам и договорам ТО</Text>
+            <Text style={styles.directorRevenue}>{(stats.total_earnings_today || 0).toLocaleString('ru-RU')} ₽</Text>
+            <Text style={styles.directorRevenueDesc}>Выручка по подписанным актам за сегодня</Text>
 
             <View style={styles.directorMetricsRow}>
               <View style={styles.directorMetric}>
-                <Text style={styles.dirMetricVal}>94%</Text>
-                <Text style={styles.dirMetricSub}>SLA в срок</Text>
+                <Text style={styles.dirMetricVal}>{doneTodayCount}</Text>
+                <Text style={styles.dirMetricSub}>Выполнено</Text>
               </View>
               <View style={styles.directorMetric}>
-                <Text style={styles.dirMetricVal}>18 / 21</Text>
-                <Text style={styles.dirMetricSub}>Закрыто нарядов</Text>
+                <Text style={styles.dirMetricVal}>{inProgressCount}</Text>
+                <Text style={styles.dirMetricSub}>В работе</Text>
               </View>
               <View style={styles.directorMetric}>
-                <Text style={styles.dirMetricVal}>8 чел.</Text>
-                <Text style={styles.dirMetricSub}>Экипажей на линии</Text>
+                <Text style={styles.dirMetricVal}>{urgentCount}</Text>
+                <Text style={styles.dirMetricSub}>Срочных</Text>
               </View>
             </View>
           </View>
@@ -358,40 +369,7 @@ export default function WorkspaceScreen() {
         </View>
       )}
 
-      {/* =========================================================================
-          ПАНЕЛЬ ПЕРЕКЛЮЧЕНИЯ РОЛЕЙ ДЛЯ ТЕСТИРОВАНИЯ
-         ========================================================================= */}
-      <View style={styles.roleSwitchBox}>
-        <Text style={styles.roleSwitchTitle}>🔄 ТЕСТИРОВАНИЕ: ПЕРЕКЛЮЧЕНИЕ РОЛИ В 1 КЛИК</Text>
-        <View style={styles.roleTabsRow}>
-          <TouchableOpacity
-            style={[styles.roleTab, activeViewRole === 'master' && styles.roleTabActive]}
-            onPress={() => setActiveViewRole('master')}
-          >
-            <Text style={[styles.roleTabText, activeViewRole === 'master' && styles.roleTabTextActive]}>
-              Мастер
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.roleTab, activeViewRole === 'dispatcher' && styles.roleTabActive]}
-            onPress={() => setActiveViewRole('dispatcher')}
-          >
-            <Text style={[styles.roleTabText, activeViewRole === 'dispatcher' && styles.roleTabTextActive]}>
-              Диспетчер
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.roleTab, activeViewRole === 'director' && styles.roleTabActive]}
-            onPress={() => setActiveViewRole('director')}
-          >
-            <Text style={[styles.roleTabText, activeViewRole === 'director' && styles.roleTabTextActive]}>
-              Директор
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      {/* Переключение ролей перенесено в Профиль (только для супер-админа, режим предпросмотра). */}
 
       {/* Центр системных разрешений и фонового режима */}
       <PermissionsCenterModal
@@ -827,6 +805,22 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#64748B',
     marginTop: 2,
+  },
+  previewBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.4)',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+  },
+  previewBannerText: {
+    flex: 1,
+    color: '#FCD34D',
+    fontSize: 12,
+    fontWeight: '700',
   },
   roleSwitchBox: {
     backgroundColor: 'rgba(30, 41, 59, 0.7)',

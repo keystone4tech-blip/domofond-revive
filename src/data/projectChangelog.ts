@@ -258,6 +258,16 @@ export const KIND_META: Record<Kind, { label: string; badgeCls: string }> = {
  */
 export const PROJECT_CHANGELOG: ProjectEntry[] = [
   {
+    id: "stage-2026-10-10-2215",
+    datetime: "2026-10-10 22:15",
+    title: "Интеграция ролевой модели прав доступа в приложении «Офис Работа» и фиксация логов CI/CD",
+    description: "1) В бэкенде server/index.js внедрен эндпоинт GET /api/user/permissions (JWT): выдача назначенных ролей, прав разделов CRM, каталога ролей и режима предпросмотра. 2) В приложении сотрудников mobile-staff (Claude) внедрена загрузка прав в auth.store, динамическое отображение табов по ролям (_layout.tsx), переключатель ролей для суперадмина в профиле и удалена публичная панель тестирования. 3) В CI/CD build-staff-apk.yml добавлено сохранение логов компиляции Gradle в артефакты, в deploy.yml добавлен continue-on-error для предотвращения ложных алертов SSH.",
+    module: "hr_staff",
+    kind: "feature",
+    hours: 3.0,
+    difficulty: "Высокая",
+  },
+  {
     id: "stage-2026-10-10-2115",
     datetime: "2026-10-10 21:15",
     title: "Координация агентов, оптимизация CI/CD пайплайнов мобильных приложений и передача ТЗ Claude",

@@ -1,6 +1,9 @@
 /**
- * Хранилище состояния авторизации сотрудника и активной роли (Zustand)
+ * Хранилище состояния авторизации сотрудника, ролей и прав доступа (Zustand)
  * Служебное приложение «Офис Работа»
+ *
+ * Единая модель прав с сайтом: роль → permissions (массив id разделов из таблицы crm_roles).
+ * Права приходят с бэкенда (/api/user/permissions) и повторяют логику useUserRole на сайте.
  */
 
 import { create } from 'zustand';
@@ -9,20 +12,84 @@ import { StaffUser, StaffRole, ShiftStatus } from '../types/staff';
 import { staffApiClient, setStaffToken, removeStaffToken, getStaffToken } from '../api/client';
 import { STORAGE_KEYS } from '../config/constants';
 
+// Полный перечень id разделов CRM (совпадает с CRM_TABS на сайте) — запасной вариант,
+// если бэкенд не прислал all_tab_ids.
+export const ALL_TAB_IDS: string[] = [
+  'dashboard', 'tasks', 'requests', 'new-buildings', 'installer-sheet', 'products',
+  'equipment-matching', 'addresses', 'accounts', 'logins', 'autopay', 'employees',
+  'clients', 'cabinets', 'map', 'reports', 'verification', 'instructions',
+];
+
+// Каталог роли из crm_roles
+export interface RoleCatalogItem {
+  id: string;
+  name: string;
+  permissions: string[];
+}
+
+// Роли с полным доступом ко всем разделам
+const ADMIN_LIKE = ['director', 'admin', 'superadmin'];
+// Соответствие ролей приложения ролям в crm_roles
+const ROLE_ALIAS: Record<string, string> = { technician: 'engineer', installer: 'engineer' };
+
+/**
+ * Разрешения конкретной роли на основе каталога crm_roles.
+ * Директор/админ/суперадмин → все разделы.
+ */
+export function resolveRolePermissions(
+  role: string,
+  allRoles: RoleCatalogItem[],
+  allTabIds: string[],
+): string[] {
+  const r = String(role || '').toLowerCase();
+  if (ADMIN_LIKE.includes(r)) return (allTabIds && allTabIds.length ? allTabIds : ALL_TAB_IDS).slice();
+  const target = ROLE_ALIAS[r] || r;
+  const found = (allRoles || []).find(
+    (x) => x.id.toLowerCase() === target || x.name.toLowerCase() === target,
+  );
+  return found ? found.permissions.slice() : [];
+}
+
+/**
+ * Эффективные права: в режиме предпросмотра (супер-админ) — права выбранной роли,
+ * иначе реальные права сотрудника.
+ */
+export function computeEffectivePermissions(
+  permissions: string[],
+  previewRole: StaffRole | null,
+  allRoles: RoleCatalogItem[],
+  allTabIds: string[],
+): string[] {
+  if (previewRole) return resolveRolePermissions(previewRole, allRoles, allTabIds);
+  return permissions || [];
+}
+
 interface AuthState {
   user: StaffUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  activeViewRole: StaffRole;        // Режим рабочего стола (для тестирования всех ролей)
-  shiftStatus: ShiftStatus;         // Статус смены («На смене» / «Отдых»)
+  activeViewRole: StaffRole;        // Режим рабочего стола (реальная роль либо предпросмотр)
+  shiftStatus: ShiftStatus;
   error: string | null;
 
-  // Методы управления
+  // Права доступа
+  permissions: string[];            // Реальные права сотрудника (id разделов CRM)
+  roleLabel: string;                // Понятное название роли
+  isSuperadminUser: boolean;        // Доступен ли режим предпросмотра ролей
+  allRoles: RoleCatalogItem[];      // Каталог ролей из crm_roles (для предпросмотра)
+  allTabIds: string[];              // Полный список id разделов
+  previewRole: StaffRole | null;    // Активный предпросмотр роли (только супер-админ)
+
+  // Методы
   login: (phone: string, password: string) => Promise<boolean>;
   loginDemo: (role: StaffRole) => void;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
+  loadPermissions: () => Promise<void>;
+  setPreviewRole: (role: StaffRole | null) => void;
   setActiveViewRole: (role: StaffRole) => void;
+  getEffectivePermissions: () => string[];
+  hasPermission: (tabId: string) => boolean;
   setShiftStatus: (status: ShiftStatus) => void;
   clearError: () => void;
 }
@@ -31,74 +98,112 @@ export const useStaffAuthStore = create<AuthState>((set, get) => ({
   user: null,
   isAuthenticated: false,
   isLoading: false,
-  activeViewRole: 'master',         // По умолчанию режим Мастера
-  shiftStatus: 'on_shift',          // По умолчанию на смене
+  activeViewRole: 'master',
+  shiftStatus: 'on_shift',
   error: null,
+
+  permissions: [],
+  roleLabel: 'Сотрудник',
+  isSuperadminUser: false,
+  allRoles: [],
+  allTabIds: ALL_TAB_IDS,
+  previewRole: null,
 
   clearError: () => set({ error: null }),
 
-  // Быстрый демо-вход для мгновенного тестирования любой роли
-  loginDemo: (role: StaffRole) => {
-    const roleTitles: Record<StaffRole, string> = {
-      master: 'Сервисный мастер',
-      technician: 'Инженер ТО',
-      installer: 'Монтажник',
-      dispatcher: 'Диспетчер смены',
-      director: 'Директор филиала',
-      admin: 'Администратор системы',
-      superadmin: 'Главный инженер',
-    };
+  getEffectivePermissions: () => {
+    const { permissions, previewRole, allRoles, allTabIds } = get();
+    return computeEffectivePermissions(permissions, previewRole, allRoles, allTabIds);
+  },
 
+  hasPermission: (tabId: string) => get().getEffectivePermissions().includes(tabId),
+
+  // Загрузка прав сотрудника с бэкенда (единая модель с сайтом)
+  loadPermissions: async () => {
+    try {
+      const res = await staffApiClient.get('/api/user/permissions');
+      const d = res.data || {};
+      set({
+        permissions: Array.isArray(d.permissions) ? d.permissions : [],
+        allRoles: Array.isArray(d.all_roles) ? d.all_roles : [],
+        allTabIds: Array.isArray(d.all_tab_ids) && d.all_tab_ids.length ? d.all_tab_ids : ALL_TAB_IDS,
+        roleLabel: d.role_label || get().roleLabel,
+        isSuperadminUser: !!d.is_superadmin,
+      });
+      // Уточняем реальную роль, если бэкенд прислал primary_role
+      const u = get().user;
+      if (u && d.primary_role) {
+        const primary = String(d.primary_role).toLowerCase() as StaffRole;
+        const known: StaffRole[] = ['master', 'technician', 'installer', 'dispatcher', 'director', 'admin', 'superadmin'];
+        const realRole = known.includes(primary) ? primary : u.role;
+        const updated = { ...u, role: realRole };
+        set({ user: updated });
+        if (!get().previewRole) set({ activeViewRole: realRole });
+        AsyncStorage.setItem(STORAGE_KEYS.STAFF_USER, JSON.stringify(updated)).catch(() => {});
+      }
+    } catch (e: any) {
+      console.warn('[Staff Auth] Не удалось загрузить права доступа:', e?.message);
+    }
+  },
+
+  // Режим предпросмотра роли (только супер-админ). null — выйти из предпросмотра.
+  setPreviewRole: (role: StaffRole | null) => {
+    if (role) {
+      set({ previewRole: role, activeViewRole: role });
+    } else {
+      const real = get().user?.role || 'master';
+      set({ previewRole: null, activeViewRole: real });
+    }
+  },
+
+  // Быстрый демо-вход (для локального тестирования без сервера)
+  loginDemo: (role: StaffRole) => {
     const demoUser: StaffUser = {
       id: 'demo-staff-001',
-      phone: '+7 (909) 453-62-41',
-      full_name: 'Шибаев Сергей Викторович',
-      role: role,
+      phone: '+7 (900) 000-00-00',
+      full_name: 'Демо-сотрудник',
+      role,
       active_view_role: role,
       shift_status: 'on_shift',
-      completed_today: 4,
-      total_earnings_today: 2850,
-      rating: 4.96,
+      completed_today: 0,
+      total_earnings_today: 0,
+      rating: 0,
     };
-
+    const perms = ADMIN_LIKE.includes(role) ? ALL_TAB_IDS.slice() : [];
     set({
       user: demoUser,
       isAuthenticated: true,
       activeViewRole: role,
+      previewRole: null,
+      permissions: perms,
+      isSuperadminUser: ADMIN_LIKE.includes(role),
       shiftStatus: 'on_shift',
       error: null,
     });
   },
 
-  // Авторизация по номеру телефона и паролю личного кабинета сотрудника
+  // Авторизация по логину и паролю личного кабинета сотрудника
   login: async (phone: string, password: string) => {
     set({ isLoading: true, error: null });
     try {
-      console.log(`[Staff Auth] Авторизация сотрудника по логину: ${phone}`);
-      
       const response = await staffApiClient.post('/api/auth/login', {
         login: phone.trim(),
         password: password.trim(),
       });
 
       const { token, user: apiUser } = response.data;
-      if (!token) {
-        throw new Error('Токен авторизации не получен от сервера');
-      }
+      if (!token) throw new Error('Токен авторизации не получен от сервера');
 
-      // Сохраняем полученный JWT токен
       await setStaffToken(token);
 
-      // Запрашиваем полный профиль сотрудника
       let fullProfile: any = null;
       try {
         const profRes = await staffApiClient.get('/api/user/profile');
         fullProfile = profRes.data;
       } catch (profErr) {
-        console.warn('[Staff Auth] Профиль не вернул доп. полей, берем данные из сессии');
+        console.warn('[Staff Auth] Профиль не вернул доп. полей');
       }
 
-      // Определяем системную роль
       const systemRole = (apiUser?.role || fullProfile?.role || 'master') as StaffRole;
       const normalizedRole: StaffRole = ['director', 'admin', 'superadmin', 'dispatcher', 'master', 'technician', 'installer'].includes(systemRole)
         ? systemRole
@@ -112,23 +217,25 @@ export const useStaffAuthStore = create<AuthState>((set, get) => ({
         role: normalizedRole,
         active_view_role: normalizedRole,
         shift_status: 'on_shift',
-        completed_today: 3,
-        total_earnings_today: 2100,
-        rating: 4.9,
+        completed_today: 0,
+        total_earnings_today: 0,
+        rating: 0,
       };
 
-      // Сохраняем в локальное хранилище для автологина
       await AsyncStorage.setItem(STORAGE_KEYS.STAFF_USER, JSON.stringify(staffUser));
 
       set({
         user: staffUser,
         isAuthenticated: true,
         activeViewRole: normalizedRole,
+        previewRole: null,
         shiftStatus: 'on_shift',
         isLoading: false,
         error: null,
       });
 
+      // Подтягиваем реальные права и каталог ролей
+      await get().loadPermissions();
       return true;
     } catch (err: any) {
       console.error('[Staff Auth] Ошибка авторизации:', err.message);
@@ -154,14 +261,16 @@ export const useStaffAuthStore = create<AuthState>((set, get) => ({
         set({
           user: savedUser,
           isAuthenticated: true,
-          activeViewRole: savedUser.active_view_role || savedUser.role || 'master',
+          activeViewRole: savedUser.role || 'master',
+          previewRole: null,
           shiftStatus: savedUser.shift_status || 'on_shift',
           isLoading: false,
         });
+        // Обновляем права в фоне
+        get().loadPermissions();
         return;
       }
 
-      // Если есть токен, но нет профиля — запрашиваем с сервера
       const profRes = await staffApiClient.get('/api/user/profile');
       const profile = profRes.data;
       if (profile) {
@@ -172,11 +281,12 @@ export const useStaffAuthStore = create<AuthState>((set, get) => ({
           role: (profile.role as StaffRole) || 'master',
           active_view_role: (profile.role as StaffRole) || 'master',
           shift_status: 'on_shift',
-          completed_today: 2,
-          total_earnings_today: 1400,
-          rating: 4.9,
+          completed_today: 0,
+          total_earnings_today: 0,
+          rating: 0,
         };
-        set({ user: staffUser, isAuthenticated: true, activeViewRole: staffUser.role, isLoading: false });
+        set({ user: staffUser, isAuthenticated: true, activeViewRole: staffUser.role, previewRole: null, isLoading: false });
+        get().loadPermissions();
       } else {
         set({ isAuthenticated: false, isLoading: false });
       }
@@ -186,9 +296,8 @@ export const useStaffAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  // Смена активного режима рабочего стола (для тестирования всех ролей)
+  // Прямая смена рабочего стола (используется предпросмотром)
   setActiveViewRole: (role: StaffRole) => {
-    console.log(`[Staff Auth] Переключение рабочего стола на роль: ${role}`);
     const currentUser = get().user;
     if (currentUser) {
       const updatedUser = { ...currentUser, active_view_role: role };
@@ -199,12 +308,10 @@ export const useStaffAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  // Переключение статуса смены («На смене» / «Отдых»)
   setShiftStatus: (status: ShiftStatus) => {
     set({ shiftStatus: status });
   },
 
-  // Выход из системы
   logout: async () => {
     try {
       await removeStaffToken();
@@ -217,6 +324,10 @@ export const useStaffAuthStore = create<AuthState>((set, get) => ({
       isAuthenticated: false,
       error: null,
       shiftStatus: 'off_duty',
+      permissions: [],
+      previewRole: null,
+      isSuperadminUser: false,
+      roleLabel: 'Сотрудник',
     });
   },
 }));

@@ -1,6 +1,6 @@
 /**
  * Экран «Профиль сотрудника» — Приложение «Офис Работа»
- * Управление сменой, просмотр личной статистики, переключение роли и выход
+ * Управление сменой, личная статистика, предпросмотр ролей (супер-админ) и выход
  */
 
 import React, { useState } from 'react';
@@ -27,8 +27,10 @@ export default function ProfileScreen() {
   const router = useRouter();
   const [permissionsVisible, setPermissionsVisible] = useState(false);
   const user = useStaffAuthStore((state) => state.user);
-  const activeViewRole = useStaffAuthStore((state) => state.activeViewRole);
-  const setActiveViewRole = useStaffAuthStore((state) => state.setActiveViewRole);
+  const roleLabel = useStaffAuthStore((state) => state.roleLabel);
+  const isSuperadminUser = useStaffAuthStore((state) => state.isSuperadminUser);
+  const previewRole = useStaffAuthStore((state) => state.previewRole);
+  const setPreviewRole = useStaffAuthStore((state) => state.setPreviewRole);
   const shiftStatus = useStaffAuthStore((state) => state.shiftStatus);
   const setShiftStatus = useStaffAuthStore((state) => state.setShiftStatus);
   const logout = useStaffAuthStore((state) => state.logout);
@@ -79,26 +81,14 @@ export default function ProfileScreen() {
     );
   };
 
-  const rolesList: { role: StaffRole; title: string; desc: string; icon: string }[] = [
-    {
-      role: 'master',
-      title: 'Мастер / Техник',
-      desc: 'Наряды на выезд, акты, фотоотчеты, выработка',
-      icon: 'build',
-    },
-    {
-      role: 'dispatcher',
-      title: 'Диспетчер',
-      desc: 'Очередь входящих заявок, распределение по мастерам',
-      icon: 'headset',
-    },
-    {
-      role: 'director',
-      title: 'Руководитель',
-      desc: 'Сводка выручки дня, контроль SLA, ревизия филиала',
-      icon: 'stats-chart',
-    },
+  // Роли для предпросмотра (совпадают с рабочими столами на главном экране)
+  const previewList: { role: StaffRole; title: string; desc: string; icon: string }[] = [
+    { role: 'master', title: 'Мастер / Техник', desc: 'Наряды на выезд, акты, фотоотчёты, выработка', icon: 'build' },
+    { role: 'dispatcher', title: 'Диспетчер', desc: 'Очередь входящих заявок, распределение по мастерам', icon: 'headset' },
+    { role: 'director', title: 'Руководитель', desc: 'Сводка выручки дня, контроль SLA, ревизия филиала', icon: 'stats-chart' },
   ];
+
+  const hasRating = !!(user?.rating && user.rating > 0);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -115,19 +105,19 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.userInfo}>
-          <Text style={styles.userName}>{user?.full_name || 'Шибаев Сергей Викторович'}</Text>
-          <Text style={styles.userPhone}>{user?.phone || '+7 (909) 453-62-41'}</Text>
+          <Text style={styles.userName}>{user?.full_name || 'Сотрудник'}</Text>
+          <Text style={styles.userPhone}>{user?.phone || '—'}</Text>
 
           <View style={styles.badgeRow}>
             <View style={styles.roleBadge}>
-              <Text style={styles.roleBadgeText}>
-                {user?.role === 'director' ? 'Генеральный директор' : 'Сервисный мастер'}
-              </Text>
+              <Text style={styles.roleBadgeText}>{roleLabel || 'Сотрудник'}</Text>
             </View>
-            <View style={styles.ratingBadge}>
-              <Ionicons name="star" size={12} color="#F59E0B" />
-              <Text style={styles.ratingText}>4.96</Text>
-            </View>
+            {hasRating && (
+              <View style={styles.ratingBadge}>
+                <Ionicons name="star" size={12} color="#F59E0B" />
+                <Text style={styles.ratingText}>{user!.rating.toFixed(2)}</Text>
+              </View>
+            )}
           </View>
         </View>
       </View>
@@ -141,7 +131,7 @@ export default function ProfileScreen() {
             size={24}
             color={shiftStatus === 'on_shift' ? '#10B981' : '#64748B'}
           />
-          <View style={{ marginLeft: 12 }}>
+          <View style={{ marginLeft: 12, flex: 1 }}>
             <Text style={styles.shiftCardTitle}>
               {shiftStatus === 'on_shift' ? 'На смене (принимаю вызовы)' : 'Отдых / Не беспокоить'}
             </Text>
@@ -163,37 +153,61 @@ export default function ProfileScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Переключение роли интерфейса (для тестирования) */}
-      <Text style={styles.sectionTitle}>РЕЖИМ РАБОЧЕГО СТОЛА (ТЕСТИРОВАНИЕ РОЛЕЙ)</Text>
-      <View style={styles.rolesContainer}>
-        {rolesList.map((item) => (
-          <TouchableOpacity
-            key={item.role}
-            style={[styles.roleOptionCard, activeViewRole === item.role && styles.roleOptionActive]}
-            onPress={() => {
-              setActiveViewRole(item.role);
-              Alert.alert('Роль переключена', `Рабочий стол адаптирован под роль «${item.title}»`);
-            }}
-          >
-            <View style={styles.roleIconWrap}>
-              <Ionicons
-                name={item.icon as any}
-                size={22}
-                color={activeViewRole === item.role ? '#38BDF8' : '#94A3B8'}
-              />
-            </View>
-            <View style={styles.roleTextWrap}>
-              <Text style={[styles.roleTitle, activeViewRole === item.role && styles.roleTitleActive]}>
-                {item.title}
+      {/* ПРЕДПРОСМОТР РОЛЕЙ — только для супер-администратора */}
+      {isSuperadminUser && (
+        <>
+          <Text style={styles.sectionTitle}>ПРЕДПРОСМОТР РОЛИ · ТОЛЬКО СУПЕР-АДМИН</Text>
+
+          {previewRole && (
+            <View style={styles.previewBanner}>
+              <Ionicons name="eye" size={16} color="#FBBF24" style={{ marginRight: 8 }} />
+              <Text style={styles.previewBannerText}>
+                Включён предпросмотр чужой роли. Это только показ интерфейса — ваши реальные права не меняются.
               </Text>
-              <Text style={styles.roleDesc}>{item.desc}</Text>
             </View>
-            {activeViewRole === item.role && (
-              <Ionicons name="checkmark-circle" size={20} color="#38BDF8" />
-            )}
-          </TouchableOpacity>
-        ))}
-      </View>
+          )}
+
+          <View style={styles.rolesContainer}>
+            {/* Вернуться к своей роли */}
+            <TouchableOpacity
+              style={[styles.roleOptionCard, !previewRole && styles.roleOptionActive]}
+              onPress={() => setPreviewRole(null)}
+            >
+              <View style={styles.roleIconWrap}>
+                <Ionicons name="shield-checkmark" size={22} color={!previewRole ? '#38BDF8' : '#94A3B8'} />
+              </View>
+              <View style={styles.roleTextWrap}>
+                <Text style={[styles.roleTitle, !previewRole && styles.roleTitleActive]}>Моя роль (супер-админ)</Text>
+                <Text style={styles.roleDesc}>Полный доступ ко всем разделам</Text>
+              </View>
+              {!previewRole && <Ionicons name="checkmark-circle" size={20} color="#38BDF8" />}
+            </TouchableOpacity>
+
+            {previewList.map((item) => (
+              <TouchableOpacity
+                key={item.role}
+                style={[styles.roleOptionCard, previewRole === item.role && styles.roleOptionActive]}
+                onPress={() => setPreviewRole(item.role)}
+              >
+                <View style={styles.roleIconWrap}>
+                  <Ionicons
+                    name={item.icon as any}
+                    size={22}
+                    color={previewRole === item.role ? '#38BDF8' : '#94A3B8'}
+                  />
+                </View>
+                <View style={styles.roleTextWrap}>
+                  <Text style={[styles.roleTitle, previewRole === item.role && styles.roleTitleActive]}>
+                    {item.title}
+                  </Text>
+                  <Text style={styles.roleDesc}>{item.desc}</Text>
+                </View>
+                {previewRole === item.role && <Ionicons name="checkmark-circle" size={20} color="#38BDF8" />}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </>
+      )}
 
       {/* О приложении */}
       <Text style={styles.sectionTitle}>О СИСТЕМЕ</Text>
@@ -204,7 +218,7 @@ export default function ProfileScreen() {
         </View>
         <View style={styles.infoRow}>
           <Text style={styles.infoLabel}>Версия:</Text>
-          <Text style={styles.infoValue}>v1.1.0 (FSM Mobile Core)</Text>
+          <Text style={styles.infoValue}>v{APP_VERSION}</Text>
         </View>
         <View style={styles.infoRow}>
           <Text style={styles.infoLabel}>Среда:</Text>
@@ -402,6 +416,23 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '700',
+  },
+  previewBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.4)',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+  },
+  previewBannerText: {
+    flex: 1,
+    color: '#FCD34D',
+    fontSize: 11.5,
+    lineHeight: 15,
+    fontWeight: '600',
   },
   rolesContainer: {
     gap: 10,

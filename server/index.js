@@ -1144,6 +1144,90 @@ app.get('/api/user/roles', authenticateToken, async (req, res) => {
   }
 });
 
+// Получить эффективные права (permissions) текущего сотрудника — единая модель с CRM (таблица crm_roles).
+// Логика зеркалит useUserRole на сайте: объединение прав всех назначенных ролей; director/admin/superadmin/владелец → все разделы.
+const ALL_CRM_TAB_IDS = [
+  'dashboard','tasks','requests','new-buildings','installer-sheet','products','equipment-matching',
+  'addresses','accounts','logins','autopay','employees','clients','cabinets','map','reports','verification','instructions'
+];
+
+app.get('/api/user/permissions', authenticateToken, async (req, res) => {
+  try {
+    const uid = req.user.id;
+
+    // 1. Системные роли из user_roles (+ fallback из users.role через req.userRole)
+    const sysRes = await pool.query('SELECT role FROM user_roles WHERE user_id = $1', [uid]);
+    let sysRoles = sysRes.rows.map((r) => String(r.role));
+    if (sysRoles.length === 0 && req.userRole) sysRoles = [req.userRole];
+
+    // 2. Кастомная роль из карточки сотрудника (employees), если таблица есть
+    const assigned = new Set(sysRoles.map((r) => r.toLowerCase()));
+    try {
+      const empRes = await pool.query('SELECT role, position FROM employees WHERE user_id = $1 LIMIT 1', [uid]);
+      const emp = empRes.rows[0];
+      if (emp?.role) assigned.add(String(emp.role).toLowerCase());
+      if (emp?.position) assigned.add(String(emp.position).toLowerCase());
+    } catch (e) { /* таблицы employees может не быть — не критично */ }
+
+    // 3. Владелец платформы — всегда полный доступ
+    let email = '';
+    try {
+      const u = await pool.query('SELECT email FROM users WHERE id = $1', [uid]);
+      email = String(u.rows[0]?.email || '').toLowerCase().trim();
+    } catch (e) { /* ignore */ }
+    const isOwner = email === SUPERADMIN_EMAIL;
+    if (isOwner) { assigned.add('superadmin'); assigned.add('admin'); }
+
+    const isAdminLike = isOwner || req.isSuperAdmin || req.isAdmin || req.isDirector
+      || assigned.has('superadmin') || assigned.has('admin') || assigned.has('director');
+
+    // Каталог ролей из crm_roles (нужен супер-админу для предпросмотра любой роли в приложении)
+    let catalog = [];
+    try {
+      const rolesRes = await pool.query('SELECT id, name, permissions FROM crm_roles ORDER BY name');
+      catalog = rolesRes.rows.map((r) => {
+        let perms = r.permissions;
+        if (typeof perms === 'string') { try { perms = JSON.parse(perms); } catch (e) { perms = []; } }
+        return { id: String(r.id), name: String(r.name || r.id), permissions: Array.isArray(perms) ? perms.map(String) : [] };
+      });
+    } catch (e) {
+      console.warn('[Бэкенд: Права] Таблица crm_roles недоступна:', e.message);
+    }
+
+    let permissions = [];
+    if (isAdminLike) {
+      permissions = [...ALL_CRM_TAB_IDS];
+    } else {
+      const permSet = new Set();
+      for (const r of catalog) {
+        if (assigned.has(r.id.toLowerCase()) || assigned.has(r.name.toLowerCase())) {
+          r.permissions.forEach((p) => permSet.add(String(p)));
+        }
+      }
+      permissions = Array.from(permSet);
+    }
+
+    const roleOrder = ['superadmin','admin','director','manager','dispatcher','master','engineer','technician','installer'];
+    const primary = roleOrder.find((r) => assigned.has(r)) || sysRoles[0] || 'user';
+    const labels = { superadmin:'Суперадмин', admin:'Администратор', director:'Директор', manager:'Менеджер', dispatcher:'Диспетчер', master:'Мастер', engineer:'Инженер', technician:'Техник', installer:'Монтажник', user:'Сотрудник' };
+
+    res.json({
+      roles: sysRoles,
+      assigned_roles: Array.from(assigned),
+      primary_role: primary,
+      role_label: labels[primary] || 'Сотрудник',
+      is_admin: !!isAdminLike,
+      is_superadmin: !!(isOwner || req.isSuperAdmin || assigned.has('superadmin')),
+      permissions,
+      all_roles: catalog,
+      all_tab_ids: ALL_CRM_TAB_IDS,
+    });
+  } catch (err) {
+    console.error('[Бэкенд: Права] Ошибка получения прав:', err.message);
+    res.status(500).json({ error: 'Не удалось получить права доступа' });
+  }
+});
+
 // Получить список пользователей для админки (С СОКРЫТИЕМ СУПЕРПОЛЬЗОВАТЕЛЯ РАЗРАБОТЧИКА)
 app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) => {
   try {

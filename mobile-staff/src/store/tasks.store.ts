@@ -89,13 +89,13 @@ interface TasksState {
 }
 
 export const useStaffTasksStore = create<TasksState>((set, get) => ({
-  tasks: FALLBACK_TASKS,
+  tasks: [],
   acts: [],
   stats: {
-    completed_today: 3,
-    in_progress: 1,
-    total_earnings_today: 2850,
-    rating: 4.96,
+    completed_today: 0,
+    in_progress: 0,
+    total_earnings_today: 0,
+    rating: 0,
   },
   searchQuery: '',
   selectedFilter: 'all',

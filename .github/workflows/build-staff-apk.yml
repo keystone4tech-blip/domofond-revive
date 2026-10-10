@@ -79,10 +79,18 @@ jobs:
           echo "[CI/CD] Запуск компиляции APK Офис Работа ($BUILD_TYPE)..."
           
           if [ "$BUILD_TYPE" = "debug" ]; then
-            ./gradlew assembleDebug --no-daemon --stacktrace --info || { echo "[CI/CD] Сборка assembleDebug упала!"; exit 1; }
+            ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log || { echo "=== GRADLE DEBUG ERROR LOG ==="; tail -n 150 build.log; exit 1; }
           else
-            ./gradlew assembleRelease --no-daemon --stacktrace --info || { echo "[CI/CD] Сборка assembleRelease упала!"; exit 1; }
+            ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee build.log || { echo "=== GRADLE RELEASE ERROR LOG ==="; tail -n 150 build.log; exit 1; }
           fi
+
+      - name: 📄 Сохранение логов компиляции Gradle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: staff-gradle-build-logs
+          path: mobile-staff/android/build.log
+          retention-days: 7
 
       - name: 🔐 Проверка, подпись и валидация APK
         run: |
