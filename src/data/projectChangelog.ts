@@ -258,6 +258,16 @@ export const KIND_META: Record<Kind, { label: string; badgeCls: string }> = {
  */
 export const PROJECT_CHANGELOG: ProjectEntry[] = [
   {
+    id: "stage-2026-10-10-2245",
+    datetime: "2026-10-10 22:45",
+    title: "Ликвидация сбоя подписи APK «Офис Работа» (добавление debug.keystore и автогенерация)",
+    description: "Устранена первопричина сбоя шага подписи и валидации APK в GitHub Actions: так как директория android в mobile-staff генерируется на лету через expo prebuild, файл debug.keystore отсутствовал по указанному пути, что приводило к ошибке apksigner. 1) В репозиторий добавлен файл mobile-staff/debug.keystore. 2) В workflow build-staff-apk.yml внедрен многоуровневый fallback: проверка наличия keystore, автогенерация нового ключа через keytool при отсутствии и финальная строгая валидация схем v1/v2 через apksigner.",
+    module: "infra_mobile",
+    kind: "fix",
+    hours: 2.0,
+    difficulty: "Средняя",
+  },
+  {
     id: "stage-2026-10-10-2215",
     datetime: "2026-10-10 22:15",
     title: "Интеграция ролевой модели прав доступа в приложении «Офис Работа» и фиксация логов CI/CD",

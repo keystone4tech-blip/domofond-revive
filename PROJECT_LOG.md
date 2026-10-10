@@ -14,6 +14,24 @@
 > 📌 **ОБЯЗАТЕЛЬНАЯ АКТУАЛИЗАЦИЯ ИНСТРУКЦИЙ ДЛЯ СТРАНИЦ CRM (`src/data/pageQuickGuides.ts`):**
 > Файл [`src/data/pageQuickGuides.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/data/pageQuickGuides.ts) является единым модулем должностных регламентов и пошаговых инструкций для всех 18 вкладок CRM («1. Назначение и состав раздела», «2. Задачи и регламентные цели», «3. Порядок работы (пошаговая инструкция)»). Стиль изложения — строго профессиональный корпоративный регламент. При любом изменении логики, добавлении новых кнопок, переключателей или функций в соответствующую вкладку CRM ассистент **ОБЯЗАН** немедленно дополнять и актуализировать этот файл, чтобы у персонала всегда была актуальная нормативная информация для работы.
 
+# 2026-10-10 22:45 — Ликвидация сбоя подписи APK «Офис Работа» (добавление debug.keystore и автогенерация)
+
+## 1. Задачи и выполненные работы
+- **Устранение первопричины сбоя на шаге валидации и подписи APK**:
+  * В GitHub Actions этап компиляции Gradle завершился успешно (`success`), но последующий шаг `🔐 Проверка, подпись и валидация APK` падал из-за отсутствия keystore-файла по статическому пути `mobile-staff/android/app/debug.keystore` (так как папка `android` генерируется динамически через `expo prebuild --clean`).
+  * Скопирован и зафиксирован в репозитории файл [`mobile-staff/debug.keystore`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile-staff/debug.keystore).
+  * В [`.github/workflows/build-staff-apk.yml`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/.github/workflows/build-staff-apk.yml) реализован многоуровневый алгоритм поиска и генерации ключа подписи:
+    - Проверка локального `mobile-staff/debug.keystore`.
+    - Резервный поиск в `mobile/android/app/debug.keystore`.
+    - Автоматическая генерация нового валидного RSA-2048 ключа утилитой `keytool` при отсутствии.
+    - Выравнивание `zipalign -p -f 4` и подпись `apksigner sign` с последующей финальной проверкой `apksigner verify --verbose`.
+
+## 2. Измененные файлы
+- [`mobile-staff/debug.keystore`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile-staff/debug.keystore) — файл ключа подписи APK для служебного приложения.
+- [`.github/workflows/build-staff-apk.yml`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/.github/workflows/build-staff-apk.yml) — отказоустойчивый скрипт подписи и верификации APK.
+- [`src/data/projectChangelog.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/data/projectChangelog.ts) — паспорт проекта.
+- [`PROJECT_LOG.md`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/PROJECT_LOG.md) — актуализация карты проекта.
+
 # 2026-10-10 22:15 — Интеграция ролевой модели прав доступа в приложении «Офис Работа» и фиксация логов CI/CD
 
 ## 1. Задачи и выполненные работы

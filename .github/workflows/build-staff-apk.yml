@@ -95,6 +95,9 @@ jobs:
       - name: 🔐 Проверка, подпись и валидация APK
         run: |
           mkdir -p staff-artifacts
+          echo "[CI/CD] Поиск всех скомпилированных .apk файлов:"
+          find mobile-staff/android/app/build/outputs/apk -name "*.apk"
+          
           RAW_APK=$(find mobile-staff/android/app/build/outputs/apk -name "*.apk" | head -n 1)
           if [ -z "$RAW_APK" ]; then
             echo "[CI/CD] ОШИБКА: Файл APK не найден!"
@@ -103,14 +106,33 @@ jobs:
           echo "[CI/CD] Найден исходный APK: $RAW_APK"
           
           BUILD_TOOLS_DIR=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -n 1)
+          echo "[CI/CD] Используются Build-Tools: $BUILD_TOOLS_DIR"
+          
+          # Определение пути к keystore для подписи
+          KEYSTORE_PATH="mobile-staff/debug.keystore"
+          if [ ! -f "$KEYSTORE_PATH" ]; then
+            KEYSTORE_PATH="mobile/android/app/debug.keystore"
+          fi
+          if [ ! -f "$KEYSTORE_PATH" ]; then
+            echo "[CI/CD] Keystore не найден, генерация нового через keytool..."
+            mkdir -p mobile-staff
+            keytool -genkey -v -keystore mobile-staff/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+            KEYSTORE_PATH="mobile-staff/debug.keystore"
+          fi
+          echo "[CI/CD] Выбран keystore: $KEYSTORE_PATH"
+          
+          # Проверяем, подписан ли APK
           VERIFY_OUTPUT=$("$BUILD_TOOLS_DIR/apksigner" verify --verbose "$RAW_APK" 2>&1 || true)
+          echo "$VERIFY_OUTPUT"
           
           if echo "$VERIFY_OUTPUT" | grep -q "Verifies: true"; then
+            echo "[CI/CD] APK уже подписан и валиден!"
             cp "$RAW_APK" staff-artifacts/office-work.apk
           else
+            echo "[CI/CD] Подпись APK через zipalign и apksigner..."
             "$BUILD_TOOLS_DIR/zipalign" -p -f 4 "$RAW_APK" staff-artifacts/aligned.apk
             "$BUILD_TOOLS_DIR/apksigner" sign \
-              --ks mobile-staff/android/app/debug.keystore \
+              --ks "$KEYSTORE_PATH" \
               --ks-pass pass:android \
               --key-pass pass:android \
               --ks-key-alias androiddebugkey \
@@ -119,7 +141,9 @@ jobs:
             rm -f staff-artifacts/aligned.apk
           fi
           
+          echo "[CI/CD] Финальная валидация apksigner:"
           "$BUILD_TOOLS_DIR/apksigner" verify --verbose staff-artifacts/office-work.apk
+          echo "[CI/CD] Итоговый размер готового APK:"
           ls -lh staff-artifacts/office-work.apk
 
       - name: 🚀 Сохранение APK в артефакты GitHub
