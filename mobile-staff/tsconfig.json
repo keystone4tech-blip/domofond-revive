@@ -1,12 +1,16 @@
 {
-  "extends": "expo/tsconfig.base",
+  "extends": "../mobile/node_modules/expo/tsconfig.base.json",
   "compilerOptions": {
     "strict": true,
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
       "~/*": ["./*"]
-    }
+    },
+    "typeRoots": [
+      "../mobile/node_modules/@types",
+      "../node_modules/@types"
+    ]
   },
   "include": [
     "**/*.ts",

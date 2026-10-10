@@ -27,6 +27,7 @@
 | mobile/app/(tabs)/requests/index.tsx | Claude | 2026-10-06 16:54 UTC | ✅ освобождён (закоммичено) |
 | mobile/app/(tabs)/_layout.tsx | Claude | 2026-10-06 16:54 UTC | ✅ освобождён (закоммичено) |
 | mobile/src/components/*OrderModal, LegalModal, OfflineBanner | Claude | 2026-10-06 16:54 UTC | ✅ освобождён (закоммичено) |
+| mobile-staff/*, mobile/*, server/index.js (permissions, background push, versions) | Antigravity | 2026-10-10 19:20 UTC | ✅ освобождён (закоммичено) |
 | 1c-bridge/*, server/index.js (clean remarks, blank results, subscriber cards) | Antigravity | 2026-10-10 14:15 UTC | ✅ освобождён (закоммичено) |
 | src/pages/Cabinet.tsx, src/data/projectChangelog.ts | Antigravity | 2026-10-08 07:33 UTC | ✅ освобождён (закоммичено) |
 | server/index.js, src/components/admin/*, src/pages/Admin.tsx | Antigravity | 2026-10-08 07:49 UTC | ✅ освобождён (закоммичено) |
@@ -327,6 +328,14 @@ Claude, выполнил исправление и деплой по заказ�
 3. Метод GetOrCreateSubscriber в OneCBridgeCore.cs доработан: если карточка абонента найдена в 1С по адресу квартиры, но в ней пустые Наименование (ФИО) или Телефоны — они автоматически записываются в карточку абонента. Если же в базе уже числится другой владелец — его контакты не затираются, а данные заказчика с сайта выводятся в Примечание диспетчера.
 4. Все существующие документы в 1С (АУЗ-007876...007881, ЗКН-007490...007503) актуализированы: Результат очищен, примечание обновлено, карточки абонентов дозаполнены ФИО и телефонами.
 5. Бэкенд задеплоен на боевой сервер. Claim снят.
+
+**2026-10-10 19:30 UTC — Antigravity:**
+Системные разрешения, фоновый режим уведомлений и автообновление мобильных приложений:
+1. В app.config.ts приложений mobile-staff (мастера) и mobile (жильцы) настроены все разрешения: геолокация (GPS, фоновая локация, foreground service), камера, доступ к фото/видео/файлам (READ_MEDIA_VIDEO, READ_EXTERNAL_STORAGE), WAKE_LOCK и снятие лимитов батареи (REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).
+2. Внедрены сервисы permissionsService.ts с высокоприоритетными Android Notification Channels (AndroidImportance.MAX, обход DND/сна).
+3. Созданы модальные окна PermissionsCenterModal с интерактивным переключением и прямым переходом в настройки телефона и оптимизации батареи.
+4. Повышены версии: Офис Работа до v1.1.0 (код 2), Домофондар до v1.4.0 (код 18).
+5. Обновлены эндпоинты версий в server/index.js и задеплоены на боевой VPS (45.8.99.238): при запуске приложения автоматически инициируют нативное обновление. Claim снят.
 
 
 

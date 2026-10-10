@@ -14,6 +14,48 @@
 > 📌 **ОБЯЗАТЕЛЬНАЯ АКТУАЛИЗАЦИЯ ИНСТРУКЦИЙ ДЛЯ СТРАНИЦ CRM (`src/data/pageQuickGuides.ts`):**
 > Файл [`src/data/pageQuickGuides.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/data/pageQuickGuides.ts) является единым модулем должностных регламентов и пошаговых инструкций для всех 18 вкладок CRM («1. Назначение и состав раздела», «2. Задачи и регламентные цели», «3. Порядок работы (пошаговая инструкция)»). Стиль изложения — строго профессиональный корпоративный регламент. При любом изменении логики, добавлении новых кнопок, переключателей или функций в соответствующую вкладку CRM ассистент **ОБЯЗАН** немедленно дополнять и актуализировать этот файл, чтобы у персонала всегда была актуальная нормативная информация для работы.
 
+# 2026-10-10 19:25 — Системные разрешения, фоновая доставка push-уведомлений и автообновление мобильных приложений (мастера v1.1.0, жильцы v1.4.0)
+
+## 1. Задачи и выполненные работы
+- **Комплексная настройка системных манифестов разрешений**:
+  * В приложении для мастеров (`mobile-staff/app.config.ts`):
+    - Геолокация: `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`, `ACCESS_BACKGROUND_LOCATION`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_LOCATION` для непрерывной навигации к МКД.
+    - Фото, видео и файлы: `CAMERA`, `RECORD_AUDIO`, `READ_MEDIA_IMAGES`, `READ_MEDIA_VIDEO`, `READ_MEDIA_AUDIO`, `READ_EXTERNAL_STORAGE`, `WRITE_EXTERNAL_STORAGE` для составления актов и видеофиксации неисправностей.
+    - Фоновый режим и уведомления: `POST_NOTIFICATIONS`, `VIBRATE`, `WAKE_LOCK`, `RECEIVE_BOOT_COMPLETED`, `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`.
+    - iOS (`infoPlist`): `UIBackgroundModes: ['fetch', 'remote-notification', 'location']`.
+  * В приложении для жителей (`mobile/app.config.ts`):
+    - Добавлены разрешения на видео и файлы (`READ_MEDIA_VIDEO`, `READ_MEDIA_AUDIO`, `READ_EXTERNAL_STORAGE`, `WRITE_EXTERNAL_STORAGE`).
+    - Добавлены `WAKE_LOCK`, `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` и `UIBackgroundModes: ['fetch', 'remote-notification']` для пробуждения телефона при закрытом приложении.
+- **Высокоприоритетные каналы Push-уведомлений**:
+  * Разработаны сервисы `permissionsService.ts` для обоих приложений с регистрацией Android Notification Channels максимальной важности (`AndroidImportance.MAX`, звук тревоги, вибрация, обход режима "Не беспокоить").
+  * Реализовано снятие ограничений энергосбережения батареи (Battery Optimization) в один клик через `IntentLauncher` (критично для телефонов Xiaomi MIUI/HyperOS, Samsung OneUI, Huawei EMUI, чтобы закрытое приложение продолжало получать пуши).
+- **Интерактивный UI «Центр разрешений и фоновой работы»**:
+  * В `mobile-staff` и `mobile` созданы модальные окна `PermissionsCenterModal`: карточки статусов каждого разрешения с цветовой индикацией (зеленый "Вкл" / красный "Выключить"), кнопками запроса и кнопкой «Настройки телефона» (`Linking.openSettings()`).
+  * Внедрены вызовы в профилях обоих приложений и предупреждающий баннер на рабочем столе мастера.
+- **Синхронизация и повышение версий для автообновления**:
+  * Версия приложения сотрудников «Офис Работа» повышена до **v1.1.0** (код версии 2).
+  * Версия приложения жителей «Домофондар» повышена до **v1.4.0** (код версии 18).
+  * Обновлены серверные эндпоинты `/api/app/version` и `/api/app/version-staff` в `server/index.js` и задеплоены на боевой VPS `45.8.99.238`: при открытии установленные клиенты автоматически проверяют обновления и предлагают обновиться в один клик.
+
+## 2. Измененные файлы
+- [`mobile-staff/app.config.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile-staff/app.config.ts) — манифест, разрешения и версия v1.1.0 (код 2).
+- [`mobile-staff/package.json`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile-staff/package.json) — версия 1.1.0.
+- [`mobile-staff/src/config/constants.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile-staff/src/config/constants.ts) — константа APP_VERSION 1.1.0.
+- [`mobile-staff/src/services/permissionsService.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile-staff/src/services/permissionsService.ts) — сервис проверки прав, каналы пушей и оптимизация батареи.
+- [`mobile-staff/src/components/PermissionsCenterModal.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile-staff/src/components/PermissionsCenterModal.tsx) — окно проверки и включения разрешений для техников.
+- [`mobile-staff/app/(tabs)/index.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile-staff/app/(tabs)/index.tsx) — баннер предупреждения и вызов модалки на рабочем столе.
+- [`mobile-staff/app/(tabs)/profile.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile-staff/app/(tabs)/profile.tsx) — пункт «Разрешения и фоновая работа» в профиле.
+- [`mobile-staff/tsconfig.json`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile-staff/tsconfig.json) — путь к конфигурации Expo tsconfig.base.json.
+- [`mobile/app.config.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/app.config.ts) — манифест, разрешения и версия v1.4.0 (код 18).
+- [`mobile/package.json`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/package.json) — версия 1.4.0.
+- [`mobile/src/config/constants.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/src/config/constants.ts) — константа APP_VERSION 1.4.0.
+- [`mobile/src/services/permissionsService.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/src/services/permissionsService.ts) — сервис разрешений жильцов.
+- [`mobile/src/components/PermissionsCenterModal.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/src/components/PermissionsCenterModal.tsx) — окно проверки разрешений для жильцов.
+- [`mobile/app/(tabs)/profile/index.tsx`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile/app/(tabs)/profile/index.tsx) — пункт «Центр разрешений (Батарея / Фоновый режим)» в профиле жильца.
+- [`server/index.js`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/server/index.js) — эндпоинты версий 1.4.0 и 1.1.0 с описанием обновлений (задеплоено на боевой VPS).
+- [`src/data/projectChangelog.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/data/projectChangelog.ts) — добавление этапа в паспорт проекта.
+- [`PROJECT_LOG.md`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/PROJECT_LOG.md) — актуализация карты проекта.
+
 # 2026-10-10 14:15 — Стандартизация документов 1С: очистка поля результата, форматирование примечаний диспетчера и автозаполнение карточек абонентов
 
 ## 1. Задачи и выполненные работы

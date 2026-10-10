@@ -10,7 +10,7 @@ export const API_URL = 'https://xn--80aha5afebav9a.xn--p1ai/backend-api';
 export const APP_NAME = 'Офис Работа';
 
 // Версия сборки
-export const APP_VERSION = '1.0.0';
+export const APP_VERSION = '1.1.0';
 
 // Ссылка для прямого скачивания служебного приложения
 export const APP_DOWNLOAD_URL = 'https://xn--80aha5afebav9a.xn--p1ai/backend-api/api/app/download-staff';

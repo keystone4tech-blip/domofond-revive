@@ -3,7 +3,7 @@
  * Управление сменой, просмотр личной статистики, переключение роли и выход
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -21,9 +21,11 @@ import { StaffRole } from '../../src/types/staff';
 import { staffApiClient } from '../../src/api/client';
 import { APP_VERSION, APP_DOWNLOAD_URL } from '../../src/config/constants';
 import { compareVersions } from '../../src/components/UpdateCheckerModal';
+import { PermissionsCenterModal } from '../../src/components/PermissionsCenterModal';
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const [permissionsVisible, setPermissionsVisible] = useState(false);
   const user = useStaffAuthStore((state) => state.user);
   const activeViewRole = useStaffAuthStore((state) => state.activeViewRole);
   const setActiveViewRole = useStaffAuthStore((state) => state.setActiveViewRole);
@@ -202,12 +204,37 @@ export default function ProfileScreen() {
         </View>
         <View style={styles.infoRow}>
           <Text style={styles.infoLabel}>Версия:</Text>
-          <Text style={styles.infoValue}>v1.0.0 (FSM Mobile Core)</Text>
+          <Text style={styles.infoValue}>v1.1.0 (FSM Mobile Core)</Text>
         </View>
         <View style={styles.infoRow}>
           <Text style={styles.infoLabel}>Среда:</Text>
           <Text style={styles.infoValue}>Производственный сервер (HTTPS)</Text>
         </View>
+
+        {/* Кнопка открытия Центра разрешений и фоновой работы */}
+        <TouchableOpacity
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingTop: 12,
+            marginTop: 10,
+            borderTopWidth: 1,
+            borderTopColor: '#334155',
+          }}
+          onPress={() => setPermissionsVisible(true)}
+          activeOpacity={0.7}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Ionicons name="shield-checkmark-outline" size={18} color="#38BDF8" />
+            <Text style={{ fontSize: 13, fontWeight: '700', color: '#38BDF8' }}>
+              Разрешения и фоновая работа
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color="#64748B" />
+        </TouchableOpacity>
+
+        {/* Кнопка ручной проверки обновлений */}
         <TouchableOpacity
           style={{
             flexDirection: 'row',
@@ -234,6 +261,12 @@ export default function ProfileScreen() {
         <Ionicons name="log-out-outline" size={20} color="#EF4444" />
         <Text style={styles.logoutBtnText}>Выйти из аккаунта</Text>
       </TouchableOpacity>
+
+      {/* Центр системных разрешений и фонового режима */}
+      <PermissionsCenterModal
+        visible={permissionsVisible}
+        onClose={() => setPermissionsVisible(false)}
+      />
     </ScrollView>
   );
 }

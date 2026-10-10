@@ -18,6 +18,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useStaffAuthStore } from '../../src/store/auth.store';
 import { useStaffTasksStore } from '../../src/store/tasks.store';
 import { StaffRole } from '../../src/types/staff';
+import { PermissionsCenterModal } from '../../src/components/PermissionsCenterModal';
+import { checkAllStaffPermissions, initializeNotificationChannel } from '../../src/services/permissionsService';
 
 export default function WorkspaceScreen() {
   const router = useRouter();
@@ -36,12 +38,18 @@ export default function WorkspaceScreen() {
   const callPhone = useStaffTasksStore((state) => state.callPhone);
 
   const [refreshing, setRefreshing] = useState(false);
+  const [permissionsModalVisible, setPermissionsModalVisible] = useState(false);
+  const [hasMissingPermissions, setHasMissingPermissions] = useState(false);
 
   // Фоновая синхронизация с сервером при открытии экрана
   useEffect(() => {
     loadTasks();
     loadActs();
     loadStats();
+    initializeNotificationChannel();
+    checkAllStaffPermissions().then((status) => {
+      setHasMissingPermissions(!status.allEssentialGranted);
+    });
   }, []);
 
   const onRefresh = async () => {
@@ -119,6 +127,28 @@ export default function WorkspaceScreen() {
           Рабочий стол: <Text style={styles.roleBannerBold}>{getRoleLabel(activeViewRole)}</Text>
         </Text>
       </View>
+
+      {/* Баннер проверки разрешений и фонового режима */}
+      {hasMissingPermissions && (
+        <TouchableOpacity
+          style={styles.permissionsAlertBanner}
+          onPress={() => setPermissionsModalVisible(true)}
+          activeOpacity={0.8}
+        >
+          <View style={styles.permissionsAlertLeft}>
+            <Ionicons name="warning" size={20} color="#F59E0B" />
+            <View style={{ marginLeft: 10, flex: 1 }}>
+              <Text style={styles.permissionsAlertTitle}>Включите системные разрешения</Text>
+              <Text style={styles.permissionsAlertText}>
+                Геолокация, фоновые пуши и фотоотчеты для стабильной работы мастера
+              </Text>
+            </View>
+          </View>
+          <View style={styles.permissionsAlertBtn}>
+            <Text style={styles.permissionsAlertBtnText}>Настроить</Text>
+          </View>
+        </TouchableOpacity>
+      )}
 
       {/* =========================================================================
           ВАРИАНТ 1: РАБОЧИЙ СТОЛ МАСТЕРА / ТЕХНИКА
@@ -362,6 +392,16 @@ export default function WorkspaceScreen() {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Центр системных разрешений и фонового режима */}
+      <PermissionsCenterModal
+        visible={permissionsModalVisible}
+        onClose={async () => {
+          setPermissionsModalVisible(false);
+          const s = await checkAllStaffPermissions();
+          setHasMissingPermissions(!s.allEssentialGranted);
+        }}
+      />
     </ScrollView>
   );
 }
@@ -370,6 +410,45 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0B132B',
+  },
+  permissionsAlertBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.4)',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 16,
+  },
+  permissionsAlertLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 10,
+  },
+  permissionsAlertTitle: {
+    color: '#FCD34D',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  permissionsAlertText: {
+    color: '#CBD5E1',
+    fontSize: 11,
+    marginTop: 2,
+    lineHeight: 14,
+  },
+  permissionsAlertBtn: {
+    backgroundColor: '#F59E0B',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  permissionsAlertBtnText: {
+    color: '#0F172A',
+    fontSize: 12,
+    fontWeight: '800',
   },
   contentContainer: {
     paddingHorizontal: 16,

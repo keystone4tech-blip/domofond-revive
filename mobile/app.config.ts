@@ -12,18 +12,20 @@ const withAppCustomManifest: ConfigPlugin = (config) => {
       androidManifest.application[0].$['android:usesCleartextTraffic'] = 'true';
     }
 
-    // Добавляем системное разрешение REQUEST_INSTALL_PACKAGES для нативного PackageInstaller
+    // Добавляем системные разрешения
     if (!androidManifest['uses-permission']) {
       androidManifest['uses-permission'] = [];
     }
-    const hasInstallPermission = androidManifest['uses-permission'].some(
-      (p: any) => p.$?.['android:name'] === 'android.permission.REQUEST_INSTALL_PACKAGES'
-    );
-    if (!hasInstallPermission) {
-      androidManifest['uses-permission'].push({
-        $: { 'android:name': 'android.permission.REQUEST_INSTALL_PACKAGES' }
-      } as any);
-    }
+    const perms = androidManifest['uses-permission'];
+    const ensurePerm = (name: string) => {
+      const exists = perms.some((p: any) => p.$?.['android:name'] === name);
+      if (!exists) {
+        perms.push({ $: { 'android:name': name } } as any);
+      }
+    };
+    ensurePerm('android.permission.REQUEST_INSTALL_PACKAGES');
+    ensurePerm('android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS');
+    ensurePerm('android.permission.WAKE_LOCK');
 
     return manifestConfig;
   });
@@ -75,7 +77,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   // === Основные параметры приложения ===
   name: 'Домофондар',                         // Название в меню телефона
   slug: 'domofondar',                          // Уникальный идентификатор проекта
-  version: '1.3.0',                            // Версия приложения (надежный загрузчик APK, синхронизация с сайтом)
+  version: '1.4.0',                            // Версия приложения (надежный загрузчик APK, синхронизация с сайтом)
   orientation: 'portrait',                     // Портретная ориентация
   icon: './assets/images/icon.png',            // Иконка приложения (1024x1024)
   scheme: 'domofondar',                        // URL-схема для deep linking (domofondar://)
@@ -92,14 +94,15 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   ios: {
     supportsTablet: true,                      // Поддержка iPad
     bundleIdentifier: 'ru.domofondar.app',     // Уникальный Bundle ID для App Store
-    buildNumber: '17',                         // Номер сборки
+    buildNumber: '18',                         // Номер сборки
     infoPlist: {
       // Описания для запросов разрешений (обязательно для App Store)
       NSCameraUsageDescription: 'Камера нужна для фото заявок и верификации документов',
-      NSPhotoLibraryUsageDescription: 'Доступ к фото для загрузки документов и фото к заявкам',
+      NSPhotoLibraryUsageDescription: 'Доступ к фото и видео для загрузки документов и медиафайлов к заявкам',
       NSFaceIDUsageDescription: 'Face ID используется для быстрого и безопасного входа в приложение',
       NSMicrophoneUsageDescription: 'Микрофон нужен для записи голосовых сообщений в чате',
       NSLocationWhenInUseUsageDescription: 'Геопозиция используется для определения адреса и удобства оформления заявок',
+      UIBackgroundModes: ['fetch', 'remote-notification'],
     },
     config: {
       usesNonExemptEncryption: false,          // Без экспортного шифрования
@@ -113,20 +116,26 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       backgroundColor: '#0F172A',                           // Фон адаптивной иконки
     },
     package: 'ru.domofondar.app',              // Уникальный Package Name для Google Play
-    versionCode: 17,                           // Код версии 17 (v1.3.0)
+    versionCode: 18,                           // Код версии 18 (v1.4.0)
     permissions: [
       'CAMERA',                                // Камера для фото
       'READ_MEDIA_IMAGES',                     // Чтение изображений (Android 13+)
+      'READ_MEDIA_VIDEO',                      // Чтение видео (Android 13+)
+      'READ_MEDIA_AUDIO',                      // Чтение аудио (Android 13+)
+      'READ_EXTERNAL_STORAGE',                 // Совместимость со старыми версиями
+      'WRITE_EXTERNAL_STORAGE',                // Сохранение квитанций
       'RECORD_AUDIO',                          // Запись аудио для голосовых сообщений
       'USE_BIOMETRIC',                         // Биометрическая аутентификация
       'USE_FINGERPRINT',                       // Сканер отпечатков пальцев
       'RECEIVE_BOOT_COMPLETED',                // Автозапуск для фоновой синхронизации
       'ACCESS_NETWORK_STATE',                  // Проверка состояния сети
       'VIBRATE',                               // Вибрация для уведомлений
+      'WAKE_LOCK',                             // Пробуждение для срочных пушей
       'POST_NOTIFICATIONS',                    // Push-уведомления (Android 13+)
       'ACCESS_FINE_LOCATION',                  // Геопозиция по GPS
       'ACCESS_COARSE_LOCATION',                // Геопозиция по сети/Wi-Fi
       'REQUEST_INSTALL_PACKAGES',              // Разрешение на установку APK обновлений
+      'REQUEST_IGNORE_BATTERY_OPTIMIZATIONS',  // Снятие ограничений батареи для пушей
     ],
   },
 

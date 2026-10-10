@@ -27,6 +27,8 @@ import { apiClient } from '@/api/client';
 import { APP_VERSION, APP_DOWNLOAD_URL } from '@/config/constants';
 import { ALL_LEGAL_DOCUMENTS } from '@/data/legalDocuments';
 import type { ThemeMode } from '@/store/theme.store';
+import { PermissionsCenterModal } from '@/components/PermissionsCenterModal';
+import { initializeUserNotificationChannel } from '@/services/permissionsService';
 
 // expo-location подключаем безопасно: если модуль ещё не установлен, приложение не падает.
 let Location: any = null;
@@ -65,6 +67,7 @@ export default function ProfileScreen() {
   const [notifGranted, setNotifGranted] = useState<boolean | null>(null);
   const [mediaGranted, setMediaGranted] = useState<boolean | null>(null);
   const [geoGranted, setGeoGranted] = useState<boolean | null>(null);
+  const [permissionsModalOpen, setPermissionsModalOpen] = useState(false);
 
   const vStatus: string = (user as any)?.verification_status || (user?.is_verified ? 'verified' : 'unverified');
 
@@ -72,6 +75,7 @@ export default function ProfileScreen() {
   // чтобы нативный поток Android не падал при монтировании таба)
   useEffect(() => {
     let isMounted = true;
+    initializeUserNotificationChannel().catch(() => {});
     const timer = setTimeout(async () => {
       try {
         if (!isMounted) return;
@@ -339,7 +343,7 @@ export default function ProfileScreen() {
 
         {/* Разрешения */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Разрешения</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Разрешения и фоновая работа</Text>
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <TouchableOpacity style={styles.menuItem} onPress={toggleNotifications} activeOpacity={0.7}>
               <View style={styles.menuItemLeft}><Ionicons name="notifications-outline" size={22} color={colors.textMuted} /><Text style={[styles.menuItemTitle, { color: colors.text }]}>Уведомления</Text></View>
@@ -354,6 +358,11 @@ export default function ProfileScreen() {
             <TouchableOpacity style={styles.menuItem} onPress={requestGeo} activeOpacity={0.7}>
               <View style={styles.menuItemLeft}><Ionicons name="location-outline" size={22} color={colors.textMuted} /><Text style={[styles.menuItemTitle, { color: colors.text }]}>Геопозиция</Text></View>
               <Text style={[styles.permStatus, { color: geoGranted ? colors.secondary : colors.textMuted }]}>{geoGranted == null ? '…' : geoGranted ? 'Разрешена' : 'Включить'}</Text>
+            </TouchableOpacity>
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            <TouchableOpacity style={styles.menuItem} onPress={() => setPermissionsModalOpen(true)} activeOpacity={0.7}>
+              <View style={styles.menuItemLeft}><Ionicons name="shield-checkmark-outline" size={22} color={colors.primaryContainer} /><Text style={[styles.menuItemTitle, { color: colors.primaryContainer, fontWeight: '700' }]}>Центр разрешений (Батарея / Фоновый режим)</Text></View>
+              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
             </TouchableOpacity>
           </View>
         </View>
@@ -606,6 +615,12 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Центр системных разрешений и фонового режима для жильцов */}
+      <PermissionsCenterModal
+        visible={permissionsModalOpen}
+        onClose={() => setPermissionsModalOpen(false)}
+      />
     </View>
   );
 }
