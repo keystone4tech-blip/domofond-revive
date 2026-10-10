@@ -200,6 +200,7 @@ function Execute-SyncCycle {
                     $Apartment = if ($Payload.apartment) { $Payload.apartment } else { "" }
                     $ClientName = if ($Payload.name) { $Payload.name } else { "Абонент с сайта" }
                     $Phone = if ($Payload.phone) { $Payload.phone } else { "" }
+                    $ClientComment = if ($Payload.client_comment) { $Payload.client_comment } else { "" }
 
                     if ($ev.entity_type -eq "act" -or $OrderType -in @("equipment_order", "tube", "keys", "installation")) {
                         # Это заказ оборудования или акт монтажа -> формируем состав номенклатуры
@@ -229,7 +230,8 @@ function Execute-SyncCycle {
                             $Config.oneC.defaultPriceType,
                             $Payload.master_name,
                             $Payload.id,
-                            $ItemsData
+                            $ItemsData,
+                            $ClientComment
                         )
                         Write-BridgeLog "  -> В 1С успешно создан Акт установки/замены: $CreatedDocNumber (Жилец: $ClientName, Тел: $Phone, Адрес: $Street, д. $House, кв. $Apartment)" -Color Green
                     } else {
@@ -245,7 +247,8 @@ function Execute-SyncCycle {
                             $Apartment,
                             $Payload.message,
                             $Payload.master_name,
-                            $Payload.id
+                            $Payload.id,
+                            $ClientComment
                         )
                         Write-BridgeLog "  -> В 1С успешно создан Заказ-Наряд: $CreatedDocNumber (Жилец: $ClientName, Тел: $Phone, Адрес: $Street, д. $House, кв. $Apartment)" -Color Green
                     }

@@ -161,11 +161,80 @@ public class OneCBridgeCore
 
     /// <summary>
     /// Получение существующего абонента или создание новой карточки в Справочник.Абоненты
+    /// Если в найденной карточке ФИО или телефон пустые - автоматически заполняет их.
+    /// Если в карточке уже есть другое ФИО/телефон - возвращает информацию об этом через out extraSubscriberInfo
     /// </summary>
-    public static dynamic GetOrCreateSubscriber(dynamic v8, string clientName, dynamic streetRef, dynamic houseRef, string entrance, string apartment, string phone)
+    public static dynamic GetOrCreateSubscriber(
+        dynamic v8,
+        string clientName,
+        dynamic streetRef,
+        dynamic houseRef,
+        string entrance,
+        string apartment,
+        string phone,
+        out string extraSubscriberInfo
+    )
     {
+        extraSubscriberInfo = "";
         dynamic existing = FindSubscriber(v8, clientName, streetRef, apartment, phone);
-        if (existing != null && !existing.Пустая()) return existing;
+        if (existing != null && !existing.Пустая())
+        {
+            try
+            {
+                dynamic abObj = existing.ПолучитьОбъект();
+                string curName = (string)abObj.Наименование;
+                string curPhone = (string)abObj.Телефоны;
+                bool needSave = false;
+
+                // 1. Проверяем ФИО в карточке абонента
+                if (string.IsNullOrWhiteSpace(curName) && !string.IsNullOrWhiteSpace(clientName))
+                {
+                    abObj.Наименование = clientName.Trim();
+                    needSave = true;
+                }
+                else if (!string.IsNullOrWhiteSpace(curName) && !string.IsNullOrWhiteSpace(clientName) && !curName.Trim().Equals(clientName.Trim(), StringComparison.OrdinalIgnoreCase))
+                {
+                    extraSubscriberInfo += string.Format("В базе 1С числится: {0}. Заказчик с сайта: {1}.", curName.Trim(), clientName.Trim());
+                }
+
+                // 2. Проверяем телефон в карточке абонента
+                if (string.IsNullOrWhiteSpace(curPhone) && !string.IsNullOrWhiteSpace(phone))
+                {
+                    abObj.Телефоны = phone.Trim();
+                    needSave = true;
+                }
+                else if (!string.IsNullOrWhiteSpace(curPhone) && !string.IsNullOrWhiteSpace(phone) && !curPhone.Trim().Equals(phone.Trim(), StringComparison.OrdinalIgnoreCase))
+                {
+                    if (string.IsNullOrEmpty(extraSubscriberInfo)) {
+                        extraSubscriberInfo += string.Format("Тел. в базе 1С: {0}. Тел. с сайта: {1}.", curPhone.Trim(), phone.Trim());
+                    } else {
+                        extraSubscriberInfo += string.Format(" (Тел. в базе: {0}, тел. с сайта: {1})", curPhone.Trim(), phone.Trim());
+                    }
+                }
+
+                // 3. Проверяем дом и подъезд
+                if (abObj.Дом.Пустая() && houseRef != null && !houseRef.Пустая())
+                {
+                    abObj.Дом = houseRef;
+                    needSave = true;
+                }
+                if (string.IsNullOrWhiteSpace((string)abObj.Подъезд) && !string.IsNullOrWhiteSpace(entrance))
+                {
+                    abObj.Подъезд = entrance.Trim();
+                    needSave = true;
+                }
+
+                if (needSave)
+                {
+                    abObj.Записать();
+                    string code = (string)abObj.Код;
+                    dynamic reloaded = v8.Справочники.Абоненты.НайтиПоКоду(code);
+                    if (reloaded != null && !reloaded.Пустая()) return reloaded;
+                }
+            }
+            catch { }
+            return existing;
+        }
 
         if (string.IsNullOrEmpty(clientName)) return null;
 
@@ -202,7 +271,8 @@ public class OneCBridgeCore
         string apartment,
         string malfunctionDesc,
         string masterCodeOrName,
-        string siteOrderId
+        string siteOrderId,
+        string clientComment
     )
     {
         dynamic doc = v8.Документы.ЗаказНаряд.СоздатьДокумент();
@@ -223,12 +293,12 @@ public class OneCBridgeCore
         doc.Подъезд = entrance ?? "";
         doc.Квартира = apartment ?? "";
 
-        // Поиск или создание Абонента
-        dynamic abonRef = GetOrCreateSubscriber(v8, clientName, streetRef, houseRef, entrance, apartment, phone);
+        // Поиск или создание/дозаполнение Абонента
+        string extraSubInfo;
+        dynamic abonRef = GetOrCreateSubscriber(v8, clientName, streetRef, houseRef, entrance, apartment, phone, out extraSubInfo);
         if (abonRef != null && !abonRef.Пустая())
         {
             doc.Абонент = abonRef;
-            // Подтягиваем точные реквизиты из карточки абонента, если в наряде они еще не стоят
             try
             {
                 if (doc.Город.Пустая() && abonRef.Город != null && !abonRef.Город.Пустая()) doc.Город = abonRef.Город;
@@ -275,8 +345,20 @@ public class OneCBridgeCore
             catch { }
         }
 
-        doc.Примечание = string.Format("[САЙТ #{0}] {1}", siteOrderId, malfunctionDesc);
-        doc.Результат = string.Format("Жилец: {0}, тел: {1}, кв. {2}", clientName, phone, apartment);
+        // Примечание диспетчера: строго [САЙТ ЗАКАЗ] + комментарий пользователя (если был) + данные другого владельца (если есть)
+        string remark = "[САЙТ ЗАКАЗ]";
+        if (!string.IsNullOrWhiteSpace(clientComment))
+        {
+            remark += " " + clientComment.Trim();
+        }
+        if (!string.IsNullOrWhiteSpace(extraSubInfo))
+        {
+            remark += (remark.Length > "[САЙТ ЗАКАЗ]".Length ? " | " : " ") + extraSubInfo.Trim();
+        }
+        doc.Примечание = remark;
+
+        // Графа «Результат выполнения работ» оставляется ПУСТОЙ для заполнения мастером при закрытии наряда
+        doc.Результат = "";
 
         // Табличная часть «Неисправности»
         dynamic row = doc.Неисправности.Добавить();
@@ -443,12 +525,14 @@ public class OneCBridgeCore
         string priceTypeName,
         string masterName,
         string siteOrderId,
-        string itemsData
+        string itemsData,
+        string clientComment
     )
     {
         dynamic doc = v8.Документы.АктУстановкиЗамены.СоздатьДокумент();
         doc.Дата = DateTime.Now;
-        doc.Результат = string.Format("[САЙТ ЗАКАЗ #{0}] Монтаж/Оборудование: {1}, тел: {2}, кв. {3}", siteOrderId, clientName, phone, apartment);
+        // Графа «Результат выполнения работ» оставляется ПУСТОЙ для заполнения мастером при закрытии акта
+        doc.Результат = "";
         doc.Выполнено = false;
 
         // Организация
@@ -475,8 +559,9 @@ public class OneCBridgeCore
         doc.Подъезд = entrance ?? "";
         doc.Квартира = apartment ?? "";
 
-        // Абонент (поиск или автоматическое заведение нового)
-        dynamic abonRef = GetOrCreateSubscriber(v8, clientName, streetRef, houseRef, entrance, apartment, phone);
+        // Абонент (поиск, дозаполнение ФИО/телефона или автоматическое создание нового)
+        string extraSubInfo;
+        dynamic abonRef = GetOrCreateSubscriber(v8, clientName, streetRef, houseRef, entrance, apartment, phone, out extraSubInfo);
         if (abonRef != null && !abonRef.Пустая())
         {
             doc.Абонент = abonRef;
@@ -588,7 +673,18 @@ public class OneCBridgeCore
         }
 
         doc.СуммаДокумента = docSum;
-        doc.Примечание = string.Format("[САЙТ ЗАКАЗ #{0}] {1}", siteOrderId, clientName);
+
+        // Примечание диспетчера: строго [САЙТ ЗАКАЗ] + комментарий жильца (если был) + данные другого владельца (если есть)
+        string remark = "[САЙТ ЗАКАЗ]";
+        if (!string.IsNullOrWhiteSpace(clientComment))
+        {
+            remark += " " + clientComment.Trim();
+        }
+        if (!string.IsNullOrWhiteSpace(extraSubInfo))
+        {
+            remark += (remark.Length > "[САЙТ ЗАКАЗ]".Length ? " | " : " ") + extraSubInfo.Trim();
+        }
+        doc.Примечание = remark;
 
         doc.Записать(v8.РежимЗаписиДокумента.Запись);
         return (string)doc.Номер;

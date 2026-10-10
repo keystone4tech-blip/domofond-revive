@@ -4320,6 +4320,20 @@ function parseEquipmentItemsFromMessage(text) {
   return items;
 }
 
+// Извлечение чистого комментария пользователя из текста заявки/заказа
+function extractClientComment(text) {
+  if (!text) return '';
+  const match = text.match(/(?:💬\s*)?(?:Комментарий клиента|Дополнительно|Пожелания):\s*([^\n\r]+)/i);
+  if (match) {
+    return match[1].trim();
+  }
+  // Для обычных заявок на ремонт (без шаблонной шапки заказа товаров)
+  if (!text.includes('🛍️') && !text.includes('— Услуга:') && !text.includes('— Оборудование:')) {
+    return text.trim();
+  }
+  return '';
+}
+
 /**
  * 1. Получение очереди событий для 1С (заявки на ремонт, заказы оборудования, акты)
  * Вызывается скриптом bridge.ps1 с офисного компьютера
@@ -4394,6 +4408,8 @@ app.get('/api/1c/pull-events', require1CApiKey, async (req, res) => {
         const reqRow = extractAddressParts(rawReq);
         const isEquipment = ['equipment_order', 'tube', 'keys', 'installation'].includes(reqRow.order_type);
         const entityType = isEquipment ? 'act' : 'request';
+
+        reqRow.client_comment = extractClientComment(rawReq.message);
 
         if (isEquipment) {
           reqRow.items = parseEquipmentItemsFromMessage(rawReq.message);
