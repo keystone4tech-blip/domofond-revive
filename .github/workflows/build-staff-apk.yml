@@ -79,9 +79,9 @@ jobs:
           echo "[CI/CD] Запуск компиляции APK Офис Работа ($BUILD_TYPE)..."
           
           if [ "$BUILD_TYPE" = "debug" ]; then
-            ./gradlew assembleDebug --no-daemon
+            ./gradlew assembleDebug --no-daemon --stacktrace
           else
-            ./gradlew assembleRelease --no-daemon
+            ./gradlew assembleRelease --no-daemon --stacktrace
           fi
 
       - name: 🔐 Проверка, подпись и валидация APK

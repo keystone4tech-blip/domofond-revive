@@ -5,34 +5,13 @@
 import { ExpoConfig, ConfigContext } from 'expo/config';
 import { withAndroidManifest, ConfigPlugin } from '@expo/config-plugins';
 
-// Плагин для гарантированного разрешения фонового трафика и системной установки APK-обновлений
+// Плагин для гарантированного разрешения HTTP-трафика и системной установки APK-обновлений
 const withStaffCustomManifest: ConfigPlugin = (config) => {
   return withAndroidManifest(config, async (manifestConfig) => {
     const androidManifest = manifestConfig.modResults.manifest;
     if (androidManifest.application && androidManifest.application[0]) {
       androidManifest.application[0].$['android:usesCleartextTraffic'] = 'true';
     }
-
-    if (!androidManifest['uses-permission']) {
-      androidManifest['uses-permission'] = [];
-    }
-    const perms = androidManifest['uses-permission'];
-
-    // Проверяем и добавляем системные разрешения
-    const ensurePerm = (name: string) => {
-      const exists = perms.some((p: any) => p.$?.['android:name'] === name);
-      if (!exists) {
-        perms.push({ $: { 'android:name': name } } as any);
-      }
-    };
-
-    ensurePerm('android.permission.REQUEST_INSTALL_PACKAGES');
-    ensurePerm('android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS');
-    ensurePerm('android.permission.WAKE_LOCK');
-    ensurePerm('android.permission.FOREGROUND_SERVICE');
-    ensurePerm('android.permission.FOREGROUND_SERVICE_LOCATION');
-    ensurePerm('android.permission.ACCESS_BACKGROUND_LOCATION');
-
     return manifestConfig;
   });
 };
@@ -142,7 +121,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       [
         'expo-notifications',
         {
-          icon: './assets/images/icon.png',
+          icon: './assets/images/notification-icon.png',
           color: '#3B82F6',                     // Синий фирменный цвет уведомлений мастера
         },
       ],
