@@ -74,6 +74,7 @@ jobs:
 
       - name: 🔨 Компиляция автономного APK через Gradle
         run: |
+          set -o pipefail
           cd mobile-staff/android
           BUILD_TYPE="${{ github.event.inputs.build_type || 'release' }}"
           echo "[CI/CD] Запуск компиляции APK Офис Работа ($BUILD_TYPE)..."

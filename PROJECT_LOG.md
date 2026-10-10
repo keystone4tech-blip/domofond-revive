@@ -14,6 +14,21 @@
 > 📌 **ОБЯЗАТЕЛЬНАЯ АКТУАЛИЗАЦИЯ ИНСТРУКЦИЙ ДЛЯ СТРАНИЦ CRM (`src/data/pageQuickGuides.ts`):**
 > Файл [`src/data/pageQuickGuides.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/data/pageQuickGuides.ts) является единым модулем должностных регламентов и пошаговых инструкций для всех 18 вкладок CRM («1. Назначение и состав раздела», «2. Задачи и регламентные цели», «3. Порядок работы (пошаговая инструкция)»). Стиль изложения — строго профессиональный корпоративный регламент. При любом изменении логики, добавлении новых кнопок, переключателей или функций в соответствующую вкладку CRM ассистент **ОБЯЗАН** немедленно дополнять и актуализировать этот файл, чтобы у персонала всегда была актуальная нормативная информация для работы.
 
+# 2026-10-10 22:55 — Ликвидация сбоя Metro Bundler TS5083 в сборке приложения сотрудников (mobile-staff/tsconfig.json)
+
+## 1. Задачи и выполненные работы
+- **Устранение скрытой ошибки компиляции `:app:createBundleReleaseJsAndAssets`**:
+  * В логах сборки GitHub Actions выявлен истинный сбой Metro Bundler: `Error: error TS5083: Cannot read file '/home/runner/work/domofond-revive/domofond-revive/mobile/node_modules/expo/tsconfig.base.json'`.
+  * Причина: в [`mobile-staff/tsconfig.json`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile-staff/tsconfig.json) параметр `extends` ошибочно наследовался из соседней папки `../mobile/node_modules`, которая в изолированном CI/CD раннере сборки сотрудников не устанавливалась.
+  * Исправление: параметр `extends` переведен на автономный локальный путь `"expo/tsconfig.base"`, очищены лишние `typeRoots`.
+  * В [`.github/workflows/build-staff-apk.yml`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/.github/workflows/build-staff-apk.yml) добавлен флаг `set -o pipefail` для точного перехвата кодов возврата Gradle.
+
+## 2. Измененные файлы
+- [`mobile-staff/tsconfig.json`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile-staff/tsconfig.json) — автономный путь наследования `"expo/tsconfig.base"`.
+- [`.github/workflows/build-staff-apk.yml`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/.github/workflows/build-staff-apk.yml) — активация `set -o pipefail`.
+- [`src/data/projectChangelog.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/data/projectChangelog.ts) — паспорт проекта.
+- [`PROJECT_LOG.md`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/PROJECT_LOG.md) — актуализация карты проекта.
+
 # 2026-10-10 22:45 — Ликвидация сбоя подписи APK «Офис Работа» (добавление debug.keystore и автогенерация)
 
 ## 1. Задачи и выполненные работы

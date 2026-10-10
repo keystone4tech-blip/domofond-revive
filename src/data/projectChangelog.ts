@@ -258,6 +258,16 @@ export const KIND_META: Record<Kind, { label: string; badgeCls: string }> = {
  */
 export const PROJECT_CHANGELOG: ProjectEntry[] = [
   {
+    id: "stage-2026-10-10-2255",
+    datetime: "2026-10-10 22:55",
+    title: "Ликвидация сбоя Metro Bundler TS5083 в сборке приложения сотрудников (mobile-staff/tsconfig.json)",
+    description: "Устранена скрытая первопричина падения задачи :app:createBundleReleaseJsAndAssets в GitHub Actions: в mobile-staff/tsconfig.json свойство extends ошибочно ссылалось на родительский каталог ../mobile/node_modules/expo/tsconfig.base.json. При автономной сборке раннера CI/CD в директории mobile/node_modules отсутствовали файлы, из-за чего Metro завершался ошибкой TS5083. Конфигурация переведена на стандартное автономное наследование 'expo/tsconfig.base' из локальных зависимостей mobile-staff. В CI/CD пайплайне активирован set -o pipefail.",
+    module: "infra_mobile",
+    kind: "fix",
+    hours: 2.5,
+    difficulty: "Высокая",
+  },
+  {
     id: "stage-2026-10-10-2245",
     datetime: "2026-10-10 22:45",
     title: "Ликвидация сбоя подписи APK «Офис Работа» (добавление debug.keystore и автогенерация)",
