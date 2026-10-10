@@ -191,7 +191,7 @@ function Execute-SyncCycle {
             $CreatedDocNumber = ""
             
             try {
-                if ($ev.entity_type -eq "request") {
+                if ($ev.entity_type -eq "request" -or $ev.entity_type -eq "act") {
                     $OrderType = $Payload.order_type
                     $City = if ($Payload.city) { $Payload.city } else { "Краснодар" }
                     $Street = if ($Payload.street) { $Payload.street } else { "" }
@@ -201,8 +201,20 @@ function Execute-SyncCycle {
                     $ClientName = if ($Payload.name) { $Payload.name } else { "Абонент с сайта" }
                     $Phone = if ($Payload.phone) { $Payload.phone } else { "" }
 
-                    if ($OrderType -eq "tube" -or $OrderType -eq "keys" -or $OrderType -eq "installation") {
-                        # Это заказ оборудования -> создаем Акт установки/замены со списанием со склада
+                    if ($ev.entity_type -eq "act" -or $OrderType -in @("equipment_order", "tube", "keys", "installation")) {
+                        # Это заказ оборудования или акт монтажа -> формируем состав номенклатуры
+                        $ItemsData = ""
+                        if ($Payload.items -and $Payload.items.Count -gt 0) {
+                            $ItemsList = @()
+                            foreach ($it in $Payload.items) {
+                                $itName = $it.name
+                                $itQty = if ($it.quantity) { $it.quantity } else { 1 }
+                                $itPrice = if ($it.price) { $it.price } else { 0 }
+                                $ItemsList += "$itName:::$itQty:::$itPrice"
+                            }
+                            $ItemsData = $ItemsList -join "###"
+                        }
+
                         $CreatedDocNumber = [OneCBridgeCore]::CreateInstallationAct(
                             $V8,
                             $ClientName,
@@ -217,12 +229,9 @@ function Execute-SyncCycle {
                             $Config.oneC.defaultPriceType,
                             $Payload.master_name,
                             $Payload.id,
-                            "00-00000041",
-                            "ТКП 14М",
-                            1,
-                            850
+                            $ItemsData
                         )
-                        Write-BridgeLog "  -> В 1С успешно создан Акт установки/замены: $CreatedDocNumber" -Color Green
+                        Write-BridgeLog "  -> В 1С успешно создан Акт установки/замены: $CreatedDocNumber (Жилец: $ClientName, Тел: $Phone, Адрес: $Street, д. $House, кв. $Apartment)" -Color Green
                     } else {
                         # Это ремонт без оборудования -> создаем Заказ-Наряд со всеми реквизитами
                         $CreatedDocNumber = [OneCBridgeCore]::CreateRepairOrder(

@@ -4260,8 +4260,68 @@ function extractAddressParts(row) {
   };
 }
 
+// Интеллектуальный парсинг номенклатуры оборудования и услуг из текста заявки с сайта
+function parseEquipmentItemsFromMessage(text) {
+  const items = [];
+  if (!text) return items;
+  const lines = text.split('\n');
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line.startsWith('—')) continue;
+
+    // 1. Оборудование: ТКП 12М (1 шт. x 1400.00 ₽)
+    const eqMatch = line.match(/—\s*Оборудование:\s*([^(]+?)\s*\((\d+)\s*шт\.\s*x\s*([\d.]+)/i);
+    if (eqMatch) {
+      items.push({
+        name: eqMatch[1].trim(),
+        quantity: parseFloat(eqMatch[2]) || 1,
+        price: parseFloat(eqMatch[3]) || 0
+      });
+      continue;
+    }
+
+    // 2. Ключи: Ключ UID электронный (4 шт. x 200.00 ₽ ...)
+    const keyMatch = line.match(/—\s*Ключи:\s*([^(]+?)\s*\((\d+)\s*шт\.\s*x\s*([\d.]+)/i);
+    if (keyMatch) {
+      items.push({
+        name: keyMatch[1].trim(),
+        quantity: parseFloat(keyMatch[2]) || 1,
+        price: parseFloat(keyMatch[3]) || 0
+      });
+      continue;
+    }
+
+    // 3. Сервис: Подключение личного кабинета (300.00 ₽)
+    const srvMatch = line.match(/—\s*Сервис:\s*([^(]+?)\s*\(([\d.]+)\s*₽/i);
+    if (srvMatch) {
+      const srvName = srvMatch[1].trim();
+      const normName = srvName.includes('личного кабинета') ? 'Личный кабинет (регистрация)' : srvName;
+      items.push({
+        name: normName,
+        quantity: 1,
+        price: parseFloat(srvMatch[2]) || 0
+      });
+      continue;
+    }
+
+    // 4. Услуга монтажа с ненулевой ценой: Услуга: Установка трубки (500.00 ₽)
+    const srvPriceMatch = line.match(/—\s*Услуга:\s*([^(]+?)\s*\(([\d.]+)\s*₽/i);
+    if (srvPriceMatch && parseFloat(srvPriceMatch[2]) > 0) {
+      const name = srvPriceMatch[1].trim();
+      const normName = name.includes('Установка') ? 'Установка ТКП с монтажным комплектом' : name;
+      items.push({
+        name: normName,
+        quantity: 1,
+        price: parseFloat(srvPriceMatch[2]) || 0
+      });
+      continue;
+    }
+  }
+  return items;
+}
+
 /**
- * 1. Получение очереди событий для 1С (заявки на ремонт, заказы оборудования)
+ * 1. Получение очереди событий для 1С (заявки на ремонт, заказы оборудования, акты)
  * Вызывается скриптом bridge.ps1 с офисного компьютера
  */
 app.get('/api/1c/pull-events', require1CApiKey, async (req, res) => {
@@ -4277,8 +4337,46 @@ app.get('/api/1c/pull-events', require1CApiKey, async (req, res) => {
       [limit]
     );
 
-    // Если очередь пуста, автоматически подтягиваем несинхронизированные заявки жильцов из requests
+    // Если очередь пуста, автоматически подтягиваем несинхронизированные акты и заказы
     if (queueRes.rows.length === 0) {
+      // 1.1 Несинхронизированные акты выполненных работ из acts
+      const pendingActs = await pool.query(
+        `SELECT a.id, a.act_number, a.client_name as name, a.client_phone as phone,
+                a.address, a.apartment, a.works_done, a.materials_used, a.total_price,
+                a.employee_name as master_name, a.created_at
+         FROM acts a
+         WHERE (a.external_1c_id IS NULL OR a.external_1c_id = '')
+         ORDER BY a.created_at DESC LIMIT $1`,
+        [Math.min(limit, 3)]
+      );
+
+      for (const rawAct of pendingActs.rows) {
+        const actRow = extractAddressParts(rawAct);
+        const actItems = [];
+        if (actRow.materials_used) {
+          actItems.push({
+            name: actRow.materials_used,
+            quantity: 1,
+            price: parseFloat(actRow.total_price) || 0
+          });
+        } else {
+          actItems.push({
+            name: actRow.works_done || 'Установка ТКП с монтажным комплектом',
+            quantity: 1,
+            price: parseFloat(actRow.total_price) || 0
+          });
+        }
+        actRow.items = actItems;
+        const insertRes = await pool.query(
+          `INSERT INTO sync_queue_1c (entity_type, entity_id, event_type, payload, status)
+           VALUES ('act', $1, 'create', $2, 'pending')
+           RETURNING *`,
+          [actRow.id, JSON.stringify(actRow)]
+        );
+        queueRes.rows.push(insertRes.rows[0]);
+      }
+
+      // 1.2 Несинхронизированные заявки и заказы жильцов из requests
       const pendingRequests = await pool.query(
         `SELECT r.id, r.name, r.phone, r.address, r.apartment, r.street, r.house, r.entrance,
                 r.message, r.order_type, r.status, r.created_at,
@@ -4291,14 +4389,21 @@ app.get('/api/1c/pull-events', require1CApiKey, async (req, res) => {
         [Math.min(limit, 5)]
       );
 
-      // Регистрируем найденные заявки в очереди с обогащенным адресом
+      // Регистрируем найденные заявки: разделяем ремонты (request) и монтажи с товарами (act)
       for (const rawReq of pendingRequests.rows) {
         const reqRow = extractAddressParts(rawReq);
+        const isEquipment = ['equipment_order', 'tube', 'keys', 'installation'].includes(reqRow.order_type);
+        const entityType = isEquipment ? 'act' : 'request';
+
+        if (isEquipment) {
+          reqRow.items = parseEquipmentItemsFromMessage(rawReq.message);
+        }
+
         const insertRes = await pool.query(
           `INSERT INTO sync_queue_1c (entity_type, entity_id, event_type, payload, status)
-           VALUES ('request', $1, 'create', $2, 'pending')
+           VALUES ($1, $2, 'create', $3, 'pending')
            RETURNING *`,
-          [reqRow.id, JSON.stringify(reqRow)]
+          [entityType, reqRow.id, JSON.stringify(reqRow)]
         );
         queueRes.rows.push(insertRes.rows[0]);
       }
@@ -4341,17 +4446,16 @@ app.post('/api/1c/ack-events', require1CApiKey, async (req, res) => {
 
       if (updateQueue.rows.length > 0) {
         const item = updateQueue.rows[0];
-        // Если это заявка - проставляем номер наряда 1С в requests
-        if (item.entity_type === 'request' && external1cId) {
+        // Если это заявка или заказ оборудования из requests - проставляем номер наряда/акта 1С
+        if (external1cId) {
           await pool.query(
             `UPDATE requests 
              SET external_1c_id = $1, synced_to_1c_at = CURRENT_TIMESTAMP 
              WHERE id = $2`,
             [external1cId, item.entity_id]
           );
-        }
-        // Если это акт - проставляем номер в acts
-        if (item.entity_type === 'act' && external1cId) {
+
+          // Если это акт из таблицы acts - проставляем номер акта 1С
           await pool.query(
             `UPDATE acts 
              SET external_1c_id = $1, synced_to_1c_at = CURRENT_TIMESTAMP 

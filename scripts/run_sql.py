@@ -1,6 +1,7 @@
 import paramiko
 import sys
 
+sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 sql = sys.argv[1]
 
 ssh = paramiko.SSHClient()

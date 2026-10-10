@@ -160,6 +160,35 @@ public class OneCBridgeCore
     }
 
     /// <summary>
+    /// Получение существующего абонента или создание новой карточки в Справочник.Абоненты
+    /// </summary>
+    public static dynamic GetOrCreateSubscriber(dynamic v8, string clientName, dynamic streetRef, dynamic houseRef, string entrance, string apartment, string phone)
+    {
+        dynamic existing = FindSubscriber(v8, clientName, streetRef, apartment, phone);
+        if (existing != null && !existing.Пустая()) return existing;
+
+        if (string.IsNullOrEmpty(clientName)) return null;
+
+        try
+        {
+            dynamic newAb = v8.Справочники.Абоненты.СоздатьЭлемент();
+            newAb.Наименование = clientName.Trim();
+            if (streetRef != null && !streetRef.Пустая()) newAb.Улица = streetRef;
+            if (houseRef != null && !houseRef.Пустая()) newAb.Дом = houseRef;
+            if (!string.IsNullOrEmpty(entrance)) newAb.Подъезд = entrance.Trim();
+            if (!string.IsNullOrEmpty(apartment)) newAb.Квартира = apartment.Trim();
+            if (!string.IsNullOrEmpty(phone)) newAb.Телефоны = phone.Trim();
+            newAb.Записать();
+
+            string code = (string)newAb.Код;
+            dynamic created = v8.Справочники.Абоненты.НайтиПоКоду(code);
+            if (created != null && !created.Пустая()) return created;
+        }
+        catch { }
+        return null;
+    }
+
+    /// <summary>
     /// Создание Заказ-Наряда со 100% заполнением всех реквизитов (ФИО, адрес, телефон, мастер, неисправности)
     /// </summary>
     public static string CreateRepairOrder(
@@ -194,8 +223,8 @@ public class OneCBridgeCore
         doc.Подъезд = entrance ?? "";
         doc.Квартира = apartment ?? "";
 
-        // Поиск Абонента
-        dynamic abonRef = FindSubscriber(v8, clientName, streetRef, apartment, phone);
+        // Поиск или создание Абонента
+        dynamic abonRef = GetOrCreateSubscriber(v8, clientName, streetRef, houseRef, entrance, apartment, phone);
         if (abonRef != null && !abonRef.Пустая())
         {
             doc.Абонент = abonRef;
@@ -339,7 +368,66 @@ public class OneCBridgeCore
     }
 
     /// <summary>
-    /// Создание Акта установки/замены со 100% заполнением всех реквизитов и списанием номенклатуры
+    /// Интеллектуальный поиск номенклатуры в 1С (по коду, точному названию или по ключевым словам)
+    /// </summary>
+    public static dynamic FindNomenclature(dynamic v8, string code, string name)
+    {
+        if (!string.IsNullOrEmpty(code))
+        {
+            try
+            {
+                dynamic n = v8.Справочники.Номенклатура.НайтиПоКоду(code.Trim());
+                if (n != null && !n.Пустая()) return n;
+            }
+            catch { }
+        }
+        if (!string.IsNullOrEmpty(name))
+        {
+            string clean = name.Trim();
+            try
+            {
+                dynamic n = v8.Справочники.Номенклатура.НайтиПоНаименованию(clean);
+                if (n != null && !n.Пустая()) return n;
+            }
+            catch { }
+
+            // Полнотекстовый поиск по LIKE
+            try
+            {
+                dynamic q = v8.NewObject("Запрос");
+                q.Text = "ВЫБРАТЬ ПЕРВЫЕ 1 Ссылка ИЗ Справочник.Номенклатура ГДЕ ЭтоГруппа = ЛОЖЬ И Наименование ПОДОБНО &Паттерн";
+                q.УстановитьПараметр("Паттерн", "%" + clean + "%");
+                dynamic vt = q.Execute().Unload();
+                if (vt.Count() > 0) return vt.Get(0).Ссылка;
+            }
+            catch { }
+
+            // Поиск по ключевым фрагментам (ТКП, Ключ UID, Личный кабинет, Установка)
+            try
+            {
+                string shortPattern = clean;
+                if (clean.IndexOf("ТКП 12", StringComparison.OrdinalIgnoreCase) >= 0) shortPattern = "ТКП 12";
+                else if (clean.IndexOf("ТКП 14", StringComparison.OrdinalIgnoreCase) >= 0) shortPattern = "ТКП 14";
+                else if (clean.IndexOf("VOICE", StringComparison.OrdinalIgnoreCase) >= 0) shortPattern = "VOICE";
+                else if (clean.IndexOf("Ключ UID", StringComparison.OrdinalIgnoreCase) >= 0) shortPattern = "Ключ UID";
+                else if (clean.IndexOf("MF", StringComparison.OrdinalIgnoreCase) >= 0) shortPattern = "MF";
+                else if (clean.IndexOf("личного кабинета", StringComparison.OrdinalIgnoreCase) >= 0 || clean.IndexOf("Личный кабинет", StringComparison.OrdinalIgnoreCase) >= 0) shortPattern = "Личный кабинет";
+                else if (clean.IndexOf("Установка", StringComparison.OrdinalIgnoreCase) >= 0) shortPattern = "Установка";
+
+                dynamic q2 = v8.NewObject("Запрос");
+                q2.Text = "ВЫБРАТЬ ПЕРВЫЕ 1 Ссылка ИЗ Справочник.Номенклатура ГДЕ ЭтоГруппа = ЛОЖЬ И Наименование ПОДОБНО &Паттерн";
+                q2.УстановитьПараметр("Паттерн", "%" + shortPattern + "%");
+                dynamic vt2 = q2.Execute().Unload();
+                if (vt2.Count() > 0) return vt2.Get(0).Ссылка;
+            }
+            catch { }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Создание Акта установки/замены со 100% заполнением всех реквизитов и табличной части Товары
+    /// itemsData: строка формата "Наименование1:::Количество1:::Цена1###Наименование2:::Количество2:::Цена2"
     /// </summary>
     public static string CreateInstallationAct(
         dynamic v8,
@@ -355,15 +443,12 @@ public class OneCBridgeCore
         string priceTypeName,
         string masterName,
         string siteOrderId,
-        string itemCode,
-        string itemName,
-        decimal quantity,
-        decimal price
+        string itemsData
     )
     {
         dynamic doc = v8.Документы.АктУстановкиЗамены.СоздатьДокумент();
         doc.Дата = DateTime.Now;
-        doc.Результат = string.Format("[САЙТ ЗАКАЗ #{0}] Монтаж: {1}, тел: {2}, кв. {3}", siteOrderId, clientName, phone, apartment);
+        doc.Результат = string.Format("[САЙТ ЗАКАЗ #{0}] Монтаж/Оборудование: {1}, тел: {2}, кв. {3}", siteOrderId, clientName, phone, apartment);
         doc.Выполнено = false;
 
         // Организация
@@ -374,7 +459,7 @@ public class OneCBridgeCore
         }
         catch { }
 
-        // Склад
+        // Склад (Основной склад)
         try
         {
             dynamic wh = v8.Справочники.Склады.НайтиПоНаименованию(warehouseName);
@@ -390,8 +475,8 @@ public class OneCBridgeCore
         doc.Подъезд = entrance ?? "";
         doc.Квартира = apartment ?? "";
 
-        // Абонент
-        dynamic abonRef = FindSubscriber(v8, clientName, streetRef, apartment, phone);
+        // Абонент (поиск или автоматическое заведение нового)
+        dynamic abonRef = GetOrCreateSubscriber(v8, clientName, streetRef, houseRef, entrance, apartment, phone);
         if (abonRef != null && !abonRef.Пустая())
         {
             doc.Абонент = abonRef;
@@ -456,28 +541,54 @@ public class OneCBridgeCore
         catch { }
 
         // Табличная часть «Товары»
-        if (!string.IsNullOrEmpty(itemCode) || !string.IsNullOrEmpty(itemName))
+        decimal docSum = 0;
+        if (!string.IsNullOrEmpty(itemsData))
         {
-            dynamic nom = null;
-            if (!string.IsNullOrEmpty(itemCode))
+            string[] items = itemsData.Split(new string[] { "###" }, StringSplitOptions.RemoveEmptyEntries);
+            foreach (string it in items)
             {
-                nom = v8.Справочники.Номенклатура.НайтиПоКоду(itemCode);
-            }
-            if ((nom == null || nom.Пустая()) && !string.IsNullOrEmpty(itemName))
-            {
-                nom = v8.Справочники.Номенклатура.НайтиПоНаименованию(itemName);
-            }
+                string[] parts = it.Split(new string[] { ":::" }, StringSplitOptions.None);
+                if (parts.Length >= 3)
+                {
+                    string itName = parts[0].Trim();
+                    decimal itQty = 1;
+                    decimal itPrice = 0;
+                    decimal.TryParse(parts[1], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out itQty);
+                    decimal.TryParse(parts[2], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out itPrice);
 
+                    if (itQty <= 0) itQty = 1;
+
+                    dynamic nom = FindNomenclature(v8, "", itName);
+                    if (nom != null && !nom.Пустая())
+                    {
+                        dynamic row = doc.Товары.Добавить();
+                        row.Номенклатура = nom;
+                        row.Количество = itQty;
+                        row.Цена = itPrice;
+                        row.Сумма = itQty * itPrice;
+                        docSum += row.Сумма;
+                    }
+                }
+            }
+        }
+
+        // Запасной вариант: если товаров не было или не сопоставились, ставим базовую трубку ТКП 14М
+        if (doc.Товары.Количество() == 0)
+        {
+            dynamic nom = FindNomenclature(v8, "00-00000041", "ТКП 14М");
             if (nom != null && !nom.Пустая())
             {
                 dynamic row = doc.Товары.Добавить();
                 row.Номенклатура = nom;
-                row.Количество = quantity > 0 ? quantity : 1;
-                row.Цена = price;
-                row.Сумма = (quantity > 0 ? quantity : 1) * price;
-                doc.СуммаДокумента = row.Сумма;
+                row.Количество = 1;
+                row.Цена = 850;
+                row.Сумма = 850;
+                docSum = 850;
             }
         }
+
+        doc.СуммаДокумента = docSum;
+        doc.Примечание = string.Format("[САЙТ ЗАКАЗ #{0}] {1}", siteOrderId, clientName);
 
         doc.Записать(v8.РежимЗаписиДокумента.Запись);
         return (string)doc.Номер;
