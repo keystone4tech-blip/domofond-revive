@@ -258,6 +258,16 @@ export const KIND_META: Record<Kind, { label: string; badgeCls: string }> = {
  */
 export const PROJECT_CHANGELOG: ProjectEntry[] = [
   {
+    id: "stage-2026-10-10-2115",
+    datetime: "2026-10-10 21:15",
+    title: "Координация агентов, оптимизация CI/CD пайплайнов мобильных приложений и передача ТЗ Claude",
+    description: "1) В .github/workflows/deploy.yml настроены paths-ignore (исключены mobile-staff, workflows мобилок и markdown-журналы) для предотвращения падений пайплайна развертывания веб-сервера при коммитах мобильных приложений. 2) В mobile-staff/app.config.ts оптимизирована конфигурация плагинов Expo (исключен дублирующий конфликтный вызов expo-notifications при наличии манифестных разрешений и упрощен плагин expo-location), в build-staff-apk.yml добавлен детальный вывод логов Gradle. 3) В AGENT_SYNC.md подготовлено исчерпывающее техническое задание и передан claim агенту Claude: доработка UI/UX экранов мастера (рабочий стол, наряды, оформление актов с фото «до/после» и аудио, профиль), оффлайн-кэширование, согласование с клиентским приложением жильцов «Домофондар».",
+    module: "infra_mobile",
+    kind: "improvement",
+    hours: 2.0,
+    difficulty: "Средняя",
+  },
+  {
     id: "stage-2026-10-10-2030",
     datetime: "2026-10-10 20:30",
     title: "Инженерная стабилизация компиляции Android APK служебного приложения «Офис Работа» (Expo Plugins & Gradle)",

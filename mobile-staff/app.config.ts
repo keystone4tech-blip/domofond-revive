@@ -150,16 +150,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       [
         'expo-location',
         {
-          locationAlwaysAndWhenInUsePermission: 'Разрешите доступ к геолокации для навигации к объектам и фиксации прибытия',
-          locationWhenInUsePermission: 'Разрешите доступ к геолокации для прокладки маршрута к дому',
-          isAndroidBackgroundLocationEnabled: true,
-        },
-      ],
-      [
-        'expo-notifications',
-        {
-          icon: './assets/images/notification-icon.png',
-          color: '#3B82F6',                     // Синий фирменный цвет уведомлений мастера
+          locationWhenInUsePermission: 'Разрешите доступ к геолокации для навигации к объектам и фиксации прибытия',
         },
       ],
     ],

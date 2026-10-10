@@ -14,6 +14,31 @@
 > 📌 **ОБЯЗАТЕЛЬНАЯ АКТУАЛИЗАЦИЯ ИНСТРУКЦИЙ ДЛЯ СТРАНИЦ CRM (`src/data/pageQuickGuides.ts`):**
 > Файл [`src/data/pageQuickGuides.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/data/pageQuickGuides.ts) является единым модулем должностных регламентов и пошаговых инструкций для всех 18 вкладок CRM («1. Назначение и состав раздела», «2. Задачи и регламентные цели», «3. Порядок работы (пошаговая инструкция)»). Стиль изложения — строго профессиональный корпоративный регламент. При любом изменении логики, добавлении новых кнопок, переключателей или функций в соответствующую вкладку CRM ассистент **ОБЯЗАН** немедленно дополнять и актуализировать этот файл, чтобы у персонала всегда была актуальная нормативная информация для работы.
 
+# 2026-10-10 21:15 — Оптимизация CI/CD мобильных сборок и передача ТЗ по улучшению приложений агенту Claude
+
+## 1. Задачи и выполненные работы
+- **Изоляция и оптимизация CI/CD workflows**:
+  * В [`.github/workflows/deploy.yml`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/.github/workflows/deploy.yml) обновлен фильтр `paths-ignore`: исключены каталоги `mobile-staff/**`, сценарии сборки мобилок `.github/workflows/build-staff-apk.yml`, а также файлы документации `AGENT_SYNC.md`, что предотвращает лишние сбои SSH-деплоя при коммитах мобильных приложений.
+  * В [`.github/workflows/build-staff-apk.yml`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/.github/workflows/build-staff-apk.yml) добавлен подробный вывод логов компиляции Gradle (`--info`, вывод диагностических сообщений).
+- **Очистка плагинов сборки Expo в `mobile-staff/app.config.ts`**:
+  * Удален избыточный вызов плагина `expo-notifications` из массива `plugins`, вызывавший конфликт ресурсов Android aapt2; все push-разрешения (`POST_NOTIFICATIONS`, `VIBRATE`, `WAKE_LOCK`, `RECEIVE_BOOT_COMPLETED`) стабильно декларированы в `android.permissions`.
+  * Упрощен плагин `expo-location` без переопределения манифестных флагов.
+- **Координация разработки и передача задач агенту Claude**:
+  * В [`AGENT_SYNC.md`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/AGENT_SYNC.md) зафиксирован claim на мобильные зоны (`mobile/*` и `mobile-staff/*`) за Claude.
+  * Составлено развернутое техническое задание для Claude:
+    - Доработка UI/UX экранов приложения «Офис Работа» (рабочий стол, наряды, модалка оформления актов с фото «до/после» и аудио, профиль мастера).
+    - Оффлайн-кэширование задач и надежная работа в подвалах/шахтах.
+    - Полировка экрана профиля и центра разрешений в приложении «Домофондар».
+    - Синхронизация замечаний с сайта (`[САЙТ ЗАКАЗ]`) с нарядами мастеров.
+
+## 2. Измененные файлы
+- [`.github/workflows/deploy.yml`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/.github/workflows/deploy.yml) — обновление `paths-ignore`.
+- [`.github/workflows/build-staff-apk.yml`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/.github/workflows/build-staff-apk.yml) — информативный лог Gradle.
+- [`mobile-staff/app.config.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile-staff/app.config.ts) — очистка плагинов Expo.
+- [`AGENT_SYNC.md`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/AGENT_SYNC.md) — обновление таблицы зон и передача подробного ТЗ для Claude.
+- [`src/data/projectChangelog.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/data/projectChangelog.ts) — обновление паспорта проекта.
+- [`PROJECT_LOG.md`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/PROJECT_LOG.md) — актуализация карты проекта.
+
 # 2026-10-10 20:30 — Инженерная стабилизация компиляции Android APK «Офис Работа» (Expo ConfigPlugins & Gradle)
 
 ## 1. Задачи и выполненные работы

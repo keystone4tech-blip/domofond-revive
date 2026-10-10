@@ -6,7 +6,10 @@ on:
       - main # Срабатывает при каждом пуше в основную ветку main
     paths-ignore:
       - 'mobile/**'
+      - 'mobile-staff/**'
       - '.github/workflows/build-apk.yml'
+      - '.github/workflows/build-staff-apk.yml'
+      - 'AGENT_SYNC.md'
       - 'PROJECT_LOG.md'
       - 'README.md'
 
