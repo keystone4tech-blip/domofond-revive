@@ -14,6 +14,26 @@
 > 📌 **ОБЯЗАТЕЛЬНАЯ АКТУАЛИЗАЦИЯ ИНСТРУКЦИЙ ДЛЯ СТРАНИЦ CRM (`src/data/pageQuickGuides.ts`):**
 > Файл [`src/data/pageQuickGuides.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/data/pageQuickGuides.ts) является единым модулем должностных регламентов и пошаговых инструкций для всех 18 вкладок CRM («1. Назначение и состав раздела», «2. Задачи и регламентные цели», «3. Порядок работы (пошаговая инструкция)»). Стиль изложения — строго профессиональный корпоративный регламент. При любом изменении логики, добавлении новых кнопок, переключателей или функций в соответствующую вкладку CRM ассистент **ОБЯЗАН** немедленно дополнять и актуализировать этот файл, чтобы у персонала всегда была актуальная нормативная информация для работы.
 
+# 2026-10-10 20:30 — Инженерная стабилизация компиляции Android APK «Офис Работа» (Expo ConfigPlugins & Gradle)
+
+## 1. Задачи и выполненные работы
+- **Подключение плагинов сборки Expo Prebuild в `mobile-staff/app.config.ts`**:
+  * Внедрен плагин `withStaffCustomGradleProperties`:
+    - Установлен параметр `expo.useLegacyPackaging = true` для упаковки .so библиотек без переполнения памяти Gradle.
+    - Ограничен список целевых архитектур процессоров: `reactNativeArchitectures = arm64-v8a,armeabi-v7a` (исключены неиспользуемые эмуляторные x86 и x86_64, что снижает вес APK и ускоряет сборку).
+  * Внедрен плагин `withStaffReleaseSigning`:
+    - Автоматическая привязка `signingConfig signingConfigs.debug` в блоке `buildTypes.release` файла `build.gradle`.
+    - Активированы схемы подписи `v1SigningEnabled true` и `v2SigningEnabled true` для прохождения строгой валидации утилитой Android `apksigner`.
+- **Исправление сборки в CI/CD GitHub Actions**:
+  * Устранено падение Gradle на шаге `assembleRelease` из-за отсутствия release signing config.
+  * Обеспечена автоматическая генерация автономного установочного APK `office-work.apk` v1.1.0 с доставкой в GitHub Releases и на боевой сервер.
+
+## 2. Измененные файлы
+- [`mobile-staff/app.config.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/mobile-staff/app.config.ts) — подключены ConfigPlugin'ы для подписи и оптимизации Gradle.
+- [`AGENT_SYNC.md`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/AGENT_SYNC.md) — фиксация изменений для других ИИ-агентов.
+- [`src/data/projectChangelog.ts`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/src/data/projectChangelog.ts) — обновление паспорта проекта.
+- [`PROJECT_LOG.md`](file:///c:/Users/Keystone-Tech/Desktop/Домофондар/PROJECT_LOG.md) — журнал изменений проекта.
+
 # 2026-10-10 19:25 — Системные разрешения, фоновая доставка push-уведомлений и автообновление мобильных приложений (мастера v1.1.0, жильцы v1.4.0)
 
 ## 1. Задачи и выполненные работы

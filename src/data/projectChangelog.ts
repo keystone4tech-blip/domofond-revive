@@ -258,6 +258,16 @@ export const KIND_META: Record<Kind, { label: string; badgeCls: string }> = {
  */
 export const PROJECT_CHANGELOG: ProjectEntry[] = [
   {
+    id: "stage-2026-10-10-2030",
+    datetime: "2026-10-10 20:30",
+    title: "Инженерная стабилизация компиляции Android APK служебного приложения «Офис Работа» (Expo Plugins & Gradle)",
+    description: "В конфигурацию мобильного приложения сотрудников mobile-staff/app.config.ts интегрированы ConfigPlugin'ы Expo prebuild: withStaffCustomGradleProperties (ограничение компилируемых процессорных архитектур до arm64-v8a и armeabi-v7a, включение expo.useLegacyPackaging для защиты от OOM и облегчения веса APK) и withStaffReleaseSigning (автоматическая привязка signingConfigs.debug для блока сборки release с поддержкой v1 и v2 схем верификации apksigner). Устранены сбои Gradle в CI/CD GitHub Actions и обеспечена стабильная сборка установочного APK office-work.apk v1.1.0.",
+    module: "infra_mobile",
+    kind: "fix",
+    hours: 3.5,
+    difficulty: "Высокая",
+  },
+  {
     id: "stage-2026-10-10-1925",
     datetime: "2026-10-10 19:25",
     title: "Комплексная система системных разрешений, фоновой доставки push-уведомлений и автообновлений мобильных приложений (мастера v1.1.0, жильцы v1.4.0)",

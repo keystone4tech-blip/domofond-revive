@@ -3,7 +3,7 @@
 // Включает полный набор системных разрешений для фоновой работы, GPS, фото/видео и push-уведомлений
 
 import { ExpoConfig, ConfigContext } from 'expo/config';
-import { withAndroidManifest, ConfigPlugin } from '@expo/config-plugins';
+import { withAndroidManifest, withAppBuildGradle, withGradleProperties, ConfigPlugin } from '@expo/config-plugins';
 
 // Плагин для гарантированного разрешения HTTP-трафика и системной установки APK-обновлений
 const withStaffCustomManifest: ConfigPlugin = (config) => {
@@ -13,6 +13,43 @@ const withStaffCustomManifest: ConfigPlugin = (config) => {
       androidManifest.application[0].$['android:usesCleartextTraffic'] = 'true';
     }
     return manifestConfig;
+  });
+};
+
+// Плагин для оптимизации размера APK: сжатие библиотек .so и ограничение архитектур
+const withStaffCustomGradleProperties: ConfigPlugin = (config) => {
+  return withGradleProperties(config, (propertiesConfig) => {
+    propertiesConfig.modResults = propertiesConfig.modResults.filter(
+      (item) => item.type !== 'property' || (item.key !== 'expo.useLegacyPackaging' && item.key !== 'reactNativeArchitectures')
+    );
+    propertiesConfig.modResults.push(
+      {
+        type: 'property',
+        key: 'expo.useLegacyPackaging',
+        value: 'true',
+      },
+      {
+        type: 'property',
+        key: 'reactNativeArchitectures',
+        value: 'arm64-v8a,armeabi-v7a',
+      }
+    );
+    return propertiesConfig;
+  });
+};
+
+// Плагин для гарантированной подписи Release APK (через signingConfigs.debug)
+const withStaffReleaseSigning: ConfigPlugin = (config) => {
+  return withAppBuildGradle(config, (gradleConfig) => {
+    let contents = gradleConfig.modResults.contents;
+    if (!contents.includes('signingConfig signingConfigs.release') && !contents.includes('signingConfig signingConfigs.debug')) {
+      contents = contents.replace(
+        /release\s*\{/,
+        `release {\n            signingConfig signingConfigs.debug\n            v1SigningEnabled true\n            v2SigningEnabled true`
+      );
+      gradleConfig.modResults.contents = contents;
+    }
+    return gradleConfig;
   });
 };
 
@@ -142,5 +179,5 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     },
   };
 
-  return withStaffCustomManifest(baseConfig);
+  return withStaffCustomGradleProperties(withStaffReleaseSigning(withStaffCustomManifest(baseConfig)));
 };

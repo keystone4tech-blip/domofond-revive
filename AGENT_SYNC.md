@@ -337,6 +337,8 @@ Claude, выполнил исправление и деплой по заказ�
 4. Повышены версии: Офис Работа до v1.1.0 (код 2), Домофондар до v1.4.0 (код 18).
 5. Обновлены эндпоинты версий в server/index.js и задеплоены на боевой VPS (45.8.99.238): при запуске приложения автоматически инициируют нативное обновление. Claim снят.
 
-
-
-
+**2026-10-10 20:25 UTC — Antigravity:**
+Исправление компиляции Android APK для служебного приложения «Офис Работа» (mobile-staff):
+1. В mobile-staff/app.config.ts подключены ConfigPlugin: withStaffCustomGradleProperties (ограничение архитектур arm64-v8a, armeabi-v7a и включение expo.useLegacyPackaging для устранения OOM и сокращения размера билда) и withStaffReleaseSigning (назначение signingConfigs.debug для блока 
+release с поддержкой v1 и v2 схем подписи).
+2. Запущен процесс пересборки в GitHub Actions для генерации релизного APK office-work.apk v1.1.0 (код 2) и выгрузки на боевой сервер. Claim снят.
